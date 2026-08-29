@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+{% block content %}
+<h1>EsaMiX</h1>
+
+<div class="card">
+  <p>
+    App locale per la creazione e la correzione di compiti d'esame a risposta multipla:
+    genera compiti con esercizi e risposte mescolate in modo indipendente per ogni
+    studente, guida la correzione (inclusi esercizi obbligatori e orale), tiene traccia
+    di risultati e verbalizzazioni, e produce statistiche sull'appello.
+  </p>
+  <p class="muted">
+    Gira interamente in locale: nessun dato lascia il computer su cui è installata.
+  </p>
+  {% if versione %}
+  <p class="muted">Versione: {{ versione }}</p>
+  {% endif %}
+  <p>
+    Codice sorgente: <a href="https://github.com/danieleangella/esamix" target="_blank" rel="noopener">github.com/danieleangella/esamix</a>
+  </p>
+</div>
+{% endblock %}

@@ -1,4 +1,4 @@
-# Gestione compiti d'esame
+# EsaMiX
 
 App locale per la creazione e la correzione di compiti d'esame a risposta multipla.
 Gira come un piccolo server sul proprio computer e si usa dal browser.

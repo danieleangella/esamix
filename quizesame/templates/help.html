@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Help{% endblock %}
+{% block content %}
+<h1>Guida</h1>
+
+<div class="card">
+  <h2>Corsi</h2>
+  <p>
+    Ogni corso rappresenta un insegnamento in un anno accademico (es. "Geometria O-Z,
+    2025/2026") e ha un proprio database indipendente. Si crea dalla homepage ("Nuovo
+    corso"); voto minimo, punti per risposta e le frasi del testo d'esame si impostano
+    poi nella scheda <strong>Impostazioni</strong> del corso e valgono per tutti i suoi
+    appelli.
+  </p>
+</div>
+
+<div class="card">
+  <h2>Esercizi</h2>
+  <p>
+    La banca esercizi di un corso è condivisa tra tutti i suoi appelli: uno stesso
+    esercizio (con le sue varianti) può essere assegnato a più appelli. Il testo può
+    contenere sintassi LaTeX (finisce direttamente nel sorgente del compito). Ogni
+    esercizio può avere più <strong>varianti</strong> (stesso esercizio, formulazioni
+    diverse): alla generazione, per ogni studente viene scelta una variante a caso con
+    probabilità uniforme, e le risposte vengono mescolate.
+  </p>
+  <p>
+    Un esercizio assegnato a un appello può essere marcato <strong>obbligatorio</strong>:
+    richiede sia la risposta a scelta multipla sia lo svolgimento scritto. Gli esercizi
+    di un appello si possono esportare/importare in JSON per condividerli con un collega
+    o riusarli in un altro corso.
+  </p>
+</div>
+
+<div class="card">
+  <h2>Generare i compiti</h2>
+  <p>
+    Dalla scheda <strong>Testo</strong> di un appello, "Genera nuovo blocco di compiti"
+    crea un <strong>blocco</strong>: un insieme di compiti (uno per studente, con codice
+    univoco) stampati insieme. Si possono generare più blocchi nel tempo per lo stesso
+    appello (es. per chi arriva più tardi, o per aule diverse). Il <strong>foglio di
+    riferimento</strong> (testo e risposte corrette) è invece unico per l'appello,
+    comune a tutti i blocchi, e viene creato solo la prima volta.
+  </p>
+  <p class="muted">
+    Se si modificano gli esercizi assegnati dopo aver già generato un blocco, l'app
+    chiede conferma e rigenera automaticamente tutti i blocchi esistenti (con nuovi
+    codici) — a meno che qualche blocco non abbia già risultati registrati, nel qual
+    caso la modifica viene bloccata per non invalidare compiti già corretti.
+  </p>
+</div>
+
+<div class="card">
+  <h2>Correzione</h2>
+  <p>
+    Dalla scheda <strong>Valutazione scritti</strong>, si inserisce matricola (o nome,
+    con autocompletamento), codice del compito e la stringa di risposte data. Si arriva
+    sempre a un riepilogo prima di salvare: mostra risposte date e corrette una per una,
+    permette di correggere la stringa e ricalcolare, modificare il voto finale, ed
+    eventualmente <strong>richiedere l'orale</strong> invece di salvare un voto scritto
+    definitivo (solo se il compito è sufficiente).
+  </p>
+  <p>
+    Se un esercizio obbligatorio non è stato svolto, il compito risulta automaticamente
+    insufficiente. Se è stato svolto e la risposta a scelta multipla è corretta, il
+    riepilogo chiede di giudicare lo svolgimento scritto assegnando un punteggio tra il
+    valore di una risposta sbagliata e quello di una corretta.
+  </p>
+  <p>
+    Un esito già inserito si può modificare in qualsiasi momento (voto e/o risposte, con
+    ricalcolo) finché non è verbalizzato. Per chi non si è presentato o si è ritirato
+    durante la prova, si usa "Segna assente o ritirato" invece della correzione normale.
+  </p>
+</div>
+
+<div class="card">
+  <h2>Orale</h2>
+  <p>
+    Nella scheda <strong>Orali</strong> di un appello compaiono gli studenti in attesa:
+    per ciascuno si registra l'esito (voto assegnato, assente, o insufficiente). Nelle
+    impostazioni del corso si può decidere se, una volta richiesto l'orale a uno
+    studente, resti obbligatorio per lui in tutti gli appelli successivi (anche in un
+    altro anno accademico, se lo studente viene importato da un corso precedente), ed
+    eventualmente attivare una soglia automatica ("obbligatorio dopo N compiti con voto
+    sotto M", con la possibilità di contare anche i ritirati).
+  </p>
+</div>
+
+<div class="card">
+  <h2>Verbalizzazione e statistiche</h2>
+  <p>
+    Gli studenti idonei non ancora verbalizzati compaiono in fondo alla scheda
+    "Valutazione scritti"; una volta verbalizzato, un esito non è più modificabile o
+    eliminabile. La scheda <strong>Statistiche</strong> di un appello mostra promossi,
+    medie scritto/orale, distribuzione dei voti confrontata con una gaussiana teorica, e
+    gli esercizi più sbagliati con la percentuale di ciascuna risposta sbagliata scelta.
+  </p>
+</div>
+
+<div class="card">
+  <h2>Studenti</h2>
+  <p>
+    Si aggiungono singolarmente, si importano da CSV, o si importano da un altro corso
+    (solo chi non ha ancora superato l'esame in quello di origine — utile a inizio anno
+    per ripescare chi deve ripetere). Cliccando su nome o cognome di uno studente si apre
+    una pagina di riepilogo con tutti i suoi esami, suddivisi per anno accademico.
+  </p>
+</div>
+
+<div class="card">
+  <h2>Raggruppamenti</h2>
+  <p>
+    Un raggruppamento combina più appelli (es. prove parziali) in un voto unico: la
+    media dei voti di chi ha superato la soglia di <em>ciascuna</em> prova membro. Si
+    crea dalla pagina del corso, dopo aver creato almeno due appelli.
+  </p>
+</div>
+
+<div class="card">
+  <h2>Migrazione da dati legacy</h2>
+  <p>
+    Dalla pagina "Migrazione dati legacy" si importa un corso gestito con la vecchia CLI
+    a riga di comando: serve una cartella con <code>db.sqlite</code> nella radice e gli
+    esercizi in sottocartelle per appello (<code>&lt;appello&gt;/esercizi/testi.py</code>).
+    L'importazione non modifica né cancella i file originali.
+  </p>
+</div>
+{% endblock %}

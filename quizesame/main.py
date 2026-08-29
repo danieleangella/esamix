@@ -2,6 +2,7 @@ import json
 import traceback
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request, UploadFile, File
@@ -23,7 +24,7 @@ from quizesame.services import statistiche as statistiche_service
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
 
-app = FastAPI(title="Gestione compiti d'esame")
+app = FastAPI(title="EsaMiX")
 app.mount("/static", StaticFiles(directory=str(PACKAGE_DIR / "static")), name="static")
 
 
@@ -813,6 +814,20 @@ def fs_sfoglia(path: str = ""):
         pass
     genitore = str(base.parent) if base.parent != base else None
     return {"path": str(base), "genitore": genitore, "cartelle": cartelle}
+
+
+@app.get("/help", response_class=HTMLResponse)
+def help_page(request: Request):
+    return templates.TemplateResponse(request, "help.html", {})
+
+
+@app.get("/about", response_class=HTMLResponse)
+def about_page(request: Request):
+    try:
+        versione = version("quizesame")
+    except PackageNotFoundError:
+        versione = None
+    return templates.TemplateResponse(request, "about.html", {"versione": versione})
 
 
 @app.get("/migrazione", response_class=HTMLResponse)
