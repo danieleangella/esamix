@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Impostazioni · {{ corso.nome }}{% endblock %}
+{% block content %}
+<h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span></h1>
+<div class="tabs">
+  <a href="/corsi/{{ corso.tag }}">Appelli</a>
+  <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
+  <a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
+  <a class="active" href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
+</div>
+
+<div class="card">
+  <h2>Dati del corso</h2>
+  <form method="post" action="/corsi/{{ corso.tag }}/impostazioni">
+    <div class="form-grid">
+      <div><label>Nome corso</label><input name="nome" value="{{ corso.nome }}" required></div>
+      <div><label>Facoltà</label><input name="facolta" value="{{ corso.facolta }}"></div>
+      <div><label>Università</label><input name="universita" value="{{ corso.universita }}"></div>
+      <div><label>Anno accademico</label><input name="anno" value="{{ corso.anno }}"></div>
+      <div><label>Docente</label><input name="docente" value="{{ corso.docente }}"></div>
+    </div>
+
+    <h2 style="margin-top:1.5rem">Voti e soglie</h2>
+    <div class="form-grid">
+      <div><label>Voto minimo (appelli normali) <code class="muted">{votomin}</code></label><input type="number" name="votomin" value="{{ corso.votomin }}" required></div>
+      <div><label>Voto minimo (prove di un raggruppamento)</label><input type="number" name="votomin_raggruppamento" value="{{ corso.votomin_raggruppamento }}" required></div>
+      <div><label>N. esercizi obbligatori <code class="muted">{consegna}</code></label><input type="number" name="consegna" value="{{ corso.consegna }}" required></div>
+    </div>
+    <div class="form-grid" style="margin-top:0.75rem">
+      <div><label>Punti risposta corretta <code class="muted">{corretta}</code></label><input type="number" name="risposta_corretta" value="{{ corso.risposta_corretta }}" required></div>
+      <div><label>Punti risposta sbagliata <code class="muted">{sbagliata}</code></label><input type="number" name="risposta_sbagliata" value="{{ corso.risposta_sbagliata }}" required></div>
+      <div><label>Punti risposta vuota <code class="muted">{vuota}</code></label><input type="number" name="risposta_vuota" value="{{ corso.risposta_vuota }}" required></div>
+    </div>
+    <p class="muted">Valgono per tutti gli appelli del corso.</p>
+
+    <h2 style="margin-top:1.5rem">Orale</h2>
+    <div>
+      <label style="display:inline-flex; align-items:center; gap:0.4rem">
+        <input type="checkbox" name="orale_dopo_richiesta" style="width:auto" {% if corso.orale_dopo_richiesta %}checked{% endif %}>
+        Rendi l'orale obbligatorio per lo studente in tutti gli appelli successivi al primo in cui viene richiesto
+      </label>
+    </div>
+    <div class="form-grid" style="margin-top:0.75rem">
+      <div><label>Rendi l'orale obbligatorio dopo N compiti insufficienti (vuoto = disattivato)</label><input type="number" name="orale_soglia_n" value="{{ corso.orale_soglia_n or '' }}" min="1"></div>
+      <div><label>con votazione inferiore a</label><input type="number" name="orale_soglia_voto" value="{{ corso.orale_soglia_voto or '' }}"></div>
+    </div>
+    <p class="muted">Se entrambi i campi sono impostati, uno studente che accumula quel numero di compiti
+      con voto sotto la soglia indicata viene reso automaticamente obbligato all'orale da quel momento in poi.</p>
+    <div style="margin-top:0.5rem">
+      <label style="display:inline-flex; align-items:center; gap:0.4rem">
+        <input type="checkbox" name="ritirato_conta_insufficiente" style="width:auto" {% if corso.ritirato_conta_insufficiente %}checked{% endif %}>
+        Considera "ritirato" come un compito insufficiente ai fini del conteggio qui sopra
+      </label>
+    </div>
+
+    <h2 style="margin-top:1.5rem">Testo del compito</h2>
+    <p class="muted">
+      I placeholder tra parentesi graffe (vedi sopra) vengono sostituiti con i valori
+      effettivi di ciascun appello al momento della generazione del testo.
+    </p>
+    <label>Frase sugli esercizi obbligatori</label>
+    <textarea name="frase_consegna" id="frase-consegna" rows="2">{{ corso.frase_consegna }}</textarea>
+    <button type="button" class="secondary btn-reset-default" data-target="frase-consegna" data-default-tpl="tpl-default-frase-consegna">Reimposta default</button>
+    <template id="tpl-default-frase-consegna">{{ default_frase_consegna }}</template>
+
+    <label style="margin-top:0.75rem">Frase di valutazione (punteggi e voto minimo)</label>
+    <textarea name="frase_regole" id="frase-regole" rows="3">{{ corso.frase_regole }}</textarea>
+    <button type="button" class="secondary btn-reset-default" data-target="frase-regole" data-default-tpl="tpl-default-frase-regole">Reimposta default</button>
+    <template id="tpl-default-frase-regole">{{ default_frase_regole }}</template>
+
+    <button type="submit" style="display:block; margin-top:1.25rem">Salva impostazioni</button>
+  </form>
+</div>
+<script>
+document.querySelectorAll(".btn-reset-default").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var textarea = document.getElementById(btn.dataset.target);
+    var defaultValue = document.getElementById(btn.dataset.defaultTpl).content.textContent;
+    if (textarea.value.trim() === defaultValue.trim()) {
+      return;
+    }
+    if (confirm("Il testo attuale è diverso dal default: sostituirlo con quello predefinito?")) {
+      textarea.value = defaultValue;
+    }
+  });
+});
+</script>
+{% endblock %}

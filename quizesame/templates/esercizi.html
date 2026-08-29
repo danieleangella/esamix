@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Esercizi · {{ corso.nome }}{% endblock %}
+{% block content %}
+<p><a href="/corsi/{{ corso.tag }}">&larr; {{ corso.nome }}</a></p>
+<div class="tabs">
+  <a href="/corsi/{{ corso.tag }}">Appelli</a>
+  <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
+  <a class="active" href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
+  <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
+</div>
+
+<div class="card">
+  <h2>Banca esercizi del corso ({{ esercizi|length }})</h2>
+  {% if esercizi %}
+  <table>
+    <tr><th>Nome</th><th>Argomento</th><th>Varianti</th><th>Anteprima</th><th></th></tr>
+    {% for e in esercizi %}
+    <tr>
+      <td>{{ e.nome or ('#' ~ e.id) }}</td>
+      <td>{{ e.argomento or '-' }}</td>
+      <td>{{ e.varianti|length }}</td>
+      <td class="muted">{{ (e.varianti[0].testo if e.varianti else '')[:80] }}&hellip;</td>
+      <td style="white-space:nowrap">
+        <button type="button" class="secondary btn-modifica-esercizio" data-esercizio="{{ e.id }}">Modifica</button>
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/elimina">
+          <button type="submit" class="secondary">Elimina</button>
+        </form>
+      </td>
+    </tr>
+    <tr class="riga-modifica-esercizio" data-esercizio="{{ e.id }}" style="display:none">
+      <td colspan="5">
+        {% set action = "/corsi/" ~ corso.tag ~ "/esercizi/" ~ e.id ~ "/modifica" %}
+        {% set esercizio = e %}
+        {% set avvisa_rigenerazione = blocchi_generati.get(e.id, False) %}
+        {% include "_esercizio_form.html" %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nessun esercizio ancora creato. Puoi crearne uno qui sotto, oppure dalla pagina di un
+    appello (verrà comunque salvato in questa banca condivisa del corso e potrà essere riusato altrove).</p>
+  {% endif %}
+</div>
+
+<details class="card">
+  <summary>Collega banca esercizi di un altro corso</summary>
+  <div style="margin-top:1rem">
+    {% if corsi_suggeriti %}
+    <p class="muted">Stesso nome e stessa facoltà di questo corso — probabilmente lo stesso insegnamento in un altro anno:</p>
+    <ul class="list-links">
+      {% for c in corsi_suggeriti %}
+      <li><a href="/corsi/{{ corso.tag }}/esercizi?da={{ c.tag }}">{{ c.nome }} ({{ c.anno }})</a> <span class="muted">{{ c.tag }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if altri_corsi %}
+    <form method="get" action="/corsi/{{ corso.tag }}/esercizi" style="margin-top:0.75rem">
+      <label>Oppure scegli un altro corso</label>
+      <div class="form-grid">
+        <div>
+          <select name="da">
+            {% for c in altri_corsi %}<option value="{{ c.tag }}" {% if corso_sorgente and c.tag == corso_sorgente.tag %}selected{% endif %}>{{ c.nome }} ({{ c.anno }}) — {{ c.tag }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <button type="submit">Sfoglia</button>
+    </form>
+    {% else %}
+    <p class="muted">Non ci sono altri corsi da cui importare.</p>
+    {% endif %}
+
+    {% if corso_sorgente %}
+    <h2 style="margin-top:1.25rem">Esercizi di "{{ corso_sorgente.nome }}" ({{ corso_sorgente.anno }})</h2>
+    {% if esercizi_sorgente %}
+    <form method="post" action="/corsi/{{ corso.tag }}/esercizi/collega-importa">
+      <input type="hidden" name="tag_sorgente" value="{{ corso_sorgente.tag }}">
+      <table>
+        <tr><th></th><th>Nome</th><th>Varianti</th><th>Anteprima</th></tr>
+        {% for e in esercizi_sorgente %}
+        <tr>
+          <td><input type="checkbox" name="esercizio_ids" value="{{ e.id }}" style="width:auto"></td>
+          <td>{{ e.nome or ('#' ~ e.id) }}</td>
+          <td>{{ e.varianti|length }}</td>
+          <td class="muted">{{ (e.varianti[0].testo if e.varianti else '')[:80] }}&hellip;</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <button type="submit">Importa selezionati</button>
+    </form>
+    {% else %}
+    <p class="muted">Quel corso non ha ancora esercizi nella sua banca.</p>
+    {% endif %}
+    {% endif %}
+  </div>
+</details>
+
+<details class="card">
+  <summary>Nuovo esercizio</summary>
+  <div style="margin-top:1rem">
+    {% set action = "/corsi/" ~ corso.tag ~ "/esercizi/nuovo" %}
+    {% include "_esercizio_form.html" %}
+  </div>
+</details>
+
+<script>
+(function () {
+  document.querySelectorAll(".btn-modifica-esercizio").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var riga = document.querySelector('.riga-modifica-esercizio[data-esercizio="' + btn.dataset.esercizio + '"]');
+      riga.style.display = riga.style.display === "none" ? "" : "none";
+    });
+  });
+})();
+</script>
+{% endblock %}

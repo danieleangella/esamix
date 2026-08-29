@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Gestione compiti d'esame{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Gestione compiti d'esame</a>
+    <nav>
+      <a href="/">Corsi</a>
+      <a href="/migrazione">Migrazione dati legacy</a>
+    </nav>
+  </header>
+  <main class="container">
+    {% set msg = request.query_params.get('msg') %}
+    {% if msg %}
+      <div class="flash flash-{{ request.query_params.get('kind', 'success') }}">{{ msg }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <div class="modal-overlay" id="modal-sfoglia" style="display:none">
+    <div class="modal-box">
+      <h3 style="margin-top:0">Scegli una cartella</h3>
+      <p class="muted" id="sfoglia-path" style="word-break:break-all"></p>
+      <div class="sfoglia-lista" id="sfoglia-lista"></div>
+      <div style="margin-top:1rem; display:flex; justify-content:flex-end; gap:0.5rem">
+        <button type="button" class="secondary" id="sfoglia-annulla">Annulla</button>
+        <button type="button" id="sfoglia-seleziona">Seleziona questa cartella</button>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var overlay = document.getElementById("modal-sfoglia");
+    var pathEl = document.getElementById("sfoglia-path");
+    var listaEl = document.getElementById("sfoglia-lista");
+    var targetInput = null;
+    var currentPath = "";
+
+    function carica(path) {
+      fetch("/api/fs/sfoglia?path=" + encodeURIComponent(path || ""))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          currentPath = data.path;
+          pathEl.textContent = currentPath;
+          listaEl.innerHTML = "";
+          if (data.genitore) {
+            listaEl.appendChild(voce("↑ ..", data.genitore));
+          }
+          data.cartelle.forEach(function (nome) {
+            var sep = currentPath.endsWith("/") ? "" : "/";
+            listaEl.appendChild(voce("📁 " + nome, currentPath + sep + nome));
+          });
+        });
+    }
+    function voce(etichetta, path) {
+      var div = document.createElement("div");
+      div.className = "sfoglia-voce";
+      div.textContent = etichetta;
+      div.addEventListener("click", function () { carica(path); });
+      return div;
+    }
+
+    document.querySelectorAll("[data-sfoglia-cartella]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        targetInput = document.getElementById(btn.dataset.sfogliaCartella);
+        carica(targetInput.value || "");
+        overlay.style.display = "flex";
+      });
+    });
+    document.getElementById("sfoglia-annulla").addEventListener("click", function () {
+      overlay.style.display = "none";
+    });
+    document.getElementById("sfoglia-seleziona").addEventListener("click", function () {
+      if (targetInput) targetInput.value = currentPath;
+      overlay.style.display = "none";
+    });
+    overlay.addEventListener("click", function (ev) {
+      if (ev.target === overlay) overlay.style.display = "none";
+    });
+  })();
+  </script>
+  <script>
+  // Chrome (e altri browser) spesso ignorano autocomplete="off" sui campi di testo e
+  // continuano a proporre valori inseriti in precedenza altrove nell'app: impostare un
+  // valore che i browser trattano davvero come "non salvare/non suggerire" (lo stesso
+  // trucco usato per i campi password) su ogni input di testo che non ne ha già uno
+  // esplicito elimina questi suggerimenti fuorvianti.
+  document.querySelectorAll('input:not([autocomplete])').forEach(function (el) {
+    var tipo = (el.getAttribute("type") || "text").toLowerCase();
+    if (["text", "search", "number", "tel", "url"].indexOf(tipo) !== -1) {
+      el.setAttribute("autocomplete", "new-password");
+    }
+  });
+  </script>
+</body>
+</html>

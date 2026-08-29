@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Studenti · {{ corso.nome }}{% endblock %}
+{% block content %}
+<p><a href="/corsi/{{ corso.tag }}">&larr; {{ corso.nome }}</a></p>
+<div class="tabs">
+  <a href="/corsi/{{ corso.tag }}">Appelli</a>
+  <a class="active" href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
+  <a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
+  <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
+</div>
+
+<div class="card">
+  <h2>Studenti ({{ studenti|length }})</h2>
+  <form method="get" action="/corsi/{{ corso.tag }}/studenti">
+    <input name="q" value="{{ q }}" placeholder="Cerca per matricola, nome o cognome">
+  </form>
+  <table style="margin-top:0.75rem">
+    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
+    {% for s in studenti %}
+    <tr>
+      <td>{{ s.matricola }}</td>
+      <td>{{ s.cognome }}</td>
+      <td>{{ s.nome }}</td>
+      <td><button type="button" class="secondary btn-modifica-studente" data-matricola="{{ s.matricola }}">Modifica</button></td>
+    </tr>
+    <tr class="riga-modifica-studente" data-matricola="{{ s.matricola }}" style="display:none">
+      <td colspan="4">
+        <form method="post" action="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/modifica" style="display:flex; gap:0.5rem; align-items:flex-end; margin-top:0">
+          <div><label>Cognome</label><input name="cognome" value="{{ s.cognome }}" required></div>
+          <div><label>Nome</label><input name="nome" value="{{ s.nome }}" required></div>
+          <button type="submit">Salva</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<details class="card">
+  <summary>Aggiungi studente</summary>
+  <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" style="margin-top:1rem">
+    <div class="form-grid">
+      <div><label>Matricola</label><input name="matricola" required></div>
+      <div><label>Nome</label><input name="nome" required></div>
+      <div><label>Cognome</label><input name="cognome" required></div>
+    </div>
+    <button type="submit">Salva</button>
+  </form>
+</details>
+
+<details class="card">
+  <summary>Importa da CSV</summary>
+  <p class="muted" style="margin-top:1rem">Formato: matricola,nome,cognome. Una riga per studente; le matricole già presenti vengono aggiornate, non duplicate.</p>
+  <form method="post" action="/corsi/{{ corso.tag }}/studenti/importa-csv" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv" required>
+    <button type="submit">Importa</button>
+  </form>
+</details>
+
+<details class="card">
+  <summary>Importa studenti da un altro corso</summary>
+  <div style="margin-top:1rem">
+    {% if corsi_suggeriti %}
+    <p>Corsi con stesso nome e facoltà:
+      {% for c in corsi_suggeriti %}
+      <a href="/corsi/{{ corso.tag }}/studenti?da={{ c.tag }}">{{ c.nome }} ({{ c.anno }})</a>{% if not loop.last %}, {% endif %}
+      {% endfor %}
+    </p>
+    {% endif %}
+    <form method="get" action="/corsi/{{ corso.tag }}/studenti">
+      <div class="form-grid">
+        <div>
+          <label>Oppure scegli un corso</label>
+          <select name="da">
+            <option value="">-</option>
+            {% for c in altri_corsi %}<option value="{{ c.tag }}" {% if corso_sorgente and c.tag == corso_sorgente.tag %}selected{% endif %}>{{ c.nome }} ({{ c.anno }}, {{ c.tag }})</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <button type="submit">Mostra studenti</button>
+    </form>
+
+    {% if corso_sorgente %}
+    <p class="muted" style="margin-top:0.75rem">
+      Studenti di {{ corso_sorgente.nome }} ({{ corso_sorgente.anno }}) che non hanno ancora superato l'esame
+      ({{ studenti_sorgente|length }}):
+    </p>
+    {% if studenti_sorgente %}
+    <form method="post" action="/corsi/{{ corso.tag }}/studenti/importa-da-corso">
+      <input type="hidden" name="da" value="{{ corso_sorgente.tag }}">
+      <table>
+        <tr><th></th><th>Matricola</th><th>Cognome</th><th>Nome</th></tr>
+        {% for s in studenti_sorgente %}
+        <tr>
+          <td><input type="checkbox" name="matricole" value="{{ s.matricola }}" style="width:auto"></td>
+          <td>{{ s.matricola }}</td>
+          <td>{{ s.cognome }}</td>
+          <td>{{ s.nome }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <button type="submit">Importa selezionati</button>
+    </form>
+    {% else %}
+    <p class="muted">Nessuno studente da importare (o hanno tutti già superato l'esame).</p>
+    {% endif %}
+    {% endif %}
+  </div>
+</details>
+
+<script>
+(function () {
+  document.querySelectorAll(".btn-modifica-studente").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var riga = document.querySelector('.riga-modifica-studente[data-matricola="' + btn.dataset.matricola + '"]');
+      riga.style.display = riga.style.display === "none" ? "" : "none";
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Riepilogo correzione · {{ appello.nome }}{% endblock %}
+{% block content %}
+<p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">&larr; {{ appello.nome }}</a></p>
+<h1>Riepilogo: {{ v.nome }} {{ v.cognome }} ({{ v.matricola }})</h1>
+
+{% if errore %}
+<div class="flash flash-error">{{ errore }}</div>
+{% endif %}
+
+<div class="card">
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/conferma" id="form-riepilogo">
+  <input type="hidden" name="matricola" value="{{ v.matricola }}">
+  <input type="hidden" name="codice" value="{{ v.codice }}">
+
+  <div style="text-align:center; margin-bottom:1rem">
+    <div class="muted" style="font-size:0.85rem">Codice compito inserito</div>
+    <div style="font-size:2.5rem; font-weight:bold; letter-spacing:0.05em">{{ v.codice }}</div>
+  </div>
+  <div class="form-grid">
+    <div>
+      <label class="muted" style="font-size:0.85rem">Risposte inserite (modificabile)</label>
+      <input name="risposte" value="{{ v.risposte }}" style="font-family:monospace; font-size:1.4rem; letter-spacing:0.3em">
+      <button type="submit" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" formnovalidate class="secondary" style="margin-top:0.4rem">Ricalcola con queste risposte</button>
+    </div>
+    <div>
+      <div class="muted" style="font-size:0.85rem">Risposte corrette</div>
+      <div style="font-family:monospace; font-size:1.4rem; letter-spacing:0.3em; word-break:break-all">{{ v.righe | map(attribute='lettera_corretta') | join('') }}</div>
+    </div>
+  </div>
+  <p class="muted" style="margin-top:1rem">Voto calcolato dalla griglia di risposte: <strong>{{ v.voto_base }}</strong></p>
+
+  <table>
+    <tr><th>Esercizio</th><th>Obbligatorio</th><th>Risposta data</th><th>Risposta corretta</th><th>Esito</th></tr>
+    {% for r in v.righe %}
+    <tr>
+      <td>{{ r.esercizio_nome }}</td>
+      <td>{{ 'sì' if r.obbligatorio else '-' }}</td>
+      <td>{{ r.lettera_data }}</td>
+      <td>{{ r.lettera_corretta }}</td>
+      <td>
+        {% if not r.svolta %}<span class="muted">non data</span>
+        {% elif r.corretta %}<span class="badge badge-ok">corretta</span>
+        {% else %}<span class="badge badge-warn">sbagliata</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  {% if v.non_svolte_obbligatorie %}
+  <div class="flash flash-error" style="margin-top:1rem">
+    Non risultano svolti (risposta non data): {{ v.non_svolte_obbligatorie | map(attribute='esercizio_nome') | join(', ') }}.
+    Il compito verrà registrato come <strong>insufficiente</strong>, qualunque sia il voto.
+  </div>
+  {% endif %}
+
+  {% if v.orale_obbligatorio %}
+  <div class="flash flash-warning" style="margin-top:1rem">
+    Questo studente deve fare l'orale in ogni appello (imposto in
+    "{{ v.orale_obbligatorio.origine }}": {{ v.orale_obbligatorio.motivazione or 'nessuna motivazione indicata' }}).
+  </div>
+  {% endif %}
+
+    {% if v.da_valutare %}
+    <h2 style="margin-top:1.5rem">Punteggio esercizi obbligatori</h2>
+    <p class="muted">Risposta multiple-choice corretta: giudica lo svolgimento scritto e assegna
+      un punteggio tra {{ corso.risposta_sbagliata }} (come sbagliato) e {{ corso.risposta_corretta }} (come corretto).</p>
+    {% for r in v.da_valutare %}
+    <div class="form-grid" style="margin-top:0.5rem">
+      <div>
+        <label>{{ r.esercizio_nome }}</label>
+        <input type="number" class="campo-punteggio-obbligatorio" name="punteggio_{{ r.posizione }}"
+               min="{{ corso.risposta_sbagliata }}" max="{{ corso.risposta_corretta }}"
+               value="{{ punteggi_proposti.get(r.posizione, corso.risposta_corretta) }}">
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="form-grid" style="margin-top:1rem">
+      <div><label>Voto finale</label><input type="number" name="voto_finale" id="voto-finale" value="{{ voto_proposto }}"></div>
+    </div>
+
+    {% set orale_possibile = not v.non_svolte_obbligatorie and voto_proposto >= votomin_effettivo %}
+    <div style="margin-top:1rem">
+      <label style="display:inline-flex; align-items:center; gap:0.4rem">
+        <input type="checkbox" id="checkbox-richiedi-orale" style="width:auto"
+               {% if richiedi_orale_checked and orale_possibile %}checked{% endif %}
+               {% if not orale_possibile %}disabled{% endif %}>
+        Richiedi l'orale
+      </label>
+      {% if v.non_svolte_obbligatorie %}
+      <p class="muted">Non disponibile: questo compito risulterà insufficiente per un obbligatorio non svolto.</p>
+      {% else %}
+      <p class="muted" id="avviso-orale-non-sufficiente" style="display:none">L'orale si può richiedere solo se il voto è almeno {{ votomin_effettivo }}.</p>
+      {% endif %}
+    </div>
+    <div id="box-motivazione-orale" style="display:none; margin-top:0.5rem">
+      <label>Motivazione (visibile solo al docente)</label>
+      <textarea name="orale_motivazione" rows="2"></textarea>
+    </div>
+
+    <input type="hidden" name="azione" id="azione-hidden" value="{{ 'richiedi_orale' if (richiedi_orale_checked and orale_possibile) else 'salva' }}">
+    <input type="hidden" name="conferma_orale_obbligatorio" id="conferma-obbligatorio-hidden" value="">
+
+    <button type="submit">Conferma</button>
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione" class="muted" style="margin-left:1rem">Annulla, non salvare</a>
+  </form>
+</div>
+<script>
+(function () {
+  var votoFinale = document.getElementById("voto-finale");
+  var checkboxOrale = document.getElementById("checkbox-richiedi-orale");
+  var boxMotivazione = document.getElementById("box-motivazione-orale");
+  var azioneHidden = document.getElementById("azione-hidden");
+  var confermaObbligatorioHidden = document.getElementById("conferma-obbligatorio-hidden");
+  var avviso = document.getElementById("avviso-orale-non-sufficiente");
+  var insufficientePerObbligatorio = {{ 'true' if v.non_svolte_obbligatorie else 'false' }};
+  var oraleObbligatorio = {{ 'true' if v.orale_obbligatorio else 'false' }};
+  var votomin = {{ votomin_effettivo }};
+
+  function sincronizzaCheckbox() {
+    if (!checkboxOrale) return;
+    boxMotivazione.style.display = checkboxOrale.checked ? "" : "none";
+    azioneHidden.value = checkboxOrale.checked ? "richiedi_orale" : "salva";
+  }
+
+  function aggiornaStatoOrale() {
+    if (insufficientePerObbligatorio || !checkboxOrale) return;
+    var sufficiente = (parseInt(votoFinale.value, 10) || 0) >= votomin;
+    checkboxOrale.disabled = !sufficiente;
+    if (!sufficiente) checkboxOrale.checked = false;
+    if (avviso) avviso.style.display = sufficiente ? "none" : "";
+    sincronizzaCheckbox();
+  }
+  votoFinale.addEventListener("input", aggiornaStatoOrale);
+
+  if (checkboxOrale) {
+    checkboxOrale.addEventListener("change", function () {
+      if (oraleObbligatorio && !checkboxOrale.checked) {
+        var msg = "Questo studente deve fare l'orale in ogni appello. Vuoi comunque salvare " +
+          "un voto scritto come definitivo?";
+        if (!window.confirm(msg)) {
+          checkboxOrale.checked = true;
+        } else {
+          confermaObbligatorioHidden.value = "1";
+        }
+      }
+      sincronizzaCheckbox();
+    });
+  }
+  sincronizzaCheckbox();
+
+  var campiPunteggio = document.querySelectorAll(".campo-punteggio-obbligatorio");
+  if (!campiPunteggio.length) return;
+  // voto_base ha già contato ogni obbligatorio "da valutare" come risposta corretta
+  // (dato che la lettera scelta era corretta): la parte fissa del voto è quella meno
+  // il contributo di quelle posizioni, a cui si riaggiungono i punteggi scelti qui.
+  var baseFissa = {{ v.voto_base }} - campiPunteggio.length * {{ corso.risposta_corretta }};
+  var votoModificatoAMano = false;
+  votoFinale.addEventListener("input", function () { votoModificatoAMano = true; });
+  function ricalcola() {
+    if (votoModificatoAMano) return;
+    var somma = baseFissa;
+    campiPunteggio.forEach(function (input) { somma += parseInt(input.value, 10) || 0; });
+    votoFinale.value = somma;
+    aggiornaStatoOrale();
+  }
+  campiPunteggio.forEach(function (input) { input.addEventListener("input", ricalcola); });
+})();
+</script>
+{% endblock %}

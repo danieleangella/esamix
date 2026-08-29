@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}{{ corso.nome }}{% endblock %}
+{% block content %}
+<h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span></h1>
+<div class="tabs">
+  <a class="active" href="/corsi/{{ corso.tag }}">Appelli</a>
+  <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
+  <a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
+  <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
+</div>
+
+<div class="card">
+  <h2>Appelli</h2>
+  {% if appelli %}
+  <table>
+    <tr><th>Nome</th><th>Tipo</th><th>Data</th><th>Risultati</th><th>Voto medio</th><th></th></tr>
+    {% for a in appelli %}
+    {% set s = statistiche[a.id] %}
+    <tr>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}">{{ a.nome }}</a></td>
+      <td>{{ a.tipo }}</td>
+      <td>{{ a.data or '-' }}</td>
+      <td>
+        {% if s.totale %}
+        {{ s.sufficienti }}/{{ s.totale }} <span class="muted">({{ s.percentuale }}%)</span>
+        {% else %}
+        <span class="muted">-</span>
+        {% endif %}
+      </td>
+      <td>{{ s.media if s.media is not none else '-' }}</td>
+      <td>{% if not a.attivo %}<span class="badge badge-warn">disattivato</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nessun appello ancora creato per questo corso.</p>
+  {% endif %}
+</div>
+
+<details class="card">
+  <summary>Nuovo appello</summary>
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/nuovo" style="margin-top:1rem">
+    <div class="form-grid">
+      <div><label>Nome</label><input name="nome" required placeholder="es. Primo appello"></div>
+      <div>
+        <label>Tipo</label>
+        <select name="tipo">
+          <option value="appello" selected>Appello</option>
+          <option value="straordinario">Appello straordinario</option>
+        </select>
+      </div>
+      <div><label>Data (gg/mm/aaaa, opzionale)</label><input name="data" placeholder="dd/mm/yyyy"></div>
+    </div>
+    <button type="submit">Crea appello</button>
+  </form>
+  <p class="muted" style="margin-top:0.5rem">
+    Voto minimo ed esercizi obbligatori si ereditano dalle
+    <a href="/corsi/{{ corso.tag }}/impostazioni">impostazioni del corso</a> (una soglia
+    dedicata si applica automaticamente alle prove che fanno parte di un raggruppamento).
+    Gli esercizi si assegnano dalla scheda "Testo" della pagina dell'appello, dopo averlo creato.
+  </p>
+</details>
+
+<div class="card">
+  <h2>Raggruppamenti (es. media di prove parziali)</h2>
+  <p class="muted">
+    Un raggruppamento calcola la media dei voti di più appelli come voto finale unico,
+    solo per chi ha superato la soglia di <em>ciascuno</em> di essi (il voto minimo per
+    le prove di raggruppamento, impostato qui sotto). La media risultante è considerata
+    sufficiente se supera il voto minimo standard del corso.
+  </p>
+  {% if raggruppamenti %}
+  <table>
+    <tr><th>Nome</th><th>Prove membro</th><th></th></tr>
+    {% for r in raggruppamenti %}
+    <tr>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ r.appello_id }}">{{ r.nome }}</a></td>
+      <td>{{ r.membri | map(attribute='nome') | join(', ') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+
+{% if appelli|length >= 2 %}
+<details class="card">
+  <summary>Nuovo raggruppamento</summary>
+  <form method="post" action="/corsi/{{ corso.tag }}/raggruppamenti/nuovo" style="margin-top:1rem">
+    <div class="form-grid">
+      <div><label>Nome raggruppamento</label><input name="nome" required placeholder="es. Prove parziali"></div>
+    </div>
+    <label style="margin-top:0.75rem">Prove da combinare (almeno due)</label>
+    {% for a in appelli %}
+    <div><label style="display:inline"><input type="checkbox" name="membri" value="{{ a.id }}" style="width:auto"> {{ a.nome }}</label></div>
+    {% endfor %}
+    <button type="submit">Crea raggruppamento</button>
+  </form>
+</details>
+{% else %}
+<p class="muted">Servono almeno due appelli per creare un raggruppamento.</p>
+{% endif %}
+{% endblock %}

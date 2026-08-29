@@ -1,0 +1,604 @@
+{% extends "base.html" %}
+{% block title %}{{ appello.nome }} · {{ corso.nome }}{% endblock %}
+{% block content %}
+<p><a href="/corsi/{{ corso.tag }}">&larr; {{ corso.nome }}</a></p>
+<h1>{{ appello.nome }} <span class="muted">({{ appello.tipo }})</span></h1>
+
+<div class="tabs" id="tabs-appello">
+  <a href="#impostazioni" data-tab="impostazioni">Impostazioni</a>
+  {% if not raggruppamento %}<a href="#creazione" data-tab="creazione">Testo</a>{% endif %}
+  <a href="#valutazione" data-tab="valutazione">Valutazione scritti</a>
+  {% if not raggruppamento %}<a href="#orali" data-tab="orali">Orali</a>{% endif %}
+  {% if statistiche %}<a href="#statistiche" data-tab="statistiche">Statistiche</a>{% endif %}
+</div>
+
+<div class="tab-pane" data-pane="impostazioni">
+  <div class="card">
+    <h2>Impostazioni</h2>
+    <p class="muted">
+      Voto minimo: <strong>{{ votomin_effettivo }}</strong>
+      ({{ 'soglia raggruppamento del corso' if appello.membro_raggruppamento else 'soglia standard del corso' }}) ·
+      Esercizi obbligatori: <strong>{{ consegna_effettivo }}</strong> ·
+      Punti risposta corretta/sbagliata/vuota: <strong>{{ corso.risposta_corretta }}/{{ corso.risposta_sbagliata }}/{{ corso.risposta_vuota }}</strong>
+      (impostazioni del corso, valide per tutti gli appelli — si cambiano dalla
+      <a href="/corsi/{{ corso.tag }}/impostazioni">pagina Impostazioni</a>, non qui).
+    </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/modifica">
+      <div class="form-grid">
+        <div><label>Nome</label><input name="nome" value="{{ appello.nome }}" required></div>
+        <div><label>Data</label><input name="data" value="{{ appello.data or '' }}" placeholder="dd/mm/yyyy"></div>
+      </div>
+      <p class="muted" style="margin-top:0.75rem">Orale (mostrato in testa al foglio dei risultati se qualcuno è in attesa):</p>
+      <div class="form-grid">
+        <div><label>Data orale</label><input name="orale_data" value="{{ appello.orale_data or '' }}" placeholder="dd/mm/yyyy"></div>
+        <div><label>Ora</label><input name="orale_ora" value="{{ appello.orale_ora or '' }}" placeholder="es. 9:00"></div>
+        <div><label>Aula</label><input name="orale_aula" value="{{ appello.orale_aula or '' }}"></div>
+      </div>
+      <button type="submit">Salva impostazioni</button>
+    </form>
+  </div>
+
+  {% if raggruppamento %}
+  <div class="card">
+    <h2>Raggruppamento</h2>
+    <p class="muted">Media dei voti di: {{ raggruppamento.membri | map(attribute='nome') | join(', ') }}.
+      Conta solo chi ha superato la soglia di ciascuna prova; la media è considerata
+      sufficiente se supera il voto minimo del corso ({{ corso.votomin }}).</p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/calcola-raggruppamento">
+      <input type="hidden" name="raggruppamento_id" value="{{ raggruppamento.id }}">
+      <button type="submit">Calcola voti combinati</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+{% if not raggruppamento %}
+<div class="tab-pane" data-pane="creazione" style="display:none">
+
+<div class="card">
+  <h2>Esercizi assegnati ({{ esercizi_assegnati|length }})</h2>
+  {% if esercizi_assegnati %}
+  <table>
+    <tr><th></th><th>Nome</th><th>Varianti</th><th>Assegnato il</th><th>Obbligatorio</th><th></th></tr>
+    {% for e in esercizi_assegnati %}
+    <tr>
+      <td style="white-space:nowrap">
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/sposta-su">
+          <button type="submit" class="secondary" {% if loop.first %}disabled{% endif %} title="Sposta su">&uarr;</button>
+        </form>
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/sposta-giu">
+          <button type="submit" class="secondary" {% if loop.last %}disabled{% endif %} title="Sposta giù">&darr;</button>
+        </form>
+      </td>
+      <td>{{ e.nome or ('#' ~ e.id) }}</td>
+      <td>{{ e.varianti|length }}</td>
+      <td class="muted">{{ e.assegnato_il }}</td>
+      <td>
+        <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/obbligatorio">
+          <input type="hidden" name="obbligatorio" value="{{ '' if e.obbligatorio else 'on' }}">
+          <button type="submit" class="{{ 'secondary' if not e.obbligatorio else '' }}">
+            {{ 'sì (consegna e svolgimento richiesti)' if e.obbligatorio else 'no' }}
+          </button>
+        </form>
+      </td>
+      <td>
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/rimuovi">
+          <button type="submit" class="secondary">Rimuovi</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="muted">Un esercizio obbligatorio richiede consegna e svolgimento scritto: se non
+    svolto il compito risulta insufficiente; se svolto, in correzione viene chiesto di
+    confermare se lo svolgimento è corretto. L'ordine qui non incide sul compito dello
+    studente (gli esercizi vengono comunque rimescolati), solo sul foglio di riferimento.</p>
+  {% else %}
+  <p class="muted">Nessun esercizio ancora assegnato a questo appello.</p>
+  {% endif %}
+
+  {% if esercizi_disponibili %}
+  <details style="margin-top:0.75rem">
+    <summary>Assegna esercizi dalla banca del corso ({{ esercizi_disponibili|length }} disponibili)</summary>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/assegna" style="margin-top:1rem">
+      <div class="form-grid">
+        <div><label>Cerca</label><input type="text" id="filtro-ricerca" placeholder="cerca per nome o testo"></div>
+        <div>
+          <label>Argomento</label>
+          <select id="filtro-argomento">
+            <option value="">Tutti</option>
+            {% for a in argomenti %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <table id="tabella-disponibili" style="margin-top:0.75rem">
+        <tr><th></th><th>Nome</th><th>Argomento</th><th>Varianti</th><th>Anteprima</th></tr>
+        {% for e in esercizi_disponibili %}
+        <tr data-nome="{{ (e.nome or '') | lower }}" data-testo="{{ (e.varianti[0].testo if e.varianti else '') | lower }}" data-argomento="{{ e.argomento or '' }}">
+          <td><input type="checkbox" name="esercizio_ids" value="{{ e.id }}" style="width:auto"></td>
+          <td>{{ e.nome or ('#' ~ e.id) }}</td>
+          <td>{{ e.argomento or '-' }}</td>
+          <td>{{ e.varianti|length }}</td>
+          <td class="muted">{{ (e.varianti[0].testo if e.varianti else '')[:80] }}&hellip;</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <div style="margin-top:0.75rem"><label style="display:inline"><input type="checkbox" name="obbligatorio" style="width:auto"> obbligatorio (per tutti quelli selezionati)</label></div>
+      <button type="submit">Assegna selezionati</button>
+    </form>
+  </details>
+  <script>
+  (function () {
+    var ricerca = document.getElementById("filtro-ricerca");
+    var argomento = document.getElementById("filtro-argomento");
+    var righe = document.querySelectorAll("#tabella-disponibili tr[data-nome]");
+    function applica() {
+      var testo = ricerca.value.trim().toLowerCase();
+      var arg = argomento.value;
+      righe.forEach(function (riga) {
+        var okTesto = !testo || riga.dataset.nome.includes(testo) || riga.dataset.testo.includes(testo);
+        var okArgomento = !arg || riga.dataset.argomento === arg;
+        riga.style.display = (okTesto && okArgomento) ? "" : "none";
+      });
+    }
+    ricerca.addEventListener("input", applica);
+    argomento.addEventListener("change", applica);
+  })();
+  </script>
+  {% endif %}
+
+  <details style="margin-top:0.75rem">
+    <summary>Crea un nuovo esercizio (verrà salvato nella banca del corso e assegnato qui)</summary>
+    {% set action = "/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/esercizi/nuovo" %}
+    {% include "_esercizio_form.html" %}
+  </details>
+
+  <details style="margin-top:0.75rem">
+    <summary>Importa esercizi da una cartella nel vecchio formato (legacy)</summary>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/importa-legacy">
+      <label>Percorso della cartella esercizi (con testi.py)</label>
+      <input name="cartella" placeholder="/percorso/assoluto/alla/cartella/esercizi" required>
+      <button type="submit">Importa</button>
+    </form>
+  </details>
+
+  {% if esercizi_assegnati %}
+  <details style="margin-top:0.75rem">
+    <summary>Esporta gli esercizi di questo appello</summary>
+    <p class="muted" style="margin-top:1rem">
+      Scarica un file con gli esercizi assegnati a questo appello (testo e varianti):
+      un collega può importarlo nel proprio corso con "Importa esercizi da un file" qui sotto.
+    </p>
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/esporta">Scarica esercizi.json</a>
+  </details>
+  {% endif %}
+
+  <details style="margin-top:0.75rem">
+    <summary>Importa esercizi da un file</summary>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/importa-json" enctype="multipart/form-data">
+      <label>File esercizi.json</label>
+      <input type="file" name="file" accept=".json" required>
+      <button type="submit">Importa</button>
+    </form>
+  </details>
+</div>
+
+<script>
+(function () {
+  var blocchiEsistono = {{ 'true' if blocchi else 'false' }};
+  if (!blocchiEsistono) return;
+  var azioniSensibili = ["/obbligatorio", "/rimuovi", "/esercizi/assegna", "/esercizi/nuovo", "/importa-legacy", "/importa-json"];
+  document.querySelectorAll("form").forEach(function (form) {
+    var action = form.getAttribute("action") || "";
+    if (!azioniSensibili.some(function (suffix) { return action.endsWith(suffix); })) return;
+    form.addEventListener("submit", function (ev) {
+      var msg = "Sono già stati generati {{ blocchi|length }} blocco/i di compiti per questo appello. " +
+        "Modificare gli esercizi assegnati rigenererà il file di riferimento e tutti i blocchi già " +
+        "generati, eliminando i vecchi codici (non è possibile se qualche blocco ha già risultati " +
+        "registrati). Procedere comunque?";
+      if (!window.confirm(msg)) ev.preventDefault();
+    });
+  });
+})();
+</script>
+
+<div class="card">
+  <h2>Crea compiti</h2>
+  {% if not esercizi_assegnati %}
+  <p class="muted">Assegna prima almeno un esercizio qui sopra.</p>
+  {% endif %}
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/genera-compiti"
+        id="form-genera-compiti"
+        data-obbligatori-assegnati="{{ esercizi_assegnati|selectattr('obbligatorio')|list|length }}"
+        data-obbligatori-attesi="{{ consegna_effettivo }}">
+    <div class="form-grid">
+      <div><label>Numero studenti</label><input type="number" name="numero_studenti" value="1" min="0" required></div>
+    </div>
+    <button type="submit" {% if not esercizi_assegnati %}disabled{% endif %}>Genera nuovo blocco di compiti</button>
+  </form>
+  <p class="muted" style="margin-top:0.5rem">
+    Ogni generazione crea un nuovo blocco (un proprio file PDF con i compiti e uno con la
+    griglia delle soluzioni); il foglio di riferimento con le risposte corrette è comune a
+    tutti i blocchi e viene creato solo la prima volta.
+  </p>
+  <script>
+  (function () {
+    var form = document.getElementById("form-genera-compiti");
+    if (!form) return;
+    form.addEventListener("submit", function (ev) {
+      var assegnati = parseInt(form.dataset.obbligatoriAssegnati, 10);
+      var attesi = parseInt(form.dataset.obbligatoriAttesi, 10);
+      if (assegnati !== attesi) {
+        var msg = "Questo appello ha " + assegnati + " esercizi obbligatori assegnati, ma le " +
+          "impostazioni del corso ne prevedono " + attesi + ". Procedere comunque?";
+        if (!window.confirm(msg)) {
+          ev.preventDefault();
+        }
+      }
+    });
+  })();
+  </script>
+  {% if riferimento_tex_esiste %}
+  <p>
+    <strong>Foglio di riferimento</strong> (testo e risposte corrette, comune a tutti i blocchi, da pubblicare online):
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riferimento.tex">.tex</a>
+    {% if riferimento_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riferimento.pdf">.pdf</a>{% endif %}
+  </p>
+  {% endif %}
+  {% if blocchi %}
+  <table>
+    <tr><th>Blocco</th><th>Studenti</th><th>Creato il</th><th>Testo</th><th>Griglia soluzioni</th></tr>
+    {% for b in blocchi %}
+    <tr>
+      <td>{{ b.numero }}</td>
+      <td>{{ b.numero_studenti }}</td>
+      <td class="muted">{{ b.creato_il or 'recuperato (generato prima di questo aggiornamento)' }}</td>
+      <td>
+        <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/testo.tex">.tex</a>
+        {% if b.pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/testo.pdf">.pdf</a>{% endif %}
+      </td>
+      <td>
+        <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/griglia.html">.html</a> ·
+        <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/griglia.tex">.tex</a>
+        {% if b.griglia_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/griglia.pdf">.pdf</a>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  <p class="muted">{{ compiti|length }} compiti registrati in totale.</p>
+</div>
+
+</div>
+{% endif %}
+
+<div class="tab-pane" data-pane="valutazione" style="display:none">
+  {% if not raggruppamento %}
+  <div class="card">
+    <h2>Correzione</h2>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi">
+      <div class="form-grid">
+        <div style="position:relative">
+          <label>Matricola o nome</label>
+          <input name="matricola" id="input-matricola" autocomplete="new-password" required>
+          <div id="suggerimenti-studenti" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+          <div id="matricola-nome-risolto" class="muted" style="margin-top:0.25rem"></div>
+        </div>
+        <div style="position:relative">
+          <label>Codice compito</label>
+          <input name="codice" id="input-codice" autocomplete="new-password" required>
+          <div id="suggerimenti-codici" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+        </div>
+        <div><label>Stringa risposte</label><input name="risposte" required placeholder="es. ABCXBADCEBA"></div>
+      </div>
+      <button type="submit">Vai al riepilogo</button>
+    </form>
+    <script>
+    (function () {
+      function autocomplete(input, suggerimentiEl, urlBuilder, renderEtichetta, campoValore, onRisultati) {
+        var timer = null;
+        var ultimaRichiesta = 0;
+        input.addEventListener("input", function () {
+          clearTimeout(timer);
+          var valore = input.value.trim();
+          if (valore.length < (input.dataset.minChars || 1)) {
+            suggerimentiEl.style.display = "none";
+            if (onRisultati) onRisultati([], valore);
+            return;
+          }
+          timer = setTimeout(function () {
+            var richiestaId = ++ultimaRichiesta;
+            fetch(urlBuilder(valore)).then(function (r) { return r.json(); }).then(function (dati) {
+              // scarta la risposta se nel frattempo è partita una richiesta più recente
+              // (altrimenti una risposta lenta e superata può sovrascrivere risultati più freschi)
+              if (richiestaId !== ultimaRichiesta) return;
+              suggerimentiEl.innerHTML = "";
+              if (onRisultati) onRisultati(dati, valore);
+              if (!dati.length) { suggerimentiEl.style.display = "none"; return; }
+              dati.forEach(function (item) {
+                var div = document.createElement("div");
+                div.className = "sfoglia-voce";
+                div.textContent = renderEtichetta(item);
+                div.addEventListener("click", function () {
+                  input.value = campoValore(item);
+                  suggerimentiEl.style.display = "none";
+                  if (onRisultati) onRisultati([item], campoValore(item));
+                });
+                suggerimentiEl.appendChild(div);
+              });
+              suggerimentiEl.style.display = "";
+            });
+          }, 200);
+        });
+        document.addEventListener("click", function (ev) {
+          if (ev.target !== input) suggerimentiEl.style.display = "none";
+        });
+      }
+      var inputMatricola = document.getElementById("input-matricola");
+      var nomeRisolto = document.getElementById("matricola-nome-risolto");
+      autocomplete(
+        inputMatricola, document.getElementById("suggerimenti-studenti"),
+        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+        function (s) { return s.matricola; },
+        function (dati, valoreDigitato) {
+          var match = dati.filter(function (s) { return s.matricola === valoreDigitato; })[0];
+          nomeRisolto.textContent = match ? (match.cognome + " " + match.nome) : "";
+        }
+      );
+      var inputCodice = document.getElementById("input-codice");
+      inputCodice.dataset.minChars = 4;
+      autocomplete(
+        inputCodice, document.getElementById("suggerimenti-codici"),
+        function (p) { return "/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/api/compiti/cerca?prefix=" + encodeURIComponent(p); },
+        function (c) { return c; },
+        function (c) { return c; }
+      );
+
+      var inputMatricolaAssenza = document.getElementById("input-matricola-assenza");
+      if (inputMatricolaAssenza) {
+        autocomplete(
+          inputMatricolaAssenza, document.getElementById("suggerimenti-studenti-assenza"),
+          function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+          function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+          function (s) { return s.matricola; }
+        );
+      }
+    })();
+    </script>
+
+
+    {% if assenti_ritirati %}
+    <h2 style="margin-top:1.5rem">Assenti e ritirati ({{ assenti_ritirati|length }})</h2>
+    <table>
+      <tr><th>Studente</th><th>Matricola</th><th>Esito</th><th></th></tr>
+      {% for r in assenti_ritirati %}
+      <tr>
+        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>{{ r.matricola }}</td>
+        <td>{{ r.esito }}</td>
+        <td>
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/elimina">
+            <button type="submit" class="secondary">Annulla</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    <h2 style="margin-top:1.5rem">Segna assente o ritirato</h2>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/assenze/segna">
+      <div class="form-grid">
+        <div style="position:relative">
+          <label>Matricola o nome</label>
+          <input name="matricola" id="input-matricola-assenza" autocomplete="new-password" required>
+          <div id="suggerimenti-studenti-assenza" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+        </div>
+        <div>
+          <label>Esito</label>
+          <select name="esito">
+            <option value="assente">Assente</option>
+            <option value="ritirato">Ritirato</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit">Segna</button>
+    </form>
+
+    <h2 style="margin-top:1.5rem">Risultati inseriti ({{ risultati|length }})</h2>
+    <table>
+      <tr><th>Studente</th><th>Matricola</th><th>Voto</th><th>Verbalizzato</th><th></th></tr>
+      {% for r in risultati %}
+      <tr>
+        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>{{ r.matricola }}</td>
+        <td>
+          {% if r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
+          {% else %}{{ r.voto }}{% endif %}
+        </td>
+        <td>{% if r.verbalizzato %}<span class="badge badge-ok">{{ r.data_verbalizzazione }}</span>{% else %}-{% endif %}</td>
+        <td style="white-space:nowrap">
+          <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}">Dettaglio</a>
+          {% if not r.verbalizzato %}
+          <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica">Modifica</a>
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/elimina">
+            <button type="submit" class="secondary">Elimina</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.tex">Scarica elenco risultati (.tex)</a></p>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Verbalizzazione ({{ idonei|length }} idonei non ancora verbalizzati)</h2>
+    <table>
+      <tr><th>Studente</th><th>Matricola</th><th>Voto</th><th></th></tr>
+      {% for r in idonei %}
+      <tr>
+        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>{{ r.matricola }}</td>
+        <td>{{ r.voto }}</td>
+        <td>
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/verbalizza/{{ r.matricola }}">
+            <input type="hidden" name="voto" value="{{ r.voto }}">
+            <button type="submit">Verbalizza oggi</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+{% if not raggruppamento %}
+<div class="tab-pane" data-pane="orali" style="display:none">
+  <div class="card">
+    <h2>Orale da svolgere ({{ orali_da_svolgere|length }})</h2>
+    {% if orali_da_svolgere %}
+    <table>
+      <tr><th>Studente</th><th>Matricola</th><th>Voto scritto</th><th>Esito orale</th><th></th></tr>
+      {% for r in orali_da_svolgere %}
+      <tr>
+        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>{{ r.matricola }}</td>
+        <td class="muted">{{ r.voto }}</td>
+        <td>
+          <form class="inline form-esito-orale" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/orale/{{ r.matricola }}/completa">
+            <select name="esito_orale" class="select-esito-orale" style="width:auto">
+              <option value="voto" selected>Voto assegnato</option>
+              <option value="assente">Assente</option>
+              <option value="insufficiente">Insufficiente</option>
+            </select>
+            <input type="number" name="voto" value="{{ r.voto }}" class="campo-voto-orale" style="width:5rem">
+            <button type="submit">Registra</button>
+          </form>
+        </td>
+        <td><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}">Dettaglio</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <script>
+    document.querySelectorAll(".form-esito-orale").forEach(function (form) {
+      var select = form.querySelector(".select-esito-orale");
+      var campoVoto = form.querySelector(".campo-voto-orale");
+      function aggiorna() { campoVoto.style.display = select.value === "voto" ? "" : "none"; }
+      select.addEventListener("change", aggiorna);
+      aggiorna();
+    });
+    </script>
+    {% else %}
+    <p class="muted">Nessuno studente in attesa di orale per questo appello.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if statistiche %}
+<div class="tab-pane" data-pane="statistiche" style="display:none">
+  <div class="card">
+    <h2>Riepilogo</h2>
+    <div class="form-grid">
+      <div><div class="muted">Corretti</div><strong>{{ statistiche.totale }}</strong></div>
+      <div><div class="muted">Promossi</div><strong>{{ statistiche.promossi }}</strong></div>
+      <div><div class="muted">Insufficienti</div><strong>{{ statistiche.insufficienti }}</strong></div>
+      <div><div class="muted">In attesa di orale</div><strong>{{ statistiche.in_attesa_orale }}</strong></div>
+      <div><div class="muted">Orali svolti</div><strong>{{ statistiche.orali_svolti }}</strong></div>
+    </div>
+    <div class="form-grid" style="margin-top:0.75rem">
+      <div><div class="muted">Media scritto</div><strong>{{ statistiche.media_scritto if statistiche.media_scritto is not none else '-' }}</strong></div>
+      <div><div class="muted">Media orale</div><strong>{{ statistiche.media_orale if statistiche.media_orale is not none else '-' }}</strong></div>
+      <div><div class="muted">Media finale</div><strong>{{ statistiche.media_finale if statistiche.media_finale is not none else '-' }}</strong></div>
+    </div>
+  </div>
+
+  {% if statistiche.distribuzione.bins %}
+  <div class="card">
+    <h2>Distribuzione dei voti</h2>
+    <p class="muted">
+      Media {{ statistiche.distribuzione.media }}, deviazione standard {{ statistiche.distribuzione.dev_std }}.
+      La linea rossa è la curva gaussiana teorica con la stessa media e deviazione standard.
+    </p>
+    <div style="overflow-x:auto">
+      <svg width="{{ statistiche.distribuzione.larghezza }}" height="{{ statistiche.distribuzione.altezza + 40 }}" style="min-width:100%; color:var(--text)">
+        {% for b in statistiche.distribuzione.bins %}
+        <rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.larghezza }}" height="{{ b.altezza_barra }}" fill="#93c5fd"></rect>
+        {% if b.conteggio %}<text x="{{ b.x_centro }}" y="{{ b.y - 4 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ b.conteggio }}</text>{% endif %}
+        <text x="{{ b.x_centro }}" y="{{ statistiche.distribuzione.altezza + 15 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ b.voto }}</text>
+        {% endfor %}
+        {% if statistiche.distribuzione.curva_points %}
+        <polyline fill="none" stroke="#dc2626" stroke-width="2" points="{{ statistiche.distribuzione.curva_points }}"></polyline>
+        {% endif %}
+      </svg>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if statistiche.esercizi %}
+  <div class="card">
+    <h2>Esercizi più sbagliati</h2>
+    <table>
+      <tr><th>Esercizio</th><th>Corrette</th><th>Sbagliate</th><th>% sbagliate</th><th>Risposte sbagliate scelte</th></tr>
+      {% for e in statistiche.esercizi %}
+      <tr>
+        <td>
+          <span class="esercizio-nome-hover" title="{{ e.varianti_testo|join(' /// ') }}" style="cursor:help; text-decoration:underline dotted">{{ e.nome }}</span>
+          {% if e.varianti_testo %}
+          <button type="button" class="secondary btn-mostra-testo" data-target="testo-es-{{ loop.index }}" style="margin-left:0.3rem; padding:0.1rem 0.4rem; font-size:0.75rem">testo</button>
+          <div id="testo-es-{{ loop.index }}" class="muted" style="display:none; margin-top:0.3rem; white-space:pre-wrap">
+            {% for t in e.varianti_testo %}<div style="margin-top:0.2rem">{{ t }}</div>{% endfor %}
+          </div>
+          {% endif %}
+        </td>
+        <td>{{ e.corrette }}</td>
+        <td>{{ e.sbagliate }}</td>
+        <td>{{ e.percentuale_sbagliate }}%</td>
+        <td>
+          {% for rs in e.risposte_sbagliate %}
+          <div>{{ rs.testo }}: {{ rs.percentuale }}% ({{ rs.conteggio }})</div>
+          {% else %}
+          <span class="muted">-</span>
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+document.querySelectorAll(".btn-mostra-testo").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var div = document.getElementById(btn.dataset.target);
+    div.style.display = div.style.display === "none" ? "" : "none";
+  });
+});
+</script>
+{% endif %}
+
+<script>
+(function () {
+  var tabs = document.querySelectorAll("#tabs-appello a");
+  var panes = document.querySelectorAll(".tab-pane");
+  function attiva(nome) {
+    tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.tab === nome); });
+    panes.forEach(function (p) { p.style.display = (p.dataset.pane === nome) ? "" : "none"; });
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      history.replaceState(null, "", "#" + t.dataset.tab);
+      attiva(t.dataset.tab);
+    });
+  });
+  var iniziale = (location.hash || "#impostazioni").slice(1);
+  if (!document.querySelector('.tab-pane[data-pane="' + iniziale + '"]')) iniziale = "impostazioni";
+  attiva(iniziale);
+})();
+</script>
+{% endblock %}

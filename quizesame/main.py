@@ -1,0 +1,836 @@
+import json
+import traceback
+import webbrowser
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+from fastapi import FastAPI, Form, Request, UploadFile, File
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from quizesame import config
+from quizesame.services import corsi as corsi_service
+from quizesame.services import studenti as studenti_service
+from quizesame.services import esercizi as esercizi_service
+from quizesame.services import compiti as compiti_service
+from quizesame.services import correzione as correzione_service
+from quizesame.services import risultati as risultati_service
+from quizesame.services import verbalizzazione as verbalizzazione_service
+from quizesame.services import migrazione as migrazione_service
+from quizesame.services import statistiche as statistiche_service
+
+PACKAGE_DIR = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
+
+app = FastAPI(title="Gestione compiti d'esame")
+app.mount("/static", StaticFiles(directory=str(PACKAGE_DIR / "static")), name="static")
+
+
+def flash_redirect(url: str, message: str, kind: str = "success", anchor: str = "") -> RedirectResponse:
+    from urllib.parse import quote
+    sep = "&" if "?" in url else "?"
+    suffisso = f"#{anchor}" if anchor else ""
+    return RedirectResponse(f"{url}{sep}msg={quote(message)}&kind={kind}{suffisso}", status_code=303)
+
+
+@app.exception_handler(Exception)
+async def gestisci_errore_generico(request: Request, exc: Exception):
+    """Rete di sicurezza: qualunque eccezione non gestita esplicitamente da una route
+    finisce qui invece che in una pagina di errore grezza. Il messaggio resta comunque
+    stampato in console (nel terminale da cui gira `quizesame`) per poterlo diagnosticare."""
+    traceback.print_exc()
+    destinazione = request.headers.get("referer") or "/"
+    return flash_redirect(destinazione, f"Si è verificato un errore imprevisto: {exc}", "error")
+
+
+def _proteggi_modifica_esercizi(tag: str, appello_id: int) -> None:
+    """Solleva ValueError se questo appello ha già blocchi generati con risultati
+    registrati: cambiare gli esercizi assegnati a quel punto invaliderebbe codici già
+    usati da studenti reali."""
+    bloccanti = compiti_service.blocchi_con_risultati(tag, appello_id)
+    if bloccanti:
+        raise ValueError(
+            "Non puoi modificare gli esercizi di questo appello: il blocco "
+            + ", ".join(str(n) for n in bloccanti)
+            + " ha già risultati registrati. Elimina prima quei risultati, oppure crea un nuovo appello."
+        )
+
+
+def _rigenera_se_necessario(tag: str, appello_id: int) -> str:
+    """Da chiamare dopo aver modificato gli esercizi assegnati a un appello: se erano già
+    stati generati blocchi, li rigenera (file di riferimento compreso) con i nuovi
+    esercizi, ricompila tutti i PDF in parallelo, e ritorna un suffisso da aggiungere al
+    messaggio di conferma."""
+    risultato = compiti_service.rigenera_tutto(tag, appello_id)
+    if risultato is None:
+        return ""
+    blocchi = compiti_service.list_blocchi(tag, appello_id)
+    da_compilare = [compiti_service.path_riferimento(tag, appello_id, "tex")]
+    for b in blocchi:
+        da_compilare.append(compiti_service.path_blocco(tag, appello_id, b["numero"], "tex"))
+        da_compilare.append(compiti_service.path_griglia(tag, appello_id, b["numero"], "tex"))
+    with ThreadPoolExecutor(max_workers=len(da_compilare)) as pool:
+        list(pool.map(compiti_service.compila_pdf, da_compilare))
+    return (
+        f" {risultato.n_blocchi} blocco/i già generato/i sono stati rigenerati con i nuovi "
+        "esercizi (i vecchi codici sono stati eliminati)."
+    )
+
+
+def _parse_varianti_form(form) -> list[dict]:
+    """Ogni variante è identificata da un indice libero (assegnato lato client dal
+    pulsante 'Aggiungi variante', non necessariamente consecutivo), elencato nei valori
+    ripetuti del campo 'variante_idx'. Le risposte sbagliate di una variante sono i
+    valori ripetuti del campo 'sbagliata_<idx>' (un input per risposta, aggiunto/rimosso
+    lato client dal pulsante 'Aggiungi risposta sbagliata')."""
+    varianti = []
+    for idx in form.getlist("variante_idx"):
+        testo = (form.get(f"testo_{idx}") or "").strip()
+        if not testo:
+            continue
+        corretta = (form.get(f"corretta_{idx}") or "").strip()
+        sbagliate = [s.strip() for s in form.getlist(f"sbagliata_{idx}") if s.strip()]
+        varianti.append({"testo": testo, "risposte": [corretta] + sbagliate})
+    return varianti
+
+
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request, q: str = ""):
+    corsi = corsi_service.list_corsi()
+    risultati_ricerca = studenti_service.cerca_in_tutti_i_corsi(q.strip()) if q.strip() else None
+    return templates.TemplateResponse(request, "corsi_list.html", {
+        "corsi": corsi, "q": q, "risultati_ricerca": risultati_ricerca,
+    })
+
+
+@app.post("/corsi/nuovo")
+def crea_corso(
+    tag: str = Form(...), nome: str = Form(...), facolta: str = Form(""),
+    universita: str = Form(""), anno: str = Form(""), docente: str = Form(""),
+):
+    try:
+        corsi_service.create_corso(tag, nome, facolta, universita, anno, docente)
+    except ValueError as e:
+        return flash_redirect("/", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}", "Corso creato")
+
+
+@app.get("/corsi/{tag}", response_class=HTMLResponse)
+def corso_detail(request: Request, tag: str):
+    corso = corsi_service.get_corso(tag)
+    appelli = corsi_service.list_appelli(tag, includi_raggruppamenti=False)
+    raggruppamenti = corsi_service.list_raggruppamenti(tag)
+    statistiche = {}
+    for a in appelli:
+        risultati = [
+            r for r in correzione_service.list_risultati(tag, a.id)
+            if not (r["richiede_orale"] and not r["orale_svolto"])
+        ]
+        totale = len(risultati)
+        votomin = corsi_service.effective_votomin(corso, a)
+        sufficienti = sum(1 for r in risultati if r["voto"] is not None and r["voto"] >= votomin)
+        media = round(sum(r["voto"] for r in risultati if r["voto"] is not None) / totale, 1) if totale else None
+        statistiche[a.id] = {
+            "totale": totale, "sufficienti": sufficienti,
+            "percentuale": round(100 * sufficienti / totale) if totale else None,
+            "media": media,
+        }
+    return templates.TemplateResponse(request, "corso_detail.html", {
+        "corso": corso, "appelli": appelli, "raggruppamenti": raggruppamenti, "statistiche": statistiche,
+    })
+
+
+@app.get("/corsi/{tag}/impostazioni", response_class=HTMLResponse)
+def impostazioni_corso(request: Request, tag: str):
+    corso = corsi_service.get_corso(tag)
+    return templates.TemplateResponse(request, "impostazioni.html", {
+        "corso": corso,
+        "default_frase_consegna": corsi_service.DEFAULT_FRASE_CONSEGNA,
+        "default_frase_regole": corsi_service.DEFAULT_FRASE_REGOLE,
+    })
+
+
+@app.post("/corsi/{tag}/impostazioni")
+def modifica_corso(
+    tag: str, nome: str = Form(...), facolta: str = Form(""), universita: str = Form(""),
+    anno: str = Form(""), docente: str = Form(""), votomin: int = Form(...), consegna: int = Form(...),
+    votomin_raggruppamento: int = Form(...),
+    risposta_corretta: int = Form(...), risposta_sbagliata: int = Form(...), risposta_vuota: int = Form(...),
+    frase_consegna: str = Form(""), frase_regole: str = Form(""),
+    orale_dopo_richiesta: str = Form(""), orale_soglia_n: str = Form(""), orale_soglia_voto: str = Form(""),
+    ritirato_conta_insufficiente: str = Form(""),
+):
+    try:
+        corsi_service.update_meta(
+            tag, nome=nome, facolta=facolta, universita=universita, anno=anno, docente=docente,
+            votomin=str(votomin), consegna=str(consegna), votomin_raggruppamento=str(votomin_raggruppamento),
+            risposta_corretta=str(risposta_corretta), risposta_sbagliata=str(risposta_sbagliata),
+            risposta_vuota=str(risposta_vuota),
+            frase_consegna=frase_consegna.strip() or corsi_service.DEFAULT_FRASE_CONSEGNA,
+            frase_regole=frase_regole.strip() or corsi_service.DEFAULT_FRASE_REGOLE,
+            orale_dopo_richiesta="1" if orale_dopo_richiesta else "0",
+            orale_soglia_n=orale_soglia_n.strip(), orale_soglia_voto=orale_soglia_voto.strip(),
+            ritirato_conta_insufficiente="1" if ritirato_conta_insufficiente else "0",
+        )
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/impostazioni", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}/impostazioni", "Impostazioni corso salvate")
+
+
+@app.post("/corsi/{tag}/appelli/nuovo")
+def crea_appello(tag: str, nome: str = Form(...), tipo: str = Form("appello"), data: str = Form("")):
+    try:
+        corsi_service.create_appello(tag, nome=nome.strip(), tipo=tipo, data=data.strip() or None)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}", "Appello creato")
+
+
+@app.post("/corsi/{tag}/raggruppamenti/nuovo")
+async def crea_raggruppamento(tag: str, request: Request):
+    form = await request.form()
+    nome = (form.get("nome") or "").strip()
+    membro_ids = [int(v) for v in form.getlist("membri")]
+    try:
+        corsi_service.create_raggruppamento(tag, nome, membro_ids)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}", "Raggruppamento creato")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}", response_class=HTMLResponse)
+def appello_detail(request: Request, tag: str, appello_id: int):
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    raggruppamento = corsi_service.get_raggruppamento_by_appello(tag, appello_id)
+    compiti = compiti_service.list_compiti(tag, appello_id)
+    risultati = correzione_service.list_risultati(tag, appello_id)
+    orali_da_svolgere = correzione_service.list_orali_da_svolgere(tag, appello_id)
+    assenti_ritirati = correzione_service.list_assenti_ritirati(tag, appello_id)
+    idonei = verbalizzazione_service.list_idonei(tag, appello_id)
+    esercizi_assegnati = esercizi_service.list_esercizi_appello(tag, appello_id)
+    banca_esercizi = esercizi_service.list_esercizi(tag)
+    assegnati_ids = {e.id for e in esercizi_assegnati}
+    disponibili = [e for e in banca_esercizi if e.id not in assegnati_ids]
+    argomenti = esercizi_service.list_argomenti(tag)
+    blocchi = compiti_service.list_blocchi(tag, appello_id)
+    for b in blocchi:
+        b["pdf_esiste"] = compiti_service.path_blocco(tag, appello_id, b["numero"], "pdf").exists()
+        b["griglia_pdf_esiste"] = compiti_service.path_griglia(tag, appello_id, b["numero"], "pdf").exists()
+    riferimento_pdf_esiste = compiti_service.path_riferimento(tag, appello_id, "pdf").exists()
+    riferimento_tex_esiste = compiti_service.path_riferimento(tag, appello_id, "tex").exists()
+    statistiche = statistiche_service.calcola(tag, appello_id) if not raggruppamento else None
+    return templates.TemplateResponse(request, "appello_detail.html", {
+        "corso": corso, "appello": appello, "raggruppamento": raggruppamento, "compiti": compiti,
+        "risultati": risultati, "orali_da_svolgere": orali_da_svolgere, "assenti_ritirati": assenti_ritirati,
+        "idonei": idonei,
+        "esercizi_assegnati": esercizi_assegnati,
+        "esercizi_disponibili": disponibili, "argomenti": argomenti,
+        "blocchi": blocchi, "riferimento_pdf_esiste": riferimento_pdf_esiste,
+        "riferimento_tex_esiste": riferimento_tex_esiste, "statistiche": statistiche,
+        "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
+        "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
+    })
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/modifica")
+def modifica_appello(
+    tag: str, appello_id: int, nome: str = Form(...), data: str = Form(""),
+    orale_data: str = Form(""), orale_ora: str = Form(""), orale_aula: str = Form(""),
+):
+    try:
+        corsi_service.update_appello(
+            tag, appello_id, nome=nome, data=data or None,
+            orale_data=orale_data or None, orale_ora=orale_ora or None, orale_aula=orale_aula or None,
+        )
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Impostazioni appello salvate")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/genera-compiti")
+def genera_compiti(tag: str, appello_id: int, numero_studenti: int = Form(...)):
+    try:
+        result = compiti_service.genera_blocco(tag, appello_id, numero_studenti)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+
+    msg = f"Blocco {result.numero}: generati {result.n_compiti_generati} compiti"
+    if result.n_saltati_duplicati:
+        msg += f" ({result.n_saltati_duplicati} scartati per codice duplicato)"
+    kind = "success"
+
+    # le compilazioni pdflatex sono indipendenti (file diversi): lanciarle in parallelo
+    # invece che una dopo l'altra dimezza (o più) il tempo di attesa dell'utente.
+    da_compilare = {
+        "Blocco": compiti_service.path_blocco(tag, appello_id, result.numero, "tex"),
+        "Griglia": compiti_service.path_griglia(tag, appello_id, result.numero, "tex"),
+    }
+    if result.riferimento_generato:
+        da_compilare["Riferimento"] = compiti_service.path_riferimento(tag, appello_id, "tex")
+    with ThreadPoolExecutor(max_workers=len(da_compilare)) as pool:
+        risultati_compilazione = dict(zip(da_compilare, pool.map(compiti_service.compila_pdf, da_compilare.values())))
+    for etichetta in ["Riferimento", "Blocco", "Griglia"]:
+        if etichetta not in risultati_compilazione:
+            continue
+        comp = risultati_compilazione[etichetta]
+        msg += f". {etichetta}: " + comp.messaggio
+        if not comp.ok:
+            kind = "error"
+
+    if result.avviso_obbligatori:
+        msg += " " + result.avviso_obbligatori
+        kind = "warning" if kind == "success" else kind
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, kind, anchor="creazione")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/riferimento.tex", response_class=PlainTextResponse)
+def scarica_riferimento_tex(tag: str, appello_id: int):
+    path = compiti_service.path_riferimento(tag, appello_id, "tex")
+    if not path.exists():
+        return PlainTextResponse("Testo non ancora generato", status_code=404)
+    return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="application/x-tex")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/riferimento.pdf")
+def scarica_riferimento_pdf(tag: str, appello_id: int):
+    path = compiti_service.path_riferimento(tag, appello_id, "pdf")
+    if not path.exists():
+        return PlainTextResponse("PDF non ancora compilato", status_code=404)
+    return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/blocchi/{numero}/testo.tex", response_class=PlainTextResponse)
+def scarica_blocco_tex(tag: str, appello_id: int, numero: int):
+    path = compiti_service.path_blocco(tag, appello_id, numero, "tex")
+    if not path.exists():
+        return PlainTextResponse("Testo non ancora generato", status_code=404)
+    return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="application/x-tex")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/blocchi/{numero}/testo.pdf")
+def scarica_blocco_pdf(tag: str, appello_id: int, numero: int):
+    path = compiti_service.path_blocco(tag, appello_id, numero, "pdf")
+    if not path.exists():
+        return PlainTextResponse("PDF non ancora compilato", status_code=404)
+    return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/blocchi/{numero}/griglia.tex", response_class=PlainTextResponse)
+def scarica_griglia_tex(tag: str, appello_id: int, numero: int):
+    path = compiti_service.path_griglia(tag, appello_id, numero, "tex")
+    if not path.exists():
+        return PlainTextResponse("Testo non ancora generato", status_code=404)
+    return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="application/x-tex")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/blocchi/{numero}/griglia.pdf")
+def scarica_griglia_pdf(tag: str, appello_id: int, numero: int):
+    path = compiti_service.path_griglia(tag, appello_id, numero, "pdf")
+    if not path.exists():
+        return PlainTextResponse("PDF non ancora compilato", status_code=404)
+    return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/blocchi/{numero}/griglia.html", response_class=HTMLResponse)
+def scarica_griglia_html(request: Request, tag: str, appello_id: int, numero: int):
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    blocco = compiti_service.get_blocco(tag, appello_id, numero)
+    if blocco is None:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Blocco {numero} non trovato", "error")
+    compiti = compiti_service.list_compiti_blocco(tag, blocco["id"])
+    return templates.TemplateResponse(request, "griglia_html.html", {
+        "corso": corso, "appello": appello, "numero": numero, "compiti": compiti,
+    })
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/assegna")
+async def assegna_esercizio(tag: str, appello_id: int, request: Request):
+    form = await request.form()
+    esercizio_ids = [int(v) for v in form.getlist("esercizio_ids")]
+    obbligatorio = bool(form.get("obbligatorio"))
+    if not esercizio_ids:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessun esercizio selezionato", "error", anchor="creazione")
+    try:
+        _proteggi_modifica_esercizi(tag, appello_id)
+        for esercizio_id in esercizio_ids:
+            esercizi_service.assegna_a_appello(tag, appello_id, esercizio_id, obbligatorio=obbligatorio)
+        msg = f"{len(esercizio_ids)} esercizi assegnati" + _rigenera_se_necessario(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/rimuovi")
+def rimuovi_esercizio(tag: str, appello_id: int, esercizio_id: int):
+    try:
+        _proteggi_modifica_esercizi(tag, appello_id)
+        esercizi_service.rimuovi_da_appello(tag, appello_id, esercizio_id)
+        msg = "Esercizio rimosso dall'appello" + _rigenera_se_necessario(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/obbligatorio")
+def imposta_obbligatorio(tag: str, appello_id: int, esercizio_id: int, obbligatorio: str = Form("")):
+    try:
+        _proteggi_modifica_esercizi(tag, appello_id)
+        esercizi_service.imposta_obbligatorio(tag, appello_id, esercizio_id, bool(obbligatorio))
+        msg = "Esercizio aggiornato" + _rigenera_se_necessario(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/sposta-su")
+def sposta_su_esercizio(tag: str, appello_id: int, esercizio_id: int):
+    esercizi_service.sposta_esercizio(tag, appello_id, esercizio_id, -1)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Ordine aggiornato", anchor="creazione")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/sposta-giu")
+def sposta_giu_esercizio(tag: str, appello_id: int, esercizio_id: int):
+    esercizi_service.sposta_esercizio(tag, appello_id, esercizio_id, 1)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Ordine aggiornato", anchor="creazione")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/nuovo")
+async def nuovo_esercizio_appello(tag: str, appello_id: int, request: Request):
+    form = await request.form()
+    varianti = _parse_varianti_form(form)
+    try:
+        _proteggi_modifica_esercizi(tag, appello_id)
+        esercizi_service.crea_e_assegna(
+            tag, appello_id, nome=(form.get("nome") or "").strip(),
+            note=(form.get("note") or "").strip(), varianti=varianti,
+            obbligatorio=bool(form.get("obbligatorio")), argomento=(form.get("argomento") or "").strip(),
+        )
+        msg = "Esercizio creato e assegnato" + _rigenera_se_necessario(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-legacy")
+def importa_esercizi_legacy(tag: str, appello_id: int, cartella: str = Form(...)):
+    try:
+        _proteggi_modifica_esercizi(tag, appello_id)
+        n = esercizi_service.importa_da_cartella_legacy(tag, cartella, appello_id)
+        msg = f"Importati {n} esercizi dalla cartella legacy" + _rigenera_se_necessario(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Errore import: {e}", "error", anchor="creazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/esercizi/esporta")
+def esporta_esercizi(tag: str, appello_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    dati = esercizi_service.esporta_esercizi_appello(tag, appello_id)
+    contenuto = json.dumps(dati, ensure_ascii=False, indent=2)
+    return Response(
+        contenuto, media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="esercizi-{appello.slug}.json"'},
+    )
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-json")
+async def importa_esercizi_json(tag: str, appello_id: int, file: UploadFile = File(...)):
+    try:
+        _proteggi_modifica_esercizi(tag, appello_id)
+        contenuto = json.loads((await file.read()).decode("utf-8"))
+        n = esercizi_service.importa_json(tag, appello_id, contenuto)
+        msg = f"Importati {n} esercizi dal file" + _rigenera_se_necessario(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Errore import: {e}", "error", anchor="creazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
+
+
+def _render_correggi_revisione(
+    request: Request, tag: str, appello_id: int, valutazione, voto_proposto=None, punteggi_proposti=None,
+    errore: str = "", richiedi_orale_checked=None,
+):
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    if voto_proposto is None:
+        voto_proposto = valutazione.voto_base
+    if punteggi_proposti is None:
+        punteggi_proposti = {r.posizione: corso.risposta_corretta for r in valutazione.da_valutare}
+    if richiedi_orale_checked is None:
+        richiedi_orale_checked = bool(valutazione.orale_obbligatorio)
+    return templates.TemplateResponse(request, "correggi_revisione.html", {
+        "corso": corso, "appello": appello, "v": valutazione, "voto_proposto": voto_proposto,
+        "punteggi_proposti": punteggi_proposti, "errore": errore,
+        "richiedi_orale_checked": richiedi_orale_checked,
+        "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
+    })
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/correggi")
+def correggi(
+    request: Request, tag: str, appello_id: int, matricola: str = Form(...), codice: str = Form(...),
+    risposte: str = Form(...),
+):
+    try:
+        valutazione = correzione_service.valuta_preliminare(tag, appello_id, matricola, codice, risposte)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+    return _render_correggi_revisione(request, tag, appello_id, valutazione)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/correggi/conferma")
+async def correggi_conferma(request: Request, tag: str, appello_id: int):
+    form = await request.form()
+    matricola = form.get("matricola") or ""
+    codice = form.get("codice") or ""
+    risposte = form.get("risposte") or ""
+    azione = form.get("azione") or "salva"
+    orale_motivazione = (form.get("orale_motivazione") or "").strip()
+    conferma_orale_obbligatorio = bool(form.get("conferma_orale_obbligatorio"))
+
+    try:
+        valutazione = correzione_service.valuta_preliminare(tag, appello_id, matricola, codice, risposte)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+
+    punteggi_obbligatori = {}
+    for r in valutazione.da_valutare:
+        valore = form.get(f"punteggio_{r.posizione}")
+        if valore is not None and valore != "":
+            punteggi_obbligatori[r.posizione] = int(valore)
+    voto_str = form.get("voto_finale")
+    voto_finale = int(voto_str) if voto_str not in (None, "") else None
+
+    richiedi_orale = azione == "richiedi_orale"
+    if richiedi_orale and not orale_motivazione:
+        return _render_correggi_revisione(
+            request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi_obbligatori,
+            errore="Per richiedere l'orale devi indicare una motivazione.", richiedi_orale_checked=richiedi_orale,
+        )
+
+    try:
+        result = correzione_service.conferma_risultato(
+            tag, appello_id, matricola, codice, risposte, voto_finale=voto_finale,
+            punteggi_obbligatori=punteggi_obbligatori, richiedi_orale=richiedi_orale,
+            orale_motivazione=orale_motivazione, conferma_orale_obbligatorio=conferma_orale_obbligatorio,
+        )
+    except correzione_service.OraleObbligatorioNonConfermato as e:
+        return _render_correggi_revisione(
+            request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi_obbligatori,
+            errore=(
+                f"Questo studente deve fare l'orale in ogni appello (imposto in \"{e.origine}\": {e.motivazione}). "
+                "Conferma la casella qui sotto per salvare comunque un voto scritto, oppure spunta \"Richiedi l'orale\"."
+            ),
+            richiedi_orale_checked=richiedi_orale,
+        )
+    except correzione_service.OraleNonConsentito as e:
+        return _render_correggi_revisione(
+            request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi_obbligatori,
+            errore=str(e), richiedi_orale_checked=richiedi_orale,
+        )
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+
+    if result.richiede_orale:
+        msg = f"Orale richiesto per {result.nome} {result.cognome} (voto scritto di riferimento: {result.voto})"
+    else:
+        msg = f"Voto calcolato per {result.nome} {result.cognome}: {result.voto}"
+        if result.insufficiente_per_obbligatorio:
+            msg += " (insufficiente: esercizio obbligatorio non svolto)"
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="valutazione")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/orale/{matricola}/completa")
+def completa_orale(tag: str, appello_id: int, matricola: str, esito_orale: str = Form(...), voto: str = Form("")):
+    try:
+        correzione_service.completa_orale(
+            tag, appello_id, matricola, esito_orale, voto=int(voto) if voto.strip() else None,
+        )
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Esito dell'orale registrato", anchor="valutazione")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/assenze/segna")
+def segna_assenza(tag: str, appello_id: int, matricola: str = Form(...), esito: str = Form(...)):
+    try:
+        correzione_service.segna_esito_speciale(tag, appello_id, matricola, esito)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Studente segnato come {esito}", anchor="valutazione")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}", response_class=HTMLResponse)
+def dettaglio_risultato(request: Request, tag: str, appello_id: int, matricola: str):
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    try:
+        dettaglio = correzione_service.dettaglio_risultato(tag, appello_id, matricola)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+    return templates.TemplateResponse(request, "risultato_dettaglio.html", {
+        "corso": corso, "appello": appello, "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
+    })
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}/elimina")
+def elimina_risultato(tag: str, appello_id: int, matricola: str):
+    try:
+        correzione_service.elimina_risultato(tag, appello_id, matricola)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Risultato eliminato", anchor="valutazione")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}/modifica", response_class=HTMLResponse)
+def modifica_risultato_form(request: Request, tag: str, appello_id: int, matricola: str):
+    try:
+        dettaglio = correzione_service.dettaglio_risultato(tag, appello_id, matricola)
+        r = dettaglio["risultato"]
+        if r["verbalizzato"]:
+            raise ValueError("Non è possibile modificare un risultato già verbalizzato")
+        if r["codice"] is None:
+            raise ValueError("Questo risultato non è associato a un compito con codice (es. calcolato da un raggruppamento)")
+        valutazione = correzione_service.valuta_preliminare(tag, appello_id, matricola, r["codice"], r["risposte"] or "")
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+    punteggi_esistenti = json.loads(r["punteggi_obbligatori"]) if r["punteggi_obbligatori"] else {}
+    punteggi_proposti = {int(k): v for k, v in punteggi_esistenti.items()}
+    return _render_correggi_revisione(
+        request, tag, appello_id, valutazione, voto_proposto=r["voto"], punteggi_proposti=punteggi_proposti,
+    )
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/risultati.tex", response_class=PlainTextResponse)
+def scarica_risultati(tag: str, appello_id: int):
+    tex = risultati_service.stampa_risultati(tag, appello_id)
+    return PlainTextResponse(tex, media_type="application/x-tex")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/verbalizza/{matricola}")
+def verbalizza(
+    tag: str, appello_id: int, matricola: str, voto: str = Form(""), data: str = Form(""),
+):
+    try:
+        verbalizzazione_service.verbalizza(
+            tag, appello_id, matricola, voto=int(voto) if voto else None, data=data or None,
+        )
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Verbalizzato", anchor="valutazione")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/calcola-raggruppamento")
+def calcola_raggruppamento(tag: str, appello_id: int, raggruppamento_id: int = Form(...)):
+    try:
+        result = risultati_service.calcola_raggruppamento(tag, raggruppamento_id)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Calcolati {result.n_calcolati} voti combinati")
+
+
+@app.get("/corsi/{tag}/studenti", response_class=HTMLResponse)
+def studenti_list(request: Request, tag: str, q: str = "", da: str = ""):
+    corso = corsi_service.get_corso(tag)
+    lista = studenti_service.list_studenti(tag, q or None)
+    corsi_suggeriti = corsi_service.corsi_simili(tag)
+    altri_corsi = [c for c in corsi_service.list_corsi() if c.tag != tag]
+    corso_sorgente = corsi_service.get_corso(da) if da and config.corso_exists(da) else None
+    studenti_sorgente = studenti_service.list_non_superati(da) if corso_sorgente else []
+    return templates.TemplateResponse(request, "studenti.html", {
+        "corso": corso, "studenti": lista, "q": q,
+        "corsi_suggeriti": corsi_suggeriti, "altri_corsi": altri_corsi,
+        "corso_sorgente": corso_sorgente, "studenti_sorgente": studenti_sorgente,
+    })
+
+
+@app.post("/corsi/{tag}/studenti/nuovo")
+def nuovo_studente(tag: str, matricola: str = Form(...), nome: str = Form(...), cognome: str = Form(...)):
+    studenti_service.upsert_studente(tag, matricola, nome, cognome)
+    return flash_redirect(f"/corsi/{tag}/studenti", "Studente salvato")
+
+
+@app.post("/corsi/{tag}/studenti/{matricola}/modifica")
+def modifica_studente(tag: str, matricola: str, nome: str = Form(...), cognome: str = Form(...)):
+    try:
+        studenti_service.aggiorna_studente(tag, matricola, nome, cognome)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/studenti", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}/studenti", "Studente aggiornato")
+
+
+@app.post("/corsi/{tag}/studenti/importa-csv")
+async def importa_csv(tag: str, file: UploadFile = File(...)):
+    content = await file.read()
+    report = studenti_service.importa_csv(tag, content)
+    msg = f"Import: {report.inseriti} inseriti, {report.aggiornati} aggiornati, {report.saltati} saltati"
+    return flash_redirect(f"/corsi/{tag}/studenti", msg, "error" if report.errori else "success")
+
+
+@app.post("/corsi/{tag}/studenti/importa-da-corso")
+async def importa_da_corso(tag: str, request: Request):
+    form = await request.form()
+    tag_sorgente = form.get("da") or ""
+    matricole = form.getlist("matricole")
+    if not tag_sorgente or not matricole:
+        return flash_redirect(f"/corsi/{tag}/studenti", "Seleziona un corso di origine e almeno uno studente", "error")
+    report = studenti_service.importa_da_altro_corso(tag, tag_sorgente, matricole)
+    msg = f"Import da {tag_sorgente}: {report.inseriti} inseriti, {report.aggiornati} aggiornati, {report.saltati} saltati"
+    return flash_redirect(f"/corsi/{tag}/studenti", msg, "error" if report.errori else "success")
+
+
+@app.get("/corsi/{tag}/esercizi", response_class=HTMLResponse)
+def esercizi_list(request: Request, tag: str, da: str = ""):
+    corso = corsi_service.get_corso(tag)
+    esercizi = esercizi_service.list_esercizi(tag)
+    corsi_suggeriti = corsi_service.corsi_simili(tag)
+    altri_corsi = [c for c in corsi_service.list_corsi() if c.tag != tag]
+
+    corso_sorgente = None
+    esercizi_sorgente = []
+    if da and config.corso_exists(da) and da != tag:
+        corso_sorgente = corsi_service.get_corso(da)
+        esercizi_sorgente = esercizi_service.list_esercizi(da)
+
+    blocchi_generati = {}
+    for e in esercizi:
+        appelli_coinvolti = esercizi_service.appelli_che_usano(tag, e.id)
+        blocchi_generati[e.id] = any(compiti_service.list_blocchi(tag, aid) for aid in appelli_coinvolti)
+
+    return templates.TemplateResponse(request, "esercizi.html", {
+        "corso": corso, "esercizi": esercizi, "corsi_suggeriti": corsi_suggeriti, "altri_corsi": altri_corsi,
+        "corso_sorgente": corso_sorgente, "esercizi_sorgente": esercizi_sorgente,
+        "argomenti": esercizi_service.list_argomenti(tag), "blocchi_generati": blocchi_generati,
+    })
+
+
+@app.post("/corsi/{tag}/esercizi/collega-importa")
+async def collega_importa_esercizi(tag: str, request: Request):
+    form = await request.form()
+    tag_sorgente = form.get("tag_sorgente") or ""
+    esercizio_ids = [int(v) for v in form.getlist("esercizio_ids")]
+    if not esercizio_ids:
+        return flash_redirect(f"/corsi/{tag}/esercizi?da={tag_sorgente}", "Nessun esercizio selezionato", "error")
+    n = esercizi_service.importa_da_altro_corso(tag, tag_sorgente, esercizio_ids)
+    return flash_redirect(f"/corsi/{tag}/esercizi", f"Importati {n} esercizi dal corso '{tag_sorgente}'")
+
+
+@app.post("/corsi/{tag}/esercizi/nuovo")
+async def nuovo_esercizio(tag: str, request: Request):
+    form = await request.form()
+    varianti = _parse_varianti_form(form)
+    try:
+        esercizi_service.create_esercizio(
+            tag, nome=(form.get("nome") or "").strip(), note=(form.get("note") or "").strip(), varianti=varianti,
+            argomento=(form.get("argomento") or "").strip(),
+        )
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/esercizi", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}/esercizi", "Esercizio creato")
+
+
+@app.post("/corsi/{tag}/esercizi/{esercizio_id}/modifica")
+async def modifica_esercizio(tag: str, esercizio_id: int, request: Request):
+    form = await request.form()
+    varianti = _parse_varianti_form(form)
+    appelli_coinvolti = esercizi_service.appelli_che_usano(tag, esercizio_id)
+    try:
+        for appello_id in appelli_coinvolti:
+            _proteggi_modifica_esercizi(tag, appello_id)
+        for appello_id in appelli_coinvolti:
+            compiti_service.svuota_blocchi_appello(tag, appello_id)
+        esercizi_service.aggiorna_esercizio(
+            tag, esercizio_id, nome=(form.get("nome") or "").strip(), note=(form.get("note") or "").strip(),
+            argomento=(form.get("argomento") or "").strip(), varianti=varianti,
+        )
+        msg = "Esercizio aggiornato"
+        for appello_id in appelli_coinvolti:
+            msg += _rigenera_se_necessario(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/esercizi", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}/esercizi", msg)
+
+
+@app.post("/corsi/{tag}/esercizi/{esercizio_id}/elimina")
+def elimina_esercizio(tag: str, esercizio_id: int):
+    try:
+        esercizi_service.elimina_esercizio(tag, esercizio_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/esercizi", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}/esercizi", "Esercizio eliminato")
+
+
+@app.get("/corsi/{tag}/api/studenti/cerca")
+def api_cerca_studenti(tag: str, q: str = ""):
+    if not q.strip():
+        return []
+    return [
+        {"matricola": s.matricola, "nome": s.nome, "cognome": s.cognome}
+        for s in studenti_service.list_studenti(tag, q.strip())[:15]
+    ]
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/api/compiti/cerca")
+def api_cerca_compiti(tag: str, appello_id: int, prefix: str = ""):
+    if not prefix.strip():
+        return []
+    return compiti_service.cerca_codici(tag, appello_id, prefix.strip())
+
+
+@app.get("/api/fs/sfoglia")
+def fs_sfoglia(path: str = ""):
+    base = Path(path).expanduser() if path.strip() else config.LEGACY_ROOT
+    try:
+        base = base.resolve()
+        if not base.is_dir():
+            base = base.parent
+        if not base.is_dir():
+            base = config.LEGACY_ROOT.resolve()
+    except Exception:
+        base = config.LEGACY_ROOT.resolve()
+    cartelle = []
+    try:
+        for p in sorted(base.iterdir(), key=lambda p: p.name.lower()):
+            if p.is_dir() and not p.name.startswith("."):
+                cartelle.append(p.name)
+    except PermissionError:
+        pass
+    genitore = str(base.parent) if base.parent != base else None
+    return {"path": str(base), "genitore": genitore, "cartelle": cartelle}
+
+
+@app.get("/migrazione", response_class=HTMLResponse)
+def migrazione_form(request: Request):
+    return templates.TemplateResponse(request, "migrazione.html", {"legacy_root": str(config.LEGACY_ROOT)})
+
+
+@app.post("/migrazione/esegui")
+def migrazione_esegui(
+    cartella: str = Form(...), tag: str = Form(...), nome: str = Form(...),
+    facolta: str = Form(""), universita: str = Form(""), anno: str = Form(""), docente: str = Form(""),
+):
+    try:
+        report = migrazione_service.migra_da_cartella(tag, cartella, nome, facolta, universita, anno, docente)
+    except Exception as e:
+        return flash_redirect("/migrazione", f"Errore migrazione: {e}", "error")
+    msg = f"Migrazione completata: {report.dopo}"
+    if report.warnings:
+        msg += f" — {len(report.warnings)} avvisi (vedi corso)"
+    return flash_redirect(f"/corsi/{tag}", msg)
+
+
+def run():
+    import uvicorn
+    host, port = "127.0.0.1", 8000
+    webbrowser.open(f"http://{host}:{port}")
+    uvicorn.run(app, host=host, port=port)
+
+
+if __name__ == "__main__":
+    run()

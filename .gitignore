@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# dati reali di corsi/studenti: mai committare database o output generati
+corsi/*/db.sqlite
+corsi/*/output/
+*.sqlite
+*.sqlite3
+GeoOZ-IngMEL-UniFi25/
+TEST/
+TEST2/
+TEST3/
+esami.zip
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.synctex.gz
+
+# impostazioni locali di Claude Code
+.claude/

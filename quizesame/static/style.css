@@ -1,0 +1,131 @@
+:root {
+  --bg: #f7f7f9;
+  --panel: #ffffff;
+  --text: #1f2430;
+  --muted: #6b7280;
+  --border: #e2e4e9;
+  --accent: #2563eb;
+  --ok-bg: #e8f7ee; --ok-text: #166534;
+  --err-bg: #fdecec; --err-text: #991b1b;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.topbar .brand { font-weight: 600; text-decoration: none; color: var(--text); }
+.topbar nav a { margin-left: 1rem; color: var(--accent); text-decoration: none; }
+
+.container { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
+
+.flash { padding: 0.6rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
+.flash-success { background: var(--ok-bg); color: var(--ok-text); }
+.flash-error { background: var(--err-bg); color: var(--err-text); }
+.flash-warning { background: #fff7e6; color: #92400e; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+details.card > summary,
+.card details > summary,
+.card summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+  list-style: none;
+}
+summary::-webkit-details-marker { display: none; }
+details.card:not([open]) { padding-bottom: 1.25rem; }
+
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.15rem; margin-top: 0; }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 600; }
+
+.list-links { list-style: none; padding: 0; margin: 0; }
+.list-links li { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
+.list-links a { text-decoration: none; color: var(--accent); font-weight: 500; }
+.list-links .muted { color: var(--muted); font-size: 0.85rem; margin-left: 0.5rem; }
+
+form.inline { display: inline; }
+
+.form-section-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 1.25rem 0 0.6rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.form-section-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; }
+label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.2rem; }
+input, select, textarea {
+  width: 100%; padding: 0.45rem 0.55rem; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 0.95rem; background: var(--panel); color: var(--text);
+}
+textarea { font-family: monospace; }
+
+button, input[type=submit] {
+  background: var(--accent); color: white; border: none; border-radius: 6px;
+  padding: 0.5rem 1rem; font-size: 0.9rem; cursor: pointer; margin-top: 0.75rem;
+}
+button.secondary { background: var(--muted); }
+button.danger { background: var(--err-text); }
+
+.tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.tabs a {
+  padding: 0.4rem 0.8rem; border-radius: 999px; text-decoration: none; color: var(--text);
+  border: 1px solid var(--border); font-size: 0.85rem;
+}
+.tabs a.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+.badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; }
+.badge-ok { background: var(--ok-bg); color: var(--ok-text); }
+.badge-warn { background: #fff7e6; color: #92400e; }
+
+.muted { color: var(--muted); }
+code { background: #f1f2f4; padding: 0.1rem 0.3rem; border-radius: 4px; }
+
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  align-items: center; justify-content: center; z-index: 1000;
+}
+.modal-box {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 1.25rem; width: 90%; max-width: 520px; max-height: 80vh;
+  overflow-y: auto;
+}
+.sfoglia-lista {
+  border: 1px solid var(--border); border-radius: 6px; max-height: 40vh;
+  overflow-y: auto;
+}
+.sfoglia-voce {
+  padding: 0.4rem 0.7rem; cursor: pointer; font-size: 0.9rem;
+}
+.sfoglia-voce:hover { background: var(--bg); }
+.input-with-button { display: flex; gap: 0.5rem; }
+.input-with-button input { flex: 1; }
+.input-with-button button { margin-top: 0; white-space: nowrap; }

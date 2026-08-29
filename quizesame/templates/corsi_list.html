@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Corsi{% endblock %}
+{% block content %}
+<h1>Corsi</h1>
+
+<div class="card">
+  <h2>Cerca uno studente</h2>
+  <form method="get" action="/">
+    <input type="text" name="q" value="{{ q }}" placeholder="Cerca per matricola, nome o cognome (in tutti i corsi)">
+  </form>
+  {% if risultati_ricerca is not none %}
+    {% if risultati_ricerca %}
+    <table style="margin-top:0.75rem">
+      <tr><th>Studente</th><th>Matricola</th><th>Corso</th><th>Risultati</th></tr>
+      {% for s in risultati_ricerca %}
+      <tr>
+        <td>{{ s.cognome }} {{ s.nome }}</td>
+        <td>{{ s.matricola }}</td>
+        <td><a href="/corsi/{{ s.corso_tag }}/studenti">{{ s.corso_nome }}</a> <span class="muted">{{ s.corso_anno }}</span></td>
+        <td>
+          {% if s.risultati %}
+          {% for r in s.risultati %}
+          <div>{{ r.appello_nome }}: <strong>{{ r.voto }}</strong>{% if r.verbalizzato %} <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>{% endif %}</div>
+          {% endfor %}
+          {% else %}
+          <span class="muted">Nessun risultato registrato</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted" style="margin-top:0.75rem">Nessuno studente trovato per "{{ q }}".</p>
+    {% endif %}
+  {% endif %}
+</div>
+
+{% if corsi %}
+<div class="card">
+  <ul class="list-links">
+    {% for c in corsi %}
+    <li>
+      <a href="/corsi/{{ c.tag }}">{{ c.nome }}</a>
+      <span class="muted">{{ c.anno }} · {{ c.tag }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% else %}
+<p class="muted">Nessun corso ancora creato. Crea un corso nuovo, oppure vai su
+  <a href="/migrazione">Migrazione dati legacy</a> per importare i dati di un corso già esistente.</p>
+{% endif %}
+
+<details class="card">
+  <summary>Nuovo corso</summary>
+  <form method="post" action="/corsi/nuovo" id="nuovo-corso-form" style="margin-top:1rem">
+    <div class="form-grid">
+      <div style="grid-column: 1 / -1"><label>Nome corso</label><input name="nome" id="corso-nome" required placeholder="es. Geometria O-Z"></div>
+      <div><label>Anno accademico</label><input name="anno" id="corso-anno" placeholder="es. 2026/2027"></div>
+      <div><label>Tag (cartella, univoco)</label><input name="tag" id="corso-tag" required placeholder="es. GeoOZ-IngMEL-UniFi26"></div>
+    </div>
+
+    <div class="form-grid" style="margin-top:0.75rem">
+      <div><label>Facoltà</label><input name="facolta" placeholder="es. Ingegneria Meccanica"></div>
+      <div><label>Università</label><input name="universita" placeholder="es. Universit\`a di Firenze"></div>
+      <div><label>Docente</label><input name="docente"></div>
+    </div>
+
+    <p class="muted" style="margin-top:1rem">
+      Voto minimo (18), voto minimo per i raggruppamenti (15) ed esercizi obbligatori (0)
+      partono dai valori predefiniti: si possono cambiare in qualsiasi momento dalla
+      scheda Impostazioni del corso.
+    </p>
+    <button type="submit">Crea corso</button>
+  </form>
+</details>
+<script>
+(function () {
+  var nome = document.getElementById("corso-nome");
+  var anno = document.getElementById("corso-anno");
+  var tag = document.getElementById("corso-tag");
+  var tagTouched = false;
+  tag.addEventListener("input", function () { tagTouched = true; });
+
+  function slugify(s) {
+    return s.trim().replace(/\s+/g, "-").replace(/[^A-Za-z0-9_-]/g, "");
+  }
+  function aggiornaTag() {
+    if (tagTouched) return;
+    var base = slugify(nome.value);
+    var annoBreve = anno.value.match(/\d{2,4}/g);
+    if (base && annoBreve) {
+      base += "-" + annoBreve[0].slice(-2);
+    }
+    tag.value = base;
+  }
+  nome.addEventListener("input", aggiornaTag);
+  anno.addEventListener("input", aggiornaTag);
+})();
+</script>
+{% endblock %}

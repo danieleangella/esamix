@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Migrazione dati legacy{% endblock %}
+{% block content %}
+<h1>Migrazione dati legacy</h1>
+<p class="muted">
+  Importa un corso gestito con la vecchia CLI a riga di comando. I file originali non
+  vengono mai modificati né cancellati: si legge tutto in sola lettura.
+</p>
+
+<div class="card">
+  <h2>Corso legacy da importare</h2>
+  <p class="muted">
+    La cartella principale del corso deve essere organizzata come con la vecchia CLI:
+  </p>
+  <pre style="background:#f1f2f4; padding:0.75rem; border-radius:6px; overflow-x:auto">NomeCartellaCorso/
+  db.sqlite              &larr; il database più aggiornato, qui nella cartella principale
+  primo-appello/
+    esercizi/
+      testi.py
+      testo1.py, testo2.py, ...
+  secondo-appello/
+    esercizi/
+      ...</pre>
+  <p class="muted">
+    Vengono importati studenti, appelli, compiti e risultati dal database, e per ogni
+    appello anche gli esercizi trovati nella sua sottocartella <code>esercizi/</code>
+    (se presente).
+  </p>
+
+  <form method="post" action="/migrazione/esegui">
+    <div class="form-grid">
+      <div style="grid-column: 1 / -1">
+        <label>Cartella principale del corso legacy</label>
+        <div class="input-with-button">
+          <input name="cartella" id="cartella-legacy" autocomplete="new-password" required placeholder="{{ legacy_root }}/NomeCartellaCorso">
+          <button type="button" class="secondary" data-sfoglia-cartella="cartella-legacy">Sfoglia&hellip;</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section-title">Dati del nuovo corso</div>
+    <div class="form-grid">
+      <div><label>Nome corso</label><input name="nome" required placeholder="es. Geometria O-Z"></div>
+      <div><label>Anno accademico</label><input name="anno" placeholder="es. 2025/2026"></div>
+      <div><label>Tag (cartella, univoco)</label><input name="tag" required placeholder="es. GeoOZ-IngMEL-UniFi25"></div>
+      <div><label>Facoltà</label><input name="facolta"></div>
+      <div><label>Università</label><input name="universita"></div>
+      <div><label>Docente</label><input name="docente"></div>
+    </div>
+
+    <button type="submit" style="margin-top:1rem">Avvia migrazione</button>
+  </form>
+</div>
+{% endblock %}

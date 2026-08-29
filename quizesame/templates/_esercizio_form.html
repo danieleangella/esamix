@@ -1,0 +1,146 @@
+<form method="post" action="{{ action }}" class="form-esercizio" {% if avvisa_rigenerazione is defined and avvisa_rigenerazione %}data-avvisa-rigenerazione="1"{% endif %}>
+  <div class="form-grid">
+    <div><label>Nome (etichetta breve, opzionale)</label><input name="nome" value="{{ esercizio.nome or '' if esercizio is defined else '' }}" placeholder="es. Area triangolo"></div>
+    <div>
+      <label>Argomento (opzionale)</label>
+      <input name="argomento" value="{{ esercizio.argomento or '' if esercizio is defined else '' }}" list="lista-argomenti" placeholder="es. Geometria analitica">
+      <datalist id="lista-argomenti">
+        {% for a in (argomenti or []) %}<option value="{{ a }}">{% endfor %}
+      </datalist>
+    </div>
+    <div><label>Note (opzionali)</label><input name="note" value="{{ esercizio.note or '' if esercizio is defined else '' }}"></div>
+    {% if appello is defined %}
+    <div><label style="display:inline-flex; align-items:center; gap:0.4rem"><input type="checkbox" name="obbligatorio" style="width:auto" {% if esercizio is defined and esercizio.obbligatorio %}checked{% endif %}> Obbligatorio (consegna e svolgimento richiesti)</label></div>
+    {% endif %}
+  </div>
+  <p class="muted" style="margin-top:0.75rem">
+    Ogni variante è un modo alternativo di porre lo stesso esercizio (la generazione dei
+    compiti ne sceglie una a caso per ogni studente); testo in LaTeX.
+  </p>
+
+  <div class="varianti-container">
+    {% for v in (esercizio.varianti if esercizio is defined else []) %}
+    {% set vidx = loop.index0 %}
+    <div class="card variante-block" style="background:transparent">
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <h2 style="font-size:1rem">Variante</h2>
+        <button type="button" class="secondary btn-rimuovi-variante">Rimuovi variante</button>
+      </div>
+      <input type="hidden" class="campo-vidx" name="variante_idx" value="{{ vidx }}">
+      <label>Testo del quesito</label>
+      <textarea class="campo-testo" name="testo_{{ vidx }}" rows="2">{{ v.testo }}</textarea>
+      <label>Risposta corretta</label>
+      <input class="campo-corretta" name="corretta_{{ vidx }}" value="{{ v.risposte[0] }}">
+      <label>Risposte sbagliate</label>
+      <div class="sbagliate-container">
+        {% for r in v.risposte[1:] %}
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.4rem; align-items:center">
+          <input class="campo-sbagliata" name="sbagliata_{{ vidx }}" value="{{ r }}" style="flex:1">
+          <button type="button" class="secondary btn-rimuovi-sbagliata">&times;</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="secondary btn-aggiungi-sbagliata">+ Aggiungi risposta sbagliata</button>
+    </div>
+    {% endfor %}
+  </div>
+  <button type="button" class="secondary btn-aggiungi-variante">+ Aggiungi variante</button>
+  <button type="submit">Salva esercizio</button>
+
+  <template class="tpl-variante">
+    <div class="card variante-block" style="background:transparent">
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <h2 style="font-size:1rem">Variante</h2>
+        <button type="button" class="secondary btn-rimuovi-variante">Rimuovi variante</button>
+      </div>
+      <input type="hidden" class="campo-vidx">
+      <label>Testo del quesito</label>
+      <textarea class="campo-testo" rows="2"></textarea>
+      <label>Risposta corretta</label>
+      <input class="campo-corretta">
+      <label>Risposte sbagliate</label>
+      <div class="sbagliate-container"></div>
+      <button type="button" class="secondary btn-aggiungi-sbagliata">+ Aggiungi risposta sbagliata</button>
+    </div>
+  </template>
+
+  <template class="tpl-sbagliata">
+    <div style="display:flex; gap:0.5rem; margin-bottom:0.4rem; align-items:center">
+      <input class="campo-sbagliata" style="flex:1">
+      <button type="button" class="secondary btn-rimuovi-sbagliata">&times;</button>
+    </div>
+  </template>
+</form>
+
+<script>
+(function () {
+  var forms = document.querySelectorAll(".form-esercizio");
+  forms.forEach(function (form) {
+    var container = form.querySelector(".varianti-container");
+    var tplVariante = form.querySelector(".tpl-variante");
+    var tplSbagliata = form.querySelector(".tpl-sbagliata");
+    var blocchiEsistenti = container.querySelectorAll(".variante-block");
+    var nextVidx = 0;
+    blocchiEsistenti.forEach(function (node) {
+      var v = parseInt(node.querySelector(".campo-vidx").value, 10);
+      if (!isNaN(v) && v >= nextVidx) nextVidx = v + 1;
+    });
+
+    function collegaSbagliata(node) {
+      node.querySelector(".btn-rimuovi-sbagliata").addEventListener("click", function () {
+        node.remove();
+      });
+    }
+
+    function aggiungiSbagliata(sbagliateContainer, vidx) {
+      var node = tplSbagliata.content.firstElementChild.cloneNode(true);
+      node.querySelector(".campo-sbagliata").name = "sbagliata_" + vidx;
+      collegaSbagliata(node);
+      sbagliateContainer.appendChild(node);
+    }
+
+    function collegaVariante(node, vidx) {
+      var sbagliateContainer = node.querySelector(".sbagliate-container");
+      node.querySelector(".btn-aggiungi-sbagliata").addEventListener("click", function () {
+        aggiungiSbagliata(sbagliateContainer, vidx);
+      });
+      node.querySelector(".btn-rimuovi-variante").addEventListener("click", function () {
+        node.remove();
+      });
+      sbagliateContainer.querySelectorAll(".btn-rimuovi-sbagliata").forEach(function (btn) {
+        btn.addEventListener("click", function () { btn.closest("div").remove(); });
+      });
+    }
+
+    function aggiungiVariante() {
+      var vidx = nextVidx++;
+      var node = tplVariante.content.firstElementChild.cloneNode(true);
+      var campoVidx = node.querySelector(".campo-vidx");
+      campoVidx.name = "variante_idx";
+      campoVidx.value = vidx;
+      node.querySelector(".campo-testo").name = "testo_" + vidx;
+      node.querySelector(".campo-corretta").name = "corretta_" + vidx;
+      collegaVariante(node, vidx);
+      container.appendChild(node);
+      aggiungiSbagliata(node.querySelector(".sbagliate-container"), vidx);
+    }
+
+    blocchiEsistenti.forEach(function (node) {
+      var vidx = parseInt(node.querySelector(".campo-vidx").value, 10);
+      collegaVariante(node, vidx);
+    });
+
+    form.querySelector(".btn-aggiungi-variante").addEventListener("click", aggiungiVariante);
+    if (blocchiEsistenti.length === 0) aggiungiVariante();
+
+    if (form.dataset.avvisaRigenerazione) {
+      form.addEventListener("submit", function (ev) {
+        var msg = "Questo esercizio è già usato in almeno un blocco di compiti generato. " +
+          "Salvare le modifiche rigenererà quei blocchi con il nuovo testo/varianti, eliminando " +
+          "i vecchi codici (non è possibile se hanno già risultati registrati). Procedere comunque?";
+        if (!window.confirm(msg)) ev.preventDefault();
+      });
+    }
+  });
+})();
+</script>
