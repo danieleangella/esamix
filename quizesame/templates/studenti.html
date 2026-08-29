@@ -19,8 +19,8 @@
     {% for s in studenti %}
     <tr>
       <td>{{ s.matricola }}</td>
-      <td>{{ s.cognome }}</td>
-      <td>{{ s.nome }}</td>
+      <td><a href="/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
+      <td><a href="/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
       <td><button type="button" class="secondary btn-modifica-studente" data-matricola="{{ s.matricola }}">Modifica</button></td>
     </tr>
     <tr class="riga-modifica-studente" data-matricola="{{ s.matricola }}" style="display:none">

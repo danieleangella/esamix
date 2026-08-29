@@ -14,7 +14,7 @@
       <tr><th>Studente</th><th>Matricola</th><th>Corso</th><th>Risultati</th></tr>
       {% for s in risultati_ricerca %}
       <tr>
-        <td>{{ s.cognome }} {{ s.nome }}</td>
+        <td><a href="/studenti/{{ s.matricola }}">{{ s.cognome }} {{ s.nome }}</a></td>
         <td>{{ s.matricola }}</td>
         <td><a href="/corsi/{{ s.corso_tag }}/studenti">{{ s.corso_nome }}</a> <span class="muted">{{ s.corso_anno }}</span></td>
         <td>

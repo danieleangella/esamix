@@ -104,6 +104,16 @@ def home(request: Request, q: str = ""):
     })
 
 
+@app.get("/studenti/{matricola}", response_class=HTMLResponse)
+def studente_riepilogo(request: Request, matricola: str):
+    riepilogo = studenti_service.riepilogo_globale(matricola)
+    if not riepilogo:
+        return flash_redirect("/", f"Nessuno studente trovato con matricola '{matricola}'", "error")
+    return templates.TemplateResponse(request, "studente_riepilogo.html", {
+        "matricola": matricola, "riepilogo": riepilogo,
+    })
+
+
 @app.post("/corsi/nuovo")
 def crea_corso(
     tag: str = Form(...), nome: str = Form(...), facolta: str = Form(""),

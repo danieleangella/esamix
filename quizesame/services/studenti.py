@@ -52,7 +52,8 @@ def _risultati_studente(tag: str, matricola: str) -> list[dict]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         rows = conn.execute(
-            "SELECT a.nome AS appello_nome, r.voto, r.verbalizzato, r.data_verbalizzazione "
+            "SELECT a.id AS appello_id, a.nome AS appello_nome, r.voto, r.esito, r.richiede_orale, "
+            "r.orale_svolto, r.esito_orale, r.verbalizzato, r.data_verbalizzazione "
             "FROM risultati r JOIN appelli a ON a.id = r.appello_id "
             "WHERE r.matricola=? ORDER BY a.data IS NULL, a.data, a.id",
             (matricola,),
@@ -60,6 +61,23 @@ def _risultati_studente(tag: str, matricola: str) -> list[dict]:
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+def riepilogo_globale(matricola: str) -> list[dict]:
+    """Tutti i corsi (anni accademici) in cui questa matricola compare, con i suoi
+    risultati in ciascuno: per la pagina di riepilogo di uno studente, raggiungibile
+    cliccando sulla matricola/nome da qualunque elenco studenti."""
+    matricola = _clean(matricola)
+    riepilogo = []
+    for corso in corsi_service.list_corsi():
+        s = get_studente(corso.tag, matricola)
+        if s is None:
+            continue
+        riepilogo.append({
+            "corso_tag": corso.tag, "corso_nome": corso.nome, "corso_anno": corso.anno,
+            "nome": s.nome, "cognome": s.cognome, "risultati": _risultati_studente(corso.tag, matricola),
+        })
+    return riepilogo
 
 
 def list_non_superati(tag: str) -> list[Studente]:

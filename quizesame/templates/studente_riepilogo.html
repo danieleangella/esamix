@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ riepilogo[0].cognome }} {{ riepilogo[0].nome }} · {{ matricola }}{% endblock %}
+{% block content %}
+<p><a href="/">&larr; Corsi</a></p>
+<h1>{{ riepilogo[0].cognome }} {{ riepilogo[0].nome }} <span class="muted">({{ matricola }})</span></h1>
+
+{% for c in riepilogo %}
+<div class="card">
+  <h2><a href="/corsi/{{ c.corso_tag }}/studenti">{{ c.corso_nome }}</a> <span class="muted">({{ c.corso_anno }})</span></h2>
+  {% if c.risultati %}
+  <table>
+    <tr><th>Appello</th><th>Esito</th><th>Orale</th><th>Verbalizzato</th><th></th></tr>
+    {% for r in c.risultati %}
+    <tr>
+      <td>{{ r.appello_nome }}</td>
+      <td>
+        {% if r.esito != 'voto' %}{{ r.esito }}
+        {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
+        {% elif r.esito_orale in ('assente', 'insufficiente') %}{{ r.esito_orale }} (orale)
+        {% else %}{{ r.voto }}{% endif %}
+      </td>
+      <td>
+        {% if r.richiede_orale %}
+          {% if r.orale_svolto %}<span class="badge badge-ok">orale svolto</span>
+          {% else %}<span class="badge badge-warn">orale richiesto</span>{% endif %}
+        {% else %}-{% endif %}
+      </td>
+      <td>{% if r.verbalizzato %}<span class="badge badge-ok">{{ r.data_verbalizzazione }}</span>{% else %}-{% endif %}</td>
+      <td><a href="/corsi/{{ c.corso_tag }}/appelli/{{ r.appello_id }}/risultati/{{ matricola }}">Dettaglio</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nessun risultato registrato in questo corso.</p>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}
