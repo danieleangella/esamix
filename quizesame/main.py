@@ -957,7 +957,14 @@ def anteprima_esercizio(request: Request, tag: str, esercizio_id: int):
     esercizio = esercizi_service.get_esercizio(tag, esercizio_id)
     if esercizio is None:
         return HTMLResponse("Esercizio non trovato", status_code=404)
-    return templates.TemplateResponse(request, "_esercizio_anteprima.html", {"e": esercizio})
+    appelli_assegnato = [
+        a for a in (
+            corsi_service.get_appello(tag, aid) for aid in esercizi_service.appelli_che_usano(tag, esercizio_id)
+        ) if a is not None
+    ]
+    return templates.TemplateResponse(request, "_esercizio_anteprima.html", {
+        "e": esercizio, "appelli_assegnato": appelli_assegnato,
+    })
 
 
 @app.get("/corsi/{tag}/esercizi", response_class=HTMLResponse)

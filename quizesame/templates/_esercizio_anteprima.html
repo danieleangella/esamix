@@ -20,3 +20,9 @@
   <p style="white-space:pre-wrap; margin:0.5rem 0 0">{{ e.soluzione }}</p>
 </div>
 {% endif %}
+{% if appelli_assegnato is defined %}
+<p class="muted" style="margin-top:0.5rem">
+  {% if appelli_assegnato %}Assegnato a: {{ appelli_assegnato | map(attribute='nome') | join(', ') }}
+  {% else %}Non ancora assegnato a nessun appello.{% endif %}
+</p>
+{% endif %}
