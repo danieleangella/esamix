@@ -251,7 +251,7 @@ def corso_detail(request: Request, tag: str):
     appelli = corsi_service.list_appelli(tag, includi_raggruppamenti=False)
     raggruppamenti = corsi_service.list_raggruppamenti(tag)
     statistiche = {}
-    for a in appelli:
+    for a in corsi_service.list_appelli(tag, includi_raggruppamenti=True):
         risultati = [
             r for r in correzione_service.list_risultati(tag, a.id)
             if not (r["richiede_orale"] and not r["orale_svolto"])
@@ -265,8 +265,10 @@ def corso_detail(request: Request, tag: str):
             "percentuale": round(100 * sufficienti / totale) if totale else None,
             "media": media,
         }
+    raggruppamenti_appelli = {r.appello_id: corsi_service.get_appello(tag, r.appello_id) for r in raggruppamenti}
     return templates.TemplateResponse(request, "corso_detail.html", {
         "corso": corso, "appelli": appelli, "raggruppamenti": raggruppamenti, "statistiche": statistiche,
+        "raggruppamenti_appelli": raggruppamenti_appelli,
     })
 
 

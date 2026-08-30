@@ -75,11 +75,23 @@
   </p>
   {% if raggruppamenti %}
   <table>
-    <tr><th>Nome</th><th>Prove membro</th><th></th></tr>
+    <tr><th>Nome</th><th>Tipo</th><th>Prove membro</th><th>Risultati</th><th>Voto medio</th><th></th></tr>
     {% for r in raggruppamenti %}
+    {% set ra = raggruppamenti_appelli[r.appello_id] %}
+    {% set s = statistiche[r.appello_id] %}
     <tr>
-      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ r.appello_id }}">{{ r.nome }}</a></td>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ r.appello_id }}" style="text-decoration:none; font-weight:500">{{ r.nome }}</a></td>
+      <td>raggruppamento</td>
       <td>{{ r.membri | map(attribute='nome') | join(', ') }}</td>
+      <td>
+        {% if s.totale %}
+        {{ s.sufficienti }}/{{ s.totale }} <span class="muted">({{ s.percentuale }}%)</span>
+        {% else %}
+        <span class="muted">-</span>
+        {% endif %}
+      </td>
+      <td>{{ s.media if s.media is not none else '-' }}</td>
+      <td>{% if not ra.attivo %}<span class="badge badge-warn">disattivato</span>{% endif %}</td>
     </tr>
     {% endfor %}
   </table>
