@@ -1,17 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Impostazioni · {{ corso.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <span class="current">Impostazioni</span>
+{% endblock %}
 {% block content %}
 <h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span></h1>
 <div class="tabs">
   <a href="/corsi/{{ corso.tag }}">Appelli</a>
   <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
   <a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
+  <a href="/corsi/{{ corso.tag }}/statistiche">Statistiche</a>
   <a class="active" href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
 </div>
 
-<div class="card">
-  <h2>Dati del corso</h2>
-  <form method="post" action="/corsi/{{ corso.tag }}/impostazioni">
+<form method="post" action="/corsi/{{ corso.tag }}/impostazioni">
+
+  <div class="card">
+    <h2>Dati del corso</h2>
     <div class="form-grid">
       <div><label>Nome corso</label><input name="nome" value="{{ corso.nome }}" required></div>
       <div><label>Facoltà</label><input name="facolta" value="{{ corso.facolta }}"></div>
@@ -19,8 +24,11 @@
       <div><label>Anno accademico</label><input name="anno" value="{{ corso.anno }}"></div>
       <div><label>Docente</label><input name="docente" value="{{ corso.docente }}"></div>
     </div>
+  </div>
 
-    <h2 style="margin-top:1.5rem">Voti e soglie</h2>
+  <div class="card">
+    <h2>Voti e punteggi</h2>
+    <p class="muted" style="margin-top:0">Valgono per tutti gli appelli del corso.</p>
     <div class="form-grid">
       <div><label>Voto minimo (appelli normali) <code class="muted">{votomin}</code></label><input type="number" name="votomin" value="{{ corso.votomin }}" required></div>
       <div><label>Voto minimo (prove di un raggruppamento)</label><input type="number" name="votomin_raggruppamento" value="{{ corso.votomin_raggruppamento }}" required></div>
@@ -31,30 +39,44 @@
       <div><label>Punti risposta sbagliata <code class="muted">{sbagliata}</code></label><input type="number" name="risposta_sbagliata" value="{{ corso.risposta_sbagliata }}" required></div>
       <div><label>Punti risposta vuota <code class="muted">{vuota}</code></label><input type="number" name="risposta_vuota" value="{{ corso.risposta_vuota }}" required></div>
     </div>
-    <p class="muted">Valgono per tutti gli appelli del corso.</p>
+  </div>
 
-    <h2 style="margin-top:1.5rem">Orale</h2>
+  <div class="card">
+    <h2>Orale</h2>
     <div>
       <label style="display:inline-flex; align-items:center; gap:0.4rem">
         <input type="checkbox" name="orale_dopo_richiesta" style="width:auto" {% if corso.orale_dopo_richiesta %}checked{% endif %}>
         Rendi l'orale obbligatorio per lo studente in tutti gli appelli successivi al primo in cui viene richiesto
       </label>
     </div>
-    <div class="form-grid" style="margin-top:0.75rem">
-      <div><label>Rendi l'orale obbligatorio dopo N compiti insufficienti (vuoto = disattivato)</label><input type="number" name="orale_soglia_n" value="{{ corso.orale_soglia_n or '' }}" min="1"></div>
-      <div><label>con votazione inferiore a</label><input type="number" name="orale_soglia_voto" value="{{ corso.orale_soglia_voto or '' }}"></div>
-    </div>
-    <p class="muted">Se entrambi i campi sono impostati, uno studente che accumula quel numero di compiti
-      con voto sotto la soglia indicata viene reso automaticamente obbligato all'orale da quel momento in poi.</p>
-    <div style="margin-top:0.5rem">
-      <label style="display:inline-flex; align-items:center; gap:0.4rem">
-        <input type="checkbox" name="ritirato_conta_insufficiente" style="width:auto" {% if corso.ritirato_conta_insufficiente %}checked{% endif %}>
-        Considera "ritirato" come un compito insufficiente ai fini del conteggio qui sopra
-      </label>
-    </div>
 
-    <h2 style="margin-top:1.5rem">Testo del compito</h2>
-    <p class="muted">
+    <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border)">
+      <label style="display:inline-flex; align-items:center; gap:0.4rem">
+        <input type="checkbox" name="orale_soglia_attiva" id="check-soglia-orale" style="width:auto" {% if corso.orale_soglia_attiva %}checked{% endif %}>
+        Rendi l'orale obbligatorio dopo un certo numero di compiti insufficienti
+      </label>
+      <div id="blocco-soglia-orale" style="display:flex; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem; margin-left:1.7rem">
+        <span class="muted">dopo</span>
+        <input type="number" name="orale_soglia_n" value="{{ corso.orale_soglia_n or '' }}" min="1" style="width:4.5rem">
+        <span class="muted">compiti con voto inferiore a</span>
+        <input type="number" name="orale_soglia_voto" value="{{ corso.orale_soglia_voto or '' }}" style="width:4.5rem">
+        <label style="display:inline-flex; align-items:center; gap:0.4rem; margin-left:1rem">
+          <input type="checkbox" name="ritirato_conta_insufficiente" style="width:auto" {% if corso.ritirato_conta_insufficiente %}checked{% endif %}>
+          conta anche "ritirato" come insufficiente
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Domande d'esame</h2>
+    <p class="muted" style="margin-top:0">Testo libero, per uso amministrativo (es. in vista dell'esportazione dei risultati).</p>
+    <textarea name="domande_esame" rows="3">{{ corso.domande_esame }}</textarea>
+  </div>
+
+  <div class="card">
+    <h2>Testo del compito</h2>
+    <p class="muted" style="margin-top:0">
       I placeholder tra parentesi graffe (vedi sopra) vengono sostituiti con i valori
       effettivi di ciascun appello al momento della generazione del testo.
     </p>
@@ -67,11 +89,23 @@
     <textarea name="frase_regole" id="frase-regole" rows="3">{{ corso.frase_regole }}</textarea>
     <button type="button" class="secondary btn-reset-default" data-target="frase-regole" data-default-tpl="tpl-default-frase-regole">Reimposta default</button>
     <template id="tpl-default-frase-regole">{{ default_frase_regole }}</template>
+  </div>
 
-    <button type="submit" style="display:block; margin-top:1.25rem">Salva impostazioni</button>
-  </form>
-</div>
+  <button type="submit">Salva impostazioni</button>
+</form>
 <script>
+(function () {
+  var checkSoglia = document.getElementById("check-soglia-orale");
+  var blocco = document.getElementById("blocco-soglia-orale");
+  function aggiorna() {
+    var attivo = checkSoglia.checked;
+    blocco.style.opacity = attivo ? "1" : "0.45";
+    blocco.querySelectorAll("input").forEach(function (el) { el.disabled = !attivo; });
+  }
+  checkSoglia.addEventListener("change", aggiorna);
+  aggiorna();
+})();
+
 document.querySelectorAll(".btn-reset-default").forEach(function (btn) {
   btn.addEventListener("click", function () {
     var textarea = document.getElementById(btn.dataset.target);

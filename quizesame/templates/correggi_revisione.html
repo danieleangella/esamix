@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Riepilogo correzione · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Riepilogo correzione</span>
+{% endblock %}
 {% block content %}
-<p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">&larr; {{ appello.nome }}</a></p>
 <h1>Riepilogo: {{ v.nome }} {{ v.cognome }} ({{ v.matricola }})</h1>
+{% if modifica %}
+<p class="muted">Stai modificando un esito già registrato per questo appello.</p>
+{% endif %}
 
 {% if errore %}
 <div class="flash flash-error">{{ errore }}</div>
@@ -12,6 +17,7 @@
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/conferma" id="form-riepilogo">
   <input type="hidden" name="matricola" value="{{ v.matricola }}">
   <input type="hidden" name="codice" value="{{ v.codice }}">
+  <input type="hidden" name="modifica" value="{{ '1' if modifica else '' }}">
 
   <div style="text-align:center; margin-bottom:1rem">
     <div class="muted" style="font-size:0.85rem">Codice compito inserito</div>

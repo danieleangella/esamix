@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ risultato.cognome }} {{ risultato.nome }} · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">{{ risultato.cognome }} {{ risultato.nome }}</span>
+{% endblock %}
 {% block content %}
-<p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">&larr; {{ appello.nome }}</a></p>
 <h1>{{ risultato.cognome }} {{ risultato.nome }} <span class="muted">({{ risultato.matricola }})</span></h1>
 
 <div class="card">

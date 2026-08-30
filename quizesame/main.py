@@ -20,9 +20,24 @@ from quizesame.services import risultati as risultati_service
 from quizesame.services import verbalizzazione as verbalizzazione_service
 from quizesame.services import migrazione as migrazione_service
 from quizesame.services import statistiche as statistiche_service
+from quizesame.services import app_config as app_config_service
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
+
+
+def _static_version() -> str:
+    """Data di ultima modifica di style.css, usata come parametro ?v= nel link allo
+    stylesheet: così il browser scarica sempre la versione aggiornata invece di tenersi
+    in cache quella vecchia ogni volta che il CSS viene modificato durante lo sviluppo."""
+    try:
+        return str(int((PACKAGE_DIR / "static" / "style.css").stat().st_mtime))
+    except OSError:
+        return "0"
+
+
+templates.env.globals["static_version"] = _static_version
+templates.env.globals["get_app_settings"] = app_config_service.get_settings
 
 app = FastAPI(title="EsaMiX")
 app.mount("/static", StaticFiles(directory=str(PACKAGE_DIR / "static")), name="static")
@@ -100,9 +115,29 @@ def _parse_varianti_form(form) -> list[dict]:
 def home(request: Request, q: str = ""):
     corsi = corsi_service.list_corsi()
     risultati_ricerca = studenti_service.cerca_in_tutti_i_corsi(q.strip()) if q.strip() else None
+    app_settings = app_config_service.get_settings()
+    riepilogo_globale = statistiche_service.calcola_globale() if app_settings.mostra_riepilogo_home else None
     return templates.TemplateResponse(request, "corsi_list.html", {
-        "corsi": corsi, "q": q, "risultati_ricerca": risultati_ricerca,
+        "corsi": corsi, "q": q, "risultati_ricerca": risultati_ricerca, "riepilogo_globale": riepilogo_globale,
     })
+
+
+@app.get("/impostazioni", response_class=HTMLResponse)
+def impostazioni_app(request: Request):
+    return templates.TemplateResponse(request, "impostazioni_app.html", {
+        "app_settings": app_config_service.get_settings(),
+    })
+
+
+@app.post("/impostazioni")
+def modifica_impostazioni_app(
+    docente: str = Form(""),
+    mostra_riepilogo_home: str = Form(""),
+):
+    app_config_service.update_settings(
+        docente=docente.strip(), mostra_riepilogo_home=bool(mostra_riepilogo_home),
+    )
+    return flash_redirect("/impostazioni", "Impostazioni salvate")
 
 
 @app.get("/studenti/{matricola}", response_class=HTMLResponse)
@@ -152,6 +187,15 @@ def corso_detail(request: Request, tag: str):
     })
 
 
+@app.get("/corsi/{tag}/statistiche", response_class=HTMLResponse)
+def statistiche_corso(request: Request, tag: str):
+    corso = corsi_service.get_corso(tag)
+    statistiche = statistiche_service.calcola_corso(tag)
+    return templates.TemplateResponse(request, "corso_statistiche.html", {
+        "corso": corso, "statistiche": statistiche,
+    })
+
+
 @app.get("/corsi/{tag}/impostazioni", response_class=HTMLResponse)
 def impostazioni_corso(request: Request, tag: str):
     corso = corsi_service.get_corso(tag)
@@ -169,8 +213,9 @@ def modifica_corso(
     votomin_raggruppamento: int = Form(...),
     risposta_corretta: int = Form(...), risposta_sbagliata: int = Form(...), risposta_vuota: int = Form(...),
     frase_consegna: str = Form(""), frase_regole: str = Form(""),
-    orale_dopo_richiesta: str = Form(""), orale_soglia_n: str = Form(""), orale_soglia_voto: str = Form(""),
-    ritirato_conta_insufficiente: str = Form(""),
+    orale_dopo_richiesta: str = Form(""), orale_soglia_attiva: str = Form(""),
+    orale_soglia_n: str = Form(""), orale_soglia_voto: str = Form(""),
+    ritirato_conta_insufficiente: str = Form(""), domande_esame: str = Form(""),
 ):
     try:
         corsi_service.update_meta(
@@ -181,8 +226,10 @@ def modifica_corso(
             frase_consegna=frase_consegna.strip() or corsi_service.DEFAULT_FRASE_CONSEGNA,
             frase_regole=frase_regole.strip() or corsi_service.DEFAULT_FRASE_REGOLE,
             orale_dopo_richiesta="1" if orale_dopo_richiesta else "0",
+            orale_soglia_attiva="1" if orale_soglia_attiva else "0",
             orale_soglia_n=orale_soglia_n.strip(), orale_soglia_voto=orale_soglia_voto.strip(),
             ritirato_conta_insufficiente="1" if ritirato_conta_insufficiente else "0",
+            domande_esame=domande_esame.strip(),
         )
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/impostazioni", str(e), "error")
@@ -218,7 +265,6 @@ def appello_detail(request: Request, tag: str, appello_id: int):
     compiti = compiti_service.list_compiti(tag, appello_id)
     risultati = correzione_service.list_risultati(tag, appello_id)
     orali_da_svolgere = correzione_service.list_orali_da_svolgere(tag, appello_id)
-    assenti_ritirati = correzione_service.list_assenti_ritirati(tag, appello_id)
     idonei = verbalizzazione_service.list_idonei(tag, appello_id)
     esercizi_assegnati = esercizi_service.list_esercizi_appello(tag, appello_id)
     banca_esercizi = esercizi_service.list_esercizi(tag)
@@ -234,7 +280,7 @@ def appello_detail(request: Request, tag: str, appello_id: int):
     statistiche = statistiche_service.calcola(tag, appello_id) if not raggruppamento else None
     return templates.TemplateResponse(request, "appello_detail.html", {
         "corso": corso, "appello": appello, "raggruppamento": raggruppamento, "compiti": compiti,
-        "risultati": risultati, "orali_da_svolgere": orali_da_svolgere, "assenti_ritirati": assenti_ritirati,
+        "risultati": risultati, "orali_da_svolgere": orali_da_svolgere,
         "idonei": idonei,
         "esercizi_assegnati": esercizi_assegnati,
         "esercizi_disponibili": disponibili, "argomenti": argomenti,
@@ -465,7 +511,7 @@ async def importa_esercizi_json(tag: str, appello_id: int, file: UploadFile = Fi
 
 def _render_correggi_revisione(
     request: Request, tag: str, appello_id: int, valutazione, voto_proposto=None, punteggi_proposti=None,
-    errore: str = "", richiedi_orale_checked=None,
+    errore: str = "", richiedi_orale_checked=None, modifica: bool = False,
 ):
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
@@ -478,7 +524,7 @@ def _render_correggi_revisione(
     return templates.TemplateResponse(request, "correggi_revisione.html", {
         "corso": corso, "appello": appello, "v": valutazione, "voto_proposto": voto_proposto,
         "punteggi_proposti": punteggi_proposti, "errore": errore,
-        "richiedi_orale_checked": richiedi_orale_checked,
+        "richiedi_orale_checked": richiedi_orale_checked, "modifica": modifica,
         "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
     })
 
@@ -486,13 +532,13 @@ def _render_correggi_revisione(
 @app.post("/corsi/{tag}/appelli/{appello_id}/correggi")
 def correggi(
     request: Request, tag: str, appello_id: int, matricola: str = Form(...), codice: str = Form(...),
-    risposte: str = Form(...),
+    risposte: str = Form(...), modifica: str = Form(""),
 ):
     try:
         valutazione = correzione_service.valuta_preliminare(tag, appello_id, matricola, codice, risposte)
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
-    return _render_correggi_revisione(request, tag, appello_id, valutazione)
+    return _render_correggi_revisione(request, tag, appello_id, valutazione, modifica=bool(modifica))
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/correggi/conferma")
@@ -504,6 +550,7 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
     azione = form.get("azione") or "salva"
     orale_motivazione = (form.get("orale_motivazione") or "").strip()
     conferma_orale_obbligatorio = bool(form.get("conferma_orale_obbligatorio"))
+    modifica = bool(form.get("modifica"))
 
     try:
         valutazione = correzione_service.valuta_preliminare(tag, appello_id, matricola, codice, risposte)
@@ -523,6 +570,7 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
         return _render_correggi_revisione(
             request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi_obbligatori,
             errore="Per richiedere l'orale devi indicare una motivazione.", richiedi_orale_checked=richiedi_orale,
+            modifica=modifica,
         )
 
     try:
@@ -530,6 +578,7 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
             tag, appello_id, matricola, codice, risposte, voto_finale=voto_finale,
             punteggi_obbligatori=punteggi_obbligatori, richiedi_orale=richiedi_orale,
             orale_motivazione=orale_motivazione, conferma_orale_obbligatorio=conferma_orale_obbligatorio,
+            modifica=modifica,
         )
     except correzione_service.OraleObbligatorioNonConfermato as e:
         return _render_correggi_revisione(
@@ -538,12 +587,17 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
                 f"Questo studente deve fare l'orale in ogni appello (imposto in \"{e.origine}\": {e.motivazione}). "
                 "Conferma la casella qui sotto per salvare comunque un voto scritto, oppure spunta \"Richiedi l'orale\"."
             ),
-            richiedi_orale_checked=richiedi_orale,
+            richiedi_orale_checked=richiedi_orale, modifica=modifica,
         )
     except correzione_service.OraleNonConsentito as e:
         return _render_correggi_revisione(
             request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi_obbligatori,
-            errore=str(e), richiedi_orale_checked=richiedi_orale,
+            errore=str(e), richiedi_orale_checked=richiedi_orale, modifica=modifica,
+        )
+    except correzione_service.RisultatoGiaValutato as e:
+        return _render_correggi_revisione(
+            request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi_obbligatori,
+            errore=str(e), richiedi_orale_checked=richiedi_orale, modifica=modifica,
         )
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
@@ -615,6 +669,7 @@ def modifica_risultato_form(request: Request, tag: str, appello_id: int, matrico
     punteggi_proposti = {int(k): v for k, v in punteggi_esistenti.items()}
     return _render_correggi_revisione(
         request, tag, appello_id, valutazione, voto_proposto=r["voto"], punteggi_proposti=punteggi_proposti,
+        modifica=True,
     )
 
 
@@ -622,6 +677,17 @@ def modifica_risultato_form(request: Request, tag: str, appello_id: int, matrico
 def scarica_risultati(tag: str, appello_id: int):
     tex = risultati_service.stampa_risultati(tag, appello_id)
     return PlainTextResponse(tex, media_type="application/x-tex")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/risultati.pdf")
+def scarica_risultati_pdf(tag: str, appello_id: int):
+    tex = risultati_service.stampa_risultati(tag, appello_id)
+    tex_path = compiti_service.path_risultati(tag, appello_id, "tex")
+    tex_path.write_text(tex, encoding="utf-8")
+    compilazione = compiti_service.compila_pdf(tex_path)
+    if not compilazione.ok:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error", anchor="valutazione")
+    return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/verbalizza/{matricola}")
@@ -668,12 +734,21 @@ def nuovo_studente(tag: str, matricola: str = Form(...), nome: str = Form(...), 
 
 
 @app.post("/corsi/{tag}/studenti/{matricola}/modifica")
-def modifica_studente(tag: str, matricola: str, nome: str = Form(...), cognome: str = Form(...)):
+def modifica_studente(tag: str, matricola: str, nome: str = Form(...), cognome: str = Form(...), nuova_matricola: str = Form("")):
     try:
-        studenti_service.aggiorna_studente(tag, matricola, nome, cognome)
+        studenti_service.aggiorna_studente(tag, matricola, nome, cognome, nuova_matricola or None)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/studenti", str(e), "error")
     return flash_redirect(f"/corsi/{tag}/studenti", "Studente aggiornato")
+
+
+@app.post("/corsi/{tag}/studenti/{matricola}/elimina")
+def elimina_studente(tag: str, matricola: str):
+    try:
+        studenti_service.elimina_studente(tag, matricola)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/studenti", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}/studenti", "Studente eliminato")
 
 
 @app.post("/corsi/{tag}/studenti/importa-csv")
@@ -775,6 +850,11 @@ def elimina_esercizio(tag: str, esercizio_id: int):
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/esercizi", str(e), "error")
     return flash_redirect(f"/corsi/{tag}/esercizi", "Esercizio eliminato")
+
+
+@app.get("/api/studenti/cerca")
+def api_cerca_studenti_globale(q: str = ""):
+    return studenti_service.cerca_globale(q)
 
 
 @app.get("/corsi/{tag}/api/studenti/cerca")

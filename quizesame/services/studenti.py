@@ -63,6 +63,23 @@ def _risultati_studente(tag: str, matricola: str) -> list[dict]:
         conn.close()
 
 
+def cerca_globale(query: str, limite: int = 15) -> list[dict]:
+    """Studenti (deduplicati per matricola) che combaciano con `query` in almeno un
+    corso, per l'autocompletamento della ricerca in homepage — click su un suggerimento
+    porta alla pagina di riepilogo dello studente, che aggrega comunque tutti i corsi."""
+    query = query.strip()
+    if not query:
+        return []
+    trovati: dict[str, dict] = {}
+    for corso in corsi_service.list_corsi():
+        for s in list_studenti(corso.tag, search=query):
+            if s.matricola not in trovati:
+                trovati[s.matricola] = {"matricola": s.matricola, "nome": s.nome, "cognome": s.cognome}
+                if len(trovati) >= limite:
+                    return list(trovati.values())
+    return list(trovati.values())
+
+
 def riepilogo_globale(matricola: str) -> list[dict]:
     """Tutti i corsi (anni accademici) in cui questa matricola compare, con i suoi
     risultati in ciascuno: per la pagina di riepilogo di uno studente, raggiungibile
@@ -186,13 +203,45 @@ def upsert_studente(tag: str, matricola: str, nome: str, cognome: str, laurea_ct
         conn.close()
 
 
-def aggiorna_studente(tag: str, matricola: str, nome: str, cognome: str) -> None:
+def aggiorna_studente(tag: str, matricola: str, nome: str, cognome: str, nuova_matricola: Optional[str] = None) -> None:
+    matricola = _clean(matricola)
+    nuova_matricola = _clean(nuova_matricola) if nuova_matricola else matricola
     conn = db.get_connection(config.corso_db_path(tag))
     try:
+        if nuova_matricola != matricola:
+            if conn.execute("SELECT 1 FROM studenti WHERE matricola=?", (nuova_matricola,)).fetchone():
+                raise ValueError(f"Esiste già uno studente con matricola '{nuova_matricola}'")
+            # la matricola è chiave primaria referenziata da risultati e orale_obbligatorio:
+            # defer_foreign_keys rimanda il controllo dei vincoli a fine transazione, così si
+            # può aggiornare prima la tabella genitore e poi le tabelle figlie in sicurezza.
+            conn.execute("PRAGMA defer_foreign_keys = ON")
         cur = conn.execute(
-            "UPDATE studenti SET nome=?, cognome=? WHERE matricola=?",
-            (_clean(nome), _clean(cognome), _clean(matricola)),
+            "UPDATE studenti SET nome=?, cognome=?, matricola=? WHERE matricola=?",
+            (_clean(nome), _clean(cognome), nuova_matricola, matricola),
         )
+        if cur.rowcount == 0:
+            raise ValueError(f"Studente con matricola '{matricola}' non trovato")
+        if nuova_matricola != matricola:
+            conn.execute("UPDATE risultati SET matricola=? WHERE matricola=?", (nuova_matricola, matricola))
+            conn.execute("UPDATE orale_obbligatorio SET matricola=? WHERE matricola=?", (nuova_matricola, matricola))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def elimina_studente(tag: str, matricola: str) -> None:
+    """Rifiuta la cancellazione se lo studente ha già risultati registrati: in quel caso
+    andrebbe corretta la matricola con aggiorna_studente, non persa la storia dei voti."""
+    matricola = _clean(matricola)
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        if conn.execute("SELECT 1 FROM risultati WHERE matricola=?", (matricola,)).fetchone():
+            raise ValueError(
+                f"Lo studente {matricola} ha già risultati registrati: non può essere eliminato "
+                "(se la matricola è sbagliata, correggila invece di eliminarlo)"
+            )
+        conn.execute("DELETE FROM orale_obbligatorio WHERE matricola=?", (matricola,))
+        cur = conn.execute("DELETE FROM studenti WHERE matricola=?", (matricola,))
         if cur.rowcount == 0:
             raise ValueError(f"Studente con matricola '{matricola}' non trovato")
         conn.commit()

@@ -6,6 +6,7 @@ __pycache__/
 # dati reali di corsi/studenti: mai committare database o output generati
 corsi/*/db.sqlite
 corsi/*/output/
+corsi/app_settings.json
 *.sqlite
 *.sqlite3
 GeoOZ-IngMEL-UniFi25/

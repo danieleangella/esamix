@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Help{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <span class="current">Help</span>
+{% endblock %}
 {% block content %}
 <h1>Guida</h1>
 
@@ -29,6 +32,11 @@
     richiede sia la risposta a scelta multipla sia lo svolgimento scritto. Gli esercizi
     di un appello si possono esportare/importare in JSON per condividerli con un collega
     o riusarli in un altro corso.
+  </p>
+  <p>
+    Cliccando sul nome di un esercizio nella banca del corso si apre un'anteprima di
+    tutte le sue varianti, con la risposta corretta e quelle sbagliate ben distinte e le
+    eventuali formule LaTeX renderizzate.
   </p>
 </div>
 
@@ -91,9 +99,16 @@
   <p>
     Gli studenti idonei non ancora verbalizzati compaiono in fondo alla scheda
     "Valutazione scritti"; una volta verbalizzato, un esito non è più modificabile o
-    eliminabile. La scheda <strong>Statistiche</strong> di un appello mostra promossi,
-    medie scritto/orale, distribuzione dei voti confrontata con una gaussiana teorica, e
-    gli esercizi più sbagliati con la percentuale di ciascuna risposta sbagliata scelta.
+    eliminabile. La scheda <strong>Statistiche</strong> di un appello mostra promossi e
+    insufficienti (con percentuali), medie scritto/orale, distribuzione dei voti
+    confrontata con una gaussiana teorica (con asimmetria, curtosi e una misura sintetica
+    della distanza dalla campana teorica), e gli esercizi più sbagliati con la
+    percentuale di ciascuna risposta sbagliata scelta.
+  </p>
+  <p>
+    La scheda <strong>Statistiche</strong> del corso (accanto ad Appelli/Studenti/
+    Esercizi) aggrega gli stessi numeri su tutti gli appelli, con una tabella e un
+    grafico dell'andamento di esami svolti e promossi appello per appello.
   </p>
 </div>
 
@@ -105,6 +120,11 @@
     per ripescare chi deve ripetere). Cliccando su nome o cognome di uno studente si apre
     una pagina di riepilogo con tutti i suoi esami, suddivisi per anno accademico.
   </p>
+  <p>
+    Dal bottone "Modifica" nell'elenco studenti si può correggere anche la matricola, o
+    eliminare lo studente — possibile solo se non ha ancora risultati registrati in
+    quel corso, per non perdere dati.
+  </p>
 </div>
 
 <div class="card">
@@ -113,6 +133,16 @@
     Un raggruppamento combina più appelli (es. prove parziali) in un voto unico: la
     media dei voti di chi ha superato la soglia di <em>ciascuna</em> prova membro. Si
     crea dalla pagina del corso, dopo aver creato almeno due appelli.
+  </p>
+</div>
+
+<div class="card">
+  <h2>Impostazioni dell'app</h2>
+  <p>
+    Distinte dalle impostazioni di un singolo corso: dal link <strong>Impostazioni</strong>
+    nel menu in alto si imposta il nome del docente (mostrato accanto al titolo "EsaMiX")
+    e si può disattivare il riquadro di riepilogo generale (esami svolti e sufficienze su
+    tutti i corsi) che compare in homepage.
   </p>
 </div>
 

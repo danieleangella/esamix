@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ appello.nome }} · {{ corso.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <span class="current">{{ appello.nome }}</span>
+{% endblock %}
 {% block content %}
-<p><a href="/corsi/{{ corso.tag }}">&larr; {{ corso.nome }}</a></p>
 <h1>{{ appello.nome }} <span class="muted">({{ appello.tipo }})</span></h1>
 
 <div class="tabs" id="tabs-appello">
@@ -295,48 +297,9 @@
     </form>
     <script>
     (function () {
-      function autocomplete(input, suggerimentiEl, urlBuilder, renderEtichetta, campoValore, onRisultati) {
-        var timer = null;
-        var ultimaRichiesta = 0;
-        input.addEventListener("input", function () {
-          clearTimeout(timer);
-          var valore = input.value.trim();
-          if (valore.length < (input.dataset.minChars || 1)) {
-            suggerimentiEl.style.display = "none";
-            if (onRisultati) onRisultati([], valore);
-            return;
-          }
-          timer = setTimeout(function () {
-            var richiestaId = ++ultimaRichiesta;
-            fetch(urlBuilder(valore)).then(function (r) { return r.json(); }).then(function (dati) {
-              // scarta la risposta se nel frattempo è partita una richiesta più recente
-              // (altrimenti una risposta lenta e superata può sovrascrivere risultati più freschi)
-              if (richiestaId !== ultimaRichiesta) return;
-              suggerimentiEl.innerHTML = "";
-              if (onRisultati) onRisultati(dati, valore);
-              if (!dati.length) { suggerimentiEl.style.display = "none"; return; }
-              dati.forEach(function (item) {
-                var div = document.createElement("div");
-                div.className = "sfoglia-voce";
-                div.textContent = renderEtichetta(item);
-                div.addEventListener("click", function () {
-                  input.value = campoValore(item);
-                  suggerimentiEl.style.display = "none";
-                  if (onRisultati) onRisultati([item], campoValore(item));
-                });
-                suggerimentiEl.appendChild(div);
-              });
-              suggerimentiEl.style.display = "";
-            });
-          }, 200);
-        });
-        document.addEventListener("click", function (ev) {
-          if (ev.target !== input) suggerimentiEl.style.display = "none";
-        });
-      }
       var inputMatricola = document.getElementById("input-matricola");
       var nomeRisolto = document.getElementById("matricola-nome-risolto");
-      autocomplete(
+      creaAutocomplete(
         inputMatricola, document.getElementById("suggerimenti-studenti"),
         function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
         function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
@@ -348,7 +311,7 @@
       );
       var inputCodice = document.getElementById("input-codice");
       inputCodice.dataset.minChars = 4;
-      autocomplete(
+      creaAutocomplete(
         inputCodice, document.getElementById("suggerimenti-codici"),
         function (p) { return "/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/api/compiti/cerca?prefix=" + encodeURIComponent(p); },
         function (c) { return c; },
@@ -357,7 +320,7 @@
 
       var inputMatricolaAssenza = document.getElementById("input-matricola-assenza");
       if (inputMatricolaAssenza) {
-        autocomplete(
+        creaAutocomplete(
           inputMatricolaAssenza, document.getElementById("suggerimenti-studenti-assenza"),
           function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
           function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
@@ -367,25 +330,6 @@
     })();
     </script>
 
-
-    {% if assenti_ritirati %}
-    <h2 style="margin-top:1.5rem">Assenti e ritirati ({{ assenti_ritirati|length }})</h2>
-    <table>
-      <tr><th>Studente</th><th>Matricola</th><th>Esito</th><th></th></tr>
-      {% for r in assenti_ritirati %}
-      <tr>
-        <td>{{ r.cognome }} {{ r.nome }}</td>
-        <td>{{ r.matricola }}</td>
-        <td>{{ r.esito }}</td>
-        <td>
-          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/elimina">
-            <button type="submit" class="secondary">Annulla</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-    {% endif %}
 
     <h2 style="margin-top:1.5rem">Segna assente o ritirato</h2>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/assenze/segna">
@@ -405,23 +349,28 @@
       </div>
       <button type="submit">Segna</button>
     </form>
+  </div>
 
-    <h2 style="margin-top:1.5rem">Risultati inseriti ({{ risultati|length }})</h2>
+  <div class="card">
+    <h2>Risultati inseriti ({{ risultati|length }})</h2>
     <table>
-      <tr><th>Studente</th><th>Matricola</th><th>Voto</th><th>Verbalizzato</th><th></th></tr>
+      <tr><th>Studente</th><th>Matricola</th><th>Esito</th><th>Verbalizzato</th><th></th></tr>
       {% for r in risultati %}
       <tr>
         <td>{{ r.cognome }} {{ r.nome }}</td>
         <td>{{ r.matricola }}</td>
         <td>
-          {% if r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
+          {% if r.esito != 'voto' %}{{ r.esito }}
+          {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
           {% else %}{{ r.voto }}{% endif %}
         </td>
         <td>{% if r.verbalizzato %}<span class="badge badge-ok">{{ r.data_verbalizzazione }}</span>{% else %}-{% endif %}</td>
         <td style="white-space:nowrap">
+          {% if r.esito == 'voto' %}
           <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}">Dettaglio</a>
+          {% if not r.verbalizzato %}<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica">Modifica</a>{% endif %}
+          {% endif %}
           {% if not r.verbalizzato %}
-          <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica">Modifica</a>
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/elimina">
             <button type="submit" class="secondary">Elimina</button>
           </form>
@@ -430,7 +379,11 @@
       </tr>
       {% endfor %}
     </table>
-    <p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.tex">Scarica elenco risultati (.tex)</a></p>
+    <p>
+      Scarica elenco risultati:
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.tex">.tex</a> ·
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.pdf">.pdf</a>
+    </p>
   </div>
   {% endif %}
 
@@ -502,23 +455,44 @@
 <div class="tab-pane" data-pane="statistiche" style="display:none">
   <div class="card">
     <h2>Riepilogo</h2>
-    <div class="form-grid">
-      <div><div class="muted">Corretti</div><strong>{{ statistiche.totale }}</strong></div>
-      <div><div class="muted">Promossi</div><strong>{{ statistiche.promossi }}</strong></div>
-      <div><div class="muted">Insufficienti</div><strong>{{ statistiche.insufficienti }}</strong></div>
-      <div><div class="muted">In attesa di orale</div><strong>{{ statistiche.in_attesa_orale }}</strong></div>
-      <div><div class="muted">Orali svolti</div><strong>{{ statistiche.orali_svolti }}</strong></div>
+    <p class="muted" style="margin-top:0">Esiti su {{ statistiche.totale }} compiti corretti (voto minimo {{ statistiche.votomin }}).</p>
+    <div class="stats-grid">
+      <div class="stat-tile stat-ok">
+        <div class="stat-value">{{ statistiche.promossi }} {% if statistiche.promossi_pct is not none %}<span class="stat-pct">({{ statistiche.promossi_pct }}%)</span>{% endif %}</div>
+        <div class="stat-label">Promossi</div>
+      </div>
+      <div class="stat-tile stat-warn">
+        <div class="stat-value">{{ statistiche.insufficienti }} {% if statistiche.insufficienti_pct is not none %}<span class="stat-pct">({{ statistiche.insufficienti_pct }}%)</span>{% endif %}</div>
+        <div class="stat-label">Insufficienti</div>
+      </div>
+      <div class="stat-tile stat-info">
+        <div class="stat-value">{{ statistiche.in_attesa_orale }} {% if statistiche.in_attesa_orale_pct is not none %}<span class="stat-pct">({{ statistiche.in_attesa_orale_pct }}%)</span>{% endif %}</div>
+        <div class="stat-label">In attesa di orale</div>
+      </div>
+      <div class="stat-tile stat-info">
+        <div class="stat-value">{{ statistiche.orali_svolti }} {% if statistiche.orali_svolti_pct is not none %}<span class="stat-pct">({{ statistiche.orali_svolti_pct }}%)</span>{% endif %}</div>
+        <div class="stat-label">Orali svolti</div>
+      </div>
     </div>
-    <div class="form-grid" style="margin-top:0.75rem">
-      <div><div class="muted">Media scritto</div><strong>{{ statistiche.media_scritto if statistiche.media_scritto is not none else '-' }}</strong></div>
-      <div><div class="muted">Media orale</div><strong>{{ statistiche.media_orale if statistiche.media_orale is not none else '-' }}</strong></div>
-      <div><div class="muted">Media finale</div><strong>{{ statistiche.media_finale if statistiche.media_finale is not none else '-' }}</strong></div>
+    <div class="stats-grid">
+      <div class="stat-tile">
+        <div class="stat-value">{{ statistiche.media_scritto if statistiche.media_scritto is not none else '-' }}</div>
+        <div class="stat-label">Media scritto</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-value">{{ statistiche.media_orale if statistiche.media_orale is not none else '-' }}</div>
+        <div class="stat-label">Media orale</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-value">{{ statistiche.media_finale if statistiche.media_finale is not none else '-' }}</div>
+        <div class="stat-label">Media finale</div>
+      </div>
     </div>
   </div>
 
-  {% if statistiche.distribuzione.bins %}
   <div class="card">
     <h2>Distribuzione dei voti</h2>
+    {% if statistiche.distribuzione.bins %}
     <p class="muted">
       Media {{ statistiche.distribuzione.media }}, deviazione standard {{ statistiche.distribuzione.dev_std }}.
       La linea rossa è la curva gaussiana teorica con la stessa media e deviazione standard.
@@ -535,8 +509,33 @@
         {% endif %}
       </svg>
     </div>
+    {% if statistiche.distribuzione.distanza_gaussiana is not none %}
+    <div class="stats-grid">
+      <div class="stat-tile">
+        <div class="stat-value">{{ statistiche.distribuzione.asimmetria }}</div>
+        <div class="stat-label">Asimmetria (skewness)</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-value">{{ statistiche.distribuzione.curtosi }}</div>
+        <div class="stat-label">Curtosi in eccesso</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-value">{{ statistiche.distribuzione.distanza_gaussiana }}</div>
+        <div class="stat-label">Distanza dalla gaussiana</div>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:0.75rem">
+      Per una gaussiana perfetta asimmetria e curtosi valgono 0: più la "distanza dalla
+      gaussiana" (la loro combinazione) si avvicina a 0, più la distribuzione dei voti è
+      vicina alla campana teorica. Valori sopra ~1 indicano una forma via via più diversa
+      (es. asimmetria positiva = più voti bassi con una coda di voti alti, curtosi negativa
+      = distribuzione più "piatta" del normale).
+    </p>
+    {% endif %}
+    {% else %}
+    <p class="muted">Non ci sono ancora abbastanza voti finali registrati per calcolare una distribuzione.</p>
+    {% endif %}
   </div>
-  {% endif %}
 
   {% if statistiche.esercizi %}
   <div class="card">
@@ -575,7 +574,9 @@
 document.querySelectorAll(".btn-mostra-testo").forEach(function (btn) {
   btn.addEventListener("click", function () {
     var div = document.getElementById(btn.dataset.target);
-    div.style.display = div.style.display === "none" ? "" : "none";
+    var giaAperto = div.style.display !== "none";
+    div.style.display = giaAperto ? "none" : "";
+    if (!giaAperto) renderizzaLatex(div);
   });
 });
 </script>
@@ -588,6 +589,13 @@ document.querySelectorAll(".btn-mostra-testo").forEach(function (btn) {
   function attiva(nome) {
     tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.tab === nome); });
     panes.forEach(function (p) { p.style.display = (p.dataset.pane === nome) ? "" : "none"; });
+    // riporta subito il cursore sul campo matricola: con centinaia di studenti da
+    // correggere in fila, non dover ricliccare ogni volta sul campo fa risparmiare
+    // un bel po' di movimenti ripetuti.
+    if (nome === "valutazione") {
+      var campo = document.getElementById("input-matricola");
+      if (campo) campo.focus();
+    }
   }
   tabs.forEach(function (t) {
     t.addEventListener("click", function (ev) {

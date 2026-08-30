@@ -1,13 +1,50 @@
 {% extends "base.html" %}
 {% block title %}Corsi{% endblock %}
+{% block breadcrumb %}
+<span class="current">Corsi</span>
+{% endblock %}
 {% block content %}
 <h1>Corsi</h1>
+
+{% if riepilogo_globale %}
+<div class="card">
+  <h2>Riepilogo generale</h2>
+  <p class="muted" style="margin-top:0">
+    In {{ riepilogo_globale.numero_corsi }} corsi{% if riepilogo_globale.anno_iniziale %}, a partire dall'anno accademico {{ riepilogo_globale.anno_iniziale }}{% endif %}.
+  </p>
+  <div class="stats-grid">
+    <div class="stat-tile">
+      <div class="stat-value">{{ riepilogo_globale.esami_svolti }}</div>
+      <div class="stat-label">Esami svolti</div>
+    </div>
+    <div class="stat-tile stat-ok">
+      <div class="stat-value">{{ riepilogo_globale.sufficienze }} {% if riepilogo_globale.sufficienze_pct is not none %}<span class="stat-pct">({{ riepilogo_globale.sufficienze_pct }}%)</span>{% endif %}</div>
+      <div class="stat-label">Sufficienze</div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <div class="card">
   <h2>Cerca uno studente</h2>
   <form method="get" action="/">
-    <input type="text" name="q" value="{{ q }}" placeholder="Cerca per matricola, nome o cognome (in tutti i corsi)">
+    <div style="position:relative">
+      <input type="text" name="q" id="input-cerca-studente" value="{{ q }}" placeholder="Cerca per matricola, nome o cognome (in tutti i corsi)">
+      <div id="suggerimenti-cerca-studente" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+    </div>
   </form>
+  <script>
+  creaAutocomplete(
+    document.getElementById("input-cerca-studente"), document.getElementById("suggerimenti-cerca-studente"),
+    function (q) { return "/api/studenti/cerca?q=" + encodeURIComponent(q); },
+    function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+    function (s) { return s.matricola; }
+  );
+  document.getElementById("suggerimenti-cerca-studente").addEventListener("click", function (ev) {
+    var voce = ev.target.closest(".sfoglia-voce");
+    if (voce) window.location.href = "/studenti/" + document.getElementById("input-cerca-studente").value;
+  });
+  </script>
   {% if risultati_ricerca is not none %}
     {% if risultati_ricerca %}
     <table style="margin-top:0.75rem">

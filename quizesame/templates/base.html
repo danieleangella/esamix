@@ -5,22 +5,116 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>EsaMiX - {% block title %}EsaMiX{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ static_version() }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+  <script>
+  // Renderizza le formule LaTeX (delimitate da $...$ o $$...$$) dentro un elemento: usata
+  // per le anteprime di testo/risposte degli esercizi, definita qui in <head> per lo
+  // stesso motivo di creaAutocomplete (va chiamata da script nel blocco contenuto, che nel
+  // DOM finale vengono prima degli script in fondo a base.html).
+  function renderizzaLatex(radice) {
+    if (window.renderMathInElement) {
+      renderMathInElement(radice, {
+        delimiters: [
+          {left: "$$", right: "$$", display: true},
+          {left: "$", right: "$", display: false},
+        ],
+        throwOnError: false,
+      });
+    }
+  }
+  </script>
+  <script>
+  // Autocompletamento generico riusabile da qualunque pagina: digitando nel campo,
+  // interroga urlBuilder(valore) e mostra i risultati come lista cliccabile sotto il
+  // campo; onRisultati (facoltativo) riceve i dati man mano che arrivano, utile per
+  // mostrare un'informazione risolta (es. il nome corrispondente alla matricola).
+  // Definita qui in <head> (non in fondo al body) perché il codice che la usa vive nel
+  // blocco contenuto di ogni pagina, che nel DOM finale viene PRIMA degli script in
+  // fondo a base.html: se fosse definita lì, ogni chiamata fallirebbe silenziosamente
+  // con "creaAutocomplete is not defined" (gli script si eseguono nell'ordine in cui
+  // compaiono nel documento, non con hoisting tra un <script> e l'altro).
+  function creaAutocomplete(input, suggerimentiEl, urlBuilder, renderEtichetta, campoValore, onRisultati) {
+    var timer = null;
+    var ultimaRichiesta = 0;
+    input.addEventListener("input", function () {
+      clearTimeout(timer);
+      var valore = input.value.trim();
+      if (valore.length < (input.dataset.minChars || 1)) {
+        suggerimentiEl.style.display = "none";
+        if (onRisultati) onRisultati([], valore);
+        return;
+      }
+      timer = setTimeout(function () {
+        var richiestaId = ++ultimaRichiesta;
+        fetch(urlBuilder(valore)).then(function (r) { return r.json(); }).then(function (dati) {
+          // scarta la risposta se nel frattempo è partita una richiesta più recente
+          // (altrimenti una risposta lenta e superata può sovrascrivere risultati più freschi)
+          if (richiestaId !== ultimaRichiesta) return;
+          suggerimentiEl.innerHTML = "";
+          if (onRisultati) onRisultati(dati, valore);
+          if (!dati.length) { suggerimentiEl.style.display = "none"; return; }
+          dati.forEach(function (item) {
+            var div = document.createElement("div");
+            div.className = "sfoglia-voce";
+            div.textContent = renderEtichetta(item);
+            div.addEventListener("click", function () {
+              input.value = campoValore(item);
+              suggerimentiEl.style.display = "none";
+              if (onRisultati) onRisultati([item], campoValore(item));
+            });
+            suggerimentiEl.appendChild(div);
+          });
+          suggerimentiEl.style.display = "";
+        });
+      }, 200);
+    });
+    document.addEventListener("click", function (ev) {
+      if (ev.target !== input) suggerimentiEl.style.display = "none";
+    });
+  }
+  </script>
 </head>
 <body>
+  {% set docente_globale = get_app_settings().docente %}
   <header class="topbar">
-    <a class="brand" href="/">EsaMiX</a>
+    <span>
+      <a class="brand" href="/">EsaMiX</a>
+      {% if docente_globale %}<span class="brand-docente">({{ docente_globale }})</span>{% endif %}
+    </span>
+    {% set path = request.url.path %}
     <nav>
-      <a href="/">Corsi</a>
-      <a href="/migrazione">Migrazione dati legacy</a>
-      <a href="/help">Help</a>
-      <a href="/about">About</a>
+      <a href="/" class="{{ 'active' if path == '/' or path.startswith('/corsi') or path.startswith('/studenti') else '' }}">Home page</a>
+      <a href="/migrazione" class="{{ 'active' if path.startswith('/migrazione') else '' }}">Migrazione dati legacy</a>
+      <a href="/impostazioni" class="{{ 'active' if path == '/impostazioni' else '' }}">Impostazioni</a>
+      <a href="/help" class="{{ 'active' if path == '/help' else '' }}">Help</a>
+      <a href="/about" class="{{ 'active' if path == '/about' else '' }}">About</a>
     </nav>
   </header>
+  <nav class="breadcrumb-bar">
+    <div class="breadcrumb">
+      {% block breadcrumb %}<a href="/">Corsi</a>{% endblock %}
+    </div>
+  </nav>
   <main class="container">
     {% set msg = request.query_params.get('msg') %}
     {% if msg %}
-      <div class="flash flash-{{ request.query_params.get('kind', 'success') }}">{{ msg }}</div>
+      <div class="flash flash-{{ request.query_params.get('kind', 'success') }}" id="flash-message">
+        <span>{{ msg }}</span>
+        <button type="button" class="flash-close" aria-label="Chiudi">&times;</button>
+      </div>
+      <script>
+      (function () {
+        var flash = document.getElementById("flash-message");
+        var timer = setTimeout(function () { flash.remove(); }, {{ 12000 if request.query_params.get('kind') == 'error' else 6000 }});
+        flash.querySelector(".flash-close").addEventListener("click", function () {
+          clearTimeout(timer);
+          flash.remove();
+        });
+      })();
+      </script>
     {% endif %}
     {% block content %}{% endblock %}
   </main>
@@ -88,17 +182,28 @@
   })();
   </script>
   <script>
-  // Chrome (e altri browser) spesso ignorano autocomplete="off" sui campi di testo e
-  // continuano a proporre valori inseriti in precedenza altrove nell'app: impostare un
-  // valore che i browser trattano davvero come "non salvare/non suggerire" (lo stesso
-  // trucco usato per i campi password) su ogni input di testo che non ne ha già uno
-  // esplicito elimina questi suggerimenti fuorvianti.
+  // Chrome ignora autocomplete="off" solo sui campi che riconosce come login
+  // (username/password): l'app non ne ha, quindi "off" basta a eliminare per ogni
+  // campo di testo il menu con i valori inseriti in precedenza altrove nell'app.
   document.querySelectorAll('input:not([autocomplete])').forEach(function (el) {
     var tipo = (el.getAttribute("type") || "text").toLowerCase();
     if (["text", "search", "number", "tel", "url"].indexOf(tipo) !== -1) {
-      el.setAttribute("autocomplete", "new-password");
+      el.setAttribute("autocomplete", "off");
     }
   });
+  </script>
+  <script>
+  // Tutti i menu a scomparsa (<details>) di qualunque pagina si comportano come
+  // un'unica fisarmonica: aprirne uno chiude ogni altro rimasto aperto, così le pagine
+  // con più sezioni pieghevoli (es. Esercizi, Appelli) non restano affollate di form aperti.
+  (function () {
+    var dettagli = document.querySelectorAll("details");
+    dettagli.forEach(function (d) {
+      d.addEventListener("toggle", function () {
+        if (d.open) dettagli.forEach(function (altro) { if (altro !== d) altro.open = false; });
+      });
+    });
+  })();
   </script>
 </body>
 </html>

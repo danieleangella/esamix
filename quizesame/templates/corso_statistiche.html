@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Statistiche · {{ corso.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <span class="current">Statistiche</span>
+{% endblock %}
+{% block content %}
+<h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span></h1>
+<div class="tabs">
+  <a href="/corsi/{{ corso.tag }}">Appelli</a>
+  <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
+  <a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
+  <a class="active" href="/corsi/{{ corso.tag }}/statistiche">Statistiche</a>
+  <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
+</div>
+
+<div class="card">
+  <h2>Riepilogo di tutti gli appelli</h2>
+  <p class="muted" style="margin-top:0">Esiti su {{ statistiche.totale }} compiti corretti, in tutti gli appelli del corso.</p>
+  <div class="stats-grid">
+    <div class="stat-tile stat-ok">
+      <div class="stat-value">{{ statistiche.promossi }} {% if statistiche.promossi_pct is not none %}<span class="stat-pct">({{ statistiche.promossi_pct }}%)</span>{% endif %}</div>
+      <div class="stat-label">Promossi</div>
+    </div>
+    <div class="stat-tile stat-warn">
+      <div class="stat-value">{{ statistiche.insufficienti }} {% if statistiche.insufficienti_pct is not none %}<span class="stat-pct">({{ statistiche.insufficienti_pct }}%)</span>{% endif %}</div>
+      <div class="stat-label">Insufficienti</div>
+    </div>
+    <div class="stat-tile stat-info">
+      <div class="stat-value">{{ statistiche.in_attesa_orale }} {% if statistiche.in_attesa_orale_pct is not none %}<span class="stat-pct">({{ statistiche.in_attesa_orale_pct }}%)</span>{% endif %}</div>
+      <div class="stat-label">In attesa di orale</div>
+    </div>
+    <div class="stat-tile stat-info">
+      <div class="stat-value">{{ statistiche.orali_svolti }} {% if statistiche.orali_svolti_pct is not none %}<span class="stat-pct">({{ statistiche.orali_svolti_pct }}%)</span>{% endif %}</div>
+      <div class="stat-label">Orali svolti</div>
+    </div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-tile">
+      <div class="stat-value">{{ statistiche.media_scritto if statistiche.media_scritto is not none else '-' }}</div>
+      <div class="stat-label">Media scritto</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-value">{{ statistiche.media_orale if statistiche.media_orale is not none else '-' }}</div>
+      <div class="stat-label">Media orale</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-value">{{ statistiche.media_finale if statistiche.media_finale is not none else '-' }}</div>
+      <div class="stat-label">Media finale</div>
+    </div>
+  </div>
+</div>
+
+{% if statistiche.per_appello %}
+<div class="card">
+  <h2>Per appello</h2>
+  <table>
+    <tr><th>Appello</th><th>Corretti</th><th>Promossi</th><th>Insufficienti</th><th>Media finale</th></tr>
+    {% for a in statistiche.per_appello %}
+    <tr>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ a.appello_id }}#statistiche">{{ a.appello_nome }}</a></td>
+      <td>{{ a.totale }}</td>
+      <td>{{ a.promossi }} {% if a.promossi_pct is not none %}<span class="muted">({{ a.promossi_pct }}%)</span>{% endif %}</td>
+      <td>{{ a.insufficienti }} {% if a.insufficienti_pct is not none %}<span class="muted">({{ a.insufficienti_pct }}%)</span>{% endif %}</td>
+      <td>{{ a.media_finale if a.media_finale is not none else '-' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>Andamento per appello</h2>
+  <p class="muted">
+    <span style="display:inline-block; width:0.7rem; height:0.7rem; background:#93c5fd; border-radius:2px"></span> Esami svolti
+    &nbsp;&nbsp;
+    <span style="display:inline-block; width:0.7rem; height:0.7rem; background:#22c55e; border-radius:2px"></span> Promossi
+  </p>
+  <div style="overflow-x:auto">
+    <svg width="{{ statistiche.andamento.larghezza }}" height="{{ statistiche.andamento.margine_top + statistiche.andamento.altezza + 30 }}" style="min-width:100%; color:var(--text)">
+      {% for g in statistiche.andamento.gruppi %}
+      <rect x="{{ g.x_totale }}" y="{{ g.y_totale }}" width="22" height="{{ g.h_totale }}" fill="#93c5fd"></rect>
+      <text x="{{ g.x_totale + 11 }}" y="{{ g.y_totale - 4 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ g.totale }}</text>
+      <rect x="{{ g.x_promossi }}" y="{{ g.y_promossi }}" width="22" height="{{ g.h_promossi }}" fill="#22c55e"></rect>
+      <text x="{{ g.x_promossi + 11 }}" y="{{ g.y_promossi - 4 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ g.promossi }}</text>
+      <text x="{{ g.x_centro }}" y="{{ statistiche.andamento.margine_top + statistiche.andamento.altezza + 18 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ g.nome }}</text>
+      {% endfor %}
+    </svg>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Distribuzione dei voti</h2>
+  {% if statistiche.distribuzione.bins %}
+  <p class="muted">
+    Media {{ statistiche.distribuzione.media }}, deviazione standard {{ statistiche.distribuzione.dev_std }}.
+    La linea rossa è la curva gaussiana teorica con la stessa media e deviazione standard.
+  </p>
+  <div style="overflow-x:auto">
+    <svg width="{{ statistiche.distribuzione.larghezza }}" height="{{ statistiche.distribuzione.altezza + 40 }}" style="min-width:100%; color:var(--text)">
+      {% for b in statistiche.distribuzione.bins %}
+      <rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.larghezza }}" height="{{ b.altezza_barra }}" fill="#93c5fd"></rect>
+      {% if b.conteggio %}<text x="{{ b.x_centro }}" y="{{ b.y - 4 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ b.conteggio }}</text>{% endif %}
+      <text x="{{ b.x_centro }}" y="{{ statistiche.distribuzione.altezza + 15 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ b.voto }}</text>
+      {% endfor %}
+      {% if statistiche.distribuzione.curva_points %}
+      <polyline fill="none" stroke="#dc2626" stroke-width="2" points="{{ statistiche.distribuzione.curva_points }}"></polyline>
+      {% endif %}
+    </svg>
+  </div>
+  {% if statistiche.distribuzione.distanza_gaussiana is not none %}
+  <div class="stats-grid">
+    <div class="stat-tile">
+      <div class="stat-value">{{ statistiche.distribuzione.asimmetria }}</div>
+      <div class="stat-label">Asimmetria (skewness)</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-value">{{ statistiche.distribuzione.curtosi }}</div>
+      <div class="stat-label">Curtosi in eccesso</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-value">{{ statistiche.distribuzione.distanza_gaussiana }}</div>
+      <div class="stat-label">Distanza dalla gaussiana</div>
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <p class="muted">Non ci sono ancora abbastanza voti finali registrati per calcolare una distribuzione.</p>
+  {% endif %}
+</div>
+{% endblock %}

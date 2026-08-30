@@ -53,6 +53,11 @@ def path_riferimento(tag: str, appello_id: int, ext: str) -> Path:
     return _out_dir(tag) / f"riferimento-{appello.slug}.{ext}"
 
 
+def path_risultati(tag: str, appello_id: int, ext: str) -> Path:
+    appello = corsi_service.get_appello(tag, appello_id)
+    return _out_dir(tag) / f"risultati-{appello.slug}.{ext}"
+
+
 def path_blocco(tag: str, appello_id: int, numero: int, ext: str) -> Path:
     appello = corsi_service.get_appello(tag, appello_id)
     return _out_dir(tag) / f"blocco-{appello.slug}-{numero}.{ext}"

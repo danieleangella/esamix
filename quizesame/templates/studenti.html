@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Studenti · {{ corso.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <span class="current">Studenti</span>
+{% endblock %}
 {% block content %}
-<p><a href="/corsi/{{ corso.tag }}">&larr; {{ corso.nome }}</a></p>
+<h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span></h1>
 <div class="tabs">
   <a href="/corsi/{{ corso.tag }}">Appelli</a>
   <a class="active" href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
   <a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
+  <a href="/corsi/{{ corso.tag }}/statistiche">Statistiche</a>
   <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
 </div>
 
@@ -25,10 +29,15 @@
     </tr>
     <tr class="riga-modifica-studente" data-matricola="{{ s.matricola }}" style="display:none">
       <td colspan="4">
-        <form method="post" action="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/modifica" style="display:flex; gap:0.5rem; align-items:flex-end; margin-top:0">
+        <form method="post" action="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/modifica" style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap; margin-top:0.5rem">
+          <div><label>Matricola</label><input name="nuova_matricola" value="{{ s.matricola }}" required></div>
           <div><label>Cognome</label><input name="cognome" value="{{ s.cognome }}" required></div>
           <div><label>Nome</label><input name="nome" value="{{ s.nome }}" required></div>
           <button type="submit">Salva</button>
+        </form>
+        <form method="post" action="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/elimina" class="inline"
+              onsubmit="return confirm('Eliminare {{ s.cognome }} {{ s.nome }} ({{ s.matricola }})? Possibile solo se non ha risultati registrati.');" style="margin-top:0.5rem">
+          <button type="submit" class="danger">Elimina studente</button>
         </form>
       </td>
     </tr>
@@ -36,7 +45,7 @@
   </table>
 </div>
 
-<details class="card">
+<details class="card collassabile">
   <summary>Aggiungi studente</summary>
   <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" style="margin-top:1rem">
     <div class="form-grid">
@@ -48,7 +57,7 @@
   </form>
 </details>
 
-<details class="card">
+<details class="card collassabile">
   <summary>Importa da CSV</summary>
   <p class="muted" style="margin-top:1rem">Formato: matricola,nome,cognome. Una riga per studente; le matricole già presenti vengono aggiornate, non duplicate.</p>
   <form method="post" action="/corsi/{{ corso.tag }}/studenti/importa-csv" enctype="multipart/form-data">
@@ -57,7 +66,7 @@
   </form>
 </details>
 
-<details class="card">
+<details class="card collassabile" {% if corso_sorgente %}open{% endif %}>
   <summary>Importa studenti da un altro corso</summary>
   <div style="margin-top:1rem">
     {% if corsi_suggeriti %}
@@ -110,10 +119,30 @@
 
 <script>
 (function () {
+  // Tutti i pannelli a scomparsa di questa pagina (righe di modifica studente e i tre
+  // <details> sotto la tabella) si comportano come un'unica fisarmonica: aprirne uno
+  // chiude qualunque altro fosse aperto, per non affollare la pagina di form aperti.
+  var dettagli = document.querySelectorAll("details.collassabile");
+
+  function chiudiTutto(eccetto) {
+    dettagli.forEach(function (d) { if (d !== eccetto) d.open = false; });
+    document.querySelectorAll(".riga-modifica-studente").forEach(function (r) {
+      if (r !== eccetto) r.style.display = "none";
+    });
+  }
+
+  dettagli.forEach(function (d) {
+    d.addEventListener("toggle", function () {
+      if (d.open) chiudiTutto(d);
+    });
+  });
+
   document.querySelectorAll(".btn-modifica-studente").forEach(function (btn) {
     btn.addEventListener("click", function () {
       var riga = document.querySelector('.riga-modifica-studente[data-matricola="' + btn.dataset.matricola + '"]');
-      riga.style.display = riga.style.display === "none" ? "" : "none";
+      var giaAperta = riga.style.display !== "none";
+      chiudiTutto(giaAperta ? null : riga);
+      riga.style.display = giaAperta ? "none" : "";
     });
   });
 })();

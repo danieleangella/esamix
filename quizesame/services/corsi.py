@@ -49,9 +49,11 @@ class Corso:
     frase_consegna: str = DEFAULT_FRASE_CONSEGNA
     frase_regole: str = DEFAULT_FRASE_REGOLE
     orale_dopo_richiesta: bool = True
+    orale_soglia_attiva: bool = False
     orale_soglia_n: Optional[int] = None
     orale_soglia_voto: Optional[int] = None
     ritirato_conta_insufficiente: bool = False
+    domande_esame: str = ""
 
 
 @dataclass
@@ -148,9 +150,13 @@ def get_corso(tag: str) -> Corso:
         frase_consegna=meta.get("frase_consegna") or DEFAULT_FRASE_CONSEGNA,
         frase_regole=meta.get("frase_regole") or DEFAULT_FRASE_REGOLE,
         orale_dopo_richiesta=meta.get("orale_dopo_richiesta", "1") == "1",
+        orale_soglia_attiva=meta.get(
+            "orale_soglia_attiva", "1" if meta.get("orale_soglia_n") and meta.get("orale_soglia_voto") else "0"
+        ) == "1",
         orale_soglia_n=int(meta["orale_soglia_n"]) if meta.get("orale_soglia_n") else None,
         orale_soglia_voto=int(meta["orale_soglia_voto"]) if meta.get("orale_soglia_voto") else None,
         ritirato_conta_insufficiente=meta.get("ritirato_conta_insufficiente", "0") == "1",
+        domande_esame=meta.get("domande_esame", ""),
     )
 
 

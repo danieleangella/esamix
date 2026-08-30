@@ -19,6 +19,12 @@ class GiaVerbalizzato(Exception):
     pass
 
 
+class RisultatoGiaValutato(Exception):
+    """Lo studente ha già un esito registrato per questo appello (voto, assente o
+    ritirato): una correzione "nuova" non può sovrascriverlo per sbaglio — va usato
+    esplicitamente "Modifica" se si intende correggerlo di nuovo."""
+
+
 class OraleNonConsentito(Exception):
     """L'orale si può richiedere solo per un compito scritto sufficiente."""
 
@@ -99,7 +105,7 @@ def _applica_soglia_orale_automatica(conn, corso, matricola: str) -> None:
     """Se il corso ha impostato 'orale obbligatorio dopo N compiti con voto sotto M', e lo
     studente ha appena raggiunto quella soglia (contando tutti gli appelli del corso), lo
     rende obbligato all'orale da qui in avanti (a meno che non lo sia già)."""
-    if not corso.orale_soglia_n or corso.orale_soglia_voto is None:
+    if not corso.orale_soglia_attiva or not corso.orale_soglia_n or corso.orale_soglia_voto is None:
         return
     if _orale_obbligatorio(conn, matricola):
         return
@@ -208,6 +214,7 @@ def conferma_risultato(
     richiedi_orale: bool = False,
     orale_motivazione: str = "",
     conferma_orale_obbligatorio: bool = False,
+    modifica: bool = False,
 ) -> CorrezioneResult:
     """Salva il risultato. `punteggi_obbligatori` sono i punteggi (tra risposta_sbagliata
     e risposta_corretta) assegnati dal docente agli esercizi obbligatori risposti
@@ -216,7 +223,11 @@ def conferma_risultato(
     orale" finché non si chiama completa_orale(). Se lo studente ha già una riga in
     orale_obbligatorio (imposta in un appello precedente, anche di un altro corso da cui
     è stato importato) e non è arrivata `conferma_orale_obbligatorio`, non salva nulla e
-    solleva OraleObbligatorioNonConfermato perché il chiamante mostri l'avviso."""
+    solleva OraleObbligatorioNonConfermato perché il chiamante mostri l'avviso. Se lo
+    studente ha già un esito registrato per questo appello (voto, assente o ritirato) e
+    `modifica` non è True, non salva nulla e solleva RisultatoGiaValutato: una
+    correzione "nuova" (dal form principale) non deve poter sovrascrivere per sbaglio un
+    esito già inserito — solo un "Modifica" esplicito può."""
     punteggi_obbligatori = punteggi_obbligatori or {}
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
@@ -224,6 +235,16 @@ def conferma_risultato(
     try:
         studente, compito = _carica_dati_correzione(conn, matricola, appello_id, codice)
         soluzioni = compito["soluzioni"]
+
+        if not modifica:
+            esistente = conn.execute(
+                "SELECT 1 FROM risultati WHERE matricola=? AND appello_id=?", (matricola, appello_id)
+            ).fetchone()
+            if esistente:
+                raise RisultatoGiaValutato(
+                    f"Lo studente {matricola} ha già un esito registrato per questo appello: "
+                    "usa \"Modifica\" nella tabella dei risultati per correggerlo."
+                )
 
         orale_obb = _orale_obbligatorio(conn, studente["matricola"])
         if orale_obb and not richiedi_orale and not conferma_orale_obbligatorio:
@@ -328,33 +349,22 @@ def segna_esito_speciale(tag: str, appello_id: int, matricola: str, esito: str) 
         esistente = conn.execute(
             "SELECT verbalizzato FROM risultati WHERE matricola=? AND appello_id=?", (matricola, appello_id)
         ).fetchone()
-        if esistente and esistente["verbalizzato"]:
-            raise GiaVerbalizzato(f"Lo studente {matricola} ha già un voto verbalizzato per questo appello")
+        if esistente:
+            if esistente["verbalizzato"]:
+                raise GiaVerbalizzato(f"Lo studente {matricola} ha già un voto verbalizzato per questo appello")
+            raise RisultatoGiaValutato(
+                f"Lo studente {matricola} ha già un esito registrato per questo appello: "
+                f"elimina prima quel risultato per poterlo segnare come {esito}."
+            )
         conn.execute(
             "INSERT INTO risultati (matricola, appello_id, esito, voto, voto_scritto, compito_id, risposte) "
-            "VALUES (?,?,?,NULL,NULL,NULL,NULL) "
-            "ON CONFLICT(matricola, appello_id) DO UPDATE SET "
-            "esito=excluded.esito, voto=NULL, voto_scritto=NULL, compito_id=NULL, risposte=NULL, "
-            "richiede_orale=0, orale_svolto=0, esito_orale=NULL",
+            "VALUES (?,?,?,NULL,NULL,NULL,NULL)",
             (matricola, appello_id, esito),
         )
         if esito == "ritirato":
             corso = corsi_service.get_corso(tag)
             _applica_soglia_orale_automatica(conn, corso, matricola)
         conn.commit()
-    finally:
-        conn.close()
-
-
-def list_assenti_ritirati(tag: str, appello_id: int) -> list[dict]:
-    conn = db.get_connection(config.corso_db_path(tag))
-    try:
-        rows = conn.execute(
-            "SELECT r.*, s.nome, s.cognome FROM risultati r JOIN studenti s ON s.matricola = r.matricola "
-            "WHERE r.appello_id=? AND r.esito != 'voto' ORDER BY s.cognome, s.nome",
-            (appello_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
     finally:
         conn.close()
 
@@ -398,7 +408,7 @@ def list_risultati(tag: str, appello_id: int) -> list[dict]:
         rows = conn.execute(
             "SELECT r.*, s.nome, s.cognome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
-            "WHERE r.appello_id=? AND r.esito='voto' ORDER BY s.cognome, s.nome",
+            "WHERE r.appello_id=? ORDER BY s.cognome, s.nome",
             (appello_id,),
         ).fetchall()
         return [dict(r) for r in rows]

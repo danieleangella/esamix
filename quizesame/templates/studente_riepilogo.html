@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}{{ riepilogo[0].cognome }} {{ riepilogo[0].nome }} · {{ matricola }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <span class="current">{{ riepilogo[0].cognome }} {{ riepilogo[0].nome }}</span>
+{% endblock %}
 {% block content %}
-<p><a href="/">&larr; Corsi</a></p>
 <h1>{{ riepilogo[0].cognome }} {{ riepilogo[0].nome }} <span class="muted">({{ matricola }})</span></h1>
 
 {% for c in riepilogo %}

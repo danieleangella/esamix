@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Impostazioni{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <span class="current">Impostazioni</span>
+{% endblock %}
+{% block content %}
+<h1>Impostazioni dell'app</h1>
+<p class="muted">Valgono per l'intera installazione, non per un singolo corso.</p>
+
+<div class="card">
+  <form method="post" action="/impostazioni">
+    <div class="form-grid">
+      <div>
+        <label>Nome del docente</label>
+        <input name="docente" value="{{ app_settings.docente }}" placeholder="es. Prof. Rossi">
+      </div>
+    </div>
+    <p class="muted" style="margin-top:0.25rem">Appare tra parentesi accanto al titolo "EsaMiX" nel menu in alto.</p>
+
+    <div style="margin-top:1rem">
+      <label style="display:inline-flex; align-items:center; gap:0.4rem">
+        <input type="checkbox" name="mostra_riepilogo_home" style="width:auto" {% if app_settings.mostra_riepilogo_home %}checked{% endif %}>
+        Mostra il riquadro di riepilogo generale (esami svolti, sufficienze) in homepage
+      </label>
+    </div>
+
+    <button type="submit">Salva impostazioni</button>
+  </form>
+</div>
+{% endblock %}

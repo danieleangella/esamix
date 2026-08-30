@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Esercizi · {{ corso.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <span class="current">Esercizi</span>
+{% endblock %}
 {% block content %}
-<p><a href="/corsi/{{ corso.tag }}">&larr; {{ corso.nome }}</a></p>
+<h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span></h1>
 <div class="tabs">
   <a href="/corsi/{{ corso.tag }}">Appelli</a>
   <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
   <a class="active" href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
+  <a href="/corsi/{{ corso.tag }}/statistiche">Statistiche</a>
   <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
 </div>
 
@@ -16,7 +20,7 @@
     <tr><th>Nome</th><th>Argomento</th><th>Varianti</th><th>Anteprima</th><th></th></tr>
     {% for e in esercizi %}
     <tr>
-      <td>{{ e.nome or ('#' ~ e.id) }}</td>
+      <td><button type="button" class="link-simile btn-anteprima-esercizio" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button></td>
       <td>{{ e.argomento or '-' }}</td>
       <td>{{ e.varianti|length }}</td>
       <td class="muted">{{ (e.varianti[0].testo if e.varianti else '')[:80] }}&hellip;</td>
@@ -25,6 +29,23 @@
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/elimina">
           <button type="submit" class="secondary">Elimina</button>
         </form>
+      </td>
+    </tr>
+    <tr class="riga-anteprima-esercizio" data-esercizio="{{ e.id }}" style="display:none">
+      <td colspan="5">
+        <p class="muted" style="margin-top:0.5rem">Anteprima di tutte le varianti:</p>
+        {% for v in e.varianti %}
+        <div class="card" style="background:var(--bg); margin-bottom:0.75rem">
+          <strong>Variante {{ loop.index }}</strong>
+          <p style="white-space:pre-wrap; margin:0.5rem 0">{{ v.testo }}</p>
+          <p style="margin:0.2rem 0"><span class="badge badge-ok">Corretta</span> {{ v.risposte[0] }}</p>
+          {% for r in v.risposte[1:] %}
+          <p style="margin:0.2rem 0"><span class="badge badge-err">x</span> {{ r }}</p>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">Nessuna variante ancora inserita.</p>
+        {% endfor %}
       </td>
     </tr>
     <tr class="riga-modifica-esercizio" data-esercizio="{{ e.id }}" style="display:none">
@@ -106,12 +127,26 @@
 
 <script>
 (function () {
-  document.querySelectorAll(".btn-modifica-esercizio").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var riga = document.querySelector('.riga-modifica-esercizio[data-esercizio="' + btn.dataset.esercizio + '"]');
-      riga.style.display = riga.style.display === "none" ? "" : "none";
+  // Anteprima e modifica si escludono a vicenda (una sola riga espansa alla volta, per
+  // esercizio e tra esercizi diversi), come gli altri pannelli a scomparsa dell'app.
+  function chiudiTutte(eccetto) {
+    document.querySelectorAll(".riga-anteprima-esercizio, .riga-modifica-esercizio").forEach(function (r) {
+      if (r !== eccetto) r.style.display = "none";
     });
-  });
+  }
+  function collega(selettoreBottone, selettoreRiga, alApertura) {
+    document.querySelectorAll(selettoreBottone).forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var riga = document.querySelector(selettoreRiga + '[data-esercizio="' + btn.dataset.esercizio + '"]');
+        var giaAperta = riga.style.display !== "none";
+        chiudiTutte(giaAperta ? null : riga);
+        riga.style.display = giaAperta ? "none" : "";
+        if (!giaAperta && alApertura) alApertura(riga);
+      });
+    });
+  }
+  collega(".btn-anteprima-esercizio", ".riga-anteprima-esercizio", renderizzaLatex);
+  collega(".btn-modifica-esercizio", ".riga-modifica-esercizio");
 })();
 </script>
 {% endblock %}

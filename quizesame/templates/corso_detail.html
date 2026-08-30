@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% block title %}{{ corso.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <span class="current">{{ corso.nome }}</span>
+{% endblock %}
 {% block content %}
 <h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span></h1>
 <div class="tabs">
   <a class="active" href="/corsi/{{ corso.tag }}">Appelli</a>
   <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
   <a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
+  <a href="/corsi/{{ corso.tag }}/statistiche">Statistiche</a>
   <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
 </div>
 
