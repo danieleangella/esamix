@@ -13,6 +13,7 @@ DEFAULT_CONSEGNA = 0
 DEFAULT_RISPOSTA_CORRETTA = 3
 DEFAULT_RISPOSTA_SBAGLIATA = -1
 DEFAULT_RISPOSTA_VUOTA = 0
+DEFAULT_PUNTEGGIO_MAX_APERTA = 3
 
 # frasi del testo d'esame, personalizzabili dalla scheda Impostazioni del corso;
 # {consegna}/{corretta}/{sbagliata}/{vuota}/{votomin} vengono sostituiti con i valori
@@ -46,6 +47,7 @@ class Corso:
     risposta_corretta: int = DEFAULT_RISPOSTA_CORRETTA
     risposta_sbagliata: int = DEFAULT_RISPOSTA_SBAGLIATA
     risposta_vuota: int = DEFAULT_RISPOSTA_VUOTA
+    punteggio_max_aperta: int = DEFAULT_PUNTEGGIO_MAX_APERTA
     frase_consegna: str = DEFAULT_FRASE_CONSEGNA
     frase_regole: str = DEFAULT_FRASE_REGOLE
     orale_dopo_richiesta: bool = True
@@ -147,6 +149,7 @@ def get_corso(tag: str) -> Corso:
         risposta_corretta=int(meta.get("risposta_corretta", DEFAULT_RISPOSTA_CORRETTA)),
         risposta_sbagliata=int(meta.get("risposta_sbagliata", DEFAULT_RISPOSTA_SBAGLIATA)),
         risposta_vuota=int(meta.get("risposta_vuota", DEFAULT_RISPOSTA_VUOTA)),
+        punteggio_max_aperta=int(meta.get("punteggio_max_aperta", DEFAULT_PUNTEGGIO_MAX_APERTA)),
         frase_consegna=meta.get("frase_consegna") or DEFAULT_FRASE_CONSEGNA,
         frase_regole=meta.get("frase_regole") or DEFAULT_FRASE_REGOLE,
         orale_dopo_richiesta=meta.get("orale_dopo_richiesta", "1") == "1",

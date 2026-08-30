@@ -39,6 +39,14 @@
       <div><label>Punti risposta sbagliata <code class="muted">{sbagliata}</code></label><input type="number" name="risposta_sbagliata" value="{{ corso.risposta_sbagliata }}" required></div>
       <div><label>Punti risposta vuota <code class="muted">{vuota}</code></label><input type="number" name="risposta_vuota" value="{{ corso.risposta_vuota }}" required></div>
     </div>
+    <div class="form-grid" style="margin-top:0.75rem">
+      <div>
+        <label>Punteggio massimo domanda aperta</label>
+        <input type="number" name="punteggio_max_aperta" value="{{ corso.punteggio_max_aperta }}" required>
+        <p class="muted" style="margin-top:0.25rem">Punteggio massimo assegnabile in correzione a una domanda
+          aperta (senza risposta a scelta multipla): può essere maggiore dei punti di una risposta corretta.</p>
+      </div>
+    </div>
   </div>
 
   <div class="card">

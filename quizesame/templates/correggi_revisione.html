@@ -91,13 +91,13 @@
     {% if v.domande_aperte %}
     <h2 style="margin-top:1.5rem">Punteggio domande aperte</h2>
     <p class="muted">Nessuna risposta a scelta multipla: assegna un punteggio in base a quanto scritto sul
-      compito, tra {{ corso.risposta_sbagliata }} e {{ corso.risposta_corretta }}.</p>
+      compito, tra {{ corso.risposta_sbagliata }} e {{ corso.punteggio_max_aperta }}.</p>
     {% for r in v.domande_aperte %}
     <div class="form-grid" style="margin-top:0.5rem">
       <div>
         <label>{{ r.esercizio_nome }}</label>
         <input type="number" class="campo-punteggio-aperta" name="punteggio_{{ r.posizione }}" required
-               min="{{ corso.risposta_sbagliata }}" max="{{ corso.risposta_corretta }}"
+               min="{{ corso.risposta_sbagliata }}" max="{{ corso.punteggio_max_aperta }}"
                value="{{ punteggi_proposti.get(r.posizione, '') }}">
       </div>
     </div>
