@@ -330,7 +330,13 @@ def list_appelli(tag: str, includi_raggruppamenti: bool = True) -> list[Appello]
         query = "SELECT * FROM appelli"
         if not includi_raggruppamenti:
             query += " WHERE tipo != 'raggruppamento'"
-        query += " ORDER BY data IS NULL, data, id"
+        # "data" è testo in formato gg/mm/aaaa: va riletta come aaaammgg per ordinare
+        # cronologicamente (un ordinamento alfabetico sulla stringa originale metterebbe
+        # es. "05/01/2027" prima di "20/12/2026", sbagliato).
+        query += (
+            " ORDER BY data IS NULL, "
+            "substr(data,7,4) || substr(data,4,2) || substr(data,1,2), id"
+        )
         rows = conn.execute(query).fetchall()
         return [_row_to_appello(conn, r) for r in rows]
     finally:

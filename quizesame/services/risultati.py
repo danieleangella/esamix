@@ -23,6 +23,8 @@ def _etichetta_esito(r, votomin: int) -> str:
         return "assente"
     if r["esito"] == "ritirato":
         return "ritirato"
+    if r["esito"] == "rifiutato":
+        return "rifiutato"
     if r["richiede_orale"] and not r["orale_svolto"]:
         return "orale"
     if r["esito_orale"] == "assente":

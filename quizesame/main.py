@@ -754,12 +754,6 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
     voto_finale = None if sospendi_valutazione else (int(voto_str) if voto_str not in (None, "") else None)
 
     richiedi_orale = azione == "richiedi_orale" and not sospendi_valutazione
-    if richiedi_orale and not orale_motivazione:
-        return _render_correggi_revisione(
-            request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi_obbligatori,
-            errore="Per richiedere l'orale devi indicare una motivazione.", richiedi_orale_checked=richiedi_orale,
-            modifica=modifica,
-        )
 
     try:
         result = correzione_service.conferma_risultato(
@@ -945,6 +939,15 @@ def annulla_verbalizzazione(tag: str, appello_id: int, matricola: str):
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Verbalizzazione annullata", anchor="valutazione")
 
 
+@app.post("/corsi/{tag}/appelli/{appello_id}/rifiuta/{matricola}")
+def rifiuta_voto(tag: str, appello_id: int, matricola: str):
+    try:
+        verbalizzazione_service.rifiuta(tag, appello_id, matricola)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Voto rifiutato: lo studente dovrà ripresentarsi", anchor="valutazione")
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/calcola-raggruppamento")
 def calcola_raggruppamento(tag: str, appello_id: int, raggruppamento_id: int = Form(...)):
     try:
@@ -955,18 +958,42 @@ def calcola_raggruppamento(tag: str, appello_id: int, raggruppamento_id: int = F
 
 
 @app.get("/corsi/{tag}/studenti", response_class=HTMLResponse)
-def studenti_list(request: Request, tag: str, q: str = "", da: str = ""):
+def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro: str = ""):
     corso = corsi_service.get_corso(tag)
     lista = studenti_service.list_studenti(tag, q or None)
+    stato_esame = verbalizzazione_service.stato_esame_studenti(tag)
+    if filtro == "fatto":
+        lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") == "verbalizzato"]
+    elif filtro == "da_verbalizzare":
+        lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") == "da_verbalizzare"]
+    elif filtro == "da_fare":
+        lista = [s for s in lista if s.matricola not in stato_esame]
     corsi_suggeriti = corsi_service.corsi_simili(tag)
     altri_corsi = [c for c in corsi_service.list_corsi() if c.tag != tag]
     corso_sorgente = corsi_service.get_corso(da) if da and config.corso_exists(da) else None
     studenti_sorgente = studenti_service.list_non_superati(da) if corso_sorgente else []
     return templates.TemplateResponse(request, "studenti.html", {
-        "corso": corso, "studenti": lista, "q": q,
+        "corso": corso, "studenti": lista, "q": q, "filtro": filtro, "stato_esame": stato_esame,
         "corsi_suggeriti": corsi_suggeriti, "altri_corsi": altri_corsi,
         "corso_sorgente": corso_sorgente, "studenti_sorgente": studenti_sorgente,
     })
+
+
+@app.get("/corsi/{tag}/studenti/esporta.csv")
+def esporta_studenti(tag: str, q: str = "", filtro: str = ""):
+    lista = studenti_service.list_studenti(tag, q or None)
+    stato_esame = verbalizzazione_service.stato_esame_studenti(tag)
+    if filtro == "fatto":
+        lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") == "verbalizzato"]
+    elif filtro == "da_verbalizzare":
+        lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") == "da_verbalizzare"]
+    elif filtro == "da_fare":
+        lista = [s for s in lista if s.matricola not in stato_esame]
+    dati = studenti_service.esporta_csv(lista, stato_esame)
+    return Response(
+        dati, media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="studenti-{tag}.csv"'},
+    )
 
 
 @app.post("/corsi/{tag}/studenti/nuovo")

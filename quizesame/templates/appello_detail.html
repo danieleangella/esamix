@@ -6,11 +6,12 @@
 {% block content %}
 <h1>{{ corso.nome }} - {{ appello.nome }}{% if appello.tipo != 'appello' %} <span class="muted">({{ appello.tipo }})</span>{% endif %}</h1>
 
+{% set orali_richiesti = risultati | selectattr('richiede_orale') | list | length > 0 %}
 <div class="tabs" id="tabs-appello">
   {% if not raggruppamento %}<a href="#creazione" data-tab="creazione">Testo</a>{% endif %}
   <a href="#valutazione" data-tab="valutazione">Valutazione scritti</a>
-  <a href="#verbalizzati" data-tab="verbalizzati">Voti verbalizzati</a>
-  {% if not raggruppamento %}<a href="#orali" data-tab="orali">Orali</a>{% endif %}
+  <a href="#verbalizzati" data-tab="verbalizzati" class="{{ 'tab-disabilitata' if not blocchi }}">Voti verbalizzati</a>
+  {% if not raggruppamento %}<a href="#orali" data-tab="orali" class="{{ 'tab-disabilitata' if not orali_richiesti }}">Orali</a>{% endif %}
   {% if statistiche %}<a href="#statistiche" data-tab="statistiche">Statistiche</a>{% endif %}
   <a href="#impostazioni" data-tab="impostazioni">Impostazioni</a>
 </div>
@@ -552,7 +553,7 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
       <table>
         <tr>
           <th><input type="checkbox" id="checkbox-tutti-idonei" style="width:auto" checked></th>
-          <th>Studente</th><th>Matricola</th><th>Voto</th>
+          <th>Studente</th><th>Matricola</th><th>Voto</th><th></th>
         </tr>
         {% for r in idonei %}
         <tr>
@@ -560,11 +561,16 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
           <td>{{ r.cognome }} {{ r.nome }}</td>
           <td>{{ r.matricola }}</td>
           <td>{{ r.voto }}</td>
+          <td><button type="submit" form="form-rifiuta-{{ r.matricola }}" class="secondary" style="margin-top:0">Rifiuta</button></td>
         </tr>
         {% endfor %}
       </table>
       <button type="submit" id="btn-verbalizza-multipli">Verbalizza tutti ({{ idonei|length }})</button>
     </form>
+    {% for r in idonei %}
+    <form method="post" id="form-rifiuta-{{ r.matricola }}" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/rifiuta/{{ r.matricola }}"
+          onsubmit="return confirm('Rifiutare il voto di {{ r.cognome }} {{ r.nome }}? Dovrà ripresentarsi a un appello successivo.');" style="display:none"></form>
+    {% endfor %}
     <script>
     (function () {
       var checkboxTutti = document.getElementById("checkbox-tutti-idonei");
@@ -816,8 +822,8 @@ document.querySelectorAll(".btn-mostra-testo").forEach(function (btn) {
       attiva(t.dataset.tab);
     });
   });
-  var iniziale = (location.hash || "#valutazione").slice(1);
-  if (!document.querySelector('.tab-pane[data-pane="' + iniziale + '"]')) iniziale = "valutazione";
+  var iniziale = (location.hash || "#impostazioni").slice(1);
+  if (!document.querySelector('.tab-pane[data-pane="' + iniziale + '"]')) iniziale = "impostazioni";
   attiva(iniziale);
 })();
 </script>

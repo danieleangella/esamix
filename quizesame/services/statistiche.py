@@ -146,7 +146,12 @@ def calcola(tag: str, appello_id: int) -> dict:
 
         totale = len(risultati)
         in_attesa_orale = [r for r in risultati if r["richiede_orale"] and not r["orale_svolto"]]
-        valutati = [r for r in risultati if not (r["richiede_orale"] and not r["orale_svolto"])]
+        # un voto rifiutato dallo studente non è un esito definitivo (dovrà ripresentarsi):
+        # non va contato né tra i promossi né tra gli insufficienti.
+        valutati = [
+            r for r in risultati
+            if not (r["richiede_orale"] and not r["orale_svolto"]) and r["esito"] != "rifiutato"
+        ]
         promossi = [r for r in valutati if r["voto"] is not None and r["voto"] >= votomin]
         insufficienti = [r for r in valutati if r["voto"] is not None and r["voto"] < votomin]
 

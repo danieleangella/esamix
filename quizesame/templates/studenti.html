@@ -16,11 +16,25 @@
 <div class="card">
   <h2>Studenti ({{ studenti|length }})</h2>
   <form method="get" action="/corsi/{{ corso.tag }}/studenti">
-    <div style="position:relative">
-      <input name="q" id="input-cerca-studenti" value="{{ q }}" autocomplete="off" placeholder="Cerca per matricola, nome o cognome">
-      <div id="suggerimenti-cerca-studenti" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+    <div class="form-grid">
+      <div style="position:relative">
+        <input name="q" id="input-cerca-studenti" value="{{ q }}" autocomplete="off" placeholder="Cerca per matricola, nome o cognome">
+        <div id="suggerimenti-cerca-studenti" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+      </div>
+      <div>
+        <label>Stato esame</label>
+        <select name="filtro" onchange="this.form.requestSubmit()">
+          <option value="" {% if not filtro %}selected{% endif %}>Tutti</option>
+          <option value="fatto" {% if filtro == 'fatto' %}selected{% endif %}>Esame superato</option>
+          <option value="da_verbalizzare" {% if filtro == 'da_verbalizzare' %}selected{% endif %}>Da verbalizzare</option>
+          <option value="da_fare" {% if filtro == 'da_fare' %}selected{% endif %}>Deve ancora sostenerlo</option>
+        </select>
+      </div>
     </div>
   </form>
+  <p class="muted" style="margin-top:0.5rem">
+    <a href="/corsi/{{ corso.tag }}/studenti/esporta.csv?q={{ q }}&filtro={{ filtro }}">Esporta questo elenco in CSV</a>
+  </p>
   <script>
   creaAutocomplete(
     document.getElementById("input-cerca-studenti"), document.getElementById("suggerimenti-cerca-studenti"),

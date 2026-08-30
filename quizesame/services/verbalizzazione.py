@@ -14,7 +14,7 @@ def list_idonei(tag: str, appello_id: int) -> list[dict]:
         rows = conn.execute(
             "SELECT r.*, s.nome, s.cognome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
-            "WHERE r.appello_id=? AND r.verbalizzato=0 AND r.voto >= ? "
+            "WHERE r.appello_id=? AND r.verbalizzato=0 AND r.voto >= ? AND r.esito='voto' "
             "AND NOT (r.richiede_orale=1 AND r.orale_svolto=0) "
             "AND r.valutazione_sospesa=0 "
             "ORDER BY s.cognome, s.nome",
@@ -66,6 +66,29 @@ def verbalizza_multipli(tag: str, appello_id: int, matricole: list[str], data: s
     return n
 
 
+def rifiuta(tag: str, appello_id: int, matricola: str) -> None:
+    """Lo studente rifiuta il voto proposto invece di farlo verbalizzare: l'esito diventa
+    'rifiutato' (invece di 'voto'), quindi esce dagli idonei di questo appello e potrà
+    ripresentarsi a un appello successivo esattamente come se non lo avesse superato."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        row = conn.execute(
+            "SELECT verbalizzato FROM risultati WHERE matricola=? AND appello_id=?",
+            (matricola, appello_id),
+        ).fetchone()
+        if row is None:
+            raise ValueError("Nessun risultato registrato per questo studente in questo appello")
+        if row["verbalizzato"]:
+            raise GiaVerbalizzato("Questo risultato è già stato verbalizzato: non può più essere rifiutato")
+        conn.execute(
+            "UPDATE risultati SET esito='rifiutato' WHERE matricola=? AND appello_id=?",
+            (matricola, appello_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def list_verbalizzati(tag: str, appello_id: int) -> list[dict]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
@@ -79,6 +102,27 @@ def list_verbalizzati(tag: str, appello_id: int) -> list[dict]:
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+def stato_esame_studenti(tag: str) -> dict[str, dict]:
+    """Per ogni studente con almeno un risultato nel corso (appelli e raggruppamenti
+    compresi, dato che il voto combinato di un raggruppamento è un risultato come un
+    altro sul suo appello "virtuale"), lo stato aggregato dell'esame:
+    - "verbalizzato": ha un voto accettato e verbalizzato (su un qualunque appello) —
+      non deve più sostenere l'esame;
+    - "da_verbalizzare": non verbalizzato, ma idoneo su un appello (tipicamente il voto
+      combinato di un raggruppamento in attesa che lo studente lo accetti);
+    - assente da questo dizionario per chi non ha ancora nessuno dei due (deve ancora
+      sostenere l'esame, o l'ha rifiutato/non superato in precedenza)."""
+    stato: dict[str, dict] = {}
+    for appello in corsi_service.list_appelli(tag):
+        for r in list_verbalizzati(tag, appello.id):
+            stato[r["matricola"]] = {"stato": "verbalizzato", "voto": r["voto"], "appello_nome": appello.nome}
+        for r in list_idonei(tag, appello.id):
+            if stato.get(r["matricola"], {}).get("stato") == "verbalizzato":
+                continue
+            stato[r["matricola"]] = {"stato": "da_verbalizzare", "voto": r["voto"], "appello_nome": appello.nome}
+    return stato
 
 
 def annulla_verbalizzazione(tag: str, appello_id: int, matricola: str) -> None:

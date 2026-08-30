@@ -48,6 +48,24 @@ def list_studenti(tag: str, search: Optional[str] = None) -> list[Studente]:
         conn.close()
 
 
+def esporta_csv(studenti: list[Studente], stato_esame: dict) -> bytes:
+    """CSV di un elenco di studenti (già filtrato dal chiamante) con lo stato aggregato
+    dell'esame nel corso: usata sia per l'esportazione completa sia per quella di un
+    sottoinsieme filtrato (es. solo chi deve ancora sostenerlo)."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\r\n")
+    writer.writerow(["Matricola", "Cognome", "Nome", "Corso di laurea", "Stato esame", "Voto"])
+    etichette = {"verbalizzato": "esame superato", "da_verbalizzare": "da verbalizzare"}
+    for s in studenti:
+        stato = stato_esame.get(s.matricola)
+        writer.writerow([
+            s.matricola, s.cognome, s.nome, s.laurea_nome or "",
+            etichette.get(stato["stato"], "deve ancora sostenerlo") if stato else "deve ancora sostenerlo",
+            stato["voto"] if stato else "",
+        ])
+    return buffer.getvalue().encode("utf-8-sig")
+
+
 def _risultati_studente(tag: str, matricola: str) -> list[dict]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:

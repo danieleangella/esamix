@@ -142,6 +142,7 @@ a.button:hover { opacity: 0.9; }
   border: 1px solid var(--border); font-size: 0.85rem;
 }
 .tabs a.active { background: var(--accent); color: white; border-color: var(--accent); }
+.tabs a.tab-disabilitata { color: var(--muted); opacity: 0.5; pointer-events: none; cursor: default; }
 
 .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; }
 .badge-ok { background: var(--ok-bg); color: var(--ok-text); }
