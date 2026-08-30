@@ -383,10 +383,10 @@ def appello_detail(request: Request, tag: str, appello_id: int):
     argomenti = esercizi_service.list_argomenti(tag)
     blocchi = compiti_service.list_blocchi(tag, appello_id)
     for b in blocchi:
-        b["pdf_esiste"] = compiti_service.path_blocco(tag, appello_id, b["numero"], "pdf").exists()
-        b["griglia_pdf_esiste"] = compiti_service.path_griglia(tag, appello_id, b["numero"], "pdf").exists()
-    riferimento_pdf_esiste = compiti_service.path_riferimento(tag, appello_id, "pdf").exists()
-    riferimento_tex_esiste = compiti_service.path_riferimento(tag, appello_id, "tex").exists()
+        b["pdf_esiste"] = compiti_service.path_blocco(tag, appello_id, b["numero"], "pdf", appello=appello).exists()
+        b["griglia_pdf_esiste"] = compiti_service.path_griglia(tag, appello_id, b["numero"], "pdf", appello=appello).exists()
+    riferimento_pdf_esiste = compiti_service.path_riferimento(tag, appello_id, "pdf", appello=appello).exists()
+    riferimento_tex_esiste = compiti_service.path_riferimento(tag, appello_id, "tex", appello=appello).exists()
     statistiche = statistiche_service.calcola(tag, appello_id) if not raggruppamento else None
     return templates.TemplateResponse(request, "appello_detail.html", {
         "corso": corso, "appello": appello, "raggruppamento": raggruppamento, "compiti": compiti,

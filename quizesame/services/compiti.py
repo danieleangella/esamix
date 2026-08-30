@@ -48,23 +48,28 @@ def _out_dir(tag: str) -> Path:
     return out_dir
 
 
-def path_riferimento(tag: str, appello_id: int, ext: str) -> Path:
-    appello = corsi_service.get_appello(tag, appello_id)
+def path_riferimento(tag: str, appello_id: int, ext: str, appello=None) -> Path:
+    # `appello`, se già disponibile al chiamante (es. la pagina dell'appello, che lo
+    # carica una volta sola), evita di riaprire una connessione al database solo per
+    # rileggere lo slug: rilevante quando questa funzione è chiamata più volte per pagina
+    # (es. una volta per blocco) su un progetto sincronizzato con Dropbox, dove aprire un
+    # file sqlite è più lento che su disco locale.
+    appello = appello or corsi_service.get_appello(tag, appello_id)
     return _out_dir(tag) / f"riferimento-{appello.slug}.{ext}"
 
 
-def path_risultati(tag: str, appello_id: int, ext: str) -> Path:
-    appello = corsi_service.get_appello(tag, appello_id)
+def path_risultati(tag: str, appello_id: int, ext: str, appello=None) -> Path:
+    appello = appello or corsi_service.get_appello(tag, appello_id)
     return _out_dir(tag) / f"risultati-{appello.slug}.{ext}"
 
 
-def path_blocco(tag: str, appello_id: int, numero: int, ext: str) -> Path:
-    appello = corsi_service.get_appello(tag, appello_id)
+def path_blocco(tag: str, appello_id: int, numero: int, ext: str, appello=None) -> Path:
+    appello = appello or corsi_service.get_appello(tag, appello_id)
     return _out_dir(tag) / f"blocco-{appello.slug}-{numero}.{ext}"
 
 
-def path_griglia(tag: str, appello_id: int, numero: int, ext: str) -> Path:
-    appello = corsi_service.get_appello(tag, appello_id)
+def path_griglia(tag: str, appello_id: int, numero: int, ext: str, appello=None) -> Path:
+    appello = appello or corsi_service.get_appello(tag, appello_id)
     return _out_dir(tag) / f"griglia-{appello.slug}-{numero}.{ext}"
 
 
