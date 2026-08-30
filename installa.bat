@@ -16,5 +16,5 @@ pip install --upgrade pip
 pip install -e .
 
 echo.
-echo Installazione completata. Per avviare l'app esegui: avvia.bat
+echo Installazione completata. Per avviare l'app esegui: esamix.bat
 pause

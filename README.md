@@ -77,10 +77,10 @@ pip install -e .
 **Linux / macOS**
 
 ```bash
-./avvia.sh
+./esamix.sh
 ```
 
-**Windows** — doppio clic su `avvia.bat`.
+**Windows** — doppio clic su `esamix.bat`.
 
 Si apre automaticamente il browser su `http://127.0.0.1:8000`. Per chiudere l'app,
 tornare al terminale e premere `Ctrl+C` (su Windows, premere un tasto quando richiesto
