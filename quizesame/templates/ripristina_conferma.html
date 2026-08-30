@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Ripristina backup{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/impostazioni">Impostazioni</a> <span class="sep">›</span> <span class="current">Ripristina backup</span>
+{% endblock %}
+{% block content %}
+<h1>Ripristina backup</h1>
+<p class="muted">Scegli quali corsi ripristinare dal file caricato. Per un corso già esistente con lo
+  stesso tag, il ripristino <strong>lo sostituisce interamente</strong> (dati attuali persi per
+  sempre, senza backup automatico): l'avviso qui sotto lo segnala chiaramente.</p>
+
+<form method="post" action="/ripristina-backup/conferma"
+      onsubmit="return confirm('Ripristinare i corsi selezionati? Quelli già esistenti con lo stesso tag verranno sovrascritti completamente.') && confirm('Sei sicuro? I dati attuali dei corsi sovrascritti andranno persi per sempre.');">
+  <textarea name="dati_zip" style="display:none">{{ dati_zip }}</textarea>
+  <div class="card">
+    {% for c in candidati %}
+    <div style="padding:0.5rem 0; {% if not loop.first %}border-top:1px solid var(--border);{% endif %}">
+      <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer">
+        <input type="checkbox" name="tag_scelti" value="{{ c.tag }}" style="width:auto" checked>
+        <strong>{{ c.tag }}</strong>
+        {% if c.esiste_gia %}<span class="badge badge-warn">esiste già: verrà sovrascritto</span>{% else %}<span class="badge badge-ok">nuovo corso</span>{% endif %}
+      </label>
+    </div>
+    {% endfor %}
+  </div>
+  <button type="submit" class="danger">Ripristina i corsi selezionati</button>
+  <a href="/impostazioni" class="muted" style="margin-left:1rem">Annulla</a>
+</form>
+{% endblock %}

@@ -34,4 +34,15 @@
     ogni corso: utile prima di modifiche importanti, o come copia di sicurezza periodica.</p>
   <a href="/backup-tutti.zip" class="button">Scarica un backup completo di tutti i corsi</a>
 </div>
+
+<div class="card">
+  <h2>Ripristina backup</h2>
+  <p class="muted">Carica uno zip scaricato da qui (di un singolo corso o di tutti insieme): nella
+    pagina successiva scegli quali corsi ripristinare, con un avviso per quelli che esistono già e
+    verrebbero sovrascritti.</p>
+  <form method="post" action="/ripristina-backup" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".zip" required>
+    <button type="submit" class="secondary">Carica e scegli cosa ripristinare</button>
+  </form>
+</div>
 {% endblock %}

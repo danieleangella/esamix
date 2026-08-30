@@ -1,3 +1,4 @@
+import base64
 import json
 import traceback
 import webbrowser
@@ -164,6 +165,32 @@ def scarica_backup_tutti():
         dati, media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{nome_file}"'},
     )
+
+
+@app.post("/ripristina-backup", response_class=HTMLResponse)
+async def ripristina_backup(request: Request, file: UploadFile = File(...)):
+    contenuto = await file.read()
+    try:
+        candidati = corsi_service.anteprima_ripristino(contenuto)
+    except ValueError as e:
+        return flash_redirect("/impostazioni", str(e), "error")
+    return templates.TemplateResponse(request, "ripristina_conferma.html", {
+        "candidati": candidati, "dati_zip": base64.b64encode(contenuto).decode("ascii"),
+    })
+
+
+@app.post("/ripristina-backup/conferma")
+async def ripristina_backup_conferma(request: Request):
+    form = await request.form()
+    tags_scelti = form.getlist("tag_scelti")
+    if not tags_scelti:
+        return flash_redirect("/impostazioni", "Nessun corso selezionato per il ripristino", "error")
+    try:
+        contenuto = base64.b64decode(form.get("dati_zip") or "")
+        ripristinati = corsi_service.ripristina_backup(contenuto, tags_scelti)
+    except Exception as e:
+        return flash_redirect("/impostazioni", f"Errore nel ripristino: {e}", "error")
+    return flash_redirect("/", f"Corsi ripristinati: {', '.join(ripristinati) if ripristinati else 'nessuno'}")
 
 
 @app.get("/impostazioni", response_class=HTMLResponse)

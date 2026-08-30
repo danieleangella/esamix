@@ -204,6 +204,54 @@ def crea_backup_tutti() -> bytes:
     return buffer.getvalue()
 
 
+def _corsi_nello_zip(zf: zipfile.ZipFile) -> list[str]:
+    """Tag dei corsi presenti nello zip: cartelle di primo livello che contengono un
+    db.sqlite (stessa struttura prodotta da crea_backup_corso/crea_backup_tutti), quindi
+    valgono sia per il backup di un solo corso sia per quello di tutti insieme."""
+    tags = set()
+    for nome in zf.namelist():
+        parti = nome.split("/")
+        if len(parti) == 2 and parti[1] == "db.sqlite" and TAG_RE.match(parti[0]):
+            tags.add(parti[0])
+    return sorted(tags)
+
+
+def anteprima_ripristino(contenuto_zip: bytes) -> list[dict]:
+    """Per ogni corso trovato nello zip, se esiste già un corso con lo stesso tag (nel
+    qual caso ripristinarlo lo sovrascriverebbe interamente): usata per la conferma
+    mostrata prima di scrivere davvero qualcosa su disco."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(contenuto_zip)) as zf:
+            tags = _corsi_nello_zip(zf)
+    except zipfile.BadZipFile:
+        raise ValueError("Il file caricato non è uno zip valido")
+    if not tags:
+        raise ValueError("Lo zip non contiene nessun corso riconoscibile (manca un db.sqlite in una cartella di primo livello)")
+    return [{"tag": t, "esiste_gia": config.corso_exists(t)} for t in tags]
+
+
+def ripristina_backup(contenuto_zip: bytes, tags_da_ripristinare: list[str]) -> list[str]:
+    """Estrae dallo zip solo i corsi scelti dall'utente nella pagina di conferma,
+    sovrascrivendo interamente (cartella eliminata e ricreata) un eventuale corso già
+    esistente con lo stesso tag. Ritorna i tag effettivamente ripristinati."""
+    ripristinati = []
+    with zipfile.ZipFile(io.BytesIO(contenuto_zip)) as zf:
+        tags_validi = set(_corsi_nello_zip(zf))
+        for tag in tags_da_ripristinare:
+            if tag not in tags_validi:
+                continue
+            membri = [n for n in zf.namelist() if n == f"{tag}/" or n.startswith(f"{tag}/")]
+            if any(".." in Path(m).parts for m in membri):
+                continue
+            destinazione = config.corso_dir(tag)
+            if destinazione.exists():
+                shutil.rmtree(destinazione)
+                db.dimentica_schema(config.corso_db_path(tag))
+            zf.extractall(config.DATA_ROOT, members=membri)
+            ripristinati.append(tag)
+    return ripristinati
+
+
 def elimina_corso(tag: str) -> None:
     """Elimina definitivamente l'intero corso: database, studenti, esercizi, appelli,
     risultati e ogni file generato (PDF/tex). Azione irreversibile e senza backup: la
