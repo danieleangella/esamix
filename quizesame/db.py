@@ -219,6 +219,15 @@ def get_connection(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def dimentica_schema(db_path: Path) -> None:
+    """Da chiamare quando un database viene eliminato dal disco (es. elimina_corso): se
+    poi si ricrea un corso con lo stesso tag nella stessa esecuzione del programma, senza
+    questa il file nuovo (vuoto) verrebbe scambiato per uno già verificato in passato, e
+    get_connection salterebbe la creazione delle tabelle lasciando un database senza
+    schema (errore "no such table" alla prima query)."""
+    _schema_verificati.discard(str(Path(db_path).resolve()))
+
+
 def init_db(db_path: Path) -> None:
     """Unico punto che crea davvero un nuovo corso da zero: qui (e solo qui) è corretto
     creare anche la cartella, perché chi chiama sa di voler creare un corso nuovo."""

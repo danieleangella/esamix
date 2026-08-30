@@ -97,12 +97,18 @@ def effective_consegna(corso: Corso, appello: Appello) -> int:
 
 
 def list_corsi() -> list[Corso]:
+    """Un singolo corso con un database non leggibile (es. appena creato e non ancora
+    completamente scritto, o danneggiato) viene saltato invece di far fallire l'intera
+    homepage: è più utile vedere gli altri corsi con un errore in meno che nessuno."""
     corsi = []
     if not config.DATA_ROOT.exists():
         return corsi
     for entry in sorted(config.DATA_ROOT.iterdir()):
         if entry.is_dir() and (entry / "db.sqlite").exists():
-            corsi.append(get_corso(entry.name))
+            try:
+                corsi.append(get_corso(entry.name))
+            except Exception:
+                continue
     return sorted(corsi, key=lambda c: c.anno, reverse=True)
 
 
@@ -205,6 +211,7 @@ def elimina_corso(tag: str) -> None:
     if not config.corso_exists(tag):
         raise ValueError(f"Corso '{tag}' non trovato")
     shutil.rmtree(config.corso_dir(tag))
+    db.dimentica_schema(config.corso_db_path(tag))
 
 
 def get_corso(tag: str) -> Corso:
