@@ -24,47 +24,76 @@
   </div>
 </div>
 
-<div class="card">
-  <h2>Dettaglio righe</h2>
-  <div style="overflow-x:auto">
-    <table>
-      <tr><th>Riga</th><th>Esito</th><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
-      {% for r in verifica.righe %}
-      <tr>
-        <td>{{ r.numero_riga }}</td>
-        <td>
-          {% if r.stato == 'nuovo' %}<span class="badge badge-ok">nuovo</span>
-          {% elif r.stato == 'aggiornamento' %}<span class="badge badge-warn">aggiornamento</span>
-          {% else %}<span class="badge badge-err">errore</span>{% endif %}
-        </td>
-        {% if r.errore %}
-        <td colspan="3" class="muted">{{ r.errore }}</td>
-        {% else %}
-        <td>{{ r.matricola }}</td>
-        <td>{{ r.cognome }}</td>
-        <td>{{ r.nome }}</td>
-        {% endif %}
-        <td class="muted">
-          {% if r.stato == 'aggiornamento' %}era: {{ r.cognome_attuale }} {{ r.nome_attuale }}{% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-  </div>
-</div>
-
 <form method="post" action="/corsi/{{ corso.tag }}/studenti/importa-csv/conferma">
   <textarea name="csv_testo" style="display:none">{{ csv_testo }}</textarea>
-  <input type="hidden" name="ha_intestazione" value="{{ '1' if ha_intestazione else '' }}">
+  <input type="hidden" name="righe_da_ignorare" value="{{ righe_da_ignorare }}">
   <input type="hidden" name="matricola_idx" value="{{ matricola_idx }}">
   <input type="hidden" name="nome_idx" value="{{ nome_idx }}">
   <input type="hidden" name="cognome_idx" value="{{ cognome_idx }}">
   <input type="hidden" name="laurea_idx" value="{{ laurea_idx or '' }}">
+
+  <div class="card">
+    <h2>Dettaglio righe</h2>
+    <p class="muted" style="margin-top:0">Deseleziona le righe che non vuoi importare.</p>
+    <div style="overflow-x:auto">
+      <table>
+        <tr>
+          <th><input type="checkbox" id="checkbox-tutte-righe" style="width:auto" checked></th>
+          <th>Riga</th><th>Esito</th><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th>
+        </tr>
+        {% for r in verifica.righe %}
+        <tr>
+          <td>{% if not r.errore %}<input type="checkbox" name="righe_incluse" value="{{ r.numero_riga }}" class="campo-riga-inclusa" style="width:auto" checked>{% endif %}</td>
+          <td>{{ r.numero_riga }}</td>
+          <td>
+            {% if r.stato == 'nuovo' %}<span class="badge badge-ok">nuovo</span>
+            {% elif r.stato == 'aggiornamento' %}<span class="badge badge-warn">aggiornamento</span>
+            {% else %}<span class="badge badge-err">errore</span>{% endif %}
+          </td>
+          {% if r.errore %}
+          <td colspan="3" class="muted">{{ r.errore }}</td>
+          {% else %}
+          <td>{{ r.matricola }}</td>
+          <td>{{ r.cognome }}</td>
+          <td>{{ r.nome }}</td>
+          {% endif %}
+          <td class="muted">
+            {% if r.stato == 'aggiornamento' %}era: {{ r.cognome_attuale }} {{ r.nome_attuale }}{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+
   {% if verifica.nuovi or verifica.aggiornati %}
-  <button type="submit">Conferma importazione di {{ verifica.nuovi + verifica.aggiornati }} studenti</button>
+  <button type="submit" id="btn-conferma-import">Conferma importazione di {{ verifica.nuovi + verifica.aggiornati }} studenti</button>
   {% else %}
   <p class="muted">Nessuna riga valida da importare.</p>
   {% endif %}
   <a href="/corsi/{{ corso.tag }}/studenti" style="margin-left:1rem">Annulla</a>
 </form>
+<script>
+(function () {
+  var checkboxTutte = document.getElementById("checkbox-tutte-righe");
+  var campiRiga = document.querySelectorAll(".campo-riga-inclusa");
+  var bottone = document.getElementById("btn-conferma-import");
+  function aggiornaConteggio() {
+    if (!bottone) return;
+    var n = Array.prototype.filter.call(campiRiga, function (c) { return c.checked; }).length;
+    bottone.textContent = "Conferma importazione di " + n + " studenti";
+    bottone.disabled = n === 0;
+  }
+  checkboxTutte.addEventListener("change", function () {
+    campiRiga.forEach(function (c) { c.checked = checkboxTutte.checked; });
+    aggiornaConteggio();
+  });
+  campiRiga.forEach(function (c) {
+    c.addEventListener("change", function () {
+      checkboxTutte.checked = Array.prototype.every.call(campiRiga, function (x) { return x.checked; });
+      aggiornaConteggio();
+    });
+  });
+})();
+</script>
 {% endblock %}

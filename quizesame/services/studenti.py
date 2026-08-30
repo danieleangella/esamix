@@ -312,13 +312,13 @@ def _righe_csv(testo: str) -> list[list[str]]:
     return [r for r in csv.reader(io.StringIO(testo)) if any(cell.strip() for cell in r)]
 
 
-def analizza_csv_testo(testo: str, forza_intestazione: Optional[bool] = None) -> dict:
-    """Analizza il testo di un CSV: rileva se ha una riga di intestazione (a meno che
-    `forza_intestazione` non la imponga esplicitamente, per quando il rilevamento
-    automatico sbaglia e l'utente lo corregge a mano) e propone automaticamente quali
-    colonne usare per matricola/nome/cognome/laurea in base al nome delle colonne (se
-    presente); l'utente conferma o corregge la proposta prima che qualunque dato venga
-    scritto (vedi verifica_import_csv)."""
+def anteprima_csv(file_bytes: bytes) -> dict:
+    """Analizza un CSV appena caricato: rileva se ha una riga di intestazione e propone
+    automaticamente quali colonne usare per matricola/nome/cognome/laurea in base al nome
+    delle colonne (se presente); l'utente conferma o corregge la proposta (comprese
+    eventuali righe iniziali da ignorare) prima che qualunque dato venga scritto (vedi
+    verifica_import_csv)."""
+    testo = file_bytes.decode("utf-8-sig")
     righe = _righe_csv(testo)
     if not righe:
         return {
@@ -326,7 +326,7 @@ def analizza_csv_testo(testo: str, forza_intestazione: Optional[bool] = None) ->
             "righe_anteprima": [], "totale_righe": 0,
             "matricola_idx": None, "nome_idx": None, "cognome_idx": None, "laurea_idx": None,
         }
-    ha_intestazione = forza_intestazione if forza_intestazione is not None else _rileva_intestazione(testo)
+    ha_intestazione = _rileva_intestazione(testo)
     n_colonne = max(len(r) for r in righe)
     if ha_intestazione:
         intestazioni = (righe[0] + [""] * n_colonne)[:n_colonne]
@@ -346,18 +346,11 @@ def analizza_csv_testo(testo: str, forza_intestazione: Optional[bool] = None) ->
     }
 
 
-def anteprima_csv(file_bytes: bytes) -> dict:
-    """Come analizza_csv_testo, ma a partire dai byte di un file appena caricato."""
-    return analizza_csv_testo(file_bytes.decode("utf-8-sig"))
-
-
 def _estrai_righe_csv(
-    csv_testo: str, ha_intestazione: bool, matricola_idx: int, nome_idx: int, cognome_idx: int,
+    csv_testo: str, righe_da_ignorare: int, matricola_idx: int, nome_idx: int, cognome_idx: int,
     laurea_idx: Optional[int] = None,
 ) -> list[dict]:
-    righe = _righe_csv(csv_testo)
-    if ha_intestazione and righe:
-        righe = righe[1:]
+    righe = _righe_csv(csv_testo)[righe_da_ignorare:]
     max_idx = max(i for i in (matricola_idx, nome_idx, cognome_idx, laurea_idx) if i is not None)
     estratte = []
     for numero, row in enumerate(righe, start=1):
@@ -378,13 +371,13 @@ def _estrai_righe_csv(
 
 
 def verifica_import_csv(
-    tag: str, csv_testo: str, ha_intestazione: bool, matricola_idx: int, nome_idx: int, cognome_idx: int,
+    tag: str, csv_testo: str, righe_da_ignorare: int, matricola_idx: int, nome_idx: int, cognome_idx: int,
     laurea_idx: Optional[int] = None,
 ) -> dict:
     """Estrae e classifica ogni riga (nuovo studente / aggiornamento di uno già presente /
     errore) senza scrivere nulla nel database: usata per mostrare all'utente esattamente
     cosa succederà, con l'elenco completo, prima di confermare l'importazione vera."""
-    righe = _estrai_righe_csv(csv_testo, ha_intestazione, matricola_idx, nome_idx, cognome_idx, laurea_idx)
+    righe = _estrai_righe_csv(csv_testo, righe_da_ignorare, matricola_idx, nome_idx, cognome_idx, laurea_idx)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         esistenti = {
@@ -409,16 +402,21 @@ def verifica_import_csv(
 
 
 def importa_csv_mappato(
-    tag: str, csv_testo: str, ha_intestazione: bool, matricola_idx: int, nome_idx: int, cognome_idx: int,
-    laurea_idx: Optional[int] = None,
+    tag: str, csv_testo: str, righe_da_ignorare: int, matricola_idx: int, nome_idx: int, cognome_idx: int,
+    laurea_idx: Optional[int] = None, righe_incluse: Optional[set[int]] = None,
 ) -> ImportReport:
     """Scrive nel database le righe con la mappatura di colonne scelta e confermata
-    dall'utente (vedi verifica_import_csv per l'anteprima mostrata prima di questa)."""
-    righe = _estrai_righe_csv(csv_testo, ha_intestazione, matricola_idx, nome_idx, cognome_idx, laurea_idx)
+    dall'utente (vedi verifica_import_csv per l'anteprima mostrata prima di questa).
+    `righe_incluse`, se indicato, limita l'importazione ai soli numeri di riga presenti
+    (l'utente può deselezionarne alcune nella pagina di conferma prima di importare)."""
+    righe = _estrai_righe_csv(csv_testo, righe_da_ignorare, matricola_idx, nome_idx, cognome_idx, laurea_idx)
     report = ImportReport()
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         for r in righe:
+            if righe_incluse is not None and r["numero_riga"] not in righe_incluse:
+                report.saltati += 1
+                continue
             if r.get("errore"):
                 report.errori.append(f"Riga {r['numero_riga']}: {r['errore']}")
                 report.saltati += 1

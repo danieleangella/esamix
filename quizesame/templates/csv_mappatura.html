@@ -15,14 +15,7 @@
   <textarea name="csv_testo" style="display:none">{{ anteprima.csv_testo }}</textarea>
 
   <div class="card">
-    <label style="display:inline-flex; align-items:center; gap:0.4rem">
-      <input type="checkbox" name="ha_intestazione" value="1" style="width:auto" {% if anteprima.ha_intestazione %}checked{% endif %}>
-      Ignora la prima riga (intestazione delle colonne)
-    </label>
-    <button type="submit" formaction="/corsi/{{ corso.tag }}/studenti/importa-csv/ricalcola" formnovalidate class="secondary" style="margin-left:0.5rem">Ricalcola anteprima</button>
-    <p class="muted" style="margin-top:0.4rem">Se il file individuato sopra non corrisponde a quello che ti aspetti
-      (es. la prima riga di dati viene proposta come nome di colonna, o viceversa), correggi la casella e premi
-      "Ricalcola anteprima".</p>
+    <label>Ignora le prime <input type="number" name="righe_da_ignorare" value="{{ 1 if anteprima.ha_intestazione else 0 }}" min="0" style="width:4rem; display:inline-block"> righe del file (es. intestazione)</label>
   </div>
 
   <div class="card">

@@ -126,12 +126,14 @@ input, select, textarea {
 }
 textarea { font-family: monospace; }
 
-button, input[type=submit] {
+button, input[type=submit], a.button {
   background: var(--accent); color: white; border: none; border-radius: 6px;
   padding: 0.5rem 1rem; font-size: 0.9rem; cursor: pointer; margin-top: 0.75rem;
 }
-button.secondary { background: var(--muted); }
-button.danger { background: var(--err-text); }
+button.secondary, a.button.secondary { background: var(--muted); }
+button.danger, a.button.danger { background: var(--err-text); }
+a.button { display: inline-block; text-decoration: none; }
+a.button:hover { opacity: 0.9; }
 
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .tabs a {
