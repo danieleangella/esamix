@@ -7,12 +7,12 @@
 <h1>{{ corso.nome }} - {{ appello.nome }} <span class="muted">({{ appello.tipo }})</span></h1>
 
 <div class="tabs" id="tabs-appello">
-  <a href="#impostazioni" data-tab="impostazioni">Impostazioni</a>
   {% if not raggruppamento %}<a href="#creazione" data-tab="creazione">Testo</a>{% endif %}
   <a href="#valutazione" data-tab="valutazione">Valutazione scritti</a>
   <a href="#verbalizzati" data-tab="verbalizzati">Voti verbalizzati</a>
   {% if not raggruppamento %}<a href="#orali" data-tab="orali">Orali</a>{% endif %}
   {% if statistiche %}<a href="#statistiche" data-tab="statistiche">Statistiche</a>{% endif %}
+  <a href="#impostazioni" data-tab="impostazioni">Impostazioni</a>
 </div>
 
 <div class="tab-pane" data-pane="impostazioni">
@@ -532,7 +532,7 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
         <td>{{ r.cognome }} {{ r.nome }}</td>
         <td>{{ r.matricola }}</td>
         <td class="muted">{{ r.voto }}</td>
-        <td><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica">Completa valutazione</a></td>
+        <td><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica" class="button warning" style="margin-top:0">Completa valutazione</a></td>
       </tr>
       {% endfor %}
     </table>
@@ -811,8 +811,8 @@ document.querySelectorAll(".btn-mostra-testo").forEach(function (btn) {
       attiva(t.dataset.tab);
     });
   });
-  var iniziale = (location.hash || "#impostazioni").slice(1);
-  if (!document.querySelector('.tab-pane[data-pane="' + iniziale + '"]')) iniziale = "impostazioni";
+  var iniziale = (location.hash || "#valutazione").slice(1);
+  if (!document.querySelector('.tab-pane[data-pane="' + iniziale + '"]')) iniziale = "valutazione";
   attiva(iniziale);
 })();
 </script>
