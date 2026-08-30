@@ -132,6 +132,7 @@ button, input[type=submit], a.button {
 }
 button.secondary, a.button.secondary { background: var(--muted); }
 button.danger, a.button.danger { background: var(--err-text); }
+button.warning, a.button.warning { background: #d97706; }
 a.button { display: inline-block; text-decoration: none; }
 a.button:hover { opacity: 0.9; }
 

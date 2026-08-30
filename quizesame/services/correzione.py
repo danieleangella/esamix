@@ -29,6 +29,17 @@ class OraleNonConsentito(Exception):
     """L'orale si può richiedere solo per un compito scritto sufficiente."""
 
 
+class LunghezzaRisposteNonValida(Exception):
+    """La stringa di risposte non ha la stessa lunghezza della griglia del compito: una
+    lettera in meno o in più farebbe scivolare tutte le posizioni successive, quindi non
+    si salva finché non viene corretta."""
+
+    def __init__(self, attesa: int, ricevuta: int):
+        self.attesa = attesa
+        self.ricevuta = ricevuta
+        super().__init__(f"La stringa di risposte ha {ricevuta} caratteri, ma il compito ne prevede {attesa}")
+
+
 class OraleObbligatorioNonConfermato(Exception):
     """Lo studente ha una riga in orale_obbligatorio (l'orale gli è già stato imposto in
     un appello precedente, in questo corso o in uno da cui è stato importato) ma il
@@ -153,6 +164,7 @@ class ValutazionePreliminare:
     da_valutare: list[RigaRisposta] = field(default_factory=list)
     domande_aperte: list[RigaRisposta] = field(default_factory=list)
     orale_obbligatorio: Optional[dict] = None
+    lunghezza_attesa: int = 0
 
 
 def _righe_risposta(tag: str, compito_id: int, soluzioni: str, risposte: str) -> list[RigaRisposta]:
@@ -199,6 +211,7 @@ def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, r
             codice=codice, risposte=risposte, voto_base=voto_base, righe=righe,
             non_svolte_obbligatorie=non_svolte, da_valutare=da_valutare, domande_aperte=domande_aperte,
             orale_obbligatorio=_orale_obbligatorio(conn, studente["matricola"]),
+            lunghezza_attesa=len(soluzioni),
         )
     finally:
         conn.close()
@@ -252,6 +265,8 @@ def conferma_risultato(
     try:
         studente, compito = _carica_dati_correzione(conn, matricola, appello_id, codice)
         soluzioni = compito["soluzioni"]
+        if len(risposte) != len(soluzioni):
+            raise LunghezzaRisposteNonValida(len(soluzioni), len(risposte))
 
         if not modifica:
             esistente = conn.execute(

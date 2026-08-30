@@ -333,6 +333,7 @@ def appello_detail(request: Request, tag: str, appello_id: int):
     orali_da_svolgere = correzione_service.list_orali_da_svolgere(tag, appello_id)
     valutazioni_sospese = correzione_service.list_valutazioni_sospese(tag, appello_id)
     idonei = verbalizzazione_service.list_idonei(tag, appello_id)
+    verbalizzati = verbalizzazione_service.list_verbalizzati(tag, appello_id)
     esercizi_assegnati = esercizi_service.list_esercizi_appello(tag, appello_id)
     banca_esercizi = esercizi_service.list_esercizi(tag)
     assegnati_ids = {e.id for e in esercizi_assegnati}
@@ -348,7 +349,7 @@ def appello_detail(request: Request, tag: str, appello_id: int):
     return templates.TemplateResponse(request, "appello_detail.html", {
         "corso": corso, "appello": appello, "raggruppamento": raggruppamento, "compiti": compiti,
         "risultati": risultati, "orali_da_svolgere": orali_da_svolgere, "valutazioni_sospese": valutazioni_sospese,
-        "idonei": idonei,
+        "idonei": idonei, "verbalizzati": verbalizzati,
         "esercizi_assegnati": esercizi_assegnati,
         "esercizi_disponibili": disponibili, "argomenti": argomenti,
         "blocchi": blocchi, "riferimento_pdf_esiste": riferimento_pdf_esiste,
@@ -671,10 +672,14 @@ def _render_correggi_revisione(
         punteggi_proposti = {r.posizione: corso.risposta_corretta for r in valutazione.da_valutare}
     if richiedi_orale_checked is None:
         richiedi_orale_checked = bool(valutazione.orale_obbligatorio)
+    corretta_grezza = "".join(r.lettera_corretta for r in valutazione.righe)
+    gruppi = [corretta_grezza[i:i + 5] for i in range(0, len(corretta_grezza), 5)]
+    risposte_corrette_raggruppate = " ".join(gruppi)
     return templates.TemplateResponse(request, "correggi_revisione.html", {
         "corso": corso, "appello": appello, "v": valutazione, "voto_proposto": voto_proposto,
         "punteggi_proposti": punteggi_proposti, "errore": errore,
         "richiedi_orale_checked": richiedi_orale_checked, "modifica": modifica,
+        "risposte_corrette_raggruppate": risposte_corrette_raggruppate,
         "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
     })
 
@@ -804,6 +809,20 @@ def dettaglio_risultato(request: Request, tag: str, appello_id: int, matricola: 
     })
 
 
+@app.get("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}/dettaglio-inline", response_class=HTMLResponse)
+def dettaglio_risultato_inline(request: Request, tag: str, appello_id: int, matricola: str):
+    """Frammento HTML riusato dalla tendina a scomparsa nella tabella dei risultati:
+    caricato via fetch solo alla prima apertura, invece di navigare a una pagina
+    separata."""
+    try:
+        dettaglio = correzione_service.dettaglio_risultato(tag, appello_id, matricola)
+    except ValueError as e:
+        return HTMLResponse(str(e), status_code=404)
+    return templates.TemplateResponse(request, "_risultato_dettaglio.html", {
+        "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
+    })
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}/elimina")
 def elimina_risultato(tag: str, appello_id: int, matricola: str):
     try:
@@ -861,6 +880,15 @@ def verbalizza(
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Verbalizzato", anchor="valutazione")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/verbalizza/{matricola}/annulla")
+def annulla_verbalizzazione(tag: str, appello_id: int, matricola: str):
+    try:
+        verbalizzazione_service.annulla_verbalizzazione(tag, appello_id, matricola)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Verbalizzazione annullata", anchor="valutazione")
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/calcola-raggruppamento")

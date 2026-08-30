@@ -49,3 +49,33 @@ def verbalizza(
         conn.commit()
     finally:
         conn.close()
+
+
+def list_verbalizzati(tag: str, appello_id: int) -> list[dict]:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        rows = conn.execute(
+            "SELECT r.*, s.nome, s.cognome FROM risultati r "
+            "JOIN studenti s ON s.matricola = r.matricola "
+            "WHERE r.appello_id=? AND r.verbalizzato=1 "
+            "ORDER BY s.cognome, s.nome",
+            (appello_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def annulla_verbalizzazione(tag: str, appello_id: int, matricola: str) -> None:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        cur = conn.execute(
+            "UPDATE risultati SET verbalizzato=0, data_verbalizzazione=NULL "
+            "WHERE matricola=? AND appello_id=? AND verbalizzato=1",
+            (matricola, appello_id),
+        )
+        if cur.rowcount == 0:
+            raise ValueError("Nessun risultato verbalizzato trovato per questo studente in questo appello")
+        conn.commit()
+    finally:
+        conn.close()

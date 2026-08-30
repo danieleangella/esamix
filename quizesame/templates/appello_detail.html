@@ -10,6 +10,7 @@
   <a href="#impostazioni" data-tab="impostazioni">Impostazioni</a>
   {% if not raggruppamento %}<a href="#creazione" data-tab="creazione">Testo</a>{% endif %}
   <a href="#valutazione" data-tab="valutazione">Valutazione scritti</a>
+  <a href="#verbalizzati" data-tab="verbalizzati">Voti verbalizzati</a>
   {% if not raggruppamento %}<a href="#orali" data-tab="orali">Orali</a>{% endif %}
   {% if statistiche %}<a href="#statistiche" data-tab="statistiche">Statistiche</a>{% endif %}
 </div>
@@ -413,16 +414,6 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
         function (c) { return c; },
         function (c) { return c; }
       );
-
-      var inputMatricolaAssenza = document.getElementById("input-matricola-assenza");
-      if (inputMatricolaAssenza) {
-        creaAutocomplete(
-          inputMatricolaAssenza, document.getElementById("suggerimenti-studenti-assenza"),
-          function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
-          function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
-          function (s) { return s.matricola; }
-        );
-      }
     })();
     </script>
 
@@ -445,15 +436,27 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
       </div>
       <button type="submit">Segna</button>
     </form>
+    <script>
+    creaAutocomplete(
+      document.getElementById("input-matricola-assenza"), document.getElementById("suggerimenti-studenti-assenza"),
+      function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+      function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+      function (s) { return s.matricola; }
+    );
+    </script>
   </div>
 
   <div class="card">
-    <h2>Risultati inseriti ({{ risultati|length }})</h2>
+    <h2>Risultati inseriti ({{ risultati | rejectattr('verbalizzato') | list | length }})</h2>
     <table>
-      <tr><th>Studente</th><th>Matricola</th><th>Esito</th><th>Verbalizzato</th><th></th></tr>
-      {% for r in risultati %}
+      <tr><th>Studente</th><th>Matricola</th><th>Esito</th><th style="text-align:right"></th></tr>
+      {% for r in risultati if not r.verbalizzato %}
       <tr>
-        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>
+          {% if r.esito == 'voto' %}
+          <button type="button" class="link-simile btn-dettaglio-risultato" data-matricola="{{ r.matricola }}">{{ r.cognome }} {{ r.nome }}</button>
+          {% else %}{{ r.cognome }} {{ r.nome }}{% endif %}
+        </td>
         <td>{{ r.matricola }}</td>
         <td>
           {% if r.esito != 'voto' %}{{ r.esito }}
@@ -461,19 +464,19 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
           {% else %}{{ r.voto }}{% endif %}
         </td>
-        <td>{% if r.verbalizzato %}<span class="badge badge-ok">{{ r.data_verbalizzazione }}</span>{% else %}-{% endif %}</td>
-        <td style="white-space:nowrap">
+        <td style="white-space:nowrap; text-align:right">
           {% if r.esito == 'voto' %}
-          <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}">Dettaglio</a>
-          {% if not r.verbalizzato %}<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica">{{ 'Completa valutazione' if r.valutazione_sospesa else 'Modifica' }}</a>{% endif %}
+          <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica"
+             class="button {{ 'warning' if r.valutazione_sospesa else 'secondary' }}" style="margin-top:0">{{ 'Completa valutazione' if r.valutazione_sospesa else 'Modifica' }}</a>
           {% endif %}
-          {% if not r.verbalizzato %}
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/elimina"
                 onsubmit="return confirm('Eliminare il risultato di {{ r.cognome }} {{ r.nome }} per questo appello?');">
             <button type="submit" class="danger">Elimina</button>
           </form>
-          {% endif %}
         </td>
+      </tr>
+      <tr class="riga-dettaglio-risultato" data-matricola="{{ r.matricola }}" style="display:none">
+        <td colspan="4"></td>
       </tr>
       {% endfor %}
     </table>
@@ -483,6 +486,23 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
       <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.pdf">.pdf</a>
     </p>
   </div>
+  <script>
+  document.querySelectorAll(".btn-dettaglio-risultato").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var riga = document.querySelector('.riga-dettaglio-risultato[data-matricola="' + btn.dataset.matricola + '"]');
+      var giaAperta = riga.style.display !== "none";
+      riga.style.display = giaAperta ? "none" : "";
+      if (giaAperta || riga.dataset.caricata) return;
+      fetch("/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/" + btn.dataset.matricola + "/dettaglio-inline")
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          riga.querySelector("td").innerHTML = html;
+          riga.dataset.caricata = "1";
+          renderizzaLatex(riga);
+        });
+    });
+  });
+  </script>
 
   {% if valutazioni_sospese %}
   <div class="card">
@@ -518,12 +538,39 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
         <td>
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/verbalizza/{{ r.matricola }}">
             <input type="hidden" name="voto" value="{{ r.voto }}">
-            <button type="submit">Verbalizza oggi</button>
+            <button type="submit">Verbalizza</button>
           </form>
         </td>
       </tr>
       {% endfor %}
     </table>
+  </div>
+</div>
+
+<div class="tab-pane" data-pane="verbalizzati" style="display:none">
+  <div class="card">
+    <h2>Voti verbalizzati ({{ verbalizzati|length }})</h2>
+    {% if verbalizzati %}
+    <table>
+      <tr><th>Studente</th><th>Matricola</th><th>Voto</th><th>Data</th><th></th></tr>
+      {% for r in verbalizzati %}
+      <tr>
+        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>{{ r.matricola }}</td>
+        <td>{{ r.voto }}</td>
+        <td class="muted">{{ r.data_verbalizzazione }}</td>
+        <td style="text-align:right">
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/verbalizza/{{ r.matricola }}/annulla"
+                onsubmit="return confirm('Annullare la verbalizzazione di {{ r.cognome }} {{ r.nome }}? Tornerà tra gli idonei non ancora verbalizzati.');">
+            <button type="submit" class="secondary">Annulla verbalizzazione</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">Nessun voto ancora verbalizzato per questo appello.</p>
+    {% endif %}
   </div>
 </div>
 

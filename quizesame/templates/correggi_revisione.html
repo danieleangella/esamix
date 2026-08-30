@@ -13,6 +13,15 @@
 <div class="flash flash-error">{{ errore }}</div>
 {% endif %}
 
+{% set lunghezza_valida = v.risposte|length == v.lunghezza_attesa %}
+{% if not lunghezza_valida %}
+<div class="flash flash-error">
+  La stringa di risposte ha {{ v.risposte|length }} caratteri, ma questo compito ne prevede
+  {{ v.lunghezza_attesa }}: correggila qui sotto e premi "Ricalcola con queste risposte"
+  prima di poter salvare.
+</div>
+{% endif %}
+
 <div class="card">
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/conferma" id="form-riepilogo" autocomplete="off">
   <input type="hidden" name="matricola" value="{{ v.matricola }}">
@@ -20,21 +29,20 @@
   <input type="hidden" name="modifica" value="{{ '1' if modifica else '' }}">
 
   <div style="text-align:center; margin-bottom:1rem">
-    <div class="muted" style="font-size:0.85rem">Codice compito inserito</div>
-    <div style="font-size:2.5rem; font-weight:bold; letter-spacing:0.05em">{{ v.codice }}</div>
-  </div>
-  <div class="form-grid">
+    <div class="muted" style="font-size:0.8rem">Codice compito inserito</div>
+    <div style="font-size:1.6rem; font-weight:bold; letter-spacing:0.05em; margin-bottom:1rem">{{ v.codice }}</div>
+
+    <label class="muted" style="font-size:0.85rem">Risposte inserite (modificabile)</label>
     <div>
-      <label class="muted" style="font-size:0.85rem">Risposte inserite (modificabile)</label>
-      <input name="risposte" id="input-risposte-riepilogo" value="{{ v.risposte }}" autocomplete="off" style="font-family:monospace; font-size:1.4rem; letter-spacing:0.1em">
-      <button type="submit" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" formnovalidate class="secondary" style="margin-top:0.4rem">Ricalcola con queste risposte</button>
+      <input name="risposte" id="input-risposte-riepilogo" value="{{ v.risposte }}" autocomplete="off"
+             style="font-family:monospace; font-size:1.4rem; letter-spacing:0.1em; text-align:center">
     </div>
-    <div>
-      <div class="muted" style="font-size:0.85rem">Risposte corrette</div>
-      <div style="font-family:monospace; font-size:1.4rem; letter-spacing:0.3em; word-break:break-all">{{ v.righe | map(attribute='lettera_corretta') | join('') }}</div>
-    </div>
+    <div class="muted" style="font-size:0.8rem; margin-top:0.5rem">Risposte corrette</div>
+    <div style="font-family:monospace; font-size:1.4rem; letter-spacing:0.1em; color:var(--ok-text); font-weight:bold">{{ risposte_corrette_raggruppate }}</div>
+    <button type="submit" id="btn-ricalcola" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" formnovalidate class="secondary" disabled style="margin-top:0.6rem">Ricalcola con queste risposte</button>
   </div>
-  <p class="muted" style="margin-top:1rem">Voto calcolato dalla griglia di risposte: <strong>{{ v.voto_base }}</strong></p>
+  {% if lunghezza_valida %}
+  <p class="muted" style="margin-top:1rem; text-align:center">Voto calcolato dalla griglia di risposte: <strong>{{ v.voto_base }}</strong></p>
 
   <table>
     <tr><th>Esercizio</th><th>Obbligatorio</th><th>Risposta data / corretta</th><th>Esito</th></tr>
@@ -137,12 +145,22 @@
       decisi da assegnare più tardi dalla sezione "Valutazioni in sospeso": non serve compilarli tutti ora.
     </p>
     {% endif %}
+    {% endif %}
     <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione" class="muted" style="margin-left:1rem">Annulla, non salvare</a>
   </form>
 </div>
 <script>
 (function () {
-  formattaRisposte(document.getElementById("input-risposte-riepilogo"));
+  var inputRisposteRiepilogo = document.getElementById("input-risposte-riepilogo");
+  formattaRisposte(inputRisposteRiepilogo);
+  // "Ricalcola" ha senso solo se la stringa è stata davvero cambiata rispetto a quella
+  // già valutata in questa pagina: altrimenti ripeterebbe lo stesso identico riepilogo.
+  var btnRicalcola = document.getElementById("btn-ricalcola");
+  var risposteOriginali = inputRisposteRiepilogo.value.replace(/\s+/g, "");
+  inputRisposteRiepilogo.addEventListener("input", function () {
+    btnRicalcola.disabled = inputRisposteRiepilogo.value.replace(/\s+/g, "") === risposteOriginali;
+  });
+
   var votoFinale = document.getElementById("voto-finale");
   var checkboxOrale = document.getElementById("checkbox-richiedi-orale");
   var boxMotivazione = document.getElementById("box-motivazione-orale");
