@@ -99,7 +99,8 @@
         </form>
         {% endif %}
       </td>
-      <td>
+      <td style="white-space:nowrap">
+        <button type="button" class="secondary btn-modifica-assegnato" data-esercizio="{{ e.id }}">Modifica</button>
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/rimuovi">
           <button type="submit" class="secondary">Rimuovi</button>
         </form>
@@ -107,6 +108,16 @@
     </tr>
     <tr class="riga-anteprima-assegnato" data-esercizio="{{ e.id }}" style="display:none">
       <td colspan="5"></td>
+    </tr>
+    <tr class="riga-modifica-assegnato" data-esercizio="{{ e.id }}" style="display:none">
+      <td colspan="5">
+        {% set action = "/corsi/" ~ corso.tag ~ "/esercizi/" ~ e.id ~ "/modifica" %}
+        {% set esercizio = e %}
+        {% set avvisa_rigenerazione = blocchi|length > 0 %}
+        {% set redirect_to = "/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id %}
+        {% set redirect_anchor = "creazione" %}
+        {% include "_esercizio_form.html" %}
+      </td>
     </tr>
     {% endfor %}
   </table>
@@ -239,10 +250,16 @@
 })();
 </script>
 <script>
+function chiudiRigheEsercizioAssegnato(eccetto) {
+  document.querySelectorAll(".riga-anteprima-assegnato, .riga-modifica-assegnato").forEach(function (r) {
+    if (r !== eccetto) r.style.display = "none";
+  });
+}
 document.querySelectorAll(".btn-anteprima-assegnato").forEach(function (btn) {
   btn.addEventListener("click", function () {
     var riga = document.querySelector('.riga-anteprima-assegnato[data-esercizio="' + btn.dataset.esercizio + '"]');
     var giaAperta = riga.style.display !== "none";
+    chiudiRigheEsercizioAssegnato(giaAperta ? null : riga);
     riga.style.display = giaAperta ? "none" : "";
     if (giaAperta) return;
     if (riga.dataset.caricata) { renderizzaLatex(riga); return; }
@@ -253,6 +270,14 @@ document.querySelectorAll(".btn-anteprima-assegnato").forEach(function (btn) {
         riga.dataset.caricata = "1";
         renderizzaLatex(riga);
       });
+  });
+});
+document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var riga = document.querySelector('.riga-modifica-assegnato[data-esercizio="' + btn.dataset.esercizio + '"]');
+    var giaAperta = riga.style.display !== "none";
+    chiudiRigheEsercizioAssegnato(giaAperta ? null : riga);
+    riga.style.display = giaAperta ? "none" : "";
   });
 });
 </script>

@@ -154,7 +154,6 @@ def tex_esercizio(exx) -> str:
     for sol in risposte:
         out += f"\\item[{LETTERE[risposte.index(sol)]}] {sol}\n"
     out += "\\end{description}\n\\end{ex}\n\n"
-    out += "\\begin{center}\n\\noindent\\rule{0.3\\textwidth}{0.4pt}\n\\end{center}\n"
     return out
 
 
@@ -163,8 +162,11 @@ def tex_esercizio_aperto(testo: str) -> str:
     cui lo studente scrive la risposta a mano."""
     out = "\n\\begin{ex}\n" + testo + "\n\\end{ex}\n\n"
     out += "\\vspace{3cm}\n"
-    out += "\\begin{center}\n\\noindent\\rule{0.3\\textwidth}{0.4pt}\n\\end{center}\n"
     return out
+
+
+def _separatore_esercizio() -> str:
+    return "\\begin{center}\n\\noindent\\rule{0.3\\textwidth}{0.4pt}\n\\end{center}\n"
 
 
 def stampa_codici(ctx: LatexContext, studenti) -> str:
@@ -223,17 +225,23 @@ def crea_file_riferimento(ctx: LatexContext, esercizi_struct: list[dict]) -> str
     )
     tex += "\n\\begin{multicols}{2}\n\\setcounter{ex}{0}\n"
     for es in esercizi_struct:
-        for variante in es["varianti"]:
+        varianti = es["varianti"]
+        for i, variante in enumerate(varianti):
             if es.get("aperta"):
                 tex += tex_esercizio_aperto(variante["testo"])
             else:
                 tex += tex_esercizio([variante["testo"], variante["risposte"]])
-        if es.get("soluzione"):
-            tex += (
-                "\\begin{center}\\fbox{\\parbox{0.9\\linewidth}{\\small "
-                f"{{\\bfseries Soluzione/suggerimento:}} {es['soluzione']}"
-                "}}\\end{center}\n\n"
-            )
+            # la soluzione (se presente) va subito dopo il testo dell'ultima variante
+            # stampata di questo esercizio, prima della riga che lo separa dal successivo.
+            if i == len(varianti) - 1 and es.get("soluzione"):
+                tex += (
+                    "\\begin{center}\\fbox{\\parbox{0.9\\linewidth}{\\small "
+                    f"{{\\bfseries Soluzione/suggerimento:}} {es['soluzione']}"
+                    "}}\\end{center}\n\n"
+                )
+            if i < len(varianti) - 1:
+                tex += _separatore_esercizio()
+        tex += _separatore_esercizio()
     tex += "\\end{multicols}\n\n"
     tex += "\n\n\\end{document}"
     return tex
@@ -279,6 +287,7 @@ def crea_file_blocco(ctx: LatexContext, esercizi_struct: list[dict], numero_stud
                 tex += tex_esercizio_aperto(p["testo"])
             else:
                 tex += tex_esercizio([p["testo"], p["risposte"]])
+            tex += _separatore_esercizio()
         tex += "\\end{multicols}\n\\end{small}\n\n\\vfill\n"
         tex += regole(ctx)
         tex += "\\clearpage\n\n"

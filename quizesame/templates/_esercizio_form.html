@@ -1,4 +1,6 @@
 <form method="post" action="{{ action }}" class="form-esercizio" {% if avvisa_rigenerazione is defined and avvisa_rigenerazione %}data-avvisa-rigenerazione="1"{% endif %}>
+  {% if redirect_to is defined and redirect_to %}<input type="hidden" name="redirect_to" value="{{ redirect_to }}">{% endif %}
+  {% if redirect_anchor is defined and redirect_anchor %}<input type="hidden" name="redirect_anchor" value="{{ redirect_anchor }}">{% endif %}
   <div class="form-grid">
     <div><label>Nome (etichetta breve, opzionale)</label><input name="nome" value="{{ esercizio.nome or '' if esercizio is defined else '' }}" placeholder="es. Area triangolo"></div>
     <div>

@@ -935,6 +935,8 @@ async def modifica_esercizio(tag: str, esercizio_id: int, request: Request):
     form = await request.form()
     varianti = _parse_varianti_form(form)
     extra = _parse_esercizio_extra_form(form)
+    destinazione = (form.get("redirect_to") or "").strip() or f"/corsi/{tag}/esercizi"
+    ancora = (form.get("redirect_anchor") or "").strip()
     appelli_coinvolti = esercizi_service.appelli_che_usano(tag, esercizio_id)
     try:
         for appello_id in appelli_coinvolti:
@@ -949,8 +951,8 @@ async def modifica_esercizio(tag: str, esercizio_id: int, request: Request):
         for appello_id in appelli_coinvolti:
             msg += _rigenera_se_necessario(tag, appello_id)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/esercizi", str(e), "error")
-    return flash_redirect(f"/corsi/{tag}/esercizi", msg)
+        return flash_redirect(destinazione, str(e), "error", anchor=ancora)
+    return flash_redirect(destinazione, msg, anchor=ancora)
 
 
 @app.post("/corsi/{tag}/esercizi/{esercizio_id}/elimina")
