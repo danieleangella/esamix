@@ -411,6 +411,18 @@ def elimina_appello(tag: str, appello_id: int):
     return flash_redirect(f"/corsi/{tag}", "Appello eliminato")
 
 
+@app.post("/corsi/{tag}/appelli/{appello_id}/chiudi")
+def chiudi_appello(tag: str, appello_id: int):
+    corsi_service.chiudi_appello(tag, appello_id)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Appello chiuso: non sono più possibili modifiche")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/riapri")
+def riapri_appello(tag: str, appello_id: int):
+    corsi_service.riapri_appello(tag, appello_id)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Appello riaperto", anchor="impostazioni")
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/genera-compiti")
 def genera_compiti(tag: str, appello_id: int, numero_studenti: int = Form(...)):
     try:
@@ -570,13 +582,19 @@ def imposta_obbligatorio(tag: str, appello_id: int, esercizio_id: int, obbligato
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/sposta-su")
 def sposta_su_esercizio(tag: str, appello_id: int, esercizio_id: int):
-    esercizi_service.sposta_esercizio(tag, appello_id, esercizio_id, -1)
+    try:
+        esercizi_service.sposta_esercizio(tag, appello_id, esercizio_id, -1)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Ordine aggiornato", anchor="creazione")
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/sposta-giu")
 def sposta_giu_esercizio(tag: str, appello_id: int, esercizio_id: int):
-    esercizi_service.sposta_esercizio(tag, appello_id, esercizio_id, 1)
+    try:
+        esercizi_service.sposta_esercizio(tag, appello_id, esercizio_id, 1)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Ordine aggiornato", anchor="creazione")
 
 
@@ -926,7 +944,10 @@ async def verbalizza_multipli(tag: str, appello_id: int, request: Request):
     matricole = form.getlist("matricole")
     if not matricole:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessuno studente selezionato", "error", anchor="valutazione")
-    n = verbalizzazione_service.verbalizza_multipli(tag, appello_id, matricole)
+    try:
+        n = verbalizzazione_service.verbalizza_multipli(tag, appello_id, matricole)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Verbalizzati {n} studenti", anchor="valutazione")
 
 

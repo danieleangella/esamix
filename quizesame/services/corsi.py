@@ -76,6 +76,7 @@ class Appello:
     orale_data: Optional[str] = None
     orale_ora: Optional[str] = None
     orale_aula: Optional[str] = None
+    chiuso: bool = False
 
 
 @dataclass
@@ -321,6 +322,7 @@ def _row_to_appello(conn, row) -> Appello:
         orale_data=row["orale_data"] if "orale_data" in chiavi else None,
         orale_ora=row["orale_ora"] if "orale_ora" in chiavi else None,
         orale_aula=row["orale_aula"] if "orale_aula" in chiavi else None,
+        chiuso=bool(row["chiuso"]) if "chiuso" in chiavi else False,
     )
 
 
@@ -420,6 +422,31 @@ def update_appello(tag: str, appello_id: int, **fields) -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+def chiudi_appello(tag: str, appello_id: int) -> None:
+    """Un appello chiuso non accetta più correzioni, modifiche o eliminazioni di
+    risultati, verbalizzazioni/rifiuti, né generazione/eliminazione di blocchi o modifica
+    degli esercizi assegnati: serve a "congelare" un appello quando è del tutto concluso
+    (nessun idoneo da verbalizzare, nessun orale da svolgere)."""
+    update_appello(tag, appello_id, chiuso=True)
+
+
+def riapri_appello(tag: str, appello_id: int) -> None:
+    update_appello(tag, appello_id, chiuso=False)
+
+
+class AppelloChiuso(ValueError):
+    """L'appello è chiuso: va riaperto esplicitamente prima di poterlo modificare."""
+
+    def __init__(self):
+        super().__init__("Questo appello è chiuso: riaprilo dalla scheda Impostazioni per poterlo modificare")
+
+
+def verifica_appello_aperto(tag: str, appello_id: int) -> None:
+    appello = get_appello(tag, appello_id)
+    if appello is not None and appello.chiuso:
+        raise AppelloChiuso()
 
 
 def list_corsi_laurea(tag: str) -> list[dict]:

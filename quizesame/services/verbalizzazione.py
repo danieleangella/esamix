@@ -28,6 +28,7 @@ def list_idonei(tag: str, appello_id: int) -> list[dict]:
 def verbalizza(
     tag: str, appello_id: int, matricola: str, voto: int | None = None, data: str | None = None,
 ) -> None:
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     data = data or date.today().isoformat()
     conn = db.get_connection(config.corso_db_path(tag))
     try:
@@ -70,6 +71,7 @@ def rifiuta(tag: str, appello_id: int, matricola: str) -> None:
     """Lo studente rifiuta il voto proposto invece di farlo verbalizzare: l'esito diventa
     'rifiutato' (invece di 'voto'), quindi esce dagli idonei di questo appello e potrà
     ripresentarsi a un appello successivo esattamente come se non lo avesse superato."""
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         row = conn.execute(
@@ -126,6 +128,7 @@ def stato_esame_studenti(tag: str) -> dict[str, dict]:
 
 
 def annulla_verbalizzazione(tag: str, appello_id: int, matricola: str) -> None:
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         cur = conn.execute(

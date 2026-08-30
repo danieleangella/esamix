@@ -321,6 +321,7 @@ def conferma_risultato(
     (dal form principale) non deve poter sovrascrivere per sbaglio un esito già inserito
     — solo un "Modifica" esplicito (necessario anche per completare una valutazione
     sospesa) può."""
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     punteggi_obbligatori = punteggi_obbligatori or {}
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
@@ -416,6 +417,7 @@ def completa_orale(tag: str, appello_id: int, matricola: str, esito_orale: str, 
         raise ValueError(f"Esito orale non valido: {esito_orale}")
     if esito_orale == "voto" and voto is None:
         raise ValueError("Serve un voto se l'esito dell'orale è 'voto assegnato'")
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         row = conn.execute(
@@ -442,6 +444,7 @@ def segna_esito_speciale(tag: str, appello_id: int, matricola: str, esito: str) 
     completato) il compito scritto: nessun codice/risposte associati, voto NULL."""
     if esito not in ("assente", "ritirato"):
         raise ValueError(f"Esito non valido: {esito}")
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         esistente = conn.execute(
@@ -545,6 +548,7 @@ def list_valutazioni_sospese(tag: str, appello_id: int) -> list[dict]:
 
 
 def elimina_risultato(tag: str, appello_id: int, matricola: str) -> None:
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         row = conn.execute(

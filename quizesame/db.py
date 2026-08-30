@@ -175,6 +175,7 @@ ADDITIVE_COLUMNS = {
         ("orale_data", "TEXT"),
         ("orale_ora", "TEXT"),
         ("orale_aula", "TEXT"),
+        ("chiuso", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
 }
 

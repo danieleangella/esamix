@@ -158,6 +158,7 @@ def blocchi_con_risultati(tag: str, appello_id: int) -> list[int]:
 
 
 def genera_blocco(tag: str, appello_id: int, numero_studenti: int) -> BloccoResult:
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     appello = corsi_service.get_appello(tag, appello_id)
     if appello is None:
         raise ValueError("Appello non trovato")
@@ -254,6 +255,7 @@ def svuota_blocchi_appello(tag: str, appello_id: int) -> None:
     delle vecchie varianti non trova più righe compito_esercizi che le referenziano.
     Il richiamante deve aver già verificato con blocchi_con_risultati che è sicuro farlo,
     e chiamare rigenera_tutto subito dopo per ricostruire i blocchi coi nuovi esercizi."""
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     blocchi = list_blocchi(tag, appello_id)
     if not blocchi:
         return
@@ -271,6 +273,7 @@ def rigenera_tutto(tag: str, appello_id: int) -> RigenerazioneResult | None:
     esistenti (con lo stesso numero di studenti di ciascuno), eliminando e ricreando da
     capo i relativi codici. Solleva ValueError se qualche blocco ha già risultati
     registrati (non rigenerabile senza perdere dati reali)."""
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     blocchi = list_blocchi(tag, appello_id)
     if not blocchi:
         return None
@@ -427,6 +430,7 @@ def get_blocco(tag: str, appello_id: int, numero: int) -> Optional[dict]:
 def elimina_blocco(tag: str, appello_id: int, numero: int) -> None:
     """Elimina un blocco e i suoi compiti, rifiutando l'operazione se ha già risultati
     registrati (perderebbero il compito a cui sono legati)."""
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     if numero in blocchi_con_risultati(tag, appello_id):
         raise ValueError(
             f"Il blocco {numero} ha già risultati registrati: non può essere eliminato "

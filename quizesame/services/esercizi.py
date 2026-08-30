@@ -263,6 +263,7 @@ def list_esercizi_appello(tag: str, appello_id: int) -> list[Esercizio]:
 
 
 def assegna_a_appello(tag: str, appello_id: int, esercizio_id: int, obbligatorio: bool = False) -> None:
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         ordine = conn.execute(
@@ -281,6 +282,7 @@ def sposta_esercizio(tag: str, appello_id: int, esercizio_id: int, delta: int) -
     """Sposta un esercizio assegnato su (delta=-1) o giù (delta=+1) nell'ordine di
     visualizzazione/stampa. L'ordine non incide sul compito dello studente (gli esercizi
     lì vengono comunque rimescolati), solo sull'elenco e sul foglio di riferimento."""
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         righe = conn.execute(
@@ -305,6 +307,7 @@ def sposta_esercizio(tag: str, appello_id: int, esercizio_id: int, delta: int) -
 
 
 def imposta_obbligatorio(tag: str, appello_id: int, esercizio_id: int, obbligatorio: bool) -> None:
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         conn.execute(
@@ -317,6 +320,7 @@ def imposta_obbligatorio(tag: str, appello_id: int, esercizio_id: int, obbligato
 
 
 def rimuovi_da_appello(tag: str, appello_id: int, esercizio_id: int) -> None:
+    corsi_service.verifica_appello_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         conn.execute(
