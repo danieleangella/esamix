@@ -255,12 +255,20 @@ def calcola_corso(tag: str) -> dict:
     }
 
 
+def _anno_key(anno: Optional[str]) -> int:
+    match = re.search(r"\d{4}", anno or "")
+    return int(match.group()) if match else 0
+
+
 def calcola_multi_corsi(tags: list[str]) -> dict:
     """Le stesse statistiche di `calcola_corso`, ma aggregate su un insieme scelto di
     corsi (non necessariamente tutti quelli dell'installazione): per la pagina
     "Statistiche generali", dove si possono selezionare/deselezionare i corsi da
-    includere."""
+    includere. Aggrega anche per anno accademico (più corsi collegati, es. sezioni
+    diverse dello stesso insegnamento, possono condividere lo stesso anno), per
+    mostrare la variazione di numero di studenti e percentuale di promossi negli anni."""
     per_corso = []
+    per_anno_acc: dict[str, dict] = {}
     totale = promossi = insufficienti = in_attesa_orale = orali_svolti = 0
     voti_finali_tutti: list[int] = []
     voti_scritti_tutti: list[int] = []
@@ -288,8 +296,25 @@ def calcola_multi_corsi(tags: list[str]) -> dict:
         if stat["media_orale"] is not None:
             voti_orali_tutti.append(stat["media_orale"])
 
+        anno = corso.anno or "?"
+        acc = per_anno_acc.setdefault(anno, {"totale": 0, "promossi": 0, "insufficienti": 0, "voti_finali": []})
+        acc["totale"] += stat["totale"]
+        acc["promossi"] += stat["promossi"]
+        acc["insufficienti"] += stat["insufficienti"]
+        acc["voti_finali"].extend(stat["voti_finali"])
+
     media = lambda lista: round(sum(lista) / len(lista), 2) if lista else None  # noqa: E731
     pct = lambda n: round(100 * n / totale) if totale else None  # noqa: E731
+
+    per_anno = [
+        {
+            "anno": anno, "totale": acc["totale"], "promossi": acc["promossi"], "insufficienti": acc["insufficienti"],
+            "promossi_pct": round(100 * acc["promossi"] / acc["totale"]) if acc["totale"] else None,
+            "media_finale": media(acc["voti_finali"]),
+        }
+        for anno, acc in per_anno_acc.items()
+    ]
+    per_anno.sort(key=lambda a: _anno_key(a["anno"]))
 
     return {
         "totale": totale, "promossi": promossi, "insufficienti": insufficienti,
@@ -299,7 +324,10 @@ def calcola_multi_corsi(tags: list[str]) -> dict:
         "media_scritto": media(voti_scritti_tutti), "media_orale": media(voti_orali_tutti),
         "media_finale": media(voti_finali_tutti),
         "distribuzione": _distribuzione_e_gaussiana(voti_finali_tutti),
-        "per_corso": per_corso,
+        "per_corso": per_corso, "per_anno": per_anno,
+        "andamento_anni": _andamento_appelli(
+            [{"appello_nome": a["anno"], "totale": a["totale"], "promossi": a["promossi"]} for a in per_anno]
+        ),
     }
 
 
