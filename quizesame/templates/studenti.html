@@ -18,6 +18,7 @@
   <form method="get" action="/corsi/{{ corso.tag }}/studenti">
     <div class="form-grid">
       <div style="position:relative">
+        <label>Cerca</label>
         <input name="q" id="input-cerca-studenti" value="{{ q }}" autocomplete="off" placeholder="Cerca per matricola, nome o cognome">
         <div id="suggerimenti-cerca-studenti" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
       </div>
@@ -48,16 +49,24 @@
   });
   </script>
   <table style="margin-top:0.75rem">
-    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
+    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Risultato</th><th></th></tr>
     {% for s in studenti %}
+    {% set st = stato_esame.get(s.matricola) %}
     <tr>
       <td>{{ s.matricola }}</td>
       <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
       <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
+      <td>
+        {% if not st %}<span class="muted">mai sostenuto</span>
+        {% elif st.stato == 'verbalizzato' %}<span class="badge badge-ok">{{ st.voto }}</span>
+        {% elif st.stato == 'da_verbalizzare' %}<span class="badge badge-warn">{{ st.voto }}</span>
+        {% elif st.stato == 'insufficiente' %}<span class="badge badge-err">{{ st.voto }}</span>
+        {% endif %}
+      </td>
       <td style="white-space:nowrap"><button type="button" class="secondary btn-modifica-studente" data-matricola="{{ s.matricola }}">Modifica</button></td>
     </tr>
     <tr class="riga-modifica-studente" data-matricola="{{ s.matricola }}" style="display:none">
-      <td colspan="4">
+      <td colspan="5">
         <form method="post" action="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/modifica" style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap; margin-top:0.5rem">
           <div><label>Matricola</label><input name="nuova_matricola" value="{{ s.matricola }}" required></div>
           <div><label>Cognome</label><input name="cognome" value="{{ s.cognome }}" required></div>

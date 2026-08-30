@@ -55,7 +55,10 @@ def esporta_csv(studenti: list[Studente], stato_esame: dict) -> bytes:
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\r\n")
     writer.writerow(["Matricola", "Cognome", "Nome", "Corso di laurea", "Stato esame", "Voto"])
-    etichette = {"verbalizzato": "esame superato", "da_verbalizzare": "da verbalizzare"}
+    etichette = {
+        "verbalizzato": "esame superato", "da_verbalizzare": "da verbalizzare",
+        "insufficiente": "insufficiente, deve ripetere l'esame",
+    }
     for s in studenti:
         stato = stato_esame.get(s.matricola)
         writer.writerow([

@@ -2,6 +2,7 @@ from datetime import date
 
 from quizesame import config, db
 from quizesame.services import corsi as corsi_service
+from quizesame.services import studenti as studenti_service
 from quizesame.services.correzione import GiaVerbalizzato
 
 
@@ -107,15 +108,16 @@ def list_verbalizzati(tag: str, appello_id: int) -> list[dict]:
 
 
 def stato_esame_studenti(tag: str) -> dict[str, dict]:
-    """Per ogni studente con almeno un risultato nel corso (appelli e raggruppamenti
-    compresi, dato che il voto combinato di un raggruppamento è un risultato come un
-    altro sul suo appello "virtuale"), lo stato aggregato dell'esame:
+    """Per ogni studente del corso, lo stato aggregato dell'esame:
     - "verbalizzato": ha un voto accettato e verbalizzato (su un qualunque appello) —
       non deve più sostenere l'esame;
     - "da_verbalizzare": non verbalizzato, ma idoneo su un appello (tipicamente il voto
       combinato di un raggruppamento in attesa che lo studente lo accetti);
-    - assente da questo dizionario per chi non ha ancora nessuno dei due (deve ancora
-      sostenere l'esame, o l'ha rifiutato/non superato in precedenza)."""
+    - "insufficiente": ha già sostenuto almeno un compito con un voto numerico (esclusi
+      assente/ritirato, ed esclusi quelli ancora in attesa di orale) ma non risulta né
+      verbalizzato né idoneo su nessun appello: la media dei voti ottenuti finora;
+    - assente da questo dizionario per chi non ha mai sostenuto un compito con un voto
+      numerico (deve ancora sostenere l'esame per la prima volta)."""
     stato: dict[str, dict] = {}
     for appello in corsi_service.list_appelli(tag):
         for r in list_verbalizzati(tag, appello.id):
@@ -124,6 +126,17 @@ def stato_esame_studenti(tag: str) -> dict[str, dict]:
             if stato.get(r["matricola"], {}).get("stato") == "verbalizzato":
                 continue
             stato[r["matricola"]] = {"stato": "da_verbalizzare", "voto": r["voto"], "appello_nome": appello.nome}
+
+    for s in studenti_service.list_studenti(tag):
+        if s.matricola in stato:
+            continue
+        voti = [
+            r["voto"] for r in studenti_service.risultati_studente(tag, s.matricola)
+            if r["voto"] is not None and r["esito"] in ("voto", "rifiutato")
+            and not (r["richiede_orale"] and not r["orale_svolto"])
+        ]
+        if voti:
+            stato[s.matricola] = {"stato": "insufficiente", "voto": round(sum(voti) / len(voti), 1)}
     return stato
 
 

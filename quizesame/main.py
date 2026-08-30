@@ -1002,7 +1002,7 @@ def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro:
     elif filtro == "da_verbalizzare":
         lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") == "da_verbalizzare"]
     elif filtro == "da_fare":
-        lista = [s for s in lista if s.matricola not in stato_esame]
+        lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") not in ("verbalizzato", "da_verbalizzare")]
     corsi_suggeriti = corsi_service.corsi_simili(tag)
     altri_corsi = [c for c in corsi_service.list_corsi() if c.tag != tag]
     corso_sorgente = corsi_service.get_corso(da) if da and config.corso_exists(da) else None
@@ -1023,7 +1023,7 @@ def esporta_studenti(tag: str, q: str = "", filtro: str = ""):
     elif filtro == "da_verbalizzare":
         lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") == "da_verbalizzare"]
     elif filtro == "da_fare":
-        lista = [s for s in lista if s.matricola not in stato_esame]
+        lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") not in ("verbalizzato", "da_verbalizzare")]
     dati = studenti_service.esporta_csv(lista, stato_esame)
     return Response(
         dati, media_type="text/csv",
