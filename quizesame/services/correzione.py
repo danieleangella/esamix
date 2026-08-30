@@ -165,6 +165,8 @@ class ValutazionePreliminare:
     domande_aperte: list[RigaRisposta] = field(default_factory=list)
     orale_obbligatorio: Optional[dict] = None
     lunghezza_attesa: int = 0
+    codice_duplicato: Optional[dict] = None
+    risposte_simili: list[dict] = field(default_factory=list)
 
 
 def _righe_risposta(tag: str, compito_id: int, soluzioni: str, risposte: str) -> list[RigaRisposta]:
@@ -183,6 +185,65 @@ def _righe_risposta(tag: str, compito_id: int, soluzioni: str, risposte: str) ->
             svolta=svolta, corretta=svolta and lettera_data == lettera_corretta,
         ))
     return righe
+
+
+SOGLIA_SIMILARITA = 0.85
+MINIMO_POSIZIONI_CONFRONTABILI = 5
+
+
+def _codice_duplicato(conn, appello_id: int, matricola: str, compito_id: int) -> Optional[dict]:
+    """Il codice di un compito dovrebbe essere usato da un solo studente per appello:
+    se un altro risultato già registrato punta allo stesso compito, è quasi sempre un
+    codice letto male dalla carta (docente che trascrive) o due studenti che hanno
+    riportato lo stesso codice per errore, quindi va segnalato subito."""
+    row = conn.execute(
+        "SELECT r.matricola, s.nome, s.cognome FROM risultati r "
+        "JOIN studenti s ON s.matricola = r.matricola "
+        "WHERE r.appello_id=? AND r.compito_id=? AND r.matricola!=?",
+        (appello_id, compito_id, matricola),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def _similarita(a: str, b: str) -> Optional[tuple[float, int]]:
+    """Percentuale di posizioni uguali tra due stringhe di risposte, ignorando qualunque
+    posizione dove almeno una delle due è 'X' (non data): una risposta non data non è né
+    un indizio di copiatura né di originalità. None se non ci sono abbastanza posizioni
+    confrontabili per dare un giudizio significativo."""
+    confrontabili = 0
+    uguali = 0
+    for ca, cb in zip(a.upper(), b.upper()):
+        if ca == "X" or cb == "X":
+            continue
+        confrontabili += 1
+        if ca == cb:
+            uguali += 1
+    if confrontabili < MINIMO_POSIZIONI_CONFRONTABILI:
+        return None
+    return uguali / confrontabili, confrontabili
+
+
+def _risposte_simili(conn, appello_id: int, matricola: str, risposte: str) -> list[dict]:
+    altri = conn.execute(
+        "SELECT r.matricola, r.risposte, s.nome, s.cognome FROM risultati r "
+        "JOIN studenti s ON s.matricola = r.matricola "
+        "WHERE r.appello_id=? AND r.matricola!=? AND r.risposte IS NOT NULL",
+        (appello_id, matricola),
+    ).fetchall()
+    simili = []
+    for altro in altri:
+        esito = _similarita(risposte, altro["risposte"])
+        if esito is None:
+            continue
+        percentuale, confrontabili = esito
+        if percentuale >= SOGLIA_SIMILARITA:
+            simili.append({
+                "matricola": altro["matricola"], "nome": altro["nome"], "cognome": altro["cognome"],
+                "percentuale": round(percentuale * 100), "identica": percentuale == 1.0,
+                "posizioni_confrontabili": confrontabili,
+            })
+    simili.sort(key=lambda s: s["percentuale"], reverse=True)
+    return simili
 
 
 def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, risposte: str) -> ValutazionePreliminare:
@@ -212,6 +273,8 @@ def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, r
             non_svolte_obbligatorie=non_svolte, da_valutare=da_valutare, domande_aperte=domande_aperte,
             orale_obbligatorio=_orale_obbligatorio(conn, studente["matricola"]),
             lunghezza_attesa=len(soluzioni),
+            codice_duplicato=_codice_duplicato(conn, appello_id, studente["matricola"], compito["id"]),
+            risposte_simili=_risposte_simili(conn, appello_id, studente["matricola"], risposte),
         )
     finally:
         conn.close()

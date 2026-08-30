@@ -42,6 +42,20 @@
     <button type="submit" id="btn-ricalcola" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" formnovalidate class="secondary" disabled style="margin-top:0.6rem">Ricalcola con queste risposte</button>
   </div>
   {% if lunghezza_valida %}
+  {% if v.codice_duplicato %}
+  <div class="flash flash-error" style="margin-top:1rem">
+    Attenzione: il codice {{ v.codice }} risulta già usato nel risultato di
+    {{ v.codice_duplicato.cognome }} {{ v.codice_duplicato.nome }} ({{ v.codice_duplicato.matricola }})
+    per questo appello. I codici dovrebbero essere univoci: controlla se uno dei due è stato letto o
+    trascritto male prima di salvare.
+  </div>
+  {% endif %}
+  {% if v.risposte_simili %}
+  <div class="flash flash-warning" style="margin-top:1rem">
+    Risposte molto simili a quelle già registrate di:
+    {% for s in v.risposte_simili %}{{ s.cognome }} {{ s.nome }} ({{ s.matricola }}): {{ s.percentuale }}%{% if s.identica %} (identiche){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}.
+  </div>
+  {% endif %}
   <p class="muted" style="margin-top:1rem; text-align:center">Voto calcolato dalla griglia di risposte: <strong>{{ v.voto_base }}</strong></p>
 
   <table>
