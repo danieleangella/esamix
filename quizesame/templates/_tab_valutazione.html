@@ -129,6 +129,7 @@
     </p>
   </div>
 
+  {% if not raggruppamento %}
   <details class="card">
     <summary>Esporta voti per la segreteria</summary>
     <p class="muted" style="margin-top:1rem">
@@ -136,15 +137,13 @@
       valutazione già completata e confermata viene compilata la colonna Esito (voto, ASS, RIT o 0 per
       insufficiente) e la colonna Domande d'esame (testo salvato nelle impostazioni del corso); il file
       compilato viene subito riproposto per il download, senza salvare nulla su disco.
-      {% if raggruppamento %}Se una riga contiene la nota "prove parziali", lo studente non viene compilato
-      qui ma segnalato (se il voto combinato è già pronto) nell'elenco da confermare della scheda "Voti
-      verbalizzati".{% endif %}
     </p>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esporta-voti" enctype="multipart/form-data">
       <input type="file" name="file" accept=".csv" required>
       <button type="submit">Compila e scarica</button>
     </form>
   </details>
+  {% endif %}
   <script>
   (function () {
     var root = document.currentScript.closest(".tab-pane");

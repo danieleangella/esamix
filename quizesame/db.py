@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS studenti (
     matricola TEXT PRIMARY KEY,
     nome TEXT NOT NULL,
     cognome TEXT NOT NULL,
-    laurea_ctype TEXT REFERENCES corsi_laurea(ctype)
+    laurea_ctype TEXT REFERENCES corsi_laurea(ctype),
+    dsa BOOLEAN NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS appelli (
@@ -46,13 +47,44 @@ CREATE TABLE IF NOT EXISTS orale_obbligatorio (
 CREATE TABLE IF NOT EXISTS raggruppamenti (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     appello_id INTEGER NOT NULL UNIQUE REFERENCES appelli(id),
-    nome TEXT NOT NULL
+    nome TEXT NOT NULL,
+    matricola_minima_prima_prova TEXT
 );
 
 CREATE TABLE IF NOT EXISTS raggruppamento_membri (
     raggruppamento_id INTEGER NOT NULL REFERENCES raggruppamenti(id),
     appello_id INTEGER NOT NULL REFERENCES appelli(id),
     PRIMARY KEY (raggruppamento_id, appello_id)
+);
+
+-- Aule usate per una singola prova (membro di un raggruppamento): definite da zero per
+-- ogni prova, dato che le aule assegnate cambiano da una sessione d'esame all'altra.
+CREATE TABLE IF NOT EXISTS appello_aule (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    appello_id INTEGER NOT NULL REFERENCES appelli(id),
+    nome TEXT NOT NULL,
+    capienza INTEGER NOT NULL
+);
+
+-- Assegnazione di uno studente ammesso a un'aula per una data prova: 'manuale' distingue
+-- un'assegnazione scelta a mano dal docente (che l'assegnazione automatica non deve mai
+-- sovrascrivere) da una calcolata proporzionalmente alla capienza residua.
+CREATE TABLE IF NOT EXISTS aula_assegnazioni (
+    matricola TEXT NOT NULL REFERENCES studenti(matricola),
+    appello_id INTEGER NOT NULL REFERENCES appelli(id),
+    aula_id INTEGER REFERENCES appello_aule(id),
+    manuale BOOLEAN NOT NULL DEFAULT 0,
+    PRIMARY KEY (matricola, appello_id)
+);
+
+-- Studente ammesso a una prova membro "in deroga", cioè aggiunto a mano dal docente pur
+-- non soddisfacendo i requisiti automatici (soglia di matricola sulla prima prova, aver
+-- superato la prova precedente sulle successive): la sua sola presenza qui basta a farlo
+-- comparire nell'elenco ammessi di quella prova, con un avviso.
+CREATE TABLE IF NOT EXISTS ammissioni_manuali (
+    matricola TEXT NOT NULL REFERENCES studenti(matricola),
+    appello_id INTEGER NOT NULL REFERENCES appelli(id),
+    PRIMARY KEY (matricola, appello_id)
 );
 
 CREATE TABLE IF NOT EXISTS esercizi (
@@ -142,6 +174,12 @@ CREATE TABLE IF NOT EXISTS risultati (
 # uno schema più vecchio va "aggiornato" aggiungendo solo quelle mancanti (le nuove
 # tabelle, invece, le crea già lo script sopra grazie a CREATE TABLE IF NOT EXISTS).
 ADDITIVE_COLUMNS = {
+    "studenti": [
+        ("dsa", "BOOLEAN NOT NULL DEFAULT 0"),
+    ],
+    "raggruppamenti": [
+        ("matricola_minima_prima_prova", "TEXT"),
+    ],
     "appello_esercizi": [
         ("obbligatorio", "BOOLEAN NOT NULL DEFAULT 0"),
         ("data_assegnazione", "TEXT DEFAULT CURRENT_TIMESTAMP"),

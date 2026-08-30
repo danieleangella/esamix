@@ -2,16 +2,13 @@
 ListaStudentiEsameExport): un CSV con righe di intestazione/metadati seguite
 dall'elenco degli studenti iscritti. Si compilano solo le colonne "Esito" e
 "Domande d'esame" per gli studenti già corretti, lasciando invariato il resto
-del file (compresi le altre colonne e gli studenti senza un risultato)."""
+del file (comprese le altre colonne e gli studenti senza un risultato)."""
 import csv
 import io
 from typing import Optional
 
 from quizesame.services import correzione as correzione_service
 from quizesame.services import corsi as corsi_service
-from quizesame.services import verbalizzazione as verbalizzazione_service
-
-NOTA_PROVE_PARZIALI = "prove parziali"
 
 
 def _esito_per_export(risultato: Optional[dict], votomin: int) -> Optional[str]:
@@ -43,24 +40,16 @@ def _esito_per_export(risultato: Optional[dict], votomin: int) -> Optional[str]:
     return str(voto)
 
 
-def compila_export_voti(tag: str, appello_id: int, contenuto: bytes) -> tuple[bytes, int, int]:
+def compila_export_voti(tag: str, appello_id: int, contenuto: bytes) -> tuple[str, str, list[dict]]:
     """`contenuto` sono i byte del file ListaStudentiEsameExport.csv scaricato dalla
     segreteria: cerca la riga di intestazione con le colonne "Matricola" ed "Esito",
     poi per ogni riga studente il cui matricola corrisponde a un risultato già inserito
     in questo appello compila "Esito" (voto, ASS, RIT o 0 per insufficiente) e "Domande
     d'esame" (testo salvato nelle impostazioni del corso).
 
-    Se questo appello è una prova membro di un raggruppamento e una qualunque cella della
-    riga contiene la nota "prove parziali" (lo studente chiede la verbalizzazione del
-    voto combinato invece che della singola prova), non si scrive nulla nella colonna
-    Esito: se il voto combinato è già pronto (sufficiente, orale svolto se richiesto), lo
-    studente viene solo segnalato in un elenco a parte da confermare a mano (vedi
-    verbalizzazione_service.list_da_confermare_raggruppamento), per non anticipare una
-    verbalizzazione che il docente deve ancora rivedere.
-
-    Ritorna (file compilato negli stessi byte/codifica del file caricato, numero di
-    studenti compilati normalmente, numero di studenti aggiunti all'elenco da confermare
-    per il raggruppamento)."""
+    Ritorna (testo compilato, codifica rilevata nel file caricato, elenco degli studenti
+    compilati [{"matricola","nome","cognome","voto_label"}] — il chiamante decide se
+    scaricarlo subito o mostrare prima una conferma, es. per il raggruppamento)."""
     for codifica in ("utf-8-sig", "cp1252"):
         try:
             testo = contenuto.decode(codifica)
@@ -87,32 +76,11 @@ def compila_export_voti(tag: str, appello_id: int, contenuto: bytes) -> tuple[by
     votomin = corsi_service.effective_votomin(corso, appello)
     risultati = {r["matricola"]: r for r in correzione_service.list_risultati(tag, appello_id)}
 
-    raggruppamento_membro = (
-        corsi_service.get_raggruppamento_by_membro(tag, appello_id) if appello.membro_raggruppamento else None
-    )
-    if raggruppamento_membro is not None:
-        appello_combinato = corsi_service.get_appello(tag, raggruppamento_membro.appello_id)
-        votomin_combinato = corsi_service.effective_votomin(corso, appello_combinato)
-        risultati_combinati = {
-            r["matricola"]: r for r in correzione_service.list_risultati(tag, raggruppamento_membro.appello_id)
-        }
-
-    n_compilati = 0
-    n_da_confermare = 0
+    compilati = []
     for riga in righe[indice_intestazione + 1:]:
         if len(riga) <= idx_matricola or not riga[idx_matricola].strip():
             continue
         matricola = riga[idx_matricola].strip()
-
-        if raggruppamento_membro is not None and any(NOTA_PROVE_PARZIALI in cella.lower() for cella in riga):
-            risultato_combinato = risultati_combinati.get(matricola)
-            esito_combinato = _esito_per_export(risultato_combinato, votomin_combinato)
-            if esito_combinato is not None:
-                verbalizzazione_service.segna_da_confermare_raggruppamento(
-                    tag, raggruppamento_membro.appello_id, matricola
-                )
-                n_da_confermare += 1
-            continue
 
         risultato = risultati.get(matricola)
         esito = _esito_per_export(risultato, votomin)
@@ -121,8 +89,11 @@ def compila_export_voti(tag: str, appello_id: int, contenuto: bytes) -> tuple[by
         riga[idx_esito] = esito
         if idx_domande is not None:
             riga[idx_domande] = corso.domande_esame
-        n_compilati += 1
+        compilati.append({
+            "matricola": matricola, "nome": risultato["nome"], "cognome": risultato["cognome"],
+            "voto_label": esito,
+        })
 
     buffer = io.StringIO()
     csv.writer(buffer, lineterminator="\r\n").writerows(righe)
-    return buffer.getvalue().encode(codifica), n_compilati, n_da_confermare
+    return buffer.getvalue(), codifica, compilati

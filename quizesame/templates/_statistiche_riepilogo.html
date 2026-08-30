@@ -1,0 +1,115 @@
+<div class="card">
+  <h2>Riepilogo{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</h2>
+  <p class="muted" style="margin-top:0">Esiti su {{ stat.totale }} compiti corretti (voto minimo {{ stat.votomin }}).</p>
+  <div class="stats-grid">
+    <div class="stat-tile stat-ok">
+      <div class="stat-value">{{ stat.promossi }} {% if stat.promossi_pct is not none %}<span class="stat-pct">({{ stat.promossi_pct }}%)</span>{% endif %}</div>
+      <div class="stat-label">Promossi</div>
+    </div>
+    <div class="stat-tile stat-warn">
+      <div class="stat-value">{{ stat.insufficienti }} {% if stat.insufficienti_pct is not none %}<span class="stat-pct">({{ stat.insufficienti_pct }}%)</span>{% endif %}</div>
+      <div class="stat-label">Insufficienti</div>
+    </div>
+    <div class="stat-tile stat-info">
+      <div class="stat-value">{{ stat.in_attesa_orale }} {% if stat.in_attesa_orale_pct is not none %}<span class="stat-pct">({{ stat.in_attesa_orale_pct }}%)</span>{% endif %}</div>
+      <div class="stat-label">In attesa di orale</div>
+    </div>
+    <div class="stat-tile stat-info">
+      <div class="stat-value">{{ stat.orali_svolti }} {% if stat.orali_svolti_pct is not none %}<span class="stat-pct">({{ stat.orali_svolti_pct }}%)</span>{% endif %}</div>
+      <div class="stat-label">Orali svolti</div>
+    </div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-tile">
+      <div class="stat-value">{{ stat.media_scritto if stat.media_scritto is not none else '-' }}</div>
+      <div class="stat-label">Media scritto</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-value">{{ stat.media_orale if stat.media_orale is not none else '-' }}</div>
+      <div class="stat-label">Media orale</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-value">{{ stat.media_finale if stat.media_finale is not none else '-' }}</div>
+      <div class="stat-label">Media finale</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Distribuzione dei voti{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</h2>
+  {% if stat.distribuzione.bins %}
+  <p class="muted">
+    Media {{ stat.distribuzione.media }}, deviazione standard {{ stat.distribuzione.dev_std }}.
+    La linea rossa è la curva gaussiana teorica con la stessa media e deviazione standard.
+  </p>
+  <div style="overflow-x:auto">
+    <svg width="{{ stat.distribuzione.larghezza }}" height="{{ stat.distribuzione.altezza + 40 }}" style="min-width:100%; color:var(--text)">
+      {% for b in stat.distribuzione.bins %}
+      <rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.larghezza }}" height="{{ b.altezza_barra }}" fill="#93c5fd"></rect>
+      {% if b.conteggio %}<text x="{{ b.x_centro }}" y="{{ b.y - 4 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ b.conteggio }}</text>{% endif %}
+      <text x="{{ b.x_centro }}" y="{{ stat.distribuzione.altezza + 15 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ b.voto }}</text>
+      {% endfor %}
+      {% if stat.distribuzione.curva_points %}
+      <polyline fill="none" stroke="#dc2626" stroke-width="2" points="{{ stat.distribuzione.curva_points }}"></polyline>
+      {% endif %}
+    </svg>
+  </div>
+  {% if stat.distribuzione.distanza_gaussiana is not none %}
+  <div class="stats-grid">
+    <div class="stat-tile">
+      <div class="stat-value">{{ stat.distribuzione.asimmetria }}</div>
+      <div class="stat-label">Asimmetria (skewness)</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-value">{{ stat.distribuzione.curtosi }}</div>
+      <div class="stat-label">Curtosi in eccesso</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-value">{{ stat.distribuzione.distanza_gaussiana }}</div>
+      <div class="stat-label">Distanza dalla gaussiana</div>
+    </div>
+  </div>
+  <p class="muted" style="margin-top:0.75rem">
+    Per una gaussiana perfetta asimmetria e curtosi valgono 0: più la "distanza dalla
+    gaussiana" (la loro combinazione) si avvicina a 0, più la distribuzione dei voti è
+    vicina alla campana teorica. Valori sopra ~1 indicano una forma via via più diversa
+    (es. asimmetria positiva = più voti bassi con una coda di voti alti, curtosi negativa
+    = distribuzione più "piatta" del normale).
+  </p>
+  {% endif %}
+  {% else %}
+  <p class="muted">Non ci sono ancora abbastanza voti finali registrati per calcolare una distribuzione.</p>
+  {% endif %}
+</div>
+
+{% if stat.esercizi %}
+<div class="card">
+  <h2>Esercizi più sbagliati{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</h2>
+  <table>
+    <tr><th>Esercizio</th><th>Corrette</th><th>Sbagliate</th><th>% sbagliate</th><th>Risposte sbagliate scelte</th></tr>
+    {% for e in stat.esercizi %}
+    <tr>
+      <td>
+        <span class="esercizio-nome-hover" title="{{ e.varianti_testo|join(' /// ') }}" style="cursor:help; text-decoration:underline dotted">{{ e.nome }}</span>
+        {% if e.varianti_testo %}
+        <button type="button" class="secondary btn-mostra-testo" data-target="testo-es-{{ stat_id }}-{{ loop.index }}" style="margin-left:0.3rem; padding:0.1rem 0.4rem; font-size:0.75rem">testo</button>
+        <div id="testo-es-{{ stat_id }}-{{ loop.index }}" class="muted" style="display:none; margin-top:0.3rem; white-space:pre-wrap">
+          {% for t in e.varianti_testo %}<div style="margin-top:0.2rem">{{ t }}</div>{% endfor %}
+        </div>
+        {% endif %}
+      </td>
+      <td>{{ e.corrette }}</td>
+      <td>{{ e.sbagliate }}</td>
+      <td>{{ e.percentuale_sbagliate }}%</td>
+      <td>
+        {% for rs in e.risposte_sbagliate %}
+        <div>{{ rs.testo }}: {{ rs.percentuale }}% ({{ rs.conteggio }})</div>
+        {% else %}
+        <span class="muted">-</span>
+        {% endfor %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}

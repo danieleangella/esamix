@@ -7,7 +7,7 @@ from quizesame.services import corsi as corsi_service
 from quizesame.services.latex import LatexContext, crea_tex_risultati, celavoto
 
 
-def _ctx_for(tag: str, corso, appello) -> LatexContext:
+def ctx_for(tag: str, corso, appello) -> LatexContext:
     return LatexContext(
         corso=corso.nome, facolta=corso.facolta, universita=corso.universita, anno=corso.anno, tag=tag,
         appello_nome=appello.nome, appello_data=appello.data or "",
@@ -51,7 +51,7 @@ def stampa_risultati(tag: str, appello_id: int) -> str:
     finally:
         conn.close()
     lista = [(r["matricola"], r["nome"], r["cognome"], _etichetta_esito(r, votomin)) for r in rows]
-    return crea_tex_risultati(_ctx_for(tag, corso, appello), lista)
+    return crea_tex_risultati(ctx_for(tag, corso, appello), lista)
 
 
 @dataclass

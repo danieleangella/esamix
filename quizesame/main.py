@@ -25,6 +25,8 @@ from quizesame.services import statistiche as statistiche_service
 from quizesame.services import app_config as app_config_service
 from quizesame.services import esportazione as esportazione_service
 from quizesame.services import aggiornamenti as aggiornamenti_service
+from quizesame.services import aule as aule_service
+from quizesame.services import latex as latex_service
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
@@ -73,8 +75,15 @@ app.mount("/static", StaticFiles(directory=str(PACKAGE_DIR / "static")), name="s
 def flash_redirect(url: str, message: str, kind: str = "success", anchor: str = "") -> RedirectResponse:
     from urllib.parse import quote
     sep = "&" if "?" in url else "?"
+    # l'anchor va anche nella query string (oltre che nel fragment): un fragment non
+    # arriva mai al server, quindi se questo redirect punta a una prova membro di un
+    # raggruppamento, il secondo redirect (appello_detail, verso la pagina del
+    # raggruppamento) non avrebbe altrimenti modo di sapere su quale scheda tornare.
+    params = f"msg={quote(message)}&kind={kind}"
+    if anchor:
+        params += f"&anchor={quote(anchor)}"
     suffisso = f"#{anchor}" if anchor else ""
-    return RedirectResponse(f"{url}{sep}msg={quote(message)}&kind={kind}{suffisso}", status_code=303)
+    return RedirectResponse(f"{url}{sep}{params}{suffisso}", status_code=303)
 
 
 @app.exception_handler(Exception)
@@ -408,14 +417,18 @@ def appello_detail(request: Request, tag: str, appello_id: int):
     if appello.membro_raggruppamento:
         # Una prova membro non ha più una pagina propria: tutto (testo, correzione,
         # orale, verbalizzazione) vive nella pagina del raggruppamento, con una scheda
-        # dedicata per ciascuna prova. La query string (es. msg/kind di un flash_redirect
-        # arrivato da un'azione di correzione su questa prova) va preservata, altrimenti
-        # questo secondo redirect la perderebbe silenziosamente.
+        # dedicata per ciascuna prova. La query string (es. msg/kind/anchor di un
+        # flash_redirect arrivato da un'azione su questa prova) va preservata, altrimenti
+        # questo secondo redirect la perderebbe silenziosamente. L'anchor esatto della
+        # scheda da cui arriva l'azione viaggia come parametro "anchor" nella query (un
+        # fragment come "#creazione-5" non arriva mai al server): se manca (es. link
+        # diretto senza contesto) si torna comunque sulla Valutazione di questa prova.
         raggruppamento_padre = corsi_service.get_raggruppamento_by_membro(tag, appello_id)
         target = f"/corsi/{tag}/appelli/{raggruppamento_padre.appello_id}"
         if request.url.query:
             target += f"?{request.url.query}"
-        target += f"#valutazione-{appello_id}"
+        anchor = request.query_params.get("anchor") or f"valutazione-{appello_id}"
+        target += f"#{anchor}"
         return RedirectResponse(target, status_code=303)
 
     raggruppamento = corsi_service.get_raggruppamento_by_appello(tag, appello_id)
@@ -429,11 +442,12 @@ def appello_detail(request: Request, tag: str, appello_id: int):
         "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
     }
     if raggruppamento:
-        contesto["membri_dati"] = [_dati_appello(tag, corso, m) for m in raggruppamento.membri]
+        contesto["membri_dati"] = [
+            {**_dati_appello(tag, corso, m), "aule": aule_service.list_aule(tag, m.id),
+             "ammessi": corsi_service.list_ammessi_prova(tag, raggruppamento, i)}
+            for i, m in enumerate(raggruppamento.membri)
+        ]
         contesto["statistiche_confronto"] = statistiche_service.confronto_raggruppamento(tag, raggruppamento)
-        contesto["da_confermare_raggruppamento"] = verbalizzazione_service.list_da_confermare_raggruppamento(
-            tag, appello_id
-        )
         contesto["risultati"] = correzione_service.list_risultati(tag, appello_id)
     else:
         contesto.update(_dati_appello(tag, corso, appello))
@@ -774,12 +788,26 @@ def _render_correggi_revisione(
     corretta_grezza = "".join(r.lettera_corretta for r in valutazione.righe)
     gruppi = [corretta_grezza[i:i + 5] for i in range(0, len(corretta_grezza), 5)]
     risposte_corrette_raggruppate = " ".join(gruppi)
+
+    avviso_idoneita = None
+    if appello.membro_raggruppamento:
+        raggruppamento, indice = _membro_e_indice(tag, appello_id)
+        if raggruppamento is not None and indice > 0:
+            ammessi = {s["matricola"] for s in corsi_service.list_ammessi_prova(tag, raggruppamento, indice)}
+            if valutazione.matricola not in ammessi:
+                avviso_idoneita = (
+                    f"Attenzione: questo studente non risulta tra gli ammessi a questa prova (non "
+                    f"risulta aver superato {raggruppamento.membri[indice - 1].nome} con il voto minimo "
+                    "delle prove parziali). Puoi comunque salvare la correzione."
+                )
+
     return templates.TemplateResponse(request, "correggi_revisione.html", {
         "corso": corso, "appello": appello, "v": valutazione, "voto_proposto": voto_proposto,
         "punteggi_proposti": punteggi_proposti, "errore": errore,
         "richiedi_orale_checked": richiedi_orale_checked, "modifica": modifica,
         "risposte_corrette_raggruppate": risposte_corrette_raggruppate,
         "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
+        "avviso_idoneita": avviso_idoneita,
     })
 
 
@@ -965,19 +993,42 @@ def scarica_risultati_pdf(tag: str, appello_id: int):
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esporta-voti")
-async def esporta_voti(tag: str, appello_id: int, file: UploadFile = File(...)):
+async def esporta_voti(request: Request, tag: str, appello_id: int, file: UploadFile = File(...)):
+    raggruppamento = corsi_service.get_raggruppamento_by_appello(tag, appello_id)
     contenuto = await file.read()
     try:
-        dati, n_compilati, n_da_confermare = esportazione_service.compila_export_voti(tag, appello_id, contenuto)
+        testo, codifica, compilati = esportazione_service.compila_export_voti(tag, appello_id, contenuto)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="risultati" if raggruppamento else "valutazione",
+        )
+    if raggruppamento and compilati:
+        corso = corsi_service.get_corso(tag)
+        appello = corsi_service.get_appello(tag, appello_id)
+        return templates.TemplateResponse(request, "esporta_voti_conferma.html", {
+            "corso": corso, "appello": appello, "compilati": compilati,
+            "csv_testo": testo, "codifica": codifica, "filename": file.filename,
+        })
     return Response(
-        dati, media_type="text/csv",
+        testo.encode(codifica), media_type="text/csv",
         headers={
             "Content-Disposition": f'attachment; filename="{file.filename}"',
-            "X-Studenti-Compilati": str(n_compilati),
-            "X-Studenti-Da-Confermare-Raggruppamento": str(n_da_confermare),
+            "X-Studenti-Compilati": str(len(compilati)),
         },
+    )
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esporta-voti/conferma")
+async def esporta_voti_conferma(tag: str, appello_id: int, request: Request):
+    form = await request.form()
+    matricole = form.getlist("matricole")
+    if matricole:
+        verbalizzazione_service.verbalizza_multipli(tag, appello_id, matricole)
+    testo = form.get("csv_testo", "")
+    codifica = form.get("codifica", "utf-8")
+    return Response(
+        testo.encode(codifica), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{form.get("filename", "export.csv")}"'},
     )
 
 
@@ -985,26 +1036,28 @@ async def esporta_voti(tag: str, appello_id: int, file: UploadFile = File(...)):
 def verbalizza(
     tag: str, appello_id: int, matricola: str, voto: str = Form(""), data: str = Form(""),
 ):
+    anchor = "risultati" if corsi_service.get_raggruppamento_by_appello(tag, appello_id) else "verbalizzati"
     try:
         verbalizzazione_service.verbalizza(
             tag, appello_id, matricola, voto=int(voto) if voto else None, data=data or None,
         )
     except Exception as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="verbalizzati")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Verbalizzato", anchor="verbalizzati")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Verbalizzato", anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/verbalizza-multipli")
 async def verbalizza_multipli(tag: str, appello_id: int, request: Request):
+    anchor = "risultati" if corsi_service.get_raggruppamento_by_appello(tag, appello_id) else "verbalizzati"
     form = await request.form()
     matricole = form.getlist("matricole")
     if not matricole:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessuno studente selezionato", "error", anchor="verbalizzati")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessuno studente selezionato", "error", anchor=anchor)
     try:
         n = verbalizzazione_service.verbalizza_multipli(tag, appello_id, matricole)
     except Exception as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="verbalizzati")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Verbalizzati {n} studenti", anchor="verbalizzati")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Verbalizzati {n} studenti", anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/verbalizza/{matricola}/annulla")
@@ -1018,17 +1071,12 @@ def annulla_verbalizzazione(tag: str, appello_id: int, matricola: str):
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/rifiuta/{matricola}")
 def rifiuta_voto(tag: str, appello_id: int, matricola: str):
+    anchor = "risultati" if corsi_service.get_raggruppamento_by_appello(tag, appello_id) else "verbalizzati"
     try:
         verbalizzazione_service.rifiuta(tag, appello_id, matricola)
     except Exception as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="verbalizzati")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Voto rifiutato: lo studente dovrà ripresentarsi", anchor="verbalizzati")
-
-
-@app.post("/corsi/{tag}/appelli/{appello_id}/raggruppamento-da-confermare/{matricola}/rimuovi")
-def rimuovi_da_confermare_raggruppamento(tag: str, appello_id: int, matricola: str):
-    verbalizzazione_service.rimuovi_da_confermare_raggruppamento(tag, appello_id, matricola)
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Rimosso dall'elenco da confermare", anchor="verbalizzati")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Voto rifiutato: lo studente dovrà ripresentarsi", anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/calcola-raggruppamento")
@@ -1040,8 +1088,110 @@ def calcola_raggruppamento(tag: str, appello_id: int, raggruppamento_id: int = F
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Calcolati {result.n_calcolati} voti combinati")
 
 
+@app.post("/corsi/{tag}/appelli/{appello_id}/raggruppamento/modifica")
+def modifica_raggruppamento(tag: str, appello_id: int, matricola_minima_prima_prova: str = Form("")):
+    raggruppamento = corsi_service.get_raggruppamento_by_appello(tag, appello_id)
+    if raggruppamento is None:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Questo appello non è un raggruppamento", "error")
+    corsi_service.update_raggruppamento_soglia(tag, raggruppamento.id, matricola_minima_prima_prova.strip() or None)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Impostazioni raggruppamento salvate", anchor="impostazioni")
+
+
+def _membro_e_indice(tag: str, appello_id: int):
+    """Il raggruppamento e l'indice (0-based) di `appello_id` fra i suoi membri, o
+    (None, None) se questo appello non è una prova membro: usata da tutte le route di
+    ammissione/aule, che sono sempre scoped su una singola prova."""
+    raggruppamento = corsi_service.get_raggruppamento_by_membro(tag, appello_id)
+    if raggruppamento is None:
+        return None, None
+    for i, m in enumerate(raggruppamento.membri):
+        if m.id == appello_id:
+            return raggruppamento, i
+    return None, None
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/aule/nuova")
+def crea_aula(tag: str, appello_id: int, nome: str = Form(...), capienza: int = Form(...)):
+    aule_service.crea_aula(tag, appello_id, nome, capienza)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Aula aggiunta", anchor=f"creazione-{appello_id}")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/aule/{aula_id}/elimina")
+def elimina_aula(tag: str, appello_id: int, aula_id: int):
+    aule_service.elimina_aula(tag, appello_id, aula_id)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Aula eliminata", anchor=f"creazione-{appello_id}")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/aule/assegna")
+def assegna_aule(tag: str, appello_id: int):
+    raggruppamento, indice = _membro_e_indice(tag, appello_id)
+    if raggruppamento is None:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Questa prova non appartiene a un raggruppamento", "error")
+    ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
+    aule_service.assegna_automatica(tag, appello_id, [s["matricola"] for s in ammessi])
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Assegnazione aule aggiornata", anchor=f"creazione-{appello_id}")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/aule/{matricola}/assegna-manuale")
+def assegna_aula_manuale(tag: str, appello_id: int, matricola: str, aula_id: int = Form(...)):
+    aule_service.assegna_manuale(tag, appello_id, matricola, aula_id)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Aula assegnata", anchor=f"creazione-{appello_id}")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/ammessi/aggiungi")
+def aggiungi_ammesso_manuale(tag: str, appello_id: int, matricola: str = Form(...)):
+    try:
+        corsi_service.ammetti_manualmente(tag, appello_id, matricola.strip())
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=f"creazione-{appello_id}")
+    return flash_redirect(
+        f"/corsi/{tag}/appelli/{appello_id}",
+        "Studente aggiunto agli ammessi: verifica che soddisfi davvero i requisiti, se non è già segnalato in deroga",
+        anchor=f"creazione-{appello_id}",
+    )
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/ammessi/{matricola}/rimuovi")
+def rimuovi_ammesso_manuale(tag: str, appello_id: int, matricola: str):
+    corsi_service.rimuovi_ammissione_manuale(tag, appello_id, matricola)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Rimosso dall'elenco ammessi", anchor=f"creazione-{appello_id}")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/ammessi.csv")
+def scarica_ammessi_csv(tag: str, appello_id: int):
+    raggruppamento, indice = _membro_e_indice(tag, appello_id)
+    if raggruppamento is None:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Questa prova non appartiene a un raggruppamento", "error")
+    appello = corsi_service.get_appello(tag, appello_id)
+    ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
+    dati = studenti_service.esporta_ammessi_csv(ammessi)
+    return Response(
+        dati, media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="ammessi-{appello.slug}.csv"'},
+    )
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/ammessi.pdf")
+def scarica_ammessi_pdf(tag: str, appello_id: int):
+    raggruppamento, indice = _membro_e_indice(tag, appello_id)
+    if raggruppamento is None:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Questa prova non appartiene a un raggruppamento", "error")
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
+    aule = aule_service.list_aule(tag, appello_id)
+    ctx = risultati_service.ctx_for(tag, corso, appello)
+    tex = latex_service.crea_tex_ammessi(ctx, f"Studenti ammessi: {appello.nome}", ammessi, aule)
+    tex_path = compiti_service.path_ammessi(tag, appello_id, "tex", appello=appello)
+    tex_path.write_text(tex, encoding="utf-8")
+    compilazione = compiti_service.compila_pdf(tex_path)
+    if not compilazione.ok:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error", anchor=f"creazione-{appello_id}")
+    return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
+
+
 @app.get("/corsi/{tag}/studenti", response_class=HTMLResponse)
-def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro: str = ""):
+def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro: str = "", dsa: str = ""):
     corso = corsi_service.get_corso(tag)
     lista = studenti_service.list_studenti(tag, q or None)
     stato_esame = verbalizzazione_service.stato_esame_studenti(tag)
@@ -1051,12 +1201,14 @@ def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro:
         lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") == "da_verbalizzare"]
     elif filtro == "da_fare":
         lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") not in ("verbalizzato", "da_verbalizzare")]
+    if dsa == "1":
+        lista = [s for s in lista if s.dsa]
     corsi_suggeriti = corsi_service.corsi_simili(tag)
     altri_corsi = [c for c in corsi_service.list_corsi() if c.tag != tag]
     corso_sorgente = corsi_service.get_corso(da) if da and config.corso_exists(da) else None
     studenti_sorgente = studenti_service.list_non_superati(da) if corso_sorgente else []
     return templates.TemplateResponse(request, "studenti.html", {
-        "corso": corso, "studenti": lista, "q": q, "filtro": filtro, "stato_esame": stato_esame,
+        "corso": corso, "studenti": lista, "q": q, "filtro": filtro, "dsa": dsa, "stato_esame": stato_esame,
         "corsi_suggeriti": corsi_suggeriti, "altri_corsi": altri_corsi,
         "corso_sorgente": corso_sorgente, "studenti_sorgente": studenti_sorgente,
     })
@@ -1092,18 +1244,23 @@ def studente_dettaglio_corso(request: Request, tag: str, matricola: str):
 
 
 @app.post("/corsi/{tag}/studenti/nuovo")
-def nuovo_studente(tag: str, matricola: str = Form(...), nome: str = Form(...), cognome: str = Form(...)):
+def nuovo_studente(
+    tag: str, matricola: str = Form(...), nome: str = Form(...), cognome: str = Form(...), dsa: bool = Form(False),
+):
     try:
-        studenti_service.crea_studente(tag, matricola, nome, cognome)
+        studenti_service.crea_studente(tag, matricola, nome, cognome, dsa=dsa)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/studenti", str(e), "error")
     return flash_redirect(f"/corsi/{tag}/studenti", "Studente salvato")
 
 
 @app.post("/corsi/{tag}/studenti/{matricola}/modifica")
-def modifica_studente(tag: str, matricola: str, nome: str = Form(...), cognome: str = Form(...), nuova_matricola: str = Form("")):
+def modifica_studente(
+    tag: str, matricola: str, nome: str = Form(...), cognome: str = Form(...), nuova_matricola: str = Form(""),
+    dsa: bool = Form(False),
+):
     try:
-        studenti_service.aggiorna_studente(tag, matricola, nome, cognome, nuova_matricola or None)
+        studenti_service.aggiorna_studente(tag, matricola, nome, cognome, nuova_matricola or None, dsa=dsa)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/studenti", str(e), "error")
     return flash_redirect(f"/corsi/{tag}/studenti", "Studente aggiornato")

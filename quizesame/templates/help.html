@@ -173,6 +173,13 @@
     eliminare lo studente — possibile solo se non ha ancora risultati registrati in
     quel corso, per non perdere dati.
   </p>
+  <p>
+    Uno studente può essere segnalato come <strong>DSA</strong> (checkbox nel form di
+    aggiunta/modifica): compare come indicazione nell'elenco studenti e, cliccando
+    sull'intestazione "DSA" della tabella, si filtra l'elenco ai soli studenti DSA. La
+    stessa indicazione compare anche nell'elenco ammessi di una prova parziale (vedi
+    Raggruppamenti).
+  </p>
 </div>
 
 <div class="card">
@@ -181,6 +188,35 @@
     Un raggruppamento combina più appelli (es. prove parziali) in un voto unico: la
     media dei voti di chi ha superato la soglia di <em>ciascuna</em> prova membro. Si
     crea dalla pagina del corso, dopo aver creato almeno due appelli.
+  </p>
+  <p>
+    Una prova membro non ha più una pagina propria: tutto vive nella pagina del
+    raggruppamento, con una scheda "Testo N"/"Valutazione N" per ciascuna prova (in
+    ordine di data) e delle schede globali — <strong>Risultati</strong> (elenco
+    combinato, verbalizzazione ed esportazione .tex/.pdf/segreteria), <strong>Orali</strong>
+    (l'orale è unico per il raggruppamento: se richiesto durante la correzione di una
+    prova, il suo voto sostituisce la media delle prove parziali una volta svolto),
+    <strong>Voti verbalizzati</strong>, <strong>Statistiche</strong> (per prova e
+    combinate) e <strong>Impostazioni</strong>.
+  </p>
+  <p>
+    Alla seconda prova (e successive) può partecipare solo chi ha superato la prova
+    precedente con il voto minimo delle prove parziali; in Impostazioni si può anche
+    fissare una <strong>matricola minima</strong> per escludere dalla prima prova gli
+    iscritti di anni precedenti. Nella scheda Testo di ciascuna prova si trova l'elenco
+    degli studenti ammessi (esportabile in .csv e .pdf, quest'ultimo pensato per fare
+    l'appello in aula), insieme alla gestione delle <strong>aule</strong>: si possono
+    definire più aule con una capienza, e assegnare automaticamente gli ammessi in
+    ordine di cognome, proporzionalmente alla capienza di ciascuna (le assegnazioni
+    fatte a mano non vengono mai toccate da un successivo ricalcolo automatico). Uno
+    studente che non soddisfa i requisiti si può comunque aggiungere a mano all'elenco
+    ammessi di una prova: comparirà con l'avviso "in deroga" (anche nell'export csv/pdf),
+    e si può togliere di nuovo in qualsiasi momento.
+  </p>
+  <p>
+    L'esportazione voti per la segreteria, dalla scheda Risultati, chiede conferma prima
+    di verbalizzare: si può scegliere quali studenti compilati verbalizzare subito
+    (torneranno tra i "Voti verbalizzati") e quali lasciare solo nel file scaricato.
   </p>
 </div>
 

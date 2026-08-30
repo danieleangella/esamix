@@ -14,6 +14,7 @@ class Studente:
     cognome: str
     laurea_ctype: Optional[str]
     laurea_nome: Optional[str] = None
+    dsa: bool = False
 
 
 def _clean(value: Optional[str]) -> str:
@@ -26,6 +27,7 @@ def _row_to_studente(row) -> Studente:
     return Studente(
         matricola=row["matricola"], nome=row["nome"], cognome=row["cognome"],
         laurea_ctype=row["laurea_ctype"], laurea_nome=row["laurea_nome"] if "laurea_nome" in row.keys() else None,
+        dsa=bool(row["dsa"]) if "dsa" in row.keys() else False,
     )
 
 
@@ -65,6 +67,21 @@ def esporta_csv(studenti: list[Studente], stato_esame: dict) -> bytes:
             s.matricola, s.cognome, s.nome, s.laurea_nome or "",
             etichette.get(stato["stato"], "deve ancora sostenerlo") if stato else "deve ancora sostenerlo",
             stato["voto"] if stato else "",
+        ])
+    return buffer.getvalue().encode("utf-8-sig")
+
+
+def esporta_ammessi_csv(lista: list[dict]) -> bytes:
+    """CSV dell'elenco ammessi a una prova (vedi corsi_service.list_ammessi_prova):
+    matricola, cognome, nome, indicazione DSA, aula assegnata e se ammesso in deroga
+    (aggiunto a mano pur non soddisfacendo i requisiti automatici)."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\r\n")
+    writer.writerow(["Matricola", "Cognome", "Nome", "DSA", "Aula", "In deroga"])
+    for s in lista:
+        writer.writerow([
+            s["matricola"], s["cognome"], s["nome"], "Sì" if s.get("dsa") else "",
+            s.get("aula_nome") or "non assegnata", "Sì" if s.get("in_deroga") else "",
         ])
     return buffer.getvalue().encode("utf-8-sig")
 
@@ -229,7 +246,9 @@ def get_studente(tag: str, matricola: str) -> Optional[Studente]:
         conn.close()
 
 
-def crea_studente(tag: str, matricola: str, nome: str, cognome: str, laurea_ctype: Optional[str] = None) -> None:
+def crea_studente(
+    tag: str, matricola: str, nome: str, cognome: str, laurea_ctype: Optional[str] = None, dsa: bool = False,
+) -> None:
     """A differenza di upsert_studente, rifiuta la matricola se già assegnata a qualcun
     altro: usata dal form "Aggiungi studente", dove un inserimento con matricola sbagliata
     non deve sovrascrivere in silenzio lo studente già presente."""
@@ -244,8 +263,8 @@ def crea_studente(tag: str, matricola: str, nome: str, cognome: str, laurea_ctyp
                 f"La matricola {matricola} è già assegnata a {esistente['cognome']} {esistente['nome']}"
             )
         conn.execute(
-            "INSERT INTO studenti (matricola, nome, cognome, laurea_ctype) VALUES (?,?,?,?)",
-            (matricola, _clean(nome), _clean(cognome), laurea_ctype or None),
+            "INSERT INTO studenti (matricola, nome, cognome, laurea_ctype, dsa) VALUES (?,?,?,?,?)",
+            (matricola, _clean(nome), _clean(cognome), laurea_ctype or None, dsa),
         )
         conn.commit()
     finally:
@@ -267,7 +286,9 @@ def upsert_studente(tag: str, matricola: str, nome: str, cognome: str, laurea_ct
         conn.close()
 
 
-def aggiorna_studente(tag: str, matricola: str, nome: str, cognome: str, nuova_matricola: Optional[str] = None) -> None:
+def aggiorna_studente(
+    tag: str, matricola: str, nome: str, cognome: str, nuova_matricola: Optional[str] = None, dsa: bool = False,
+) -> None:
     matricola = _clean(matricola)
     nuova_matricola = _clean(nuova_matricola) if nuova_matricola else matricola
     conn = db.get_connection(config.corso_db_path(tag))
@@ -280,8 +301,8 @@ def aggiorna_studente(tag: str, matricola: str, nome: str, cognome: str, nuova_m
             # può aggiornare prima la tabella genitore e poi le tabelle figlie in sicurezza.
             conn.execute("PRAGMA defer_foreign_keys = ON")
         cur = conn.execute(
-            "UPDATE studenti SET nome=?, cognome=?, matricola=? WHERE matricola=?",
-            (_clean(nome), _clean(cognome), nuova_matricola, matricola),
+            "UPDATE studenti SET nome=?, cognome=?, matricola=?, dsa=? WHERE matricola=?",
+            (_clean(nome), _clean(cognome), nuova_matricola, dsa, matricola),
         )
         if cur.rowcount == 0:
             raise ValueError(f"Studente con matricola '{matricola}' non trovato")

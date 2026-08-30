@@ -1,0 +1,57 @@
+  <div class="card">
+    <h2>Verbalizzazione ({{ idonei|length }} idonei non ancora verbalizzati)</h2>
+    {% if idonei %}
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/verbalizza-multipli">
+      <table>
+        <tr>
+          <th><input type="checkbox" id="checkbox-tutti-idonei" style="width:auto" checked></th>
+          <th>Studente</th><th>Matricola</th><th>Voto</th><th></th>
+        </tr>
+        {% for r in idonei %}
+        <tr>
+          <td><input type="checkbox" name="matricole" value="{{ r.matricola }}" class="campo-idoneo-incluso" style="width:auto" checked></td>
+          <td>{{ r.cognome }} {{ r.nome }}</td>
+          <td>{{ r.matricola }}</td>
+          <td>{{ r.voto }}</td>
+          <td><button type="submit" form="form-rifiuta-{{ r.matricola }}" class="secondary" style="margin-top:0">Rifiuta</button></td>
+        </tr>
+        {% endfor %}
+      </table>
+      <button type="submit" id="btn-verbalizza-multipli">Verbalizza tutti ({{ idonei|length }})</button>
+    </form>
+    {% for r in idonei %}
+    <form method="post" id="form-rifiuta-{{ r.matricola }}" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/rifiuta/{{ r.matricola }}"
+          onsubmit="return confirm('Rifiutare il voto di {{ r.cognome }} {{ r.nome }}? Dovrà ripresentarsi a un appello successivo.');" style="display:none"></form>
+    {% endfor %}
+    <script>
+    (function () {
+      var checkboxTutti = document.getElementById("checkbox-tutti-idonei");
+      var campi = document.querySelectorAll(".campo-idoneo-incluso");
+      var bottone = document.getElementById("btn-verbalizza-multipli");
+      function aggiorna() {
+        var n = Array.prototype.filter.call(campi, function (c) { return c.checked; }).length;
+        bottone.textContent = "Verbalizza " + (n === campi.length ? "tutti" : "selezionati") + " (" + n + ")";
+        bottone.disabled = n === 0;
+      }
+      checkboxTutti.addEventListener("change", function () {
+        campi.forEach(function (c) { c.checked = checkboxTutti.checked; });
+        aggiorna();
+      });
+      campi.forEach(function (c) {
+        c.addEventListener("change", function () {
+          checkboxTutti.checked = Array.prototype.every.call(campi, function (x) { return x.checked; });
+          aggiorna();
+        });
+      });
+    })();
+    </script>
+    {% else %}
+    <p class="muted">Nessuno studente idoneo in attesa di verbalizzazione.</p>
+    {% if not orali_da_svolgere and not appello.chiuso %}
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/chiudi"
+          onsubmit="return confirm('Chiudere l\'appello {{ appello.nome }}? Non sarà più possibile correggere, verbalizzare o modificare gli esercizi assegnati finché non lo riapri.');">
+      <button type="submit" class="secondary">Chiudi appello</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </div>

@@ -85,6 +85,7 @@ class Raggruppamento:
     appello_id: int
     nome: str
     membri: list = field(default_factory=list)  # list[Appello]
+    matricola_minima_prima_prova: Optional[str] = None
 
 
 def effective_votomin(corso: Corso, appello: Appello) -> int:
@@ -492,6 +493,7 @@ def _row_to_raggruppamento(conn, row) -> Raggruppamento:
     return Raggruppamento(
         id=row["id"], appello_id=row["appello_id"], nome=row["nome"],
         membri=[_row_to_appello(conn, r) for r in membri_rows],
+        matricola_minima_prima_prova=row["matricola_minima_prima_prova"] if "matricola_minima_prima_prova" in row.keys() else None,
     )
 
 
@@ -532,6 +534,118 @@ def get_raggruppamento_by_membro(tag: str, appello_id: int) -> Optional[Raggrupp
             "WHERE rm.appello_id=?", (appello_id,),
         ).fetchone()
         return _row_to_raggruppamento(conn, row) if row else None
+    finally:
+        conn.close()
+
+
+def update_raggruppamento_soglia(tag: str, raggruppamento_id: int, matricola_minima_prima_prova: Optional[str]) -> None:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute(
+            "UPDATE raggruppamenti SET matricola_minima_prima_prova=? WHERE id=?",
+            (matricola_minima_prima_prova or None, raggruppamento_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _matricola_a_intero(matricola: str) -> Optional[int]:
+    try:
+        return int(matricola)
+    except (TypeError, ValueError):
+        return None
+
+
+def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) -> list[dict]:
+    """Studenti ammessi a sostenere la prova `raggruppamento.membri[indice]`: per la prima
+    prova (indice 0), tutti gli studenti del corso con matricola >= l'eventuale soglia
+    impostata sul raggruppamento (chi ha una matricola non numerica, o se la soglia non è
+    impostata/non è un numero valido, resta ammesso: non si filtrano casi ambigui); per le
+    successive, solo chi ha superato (voto >= voto minimo delle prove parziali) la prova
+    immediatamente precedente. Ogni voce include anche l'eventuale aula già assegnata per
+    la prova `indice`."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        membro = raggruppamento.membri[indice]
+        if indice == 0:
+            righe = conn.execute(
+                "SELECT matricola, nome, cognome, dsa FROM studenti ORDER BY cognome, nome"
+            ).fetchall()
+            soglia = _matricola_a_intero(raggruppamento.matricola_minima_prima_prova)
+            ammessi = [
+                dict(r) for r in righe
+                if soglia is None or _matricola_a_intero(r["matricola"]) is None or _matricola_a_intero(r["matricola"]) >= soglia
+            ]
+        else:
+            corso = get_corso(tag)
+            membro_precedente = raggruppamento.membri[indice - 1]
+            righe = conn.execute(
+                "SELECT s.matricola, s.nome, s.cognome, s.dsa FROM risultati r "
+                "JOIN studenti s ON s.matricola = r.matricola "
+                "WHERE r.appello_id=? AND r.esito='voto' AND r.voto IS NOT NULL AND r.voto >= ? "
+                "ORDER BY s.cognome, s.nome",
+                (membro_precedente.id, corso.votomin_raggruppamento),
+            ).fetchall()
+            ammessi = [dict(r) for r in righe]
+
+        ammessi_matricole = {s["matricola"] for s in ammessi}
+        for s in ammessi:
+            s["in_deroga"] = False
+        manuali = conn.execute(
+            "SELECT s.matricola, s.nome, s.cognome, s.dsa FROM ammissioni_manuali am "
+            "JOIN studenti s ON s.matricola = am.matricola WHERE am.appello_id=?",
+            (membro.id,),
+        ).fetchall()
+        for r in manuali:
+            if r["matricola"] not in ammessi_matricole:
+                d = dict(r)
+                d["in_deroga"] = True
+                ammessi.append(d)
+        ammessi.sort(key=lambda s: (s["cognome"], s["nome"]))
+
+        assegnazioni = {
+            r["matricola"]: {"aula_id": r["aula_id"], "aula_nome": r["aula_nome"]}
+            for r in conn.execute(
+                "SELECT aa.matricola, aa.aula_id, au.nome AS aula_nome FROM aula_assegnazioni aa "
+                "LEFT JOIN appello_aule au ON au.id = aa.aula_id WHERE aa.appello_id=?",
+                (membro.id,),
+            ).fetchall()
+        }
+        for s in ammessi:
+            info = assegnazioni.get(s["matricola"], {})
+            s["aula_id"] = info.get("aula_id")
+            s["aula_nome"] = info.get("aula_nome")
+        return ammessi
+    finally:
+        conn.close()
+
+
+def ammetti_manualmente(tag: str, appello_id: int, matricola: str) -> None:
+    """Aggiunge uno studente all'elenco ammessi di una prova membro anche se non
+    soddisfa i requisiti automatici (soglia di matricola, o aver superato la prova
+    precedente): usata per le eccezioni decise a mano dal docente. Non fa nulla se lo
+    studente non esiste nel corso."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        if not conn.execute("SELECT 1 FROM studenti WHERE matricola=?", (matricola,)).fetchone():
+            raise ValueError(f"Nessuno studente con matricola '{matricola}' in questo corso")
+        conn.execute(
+            "INSERT OR IGNORE INTO ammissioni_manuali (matricola, appello_id) VALUES (?,?)",
+            (matricola, appello_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def rimuovi_ammissione_manuale(tag: str, appello_id: int, matricola: str) -> None:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute(
+            "DELETE FROM ammissioni_manuali WHERE matricola=? AND appello_id=?", (matricola, appello_id)
+        )
+        conn.commit()
     finally:
         conn.close()
 

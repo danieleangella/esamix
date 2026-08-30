@@ -365,3 +365,41 @@ def crea_tex_risultati(ctx: LatexContext, lista) -> str:
     tex += "\\bottomrule\n\\end{longtable}\n\\end{center}\n\n"
     tex += "\\vfill\n\\end{document}"
     return tex
+
+
+def _tabella_ammessi(righe: list[dict]) -> str:
+    """Righe ben distanziate (spazio a sufficienza per segnare a penna presenza/assenza
+    durante l'appello) con una colonna "Presente" (una casella vuota da spuntare). Chi è
+    ammesso in deroga (aggiunto a mano pur non soddisfacendo i requisiti automatici) è
+    marcato con un asterisco sul cognome, spiegato in una nota sotto la tabella."""
+    tex = (
+        "\\begin{center}\n\\begin{longtable}{lllcc}\n\\toprule\n"
+        "{\\bfseries Matricola} & {\\bfseries Cognome} & {\\bfseries Nome} & {\\bfseries DSA} & {\\bfseries Presente} \\\\\n\\toprule\n"
+    )
+    for r in righe:
+        dsa = "S\\`i" if r.get("dsa") else ""
+        cognome = f"{r['cognome']}*" if r.get("in_deroga") else r["cognome"]
+        tex += f"{r['matricola']} & {cognome} & {r['nome']} & {dsa} & {{\\Large $\\square$}} \\\\[0.9cm]\n"
+    tex += "\\bottomrule\n\\end{longtable}\n\\end{center}\n\n"
+    if any(r.get("in_deroga") for r in righe):
+        tex += "{\\small * ammesso in deroga, aggiunto a mano pur non soddisfacendo i requisiti automatici.}\\\\\n\n"
+    return tex
+
+
+def crea_tex_ammessi(ctx: LatexContext, titolo: str, lista: list[dict], aule: list) -> str:
+    """Elenco degli studenti ammessi a sostenere una prova (matricola per intero, non
+    oscurata: serve a fare l'appello in aula, non va pubblicata come i risultati). `lista`:
+    dict con matricola/nome/cognome/dsa/aula_nome. `aule`: le aule di questa prova (oggetti
+    con .id/.nome/.capienza); se presenti, dopo la tabella generale segue una tabella per
+    aula con solo gli studenti assegnati a quella specifica aula."""
+    tex = BEGIN_DOCUMENT
+    tex += intestazione_breve(ctx)
+    tex += f"\\begin{{center}}{{\\bfseries {titolo}}} — {len(lista)} ammessi\\end{{center}}\\vspace{{0.5cm}}\n\n"
+    tex += _tabella_ammessi(lista)
+    for aula in aule:
+        righe_aula = [r for r in lista if r.get("aula_id") == aula.id]
+        tex += "\\newpage\n"
+        tex += f"\\begin{{center}}{{\\bfseries Aula: {aula.nome} (capienza {aula.capienza})}} — {len(righe_aula)} studenti\\end{{center}}\\vspace{{0.5cm}}\n\n"
+        tex += _tabella_ammessi(righe_aula)
+    tex += "\\end{document}"
+    return tex

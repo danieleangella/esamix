@@ -32,9 +32,15 @@
         </select>
       </div>
     </div>
+    <input type="hidden" name="dsa" value="{{ dsa }}">
   </form>
+  {% if dsa == '1' %}
   <p class="muted" style="margin-top:0.5rem">
-    <a href="/corsi/{{ corso.tag }}/studenti/esporta.csv?q={{ q }}&filtro={{ filtro }}">Esporta questo elenco in CSV</a>
+    Solo studenti DSA — <a href="/corsi/{{ corso.tag }}/studenti?q={{ q }}&filtro={{ filtro }}">rimuovi filtro</a>
+  </p>
+  {% endif %}
+  <p class="muted" style="margin-top:0.5rem">
+    <a href="/corsi/{{ corso.tag }}/studenti/esporta.csv?q={{ q }}&filtro={{ filtro }}&dsa={{ dsa }}">Esporta questo elenco in CSV</a>
   </p>
   <script>
   creaAutocomplete(
@@ -49,13 +55,14 @@
   });
   </script>
   <table style="margin-top:0.75rem">
-    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Risultato</th><th></th></tr>
+    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA</th><th>Risultato</th><th></th></tr>
     {% for s in studenti %}
     {% set st = stato_esame.get(s.matricola) %}
     <tr>
       <td>{{ s.matricola }}</td>
       <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
       <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
+      <td>{% if s.dsa %}<span class="badge badge-info">DSA</span>{% endif %}</td>
       <td>
         {% if not st %}<span class="muted">mai sostenuto</span>
         {% elif st.stato == 'verbalizzato' %}<span class="badge badge-ok">{{ st.voto }}</span>
@@ -66,11 +73,12 @@
       <td style="white-space:nowrap"><button type="button" class="secondary btn-modifica-studente" data-matricola="{{ s.matricola }}">Modifica</button></td>
     </tr>
     <tr class="riga-modifica-studente" data-matricola="{{ s.matricola }}" style="display:none">
-      <td colspan="5">
+      <td colspan="6">
         <form method="post" action="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/modifica" style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap; margin-top:0.5rem">
           <div><label>Matricola</label><input name="nuova_matricola" value="{{ s.matricola }}" required></div>
           <div><label>Cognome</label><input name="cognome" value="{{ s.cognome }}" required></div>
           <div><label>Nome</label><input name="nome" value="{{ s.nome }}" required></div>
+          <div><label style="display:inline"><input type="checkbox" name="dsa" style="width:auto" {% if s.dsa %}checked{% endif %}> DSA</label></div>
           <button type="submit">Salva</button>
         </form>
         <form method="post" action="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/elimina" class="inline"
@@ -91,6 +99,7 @@
       <div><label>Nome</label><input name="nome" required></div>
       <div><label>Cognome</label><input name="cognome" required></div>
     </div>
+    <div style="margin-top:0.5rem"><label style="display:inline"><input type="checkbox" name="dsa" style="width:auto"> DSA</label></div>
     <button type="submit">Salva</button>
   </form>
 </details>

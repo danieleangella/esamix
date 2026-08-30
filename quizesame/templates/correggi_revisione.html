@@ -13,6 +13,10 @@
 <div class="flash flash-error">{{ errore }}</div>
 {% endif %}
 
+{% if avviso_idoneita %}
+<div class="flash flash-warning">{{ avviso_idoneita }}</div>
+{% endif %}
+
 {% set lunghezza_valida = v.risposte|length == v.lunghezza_attesa %}
 {% if not lunghezza_valida %}
 <div class="flash flash-error">

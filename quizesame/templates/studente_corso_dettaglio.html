@@ -28,7 +28,8 @@
     <tr>
       <td>{{ r.appello_nome }}</td>
       <td>
-        {% if r.esito != 'voto' %}{{ r.esito }}
+        {% if r.esito == 'rifiutato' %}rifiutato <span class="muted">({{ r.voto }})</span>
+        {% elif r.esito != 'voto' %}{{ r.esito }}
         {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
         {% elif r.esito_orale in ('assente', 'insufficiente') %}{{ r.esito_orale }} (orale)
         {% else %}{{ r.voto }}{% endif %}

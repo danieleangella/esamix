@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Conferma esportazione voti · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#risultati">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Conferma esportazione voti</span>
+{% endblock %}
+{% block content %}
+<h1>Conferma esportazione voti</h1>
+
+<div class="card">
+  <p class="muted" style="margin-top:0">
+    Il file è stato compilato per {{ compilati|length }} studenti. Scegli quali verbalizzare subito (torneranno
+    nella scheda "Voti verbalizzati"): deselezionali se preferisci scaricare solo il file, senza verbalizzare
+    nulla in questo momento.
+  </p>
+
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esporta-voti/conferma" id="form-esporta-voti-conferma">
+    <textarea name="csv_testo" style="display:none">{{ csv_testo }}</textarea>
+    <input type="hidden" name="codifica" value="{{ codifica }}">
+    <input type="hidden" name="filename" value="{{ filename }}">
+
+    <table>
+      <tr>
+        <th><input type="checkbox" id="checkbox-tutti-compilati" style="width:auto" checked></th>
+        <th>Studente</th><th>Matricola</th><th>Esito</th>
+      </tr>
+      {% for r in compilati %}
+      <tr>
+        <td><input type="checkbox" name="matricole" value="{{ r.matricola }}" class="campo-compilato-incluso" style="width:auto" checked></td>
+        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>{{ r.matricola }}</td>
+        <td>{{ r.voto_label }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    <button type="submit" id="btn-conferma-verbalizza">Conferma e verbalizza ({{ compilati|length }})</button>
+    <button type="button" id="btn-scarica-senza-verbalizzare" class="secondary">Scarica senza verbalizzare</button>
+  </form>
+</div>
+<script>
+(function () {
+  var checkboxTutti = document.getElementById("checkbox-tutti-compilati");
+  var campi = document.querySelectorAll(".campo-compilato-incluso");
+  var bottone = document.getElementById("btn-conferma-verbalizza");
+  function aggiorna() {
+    var n = Array.prototype.filter.call(campi, function (c) { return c.checked; }).length;
+    bottone.textContent = "Conferma e verbalizza (" + n + ")";
+    bottone.disabled = n === 0;
+  }
+  checkboxTutti.addEventListener("change", function () {
+    campi.forEach(function (c) { c.checked = checkboxTutti.checked; });
+    aggiorna();
+  });
+  campi.forEach(function (c) {
+    c.addEventListener("change", function () {
+      checkboxTutti.checked = Array.prototype.every.call(campi, function (x) { return x.checked; });
+      aggiorna();
+    });
+  });
+  document.getElementById("btn-scarica-senza-verbalizzare").addEventListener("click", function () {
+    campi.forEach(function (c) { c.checked = false; });
+    document.getElementById("form-esporta-voti-conferma").requestSubmit();
+  });
+})();
+</script>
+{% endblock %}
