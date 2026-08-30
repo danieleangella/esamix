@@ -1,5 +1,11 @@
+import io
 import re
+import shutil
+import sqlite3
+import tempfile
+import zipfile
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 from quizesame import config, db
@@ -138,6 +144,69 @@ def create_corso(
     return get_corso(tag)
 
 
+def _backup_db_bytes(db_path: Path) -> bytes:
+    """Copia consistente di un database sqlite tramite la sua API di backup nativa,
+    invece di leggere il file grezzo: così anche se qualcosa lo sta scrivendo nello
+    stesso istante il contenuto ottenuto è comunque uno stato valido del database, mai
+    a metà di una scrittura."""
+    with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        origine = sqlite3.connect(str(db_path))
+        try:
+            destinazione = sqlite3.connect(str(tmp_path))
+            try:
+                origine.backup(destinazione)
+            finally:
+                destinazione.close()
+        finally:
+            origine.close()
+        return tmp_path.read_bytes()
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
+def _aggiungi_corso_a_zip(zf: zipfile.ZipFile, tag: str) -> None:
+    corso_root = config.corso_dir(tag)
+    zf.writestr(f"{tag}/db.sqlite", _backup_db_bytes(config.corso_db_path(tag)))
+    for p in sorted(corso_root.rglob("*")):
+        if p.is_file() and p.name != "db.sqlite":
+            zf.write(p, arcname=str(Path(tag) / p.relative_to(corso_root)))
+
+
+def crea_backup_corso(tag: str) -> bytes:
+    """Zip in memoria con il database (copiato in modo consistente) e tutti i file
+    generati (PDF/tex) di un corso."""
+    if not config.corso_exists(tag):
+        raise ValueError(f"Corso '{tag}' non trovato")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        _aggiungi_corso_a_zip(zf, tag)
+    return buffer.getvalue()
+
+
+def crea_backup_tutti() -> bytes:
+    """Zip in memoria con tutti i corsi (database e file generati di ciascuno) e le
+    impostazioni generali dell'app."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for corso in list_corsi():
+            _aggiungi_corso_a_zip(zf, corso.tag)
+        settings_path = config.DATA_ROOT / "app_settings.json"
+        if settings_path.exists():
+            zf.write(settings_path, arcname="app_settings.json")
+    return buffer.getvalue()
+
+
+def elimina_corso(tag: str) -> None:
+    """Elimina definitivamente l'intero corso: database, studenti, esercizi, appelli,
+    risultati e ogni file generato (PDF/tex). Azione irreversibile e senza backup: la
+    conferma è responsabilità del chiamante (route/template)."""
+    if not config.corso_exists(tag):
+        raise ValueError(f"Corso '{tag}' non trovato")
+    shutil.rmtree(config.corso_dir(tag))
+
+
 def get_corso(tag: str) -> Corso:
     meta = get_meta(tag)
     return Corso(
@@ -251,20 +320,15 @@ def create_appello(
 
 def elimina_appello(tag: str, appello_id: int) -> None:
     """Elimina un appello e tutto ciò che gli è assegnato (esercizi assegnati, blocchi,
-    compiti, eventuale raggruppamento). Rifiuta se ha già risultati registrati: in quel
-    caso andrebbero persi voti reali senza modo di recuperarli."""
+    compiti, eventuale raggruppamento, risultati già registrati compresi). La conferma
+    di questa azione distruttiva è responsabilità del chiamante (route/template): questa
+    funzione elimina sempre, senza controllare se ci sono risultati registrati."""
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         appello = conn.execute("SELECT slug FROM appelli WHERE id=?", (appello_id,)).fetchone()
         if appello is None:
             raise ValueError(f"Appello #{appello_id} non trovato")
-        n_risultati = conn.execute(
-            "SELECT COUNT(*) c FROM risultati WHERE appello_id=?", (appello_id,)
-        ).fetchone()["c"]
-        if n_risultati:
-            raise ValueError(
-                f"Questo appello ha già {n_risultati} risultati registrati: non può essere eliminato."
-            )
+        conn.execute("DELETE FROM risultati WHERE appello_id=?", (appello_id,))
         compiti_ids = [r["id"] for r in conn.execute("SELECT id FROM compiti WHERE appello_id=?", (appello_id,))]
         for cid in compiti_ids:
             conn.execute("DELETE FROM compito_esercizi WHERE compito_id=?", (cid,))

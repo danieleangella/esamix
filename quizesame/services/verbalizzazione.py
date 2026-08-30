@@ -16,6 +16,7 @@ def list_idonei(tag: str, appello_id: int) -> list[dict]:
             "JOIN studenti s ON s.matricola = r.matricola "
             "WHERE r.appello_id=? AND r.verbalizzato=0 AND r.voto >= ? "
             "AND NOT (r.richiede_orale=1 AND r.orale_svolto=0) "
+            "AND r.valutazione_sospesa=0 "
             "ORDER BY s.cognome, s.nome",
             (appello_id, votomin),
         ).fetchall()

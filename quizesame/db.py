@@ -156,6 +156,7 @@ ADDITIVE_COLUMNS = {
         ("voto_scritto", "INTEGER"),
         ("esito", "TEXT NOT NULL DEFAULT 'voto'"),
         ("esito_orale", "TEXT"),
+        ("valutazione_sospesa", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
     "esercizi": [
         ("argomento", "TEXT"),

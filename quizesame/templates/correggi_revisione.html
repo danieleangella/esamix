@@ -131,6 +131,13 @@
     <input type="hidden" name="conferma_orale_obbligatorio" id="conferma-obbligatorio-hidden" value="">
 
     <button type="submit">Conferma</button>
+    {% if v.da_valutare or v.domande_aperte %}
+    <button type="submit" name="sospendi_valutazione" value="1" formnovalidate class="secondary" style="margin-left:0.5rem">Completa successivamente</button>
+    <p class="muted" style="margin-top:0.4rem">
+      "Completa successivamente" salva un voto provvisorio (ottimistico) e lascia i punteggi non ancora
+      decisi da assegnare più tardi dalla sezione "Valutazioni in sospeso": non serve compilarli tutti ora.
+    </p>
+    {% endif %}
     <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione" class="muted" style="margin-left:1rem">Annulla, non salvare</a>
   </form>
 </div>

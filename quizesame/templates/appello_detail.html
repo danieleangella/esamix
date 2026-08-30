@@ -42,11 +42,18 @@
 
   <div class="card">
     <h2>Elimina appello</h2>
-    <p class="muted">Possibile solo se non ha già risultati registrati.</p>
+    {% if risultati %}
+    <p class="muted">Attenzione: ha già <strong>{{ risultati|length }}</strong> risultati registrati, che verranno eliminati insieme all'appello.</p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/elimina"
+          onsubmit="return confirm('Eliminare definitivamente l\'appello {{ appello.nome }} insieme ai suoi {{ risultati|length }} risultati registrati (esercizi assegnati, blocchi e compiti compresi)?') && confirm('Sei sicuro? I {{ risultati|length }} risultati registrati andranno persi per sempre.');">
+      <button type="submit" class="danger">Elimina questo appello</button>
+    </form>
+    {% else %}
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/elimina"
           onsubmit="return confirm('Eliminare definitivamente l\'appello {{ appello.nome }} (esercizi assegnati, blocchi e compiti compresi)?');">
       <button type="submit" class="danger">Elimina questo appello</button>
     </form>
+    {% endif %}
   </div>
 
   {% if raggruppamento %}
@@ -348,7 +355,7 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
       <td>
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/elimina"
               onsubmit="return confirm('Eliminare il blocco {{ b.numero }} ({{ b.numero_studenti }} compiti)? Possibile solo se non ha già risultati registrati.');">
-          <button type="submit" class="secondary">Elimina</button>
+          <button type="submit" class="danger">Elimina</button>
         </form>
       </td>
     </tr>
@@ -448,6 +455,7 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
         <td>{{ r.matricola }}</td>
         <td>
           {% if r.esito != 'voto' %}{{ r.esito }}
+          {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
           {% else %}{{ r.voto }}{% endif %}
         </td>
@@ -455,11 +463,12 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
         <td style="white-space:nowrap">
           {% if r.esito == 'voto' %}
           <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}">Dettaglio</a>
-          {% if not r.verbalizzato %}<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica">Modifica</a>{% endif %}
+          {% if not r.verbalizzato %}<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica">{{ 'Completa valutazione' if r.valutazione_sospesa else 'Modifica' }}</a>{% endif %}
           {% endif %}
           {% if not r.verbalizzato %}
-          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/elimina">
-            <button type="submit" class="secondary">Elimina</button>
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/elimina"
+                onsubmit="return confirm('Eliminare il risultato di {{ r.cognome }} {{ r.nome }} per questo appello?');">
+            <button type="submit" class="danger">Elimina</button>
           </form>
           {% endif %}
         </td>
@@ -472,6 +481,27 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
       <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.pdf">.pdf</a>
     </p>
   </div>
+
+  {% if valutazioni_sospese %}
+  <div class="card">
+    <h2>Valutazioni in sospeso ({{ valutazioni_sospese|length }})</h2>
+    <p class="muted" style="margin-top:0">Compiti con esercizi obbligatori o domande aperte la cui
+      valutazione è stata rimandata: il voto mostrato è provvisorio (calcolato assumendo il punteggio
+      massimo per le posizioni ancora da giudicare) e lo studente non compare tra i verbalizzabili
+      finché non si completa la valutazione.</p>
+    <table>
+      <tr><th>Studente</th><th>Matricola</th><th>Voto provvisorio</th><th></th></tr>
+      {% for r in valutazioni_sospese %}
+      <tr>
+        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>{{ r.matricola }}</td>
+        <td class="muted">{{ r.voto }}</td>
+        <td><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica">Completa valutazione</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
   {% endif %}
 
   <div class="card">

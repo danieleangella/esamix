@@ -1,6 +1,7 @@
 import json
 import traceback
 import webbrowser
+from datetime import date
 from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -131,6 +132,16 @@ def home(request: Request, q: str = ""):
     })
 
 
+@app.get("/backup-tutti.zip")
+def scarica_backup_tutti():
+    dati = corsi_service.crea_backup_tutti()
+    nome_file = f"backup-tutti-i-corsi-{date.today().isoformat()}.zip"
+    return Response(
+        dati, media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{nome_file}"'},
+    )
+
+
 @app.get("/impostazioni", response_class=HTMLResponse)
 def impostazioni_app(request: Request):
     return templates.TemplateResponse(request, "impostazioni_app.html", {
@@ -246,6 +257,28 @@ def modifica_corso(
     return flash_redirect(f"/corsi/{tag}/impostazioni", "Impostazioni corso salvate")
 
 
+@app.get("/corsi/{tag}/backup.zip")
+def scarica_backup_corso(tag: str):
+    try:
+        dati = corsi_service.crea_backup_corso(tag)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/impostazioni", str(e), "error")
+    nome_file = f"backup-{tag}-{date.today().isoformat()}.zip"
+    return Response(
+        dati, media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{nome_file}"'},
+    )
+
+
+@app.post("/corsi/{tag}/elimina")
+def elimina_corso(tag: str):
+    try:
+        corsi_service.elimina_corso(tag)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/impostazioni", str(e), "error")
+    return flash_redirect("/", f"Corso '{tag}' eliminato definitivamente")
+
+
 @app.post("/corsi/{tag}/appelli/nuovo")
 def crea_appello(tag: str, nome: str = Form(...), tipo: str = Form("appello"), data: str = Form("")):
     try:
@@ -275,6 +308,7 @@ def appello_detail(request: Request, tag: str, appello_id: int):
     compiti = compiti_service.list_compiti(tag, appello_id)
     risultati = correzione_service.list_risultati(tag, appello_id)
     orali_da_svolgere = correzione_service.list_orali_da_svolgere(tag, appello_id)
+    valutazioni_sospese = correzione_service.list_valutazioni_sospese(tag, appello_id)
     idonei = verbalizzazione_service.list_idonei(tag, appello_id)
     esercizi_assegnati = esercizi_service.list_esercizi_appello(tag, appello_id)
     banca_esercizi = esercizi_service.list_esercizi(tag)
@@ -290,7 +324,7 @@ def appello_detail(request: Request, tag: str, appello_id: int):
     statistiche = statistiche_service.calcola(tag, appello_id) if not raggruppamento else None
     return templates.TemplateResponse(request, "appello_detail.html", {
         "corso": corso, "appello": appello, "raggruppamento": raggruppamento, "compiti": compiti,
-        "risultati": risultati, "orali_da_svolgere": orali_da_svolgere,
+        "risultati": risultati, "orali_da_svolgere": orali_da_svolgere, "valutazioni_sospese": valutazioni_sospese,
         "idonei": idonei,
         "esercizi_assegnati": esercizi_assegnati,
         "esercizi_disponibili": disponibili, "argomenti": argomenti,
@@ -604,6 +638,7 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
     codice = form.get("codice") or ""
     risposte = form.get("risposte") or ""
     azione = form.get("azione") or "salva"
+    sospendi_valutazione = bool(form.get("sospendi_valutazione"))
     orale_motivazione = (form.get("orale_motivazione") or "").strip()
     conferma_orale_obbligatorio = bool(form.get("conferma_orale_obbligatorio"))
     modifica = bool(form.get("modifica"))
@@ -618,10 +653,13 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
         valore = form.get(f"punteggio_{r.posizione}")
         if valore is not None and valore != "":
             punteggi_obbligatori[r.posizione] = int(valore)
+    # con "Completa successivamente" i campi non compilati sono valutazioni rimandate,
+    # non errori: il voto proposto dal client andrebbe ricalcolato assumendo un punteggio
+    # ottimistico anche per quelle posizioni, quindi si lascia decidere al server (None).
     voto_str = form.get("voto_finale")
-    voto_finale = int(voto_str) if voto_str not in (None, "") else None
+    voto_finale = None if sospendi_valutazione else (int(voto_str) if voto_str not in (None, "") else None)
 
-    richiedi_orale = azione == "richiedi_orale"
+    richiedi_orale = azione == "richiedi_orale" and not sospendi_valutazione
     if richiedi_orale and not orale_motivazione:
         return _render_correggi_revisione(
             request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi_obbligatori,
@@ -634,7 +672,7 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
             tag, appello_id, matricola, codice, risposte, voto_finale=voto_finale,
             punteggi_obbligatori=punteggi_obbligatori, richiedi_orale=richiedi_orale,
             orale_motivazione=orale_motivazione, conferma_orale_obbligatorio=conferma_orale_obbligatorio,
-            modifica=modifica,
+            modifica=modifica, sospendi_valutazione=sospendi_valutazione,
         )
     except correzione_service.OraleObbligatorioNonConfermato as e:
         return _render_correggi_revisione(
@@ -658,7 +696,12 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
 
-    if result.richiede_orale:
+    if result.valutazione_sospesa:
+        msg = (
+            f"Valutazione di {result.nome} {result.cognome} messa in sospeso (voto provvisorio: {result.voto}): "
+            "completala dalla sezione \"Valutazioni in sospeso\""
+        )
+    elif result.richiede_orale:
         msg = f"Orale richiesto per {result.nome} {result.cognome} (voto scritto di riferimento: {result.voto})"
     else:
         msg = f"Voto calcolato per {result.nome} {result.cognome}: {result.voto}"

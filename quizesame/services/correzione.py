@@ -212,6 +212,7 @@ class CorrezioneResult:
     cognome: str
     insufficiente_per_obbligatorio: bool = False
     richiede_orale: bool = False
+    valutazione_sospesa: bool = False
 
 
 def conferma_risultato(
@@ -222,19 +223,28 @@ def conferma_risultato(
     orale_motivazione: str = "",
     conferma_orale_obbligatorio: bool = False,
     modifica: bool = False,
+    sospendi_valutazione: bool = False,
 ) -> CorrezioneResult:
     """Salva il risultato. `punteggi_obbligatori` sono i punteggi (tra risposta_sbagliata
-    e risposta_corretta) assegnati dal docente agli esercizi obbligatori risposti
-    correttamente, dopo aver giudicato lo svolgimento scritto. Se `richiedi_orale`, il
-    voto scritto viene comunque salvato come riferimento ma l'esito resta "in attesa di
-    orale" finché non si chiama completa_orale(). Se lo studente ha già una riga in
-    orale_obbligatorio (imposta in un appello precedente, anche di un altro corso da cui
-    è stato importato) e non è arrivata `conferma_orale_obbligatorio`, non salva nulla e
-    solleva OraleObbligatorioNonConfermato perché il chiamante mostri l'avviso. Se lo
-    studente ha già un esito registrato per questo appello (voto, assente o ritirato) e
-    `modifica` non è True, non salva nulla e solleva RisultatoGiaValutato: una
-    correzione "nuova" (dal form principale) non deve poter sovrascrivere per sbaglio un
-    esito già inserito — solo un "Modifica" esplicito può."""
+    e risposta_corretta, o punteggio_max_aperta per le domande aperte) assegnati dal
+    docente agli esercizi che richiedono un giudizio manuale (obbligatori risposti
+    correttamente, o domande aperte), dopo aver giudicato lo svolgimento scritto. Se
+    `sospendi_valutazione`, `punteggi_obbligatori` può essere parziale (mancano le
+    posizioni che il docente ha scelto di valutare più tardi): per quelle si usa
+    provvisoriamente lo stesso punteggio ottimistico già assunto da voto_base
+    (risposta_corretta per un obbligatorio con multiple-choice corretta, risposta_vuota
+    per una domanda aperta) finché non si completa la valutazione da "Modifica" con un
+    punteggio per tutte le posizioni rimaste. Se `richiedi_orale`, il voto scritto viene
+    comunque salvato come riferimento ma l'esito resta "in attesa di orale" finché non si
+    chiama completa_orale(). Se lo studente ha già una riga in orale_obbligatorio (imposta
+    in un appello precedente, anche di un altro corso da cui è stato importato) e non è
+    arrivata `conferma_orale_obbligatorio`, non salva nulla e solleva
+    OraleObbligatorioNonConfermato perché il chiamante mostri l'avviso. Se lo studente ha
+    già un esito registrato per questo appello (voto, assente o ritirato) e `modifica`
+    non è True, non salva nulla e solleva RisultatoGiaValutato: una correzione "nuova"
+    (dal form principale) non deve poter sovrascrivere per sbaglio un esito già inserito
+    — solo un "Modifica" esplicito (necessario anche per completare una valutazione
+    sospesa) può."""
     punteggi_obbligatori = punteggi_obbligatori or {}
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
@@ -282,7 +292,7 @@ def conferma_risultato(
         conn.execute(
             "INSERT INTO risultati (matricola, appello_id, compito_id, risposte, voto, voto_scritto, esito, "
             "insufficiente_per_obbligatorio, punteggi_obbligatori, richiede_orale, orale_svolto, "
-            "orale_motivazione, esito_orale) VALUES (?,?,?,?,?,?,'voto',?,?,?,?,?,NULL) "
+            "orale_motivazione, esito_orale, valutazione_sospesa) VALUES (?,?,?,?,?,?,'voto',?,?,?,?,?,NULL,?) "
             "ON CONFLICT(matricola, appello_id) DO UPDATE SET "
             "compito_id=excluded.compito_id, risposte=excluded.risposte, "
             "voto=CASE WHEN risultati.orale_svolto=1 THEN risultati.voto ELSE excluded.voto END, "
@@ -292,11 +302,12 @@ def conferma_risultato(
             "richiede_orale=CASE WHEN risultati.orale_svolto=1 THEN risultati.richiede_orale ELSE excluded.richiede_orale END, "
             "orale_svolto=CASE WHEN risultati.orale_svolto=1 THEN risultati.orale_svolto ELSE excluded.orale_svolto END, "
             "orale_motivazione=CASE WHEN risultati.orale_svolto=1 THEN risultati.orale_motivazione ELSE excluded.orale_motivazione END, "
-            "esito_orale=CASE WHEN risultati.orale_svolto=1 THEN risultati.esito_orale ELSE excluded.esito_orale END",
+            "esito_orale=CASE WHEN risultati.orale_svolto=1 THEN risultati.esito_orale ELSE excluded.esito_orale END, "
+            "valutazione_sospesa=excluded.valutazione_sospesa",
             (
                 matricola, appello_id, compito["id"], risposte, voto, voto, insufficiente,
                 json.dumps(punteggi_obbligatori) if punteggi_obbligatori else None,
-                richiedi_orale, False, orale_motivazione or None,
+                richiedi_orale, False, orale_motivazione or None, sospendi_valutazione,
             ),
         )
         if richiedi_orale and corso.orale_dopo_richiesta:
@@ -310,6 +321,7 @@ def conferma_risultato(
         return CorrezioneResult(
             voto=voto, matricola=studente["matricola"], nome=studente["nome"], cognome=studente["cognome"],
             insufficiente_per_obbligatorio=insufficiente, richiede_orale=richiedi_orale,
+            valutazione_sospesa=sospendi_valutazione,
         )
     finally:
         conn.close()
@@ -431,6 +443,21 @@ def list_orali_da_svolgere(tag: str, appello_id: int) -> list[dict]:
             "SELECT r.*, s.nome, s.cognome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
             "WHERE r.appello_id=? AND r.richiede_orale=1 AND r.orale_svolto=0 "
+            "ORDER BY s.cognome, s.nome",
+            (appello_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def list_valutazioni_sospese(tag: str, appello_id: int) -> list[dict]:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        rows = conn.execute(
+            "SELECT r.*, s.nome, s.cognome FROM risultati r "
+            "JOIN studenti s ON s.matricola = r.matricola "
+            "WHERE r.appello_id=? AND r.valutazione_sospesa=1 "
             "ORDER BY s.cognome, s.nome",
             (appello_id,),
         ).fetchall()

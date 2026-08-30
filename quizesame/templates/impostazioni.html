@@ -101,6 +101,23 @@
 
   <button type="submit">Salva impostazioni</button>
 </form>
+
+<div class="card">
+  <h2>Backup</h2>
+  <p class="muted">Scarica un archivio zip con il database e tutti i file generati (PDF/tex) di questo
+    corso: utile prima di modifiche importanti, o semplicemente come copia di sicurezza periodica.</p>
+  <a href="/corsi/{{ corso.tag }}/backup.zip">Scarica backup di questo corso</a>
+</div>
+
+<div class="card">
+  <h2>Elimina corso</h2>
+  <p class="muted">Elimina definitivamente il corso "{{ corso.nome }}" ({{ corso.tag }}): studenti,
+    esercizi, appelli e tutti i risultati registrati. Azione irreversibile, non c'è un backup.</p>
+  <form method="post" action="/corsi/{{ corso.tag }}/elimina"
+        onsubmit="return confirm('Eliminare DEFINITIVAMENTE il corso \'{{ corso.nome }}\' e tutto ciò che contiene (studenti, esercizi, appelli, risultati)?') && confirm('Sei sicuro? Non è possibile annullare questa operazione: tutti i dati del corso andranno persi per sempre.');">
+    <button type="submit" class="danger">Elimina questo corso</button>
+  </form>
+</div>
 <script>
 (function () {
   var checkSoglia = document.getElementById("check-soglia-orale");
