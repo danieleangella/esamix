@@ -542,22 +542,49 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
 
   <div class="card">
     <h2>Verbalizzazione ({{ idonei|length }} idonei non ancora verbalizzati)</h2>
-    <table>
-      <tr><th>Studente</th><th>Matricola</th><th>Voto</th><th></th></tr>
-      {% for r in idonei %}
-      <tr>
-        <td>{{ r.cognome }} {{ r.nome }}</td>
-        <td>{{ r.matricola }}</td>
-        <td>{{ r.voto }}</td>
-        <td>
-          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/verbalizza/{{ r.matricola }}">
-            <input type="hidden" name="voto" value="{{ r.voto }}">
-            <button type="submit">Verbalizza</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
+    {% if idonei %}
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/verbalizza-multipli">
+      <table>
+        <tr>
+          <th><input type="checkbox" id="checkbox-tutti-idonei" style="width:auto" checked></th>
+          <th>Studente</th><th>Matricola</th><th>Voto</th>
+        </tr>
+        {% for r in idonei %}
+        <tr>
+          <td><input type="checkbox" name="matricole" value="{{ r.matricola }}" class="campo-idoneo-incluso" style="width:auto" checked></td>
+          <td>{{ r.cognome }} {{ r.nome }}</td>
+          <td>{{ r.matricola }}</td>
+          <td>{{ r.voto }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <button type="submit" id="btn-verbalizza-multipli">Verbalizza tutti ({{ idonei|length }})</button>
+    </form>
+    <script>
+    (function () {
+      var checkboxTutti = document.getElementById("checkbox-tutti-idonei");
+      var campi = document.querySelectorAll(".campo-idoneo-incluso");
+      var bottone = document.getElementById("btn-verbalizza-multipli");
+      function aggiorna() {
+        var n = Array.prototype.filter.call(campi, function (c) { return c.checked; }).length;
+        bottone.textContent = "Verbalizza " + (n === campi.length ? "tutti" : "selezionati") + " (" + n + ")";
+        bottone.disabled = n === 0;
+      }
+      checkboxTutti.addEventListener("change", function () {
+        campi.forEach(function (c) { c.checked = checkboxTutti.checked; });
+        aggiorna();
+      });
+      campi.forEach(function (c) {
+        c.addEventListener("change", function () {
+          checkboxTutti.checked = Array.prototype.every.call(campi, function (x) { return x.checked; });
+          aggiorna();
+        });
+      });
+    })();
+    </script>
+    {% else %}
+    <p class="muted">Nessuno studente idoneo in attesa di verbalizzazione.</p>
+    {% endif %}
   </div>
 </div>
 

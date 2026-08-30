@@ -51,6 +51,21 @@ def verbalizza(
         conn.close()
 
 
+def verbalizza_multipli(tag: str, appello_id: int, matricole: list[str], data: str | None = None) -> int:
+    """Verbalizza in blocco gli studenti scelti (dalla lista degli idonei, con la
+    possibilità di deselezionarne alcuni prima di confermare): un matricola non più
+    idoneo nel frattempo (es. verbalizzato da un'altra scheda nel frattempo) viene
+    semplicemente ignorato invece di far fallire l'intera operazione."""
+    idonei = {r["matricola"] for r in list_idonei(tag, appello_id)}
+    n = 0
+    for matricola in matricole:
+        if matricola not in idonei:
+            continue
+        verbalizza(tag, appello_id, matricola, data=data)
+        n += 1
+    return n
+
+
 def list_verbalizzati(tag: str, appello_id: int) -> list[dict]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:

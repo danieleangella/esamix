@@ -899,6 +899,16 @@ def verbalizza(
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Verbalizzato", anchor="valutazione")
 
 
+@app.post("/corsi/{tag}/appelli/{appello_id}/verbalizza-multipli")
+async def verbalizza_multipli(tag: str, appello_id: int, request: Request):
+    form = await request.form()
+    matricole = form.getlist("matricole")
+    if not matricole:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessuno studente selezionato", "error", anchor="valutazione")
+    n = verbalizzazione_service.verbalizza_multipli(tag, appello_id, matricole)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Verbalizzati {n} studenti", anchor="valutazione")
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/verbalizza/{matricola}/annulla")
 def annulla_verbalizzazione(tag: str, appello_id: int, matricola: str):
     try:
