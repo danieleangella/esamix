@@ -6,6 +6,15 @@
 {% block content %}
 <h1>Corsi</h1>
 
+{% if aggiornamento_disponibile %}
+<div class="flash flash-warning">
+  È disponibile un aggiornamento di EsaMiX. Per scaricarlo:
+  <strong>Linux/macOS</strong> — esegui <code>./aggiorna.sh</code> dalla cartella del programma;
+  <strong>Windows</strong> — fai doppio clic su <code>aggiorna.bat</code>.
+  Vedi anche il <a href="/help#aggiornamento">README</a> per i dettagli.
+</div>
+{% endif %}
+
 {% if riepilogo_globale %}
 <div class="card">
   <h2>Riepilogo generale</h2>

@@ -24,6 +24,7 @@ from quizesame.services import migrazione as migrazione_service
 from quizesame.services import statistiche as statistiche_service
 from quizesame.services import app_config as app_config_service
 from quizesame.services import esportazione as esportazione_service
+from quizesame.services import aggiornamenti as aggiornamenti_service
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
@@ -154,6 +155,7 @@ def home(request: Request, q: str = ""):
     riepilogo_globale = statistiche_service.calcola_globale() if app_settings.mostra_riepilogo_home else None
     return templates.TemplateResponse(request, "corsi_list.html", {
         "corsi": corsi, "q": q, "risultati_ricerca": risultati_ricerca, "riepilogo_globale": riepilogo_globale,
+        "aggiornamento_disponibile": aggiornamenti_service.aggiornamento_disponibile(),
     })
 
 
