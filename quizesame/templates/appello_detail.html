@@ -108,8 +108,9 @@
       </td>
       <td style="white-space:nowrap">
         <button type="button" class="secondary btn-modifica-assegnato" data-esercizio="{{ e.id }}">Modifica</button>
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/rimuovi">
-          <button type="submit" class="secondary">Rimuovi</button>
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/rimuovi"
+              onsubmit="return confirm('Rimuovere l\'esercizio {{ e.nome or ('#' ~ e.id) }} da questo appello?');">
+          <button type="submit" class="danger">Rimuovi</button>
         </form>
       </td>
     </tr>

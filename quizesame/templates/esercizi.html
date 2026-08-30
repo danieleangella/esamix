@@ -136,6 +136,15 @@
   </div>
 </details>
 
+<details class="card">
+  <summary>Importa esercizi da un file</summary>
+  <form method="post" action="/corsi/{{ corso.tag }}/esercizi/importa-json" enctype="multipart/form-data" style="margin-top:1rem">
+    <label>File esercizi.json</label>
+    <input type="file" name="file" accept=".json" required>
+    <button type="submit">Importa</button>
+  </form>
+</details>
+
 <script>
 (function () {
   // Anteprima e modifica si escludono a vicenda (una sola riga espansa alla volta, per

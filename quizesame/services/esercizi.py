@@ -379,6 +379,21 @@ def importa_json(tag: str, appello_id: int, esercizi: list[dict]) -> int:
     return n
 
 
+def importa_json_banca(tag: str, esercizi: list[dict]) -> int:
+    """Come importa_json, ma crea gli esercizi solo nella banca del corso senza
+    assegnarli a nessun appello: per l'import dalla scheda Esercizi del corso, non
+    legata a un appello specifico."""
+    n = 0
+    for e in esercizi:
+        create_esercizio(
+            tag, nome=e.get("nome") or "", note=e.get("note") or "",
+            varianti=e.get("varianti") or [], argomento=e.get("argomento") or "",
+            difficolta=e.get("difficolta"), soluzione=e.get("soluzione") or "", aperta=bool(e.get("aperta")),
+        )
+        n += 1
+    return n
+
+
 # --- Import una tantum dal vecchio formato a file Python (legacy/esami.py) ------------
 
 def carica_esercizi_da_cartella(esercizi_dir: str):

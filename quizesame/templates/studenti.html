@@ -16,8 +16,23 @@
 <div class="card">
   <h2>Studenti ({{ studenti|length }})</h2>
   <form method="get" action="/corsi/{{ corso.tag }}/studenti">
-    <input name="q" value="{{ q }}" placeholder="Cerca per matricola, nome o cognome">
+    <div style="position:relative">
+      <input name="q" id="input-cerca-studenti" value="{{ q }}" autocomplete="off" placeholder="Cerca per matricola, nome o cognome">
+      <div id="suggerimenti-cerca-studenti" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+    </div>
   </form>
+  <script>
+  creaAutocomplete(
+    document.getElementById("input-cerca-studenti"), document.getElementById("suggerimenti-cerca-studenti"),
+    function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+    function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+    function (s) { return s.matricola; }
+  );
+  document.getElementById("suggerimenti-cerca-studenti").addEventListener("click", function (ev) {
+    var voce = ev.target.closest(".sfoglia-voce");
+    if (voce) document.getElementById("input-cerca-studenti").closest("form").requestSubmit();
+  });
+  </script>
   <table style="margin-top:0.75rem">
     <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
     {% for s in studenti %}

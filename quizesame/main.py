@@ -558,6 +558,43 @@ def esporta_esercizi(tag: str, appello_id: int):
     )
 
 
+@app.post("/corsi/{tag}/esercizi/importa-json", response_class=HTMLResponse)
+async def importa_esercizi_json_banca(request: Request, tag: str, file: UploadFile = File(...)):
+    try:
+        contenuto_bytes = await file.read()
+        contenuto = json.loads(contenuto_bytes.decode("utf-8"))
+        candidati = esercizi_service.anteprima_importa_json(tag, contenuto)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/esercizi", str(e), "error")
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/esercizi", f"File non valido: {e}", "error")
+    if not candidati:
+        return flash_redirect(f"/corsi/{tag}/esercizi", "Il file non contiene esercizi", "error")
+    corso = corsi_service.get_corso(tag)
+    return templates.TemplateResponse(request, "esercizi_importa_conferma.html", {
+        "corso": corso, "appello": None, "candidati": candidati,
+        "dati_json": json.dumps(contenuto, ensure_ascii=False),
+    })
+
+
+@app.post("/corsi/{tag}/esercizi/importa-json/conferma")
+async def importa_esercizi_json_banca_conferma(tag: str, request: Request):
+    form = await request.form()
+    try:
+        contenuto = json.loads(form.get("dati_json") or "{}")
+        candidati = esercizi_service.anteprima_importa_json(tag, contenuto)
+        indici_scelti = {int(i) for i in form.getlist("importa_idx")}
+        scelti = [c for i, c in enumerate(candidati) if i in indici_scelti]
+        if not scelti:
+            return flash_redirect(f"/corsi/{tag}/esercizi", "Nessun esercizio selezionato per l'import", "error")
+        n = esercizi_service.importa_json_banca(tag, scelti)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/esercizi", str(e), "error")
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/esercizi", f"Errore import: {e}", "error")
+    return flash_redirect(f"/corsi/{tag}/esercizi", f"Importati {n} esercizi dal file")
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-json", response_class=HTMLResponse)
 async def importa_esercizi_json(request: Request, tag: str, appello_id: int, file: UploadFile = File(...)):
     try:

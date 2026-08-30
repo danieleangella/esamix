@@ -1,17 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Importa esercizi · {{ appello.nome }}{% endblock %}
+{% block title %}Importa esercizi · {{ appello.nome if appello else corso.nome }}{% endblock %}
 {% block breadcrumb %}
-<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#creazione">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Importa esercizi</span>
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span>
+{% if appello %}<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#creazione">{{ appello.nome }}</a>{% else %}<a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>{% endif %}
+<span class="sep">›</span> <span class="current">Importa esercizi</span>
 {% endblock %}
 {% block content %}
 <h1>Importa esercizi da file</h1>
 <p class="muted">
-  Scegli quali esercizi importare (verranno creati nella banca del corso e assegnati a questo appello).
+  Scegli quali esercizi importare (verranno creati nella banca del corso{% if appello %} e assegnati a questo appello{% endif %}).
   Quelli segnalati come già presenti hanno lo stesso testo e le stesse risposte di un esercizio esistente:
   di default non vengono re-importati, ma puoi comunque spuntarli per creare un doppione.
 </p>
 
-<form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/importa-json/conferma">
+<form method="post" action="{{ '/corsi/' ~ corso.tag ~ '/appelli/' ~ appello.id ~ '/esercizi/importa-json/conferma' if appello else '/corsi/' ~ corso.tag ~ '/esercizi/importa-json/conferma' }}">
   <textarea name="dati_json" style="display:none">{{ dati_json }}</textarea>
 
   <div class="card">
@@ -38,6 +40,6 @@
   </div>
 
   <button type="submit">Importa selezionati</button>
-  <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#creazione" style="margin-left:1rem">Annulla</a>
+  <a href="{{ '/corsi/' ~ corso.tag ~ '/appelli/' ~ appello.id ~ '#creazione' if appello else '/corsi/' ~ corso.tag ~ '/esercizi' }}" style="margin-left:1rem">Annulla</a>
 </form>
 {% endblock %}
