@@ -72,6 +72,24 @@ source .venv/bin/activate        # su Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
+## Aggiornamento
+
+Per scaricare gli aggiornamenti più recenti dell'app (senza dover usare `git` a mano):
+
+**Linux / macOS**
+
+```bash
+./aggiorna.sh
+```
+
+**Windows** — doppio clic su `aggiorna.bat`.
+
+Lo script scarica il codice più recente da GitHub e reinstalla le eventuali dipendenze
+cambiate; non tocca mai i corsi/dati già presenti nella cartella `corsi/` (non fanno
+parte del codice scaricato con git). Se hai modificato a mano qualche file del programma,
+l'aggiornamento si ferma per non farti perdere quelle modifiche: te lo segnala e ti dice
+come procedere.
+
 ## Avvio
 
 **Linux / macOS**
