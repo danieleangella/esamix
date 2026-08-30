@@ -846,6 +846,7 @@ def dettaglio_risultato(request: Request, tag: str, appello_id: int, matricola: 
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
     return templates.TemplateResponse(request, "risultato_dettaglio.html", {
         "corso": corso, "appello": appello, "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
+        "storico": dettaglio["storico"],
     })
 
 
@@ -859,7 +860,8 @@ def dettaglio_risultato_inline(request: Request, tag: str, appello_id: int, matr
     except ValueError as e:
         return HTMLResponse(str(e), status_code=404)
     return templates.TemplateResponse(request, "_risultato_dettaglio.html", {
-        "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
+        "corso_tag": tag, "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
+        "storico": dettaglio["storico"],
     })
 
 
@@ -1015,6 +1017,18 @@ def esporta_studenti(tag: str, q: str = "", filtro: str = ""):
         dati, media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="studenti-{tag}.csv"'},
     )
+
+
+@app.get("/corsi/{tag}/studenti/{matricola}", response_class=HTMLResponse)
+def studente_dettaglio_corso(request: Request, tag: str, matricola: str):
+    corso = corsi_service.get_corso(tag)
+    dettaglio = studenti_service.dettaglio_studente_corso(tag, matricola)
+    if dettaglio is None:
+        return flash_redirect(f"/corsi/{tag}/studenti", f"Nessuno studente trovato con matricola '{matricola}'", "error")
+    return templates.TemplateResponse(request, "studente_corso_dettaglio.html", {
+        "corso": corso, "studente": dettaglio["studente"], "storico": dettaglio["storico"],
+        "orale_obbligatorio": dettaglio["orale_obbligatorio"],
+    })
 
 
 @app.post("/corsi/{tag}/studenti/nuovo")

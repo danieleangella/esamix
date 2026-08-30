@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ studente.cognome }} {{ studente.nome }} · {{ corso.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a> <span class="sep">›</span> <span class="current">{{ studente.cognome }} {{ studente.nome }}</span>
+{% endblock %}
+{% block content %}
+<h1>{{ studente.cognome }} {{ studente.nome }} <span class="muted">({{ studente.matricola }})</span></h1>
+
+<div class="card">
+  <p class="muted">
+    Corso di laurea: <strong>{{ studente.laurea_nome or '-' }}</strong>
+    · <a href="/studenti/{{ studente.matricola }}">Riepilogo in tutti i corsi/anni accademici</a>
+  </p>
+  {% if orale_obbligatorio %}
+  <p><span class="badge badge-warn">Orale sempre obbligatorio</span>
+    {% if orale_obbligatorio.motivazione %} — {{ orale_obbligatorio.motivazione }}{% endif %}
+    {% if orale_obbligatorio.origine %} <span class="muted">({{ orale_obbligatorio.origine }})</span>{% endif %}
+  </p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Storico in questo corso</h2>
+  {% if storico %}
+  <table>
+    <tr><th>Appello</th><th>Esito</th><th>Orale</th><th>Verbalizzato</th><th></th></tr>
+    {% for r in storico %}
+    <tr>
+      <td>{{ r.appello_nome }}</td>
+      <td>
+        {% if r.esito != 'voto' %}{{ r.esito }}
+        {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
+        {% elif r.esito_orale in ('assente', 'insufficiente') %}{{ r.esito_orale }} (orale)
+        {% else %}{{ r.voto }}{% endif %}
+      </td>
+      <td>
+        {% if r.richiede_orale %}
+          {% if r.orale_svolto %}<span class="badge badge-ok">orale svolto</span>
+          {% else %}<span class="badge badge-warn">orale richiesto</span>{% endif %}
+        {% else %}-{% endif %}
+      </td>
+      <td>{% if r.verbalizzato %}<span class="badge badge-ok">{{ r.data_verbalizzazione }}</span>{% else %}-{% endif %}</td>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ r.appello_id }}/risultati/{{ studente.matricola }}">Dettaglio</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nessun risultato ancora registrato in questo corso.</p>
+  {% endif %}
+</div>
+{% endblock %}

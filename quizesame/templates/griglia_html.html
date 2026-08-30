@@ -8,7 +8,13 @@
   <table>
     <tr><th>Codice</th><th>Griglia</th></tr>
     {% for c in compiti %}
-    <tr><td>{{ c.codice }}</td><td>{{ c.soluzioni }}</td></tr>
+    <tr>
+      <td>
+        {% if c.matricola %}<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ c.matricola }}">{{ c.codice }}</a>
+        {% else %}{{ c.codice }}{% endif %}
+      </td>
+      <td>{{ c.soluzioni }}</td>
+    </tr>
     {% endfor %}
   </table>
 </div>

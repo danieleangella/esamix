@@ -66,7 +66,7 @@ def esporta_csv(studenti: list[Studente], stato_esame: dict) -> bytes:
     return buffer.getvalue().encode("utf-8-sig")
 
 
-def _risultati_studente(tag: str, matricola: str) -> list[dict]:
+def risultati_studente(tag: str, matricola: str) -> list[dict]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         rows = conn.execute(
@@ -110,7 +110,7 @@ def riepilogo_globale(matricola: str) -> list[dict]:
             continue
         riepilogo.append({
             "corso_tag": corso.tag, "corso_nome": corso.nome, "corso_anno": corso.anno,
-            "nome": s.nome, "cognome": s.cognome, "risultati": _risultati_studente(corso.tag, matricola),
+            "nome": s.nome, "cognome": s.cognome, "risultati": risultati_studente(corso.tag, matricola),
         })
     return riepilogo
 
@@ -188,9 +188,29 @@ def cerca_in_tutti_i_corsi(query: str) -> list[dict]:
             risultati.append({
                 "corso_tag": corso.tag, "corso_nome": corso.nome, "corso_anno": corso.anno,
                 "matricola": s.matricola, "nome": s.nome, "cognome": s.cognome,
-                "laurea_nome": s.laurea_nome, "risultati": _risultati_studente(corso.tag, s.matricola),
+                "laurea_nome": s.laurea_nome, "risultati": risultati_studente(corso.tag, s.matricola),
             })
     return risultati
+
+
+def dettaglio_studente_corso(tag: str, matricola: str) -> Optional[dict]:
+    """Studente e il suo storico completo in questo corso (voto/assente/ritirato/rifiutato
+    ed eventuale richiesta di orale per ogni appello), per la sua pagina dedicata
+    all'interno del corso."""
+    studente = get_studente(tag, matricola)
+    if studente is None:
+        return None
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        orale_obb = conn.execute(
+            "SELECT motivazione, origine FROM orale_obbligatorio WHERE matricola=?", (matricola,)
+        ).fetchone()
+    finally:
+        conn.close()
+    return {
+        "studente": studente, "storico": risultati_studente(tag, matricola),
+        "orale_obbligatorio": dict(orale_obb) if orale_obb else None,
+    }
 
 
 def get_studente(tag: str, matricola: str) -> Optional[Studente]:

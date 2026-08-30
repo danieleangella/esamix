@@ -406,10 +406,17 @@ def list_compiti(tag: str, appello_id: int) -> list[dict]:
 
 
 def list_compiti_blocco(tag: str, blocco_id: int) -> list[dict]:
+    """Per ogni compito del blocco, anche l'eventuale matricola dello studente già
+    valutato con quel codice (se esiste una riga in risultati che lo referenzia): serve
+    per linkare, dalla griglia delle soluzioni, alla pagina di dettaglio del compito già
+    corretto."""
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         rows = conn.execute(
-            "SELECT codice, soluzioni FROM compiti WHERE blocco_id=? ORDER BY codice", (blocco_id,)
+            "SELECT c.codice, c.soluzioni, r.matricola FROM compiti c "
+            "LEFT JOIN risultati r ON r.compito_id = c.id "
+            "WHERE c.blocco_id=? ORDER BY c.codice",
+            (blocco_id,),
         ).fetchall()
         return [dict(r) for r in rows]
     finally:

@@ -5,6 +5,7 @@ from typing import Optional
 from quizesame import config, db
 from quizesame.services import corsi as corsi_service
 from quizesame.services import compiti as compiti_service
+from quizesame.services import studenti as studenti_service
 
 
 class StudenteNonTrovato(Exception):
@@ -368,6 +369,10 @@ def conferma_risultato(
         # Se l'orale è già stato completato per questo esito, ricorreggere lo scritto (es.
         # dalla pagina "Modifica") non deve cancellarne l'esito: richiede_orale/orale_svolto/
         # esito_orale restano quelli già registrati finché non si passa da completa_orale().
+        # Analogamente, modificare i dettagli di un risultato "rifiutato" dallo studente
+        # (per correggere un errore di valutazione) non deve farlo tornare automaticamente
+        # verbalizzabile: l'esito resta "rifiutato" finché non lo si corregge esplicitamente
+        # con un'altra correzione dal form principale (che richiede un nuovo esito "voto").
         conn.execute(
             "INSERT INTO risultati (matricola, appello_id, compito_id, risposte, voto, voto_scritto, esito, "
             "insufficiente_per_obbligatorio, punteggi_obbligatori, richiede_orale, orale_svolto, "
@@ -375,7 +380,8 @@ def conferma_risultato(
             "ON CONFLICT(matricola, appello_id) DO UPDATE SET "
             "compito_id=excluded.compito_id, risposte=excluded.risposte, "
             "voto=CASE WHEN risultati.orale_svolto=1 THEN risultati.voto ELSE excluded.voto END, "
-            "voto_scritto=excluded.voto_scritto, esito='voto', "
+            "voto_scritto=excluded.voto_scritto, "
+            "esito=CASE WHEN risultati.esito='rifiutato' THEN 'rifiutato' ELSE 'voto' END, "
             "insufficiente_per_obbligatorio=excluded.insufficiente_per_obbligatorio, "
             "punteggi_obbligatori=excluded.punteggi_obbligatori, "
             "richiede_orale=CASE WHEN risultati.orale_svolto=1 THEN risultati.richiede_orale ELSE excluded.richiede_orale END, "
@@ -471,6 +477,7 @@ def segna_esito_speciale(tag: str, appello_id: int, matricola: str, esito: str) 
 
 
 def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
+    corso = corsi_service.get_corso(tag)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         r = conn.execute(
@@ -492,13 +499,27 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
             i = pos["posizione"]
             lettera_data = risposte[i].upper() if i < len(risposte) else "X"
             lettera_corretta = soluzioni[i].upper() if i < len(soluzioni) else "?"
+            corretta = lettera_data == lettera_corretta
+            if str(i) in punteggi:
+                punteggio_assegnato = punteggi[str(i)]
+            elif pos["aperta"]:
+                punteggio_assegnato = None
+            else:
+                punteggio_assegnato = (
+                    corso.risposta_corretta if corretta
+                    else (corso.risposta_vuota if lettera_data == "X" else corso.risposta_sbagliata)
+                )
             righe.append({
                 "posizione": i, "esercizio_nome": pos["esercizio_nome"] or f"Esercizio #{pos['esercizio_id']}",
                 "obbligatorio": bool(pos["obbligatorio"]), "lettera_data": lettera_data,
-                "lettera_corretta": lettera_corretta, "corretta": lettera_data == lettera_corretta,
-                "punteggio_assegnato": punteggi.get(str(i)),
+                "lettera_corretta": lettera_corretta, "corretta": corretta,
+                "punteggio_assegnato": punteggio_assegnato,
             })
-        return {"risultato": risultato, "righe": righe}
+
+        storico = [
+            s for s in studenti_service.risultati_studente(tag, matricola) if s["appello_id"] != appello_id
+        ]
+        return {"risultato": risultato, "righe": righe, "storico": storico}
     finally:
         conn.close()
 

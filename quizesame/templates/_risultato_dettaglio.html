@@ -1,20 +1,24 @@
+{% set tag = corso.tag if corso is defined else corso_tag %}
 <div class="card">
-  {% if risultato.esito != 'voto' %}
-  <p><strong>{{ risultato.esito }}</strong></p>
-  {% else %}
-  <p class="muted">Codice compito: <strong>{{ risultato.codice or '-' }}</strong></p>
+  {% if risultato.codice %}
+  <p class="muted">Codice compito: <strong>{{ risultato.codice }}</strong></p>
   <p>
     Voto:
-    {% if risultato.richiede_orale and not risultato.orale_svolto %}
+    {% if risultato.esito == 'rifiutato' %}
+    <strong>{{ risultato.voto }}</strong>
+    {% elif risultato.richiede_orale and not risultato.orale_svolto %}
     <strong>in attesa di orale</strong> <span class="muted">(voto scritto di riferimento: {{ risultato.voto_scritto if risultato.voto_scritto is not none else risultato.voto }})</span>
     {% elif risultato.esito_orale in ('assente', 'insufficiente') %}
     <strong>{{ risultato.esito_orale }} (orale)</strong> <span class="muted">(voto scritto di riferimento: {{ risultato.voto_scritto if risultato.voto_scritto is not none else '-' }})</span>
     {% else %}
     <strong>{{ risultato.voto }}</strong>
     {% endif %}
+    {% if risultato.esito == 'rifiutato' %} · <span class="badge badge-warn">rifiutato dallo studente</span>{% endif %}
     {% if risultato.verbalizzato %} · <span class="badge badge-ok">verbalizzato {{ risultato.data_verbalizzazione }}</span>{% endif %}
     {% if risultato.insufficiente_per_obbligatorio %} · <span class="badge badge-warn">insufficiente per obbligatorio non svolto</span>{% endif %}
   </p>
+  {% else %}
+  <p><strong>{{ risultato.esito }}</strong></p>
   {% endif %}
   {% if risultato.richiede_orale %}
   <p><strong>Orale richiesto</strong>{% if risultato.orale_motivazione %} ({{ risultato.orale_motivazione }}){% endif %}</p>
@@ -38,4 +42,31 @@
     {% endfor %}
   </table>
   {% endif %}
+
+  {% if storico %}
+  <h3 style="margin-top:1.5rem">Storico in questo corso</h3>
+  <table>
+    <tr><th>Appello</th><th>Esito</th><th>Orale</th></tr>
+    {% for s in storico %}
+    <tr>
+      <td><a href="/corsi/{{ tag }}/appelli/{{ s.appello_id }}/risultati/{{ risultato.matricola }}">{{ s.appello_nome }}</a></td>
+      <td>
+        {% if s.esito != 'voto' %}{{ s.esito }}
+        {% else %}{{ s.voto }}{% endif %}
+        {% if s.verbalizzato %} <span class="badge badge-ok">verbalizzato</span>{% endif %}
+      </td>
+      <td>
+        {% if s.richiede_orale and not s.orale_svolto %}<span class="badge badge-warn">in attesa</span>
+        {% elif s.richiede_orale %}{{ s.esito_orale or 'svolto' }}
+        {% else %}-{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <p style="margin-top:1rem">
+    <a href="/corsi/{{ tag }}/appelli/{{ risultato.appello_id }}/risultati/{{ risultato.matricola }}" class="button secondary">Pagina del compito</a>
+    <a href="/corsi/{{ tag }}/studenti/{{ risultato.matricola }}" class="button secondary">Pagina dello studente</a>
+  </p>
 </div>

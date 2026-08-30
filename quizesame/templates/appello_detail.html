@@ -488,13 +488,14 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
       {% for r in risultati %}
       <tr>
         <td>
-          {% if r.esito == 'voto' %}
+          {% if r.esito in ('voto', 'rifiutato') %}
           <button type="button" class="link-simile btn-dettaglio-risultato" data-matricola="{{ r.matricola }}">{{ r.cognome }} {{ r.nome }}</button>
           {% else %}{{ r.cognome }} {{ r.nome }}{% endif %}
         </td>
         <td>{{ r.matricola }}</td>
         <td>
-          {% if r.esito != 'voto' %}{{ r.esito }}
+          {% if r.esito == 'rifiutato' %}<span class="badge badge-warn">rifiutato</span> <span class="muted">({{ r.voto }})</span>
+          {% elif r.esito != 'voto' %}{{ r.esito }}
           {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
           {% else %}{{ r.voto }}{% endif %}
@@ -504,7 +505,7 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
           {% if appello.chiuso %}
           <span class="muted">appello chiuso</span>
           {% elif not r.verbalizzato %}
-          {% if r.esito == 'voto' %}
+          {% if r.esito in ('voto', 'rifiutato') %}
           <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica"
              class="button {{ 'warning' if r.valutazione_sospesa else 'secondary' }}" style="margin-top:0">{{ 'Completa valutazione' if r.valutazione_sospesa else 'Modifica' }}</a>
           {% endif %}

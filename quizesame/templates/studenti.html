@@ -52,9 +52,9 @@
     {% for s in studenti %}
     <tr>
       <td>{{ s.matricola }}</td>
-      <td><a href="/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
-      <td><a href="/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
-      <td><button type="button" class="secondary btn-modifica-studente" data-matricola="{{ s.matricola }}">Modifica</button></td>
+      <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
+      <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
+      <td style="white-space:nowrap"><button type="button" class="secondary btn-modifica-studente" data-matricola="{{ s.matricola }}">Modifica</button></td>
     </tr>
     <tr class="riga-modifica-studente" data-matricola="{{ s.matricola }}" style="display:none">
       <td colspan="4">
