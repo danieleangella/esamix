@@ -12,10 +12,17 @@
 
 {% set orali_richiesti = risultati | selectattr('richiede_orale') | list | length > 0 %}
 <div class="tabs" id="tabs-appello">
-  {% if not raggruppamento %}<a href="#creazione" data-tab="creazione">Testo</a>{% endif %}
+  {% if raggruppamento %}
+  {% for m in raggruppamento.membri %}
+  <a href="#creazione-{{ m.id }}" data-tab="creazione-{{ m.id }}">Testo {{ loop.index }}</a>
+  <a href="#valutazione-{{ m.id }}" data-tab="valutazione-{{ m.id }}">Valutazione {{ loop.index }}</a>
+  {% endfor %}
+  {% else %}
+  <a href="#creazione" data-tab="creazione">Testo</a>
   <a href="#valutazione" data-tab="valutazione">Valutazione scritti</a>
-  <a href="#verbalizzati" data-tab="verbalizzati" class="{{ 'tab-disabilitata' if not blocchi }}">Voti verbalizzati</a>
-  {% if not raggruppamento %}<a href="#orali" data-tab="orali" class="{{ 'tab-disabilitata' if not orali_richiesti }}">Orali</a>{% endif %}
+  {% endif %}
+  <a href="#verbalizzati" data-tab="verbalizzati" class="{{ 'tab-disabilitata' if not risultati }}">Voti verbalizzati</a>
+  <a href="#orali" data-tab="orali" class="{{ 'tab-disabilitata' if not orali_richiesti }}">Orali</a>
   {% if statistiche %}<a href="#statistiche" data-tab="statistiche">Statistiche</a>{% endif %}
   <a href="#impostazioni" data-tab="impostazioni">Impostazioni</a>
 </div>
@@ -55,7 +62,8 @@
     </form>
     {% else %}
     <p class="muted">Quando tutti gli idonei sono stati verbalizzati o hanno rifiutato il voto, e non ci sono più orali
-      da svolgere, puoi chiudere l'appello per evitare ulteriori modifiche accidentali.</p>
+      da svolgere, puoi chiudere l'appello per evitare ulteriori modifiche accidentali.
+      {% if raggruppamento %}Chiudere il raggruppamento chiude anche tutte le sue prove membro.{% endif %}</p>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/chiudi"
           onsubmit="return confirm('Chiudere l\'appello {{ appello.nome }}? Non sarà più possibile correggere, verbalizzare o modificare gli esercizi assegnati finché non lo riapri.');">
       <button type="submit" class="secondary">Chiudi appello</button>
@@ -89,521 +97,44 @@
       <input type="hidden" name="raggruppamento_id" value="{{ raggruppamento.id }}">
       <button type="submit">Calcola voti combinati</button>
     </form>
-  </div>
-  {% endif %}
-</div>
-
-{% if not raggruppamento %}
-<div class="tab-pane" data-pane="creazione" style="display:none">
-
-{% if appello.chiuso %}
-<div class="card">
-  <p class="muted">Appello chiuso: gli esercizi assegnati e i file già generati restano consultabili, ma non è
-    possibile modificarli o generare nuovi blocchi finché non lo riapri dalla scheda Impostazioni.</p>
-</div>
-{% endif %}
-
-<div class="card">
-  <h2>Esercizi assegnati ({{ esercizi_assegnati|length }})</h2>
-  {% if esercizi_assegnati %}
-  <table>
-    <tr><th></th><th>Nome</th><th>Varianti</th><th>Obbligatorio</th><th></th></tr>
-    {% for e in esercizi_assegnati %}
-    <tr>
-      <td style="white-space:nowrap">
-        {% if appello.chiuso %}
-        <button type="button" class="secondary" disabled title="Sposta su">&uarr;</button>
-        <button type="button" class="secondary" disabled title="Sposta giù">&darr;</button>
-        {% else %}
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/sposta-su">
-          <button type="submit" class="secondary" {% if loop.first %}disabled{% endif %} title="Sposta su">&uarr;</button>
-        </form>
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/sposta-giu">
-          <button type="submit" class="secondary" {% if loop.last %}disabled{% endif %} title="Sposta giù">&darr;</button>
-        </form>
-        {% endif %}
-      </td>
-      <td>
-        <button type="button" class="link-simile btn-anteprima-assegnato" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button>
-        {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
-        {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
-      </td>
-      <td>{{ e.varianti|length }}</td>
-      <td>
-        {% if e.aperta %}
-        <span class="muted">n/d (domanda aperta)</span>
-        {% elif appello.chiuso %}
-        {{ 'sì (consegna e svolgimento richiesti)' if e.obbligatorio else 'no' }}
-        {% else %}
-        <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/obbligatorio">
-          <input type="hidden" name="obbligatorio" value="{{ '' if e.obbligatorio else 'on' }}">
-          <button type="submit" class="{{ 'secondary' if not e.obbligatorio else '' }}">
-            {{ 'sì (consegna e svolgimento richiesti)' if e.obbligatorio else 'no' }}
-          </button>
-        </form>
-        {% endif %}
-      </td>
-      <td style="white-space:nowrap">
-        <button type="button" class="secondary btn-modifica-assegnato" data-esercizio="{{ e.id }}">Modifica</button>
-        {% if not appello.chiuso %}
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/rimuovi"
-              onsubmit="return confirm('Rimuovere l\'esercizio {{ e.nome or ('#' ~ e.id) }} da questo appello?');">
-          <button type="submit" class="danger">Rimuovi</button>
-        </form>
-        {% endif %}
-      </td>
-    </tr>
-    <tr class="riga-anteprima-assegnato" data-esercizio="{{ e.id }}" style="display:none">
-      <td colspan="5"></td>
-    </tr>
-    <tr class="riga-modifica-assegnato" data-esercizio="{{ e.id }}" style="display:none">
-      <td colspan="5">
-        {% set action = "/corsi/" ~ corso.tag ~ "/esercizi/" ~ e.id ~ "/modifica" %}
-        {% set esercizio = e %}
-        {% set avvisa_rigenerazione = blocchi|length > 0 %}
-        {% set redirect_to = "/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id %}
-        {% set redirect_anchor = "creazione" %}
-        {% include "_esercizio_form.html" %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
-  <p class="muted">Un esercizio obbligatorio richiede consegna e svolgimento scritto: se non
-    svolto il compito risulta insufficiente; se svolto, in correzione viene chiesto di
-    confermare se lo svolgimento è corretto. L'ordine qui non incide sul compito dello
-    studente (gli esercizi vengono comunque rimescolati), solo sul foglio di riferimento.</p>
-  {% else %}
-  <p class="muted">Nessun esercizio ancora assegnato a questo appello.</p>
-  {% endif %}
-
-  {% if not appello.chiuso %}
-  <details style="margin-top:0.75rem">
-    <summary>Crea un nuovo esercizio</summary>
-    {% set action = "/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/esercizi/nuovo" %}
-    {% include "_esercizio_form.html" %}
-  </details>
-  {% endif %}
-
-  {% if esercizi_disponibili and not appello.chiuso %}
-  <details style="margin-top:0.75rem">
-    <summary>Assegna esercizi dalla banca del corso ({{ esercizi_disponibili|length }} disponibili)</summary>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/assegna" style="margin-top:1rem">
-      <div class="form-grid">
-        <div><label>Cerca</label><input type="text" id="filtro-ricerca" placeholder="cerca per nome o testo"></div>
-        <div>
-          <label>Argomento</label>
-          <select id="filtro-argomento">
-            <option value="">Tutti</option>
-            {% for a in argomenti %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
-          </select>
-        </div>
-      </div>
-      <table id="tabella-disponibili" style="margin-top:0.75rem">
-        <tr><th></th><th>Nome</th><th>Argomento</th><th>Varianti</th><th>Anteprima</th></tr>
-        {% for e in esercizi_disponibili %}
-        <tr data-nome="{{ (e.nome or '') | lower }}" data-testo="{{ (e.varianti[0].testo if e.varianti else '') | lower }}" data-argomento="{{ e.argomento or '' }}">
-          <td><input type="checkbox" name="esercizio_ids" value="{{ e.id }}" style="width:auto"></td>
-          <td>
-            {{ e.nome or ('#' ~ e.id) }}
-            {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
-            {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
-          </td>
-          <td>{{ e.argomento or '-' }}</td>
-          <td>{{ e.varianti|length }}</td>
-          <td class="muted">
-            <button type="button" class="link-simile btn-anteprima-disponibile" data-esercizio="{{ e.id }}">{{ (e.varianti[0].testo if e.varianti else '')[:80] }}&hellip;</button>
-          </td>
-        </tr>
-        <tr class="riga-anteprima-disponibile" data-esercizio="{{ e.id }}" style="display:none">
-          <td colspan="5"></td>
-        </tr>
-        {% endfor %}
-      </table>
-      <div style="margin-top:0.75rem"><label style="display:inline"><input type="checkbox" name="obbligatorio" style="width:auto"> obbligatorio (per tutti quelli selezionati)</label></div>
-      <button type="submit">Assegna selezionati</button>
-    </form>
-  </details>
-  <script>
-  (function () {
-    var ricerca = document.getElementById("filtro-ricerca");
-    var argomento = document.getElementById("filtro-argomento");
-    var righe = document.querySelectorAll("#tabella-disponibili tr[data-nome]");
-    function applica() {
-      var testo = ricerca.value.trim().toLowerCase();
-      var arg = argomento.value;
-      righe.forEach(function (riga) {
-        var okTesto = !testo || riga.dataset.nome.includes(testo) || riga.dataset.testo.includes(testo);
-        var okArgomento = !arg || riga.dataset.argomento === arg;
-        riga.style.display = (okTesto && okArgomento) ? "" : "none";
-      });
-    }
-    ricerca.addEventListener("input", applica);
-    argomento.addEventListener("change", applica);
-
-    document.querySelectorAll(".btn-anteprima-disponibile").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var riga = document.querySelector('.riga-anteprima-disponibile[data-esercizio="' + btn.dataset.esercizio + '"]');
-        var giaAperta = riga.style.display !== "none";
-        riga.style.display = giaAperta ? "none" : "";
-        if (giaAperta) return;
-        if (riga.dataset.caricata) { renderizzaLatex(riga); return; }
-        fetch("/corsi/{{ corso.tag }}/esercizi/" + btn.dataset.esercizio + "/anteprima")
-          .then(function (r) { return r.text(); })
-          .then(function (html) {
-            riga.querySelector("td").innerHTML = html;
-            riga.dataset.caricata = "1";
-            renderizzaLatex(riga);
-          });
-      });
-    });
-  })();
-  </script>
-  {% endif %}
-
-  {% if esercizi_assegnati %}
-  <details style="margin-top:0.75rem">
-    <summary>Esporta gli esercizi di questo appello</summary>
-    <p class="muted" style="margin-top:1rem">
-      Scarica un file con gli esercizi assegnati a questo appello (testo e varianti).
-    </p>
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/esporta">Scarica esercizi.json</a>
-  </details>
-  {% endif %}
-
-  {% if not appello.chiuso %}
-  <details style="margin-top:0.75rem">
-    <summary>Importa esercizi da un file</summary>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/importa-json" enctype="multipart/form-data">
-      <label>File esercizi.json</label>
-      <input type="file" name="file" accept=".json" required>
-      <button type="submit">Importa</button>
-    </form>
-  </details>
-  {% endif %}
-</div>
-
-<script>
-(function () {
-  var blocchiEsistono = {{ 'true' if blocchi else 'false' }};
-  if (!blocchiEsistono) return;
-  var azioniSensibili = ["/obbligatorio", "/rimuovi", "/esercizi/assegna", "/esercizi/nuovo", "/importa-json"];
-  document.querySelectorAll("form").forEach(function (form) {
-    var action = form.getAttribute("action") || "";
-    if (!azioniSensibili.some(function (suffix) { return action.endsWith(suffix); })) return;
-    form.addEventListener("submit", function (ev) {
-      var msg = "Sono già stati generati {{ blocchi|length }} blocco/i di compiti per questo appello. " +
-        "Modificare gli esercizi assegnati rigenererà il file di riferimento e tutti i blocchi già " +
-        "generati, eliminando i vecchi codici (non è possibile se qualche blocco ha già risultati " +
-        "registrati). Procedere comunque?";
-      if (!window.confirm(msg)) ev.preventDefault();
-    });
-  });
-})();
-</script>
-<script>
-function chiudiRigheEsercizioAssegnato(eccetto) {
-  document.querySelectorAll(".riga-anteprima-assegnato, .riga-modifica-assegnato").forEach(function (r) {
-    if (r !== eccetto) r.style.display = "none";
-  });
-}
-document.querySelectorAll(".btn-anteprima-assegnato").forEach(function (btn) {
-  btn.addEventListener("click", function () {
-    var riga = document.querySelector('.riga-anteprima-assegnato[data-esercizio="' + btn.dataset.esercizio + '"]');
-    var giaAperta = riga.style.display !== "none";
-    chiudiRigheEsercizioAssegnato(giaAperta ? null : riga);
-    riga.style.display = giaAperta ? "none" : "";
-    if (giaAperta) return;
-    if (riga.dataset.caricata) { renderizzaLatex(riga); return; }
-    fetch("/corsi/{{ corso.tag }}/esercizi/" + btn.dataset.esercizio + "/anteprima")
-      .then(function (r) { return r.text(); })
-      .then(function (html) {
-        riga.querySelector("td").innerHTML = html;
-        riga.dataset.caricata = "1";
-        renderizzaLatex(riga);
-      });
-  });
-});
-document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
-  btn.addEventListener("click", function () {
-    var riga = document.querySelector('.riga-modifica-assegnato[data-esercizio="' + btn.dataset.esercizio + '"]');
-    var giaAperta = riga.style.display !== "none";
-    chiudiRigheEsercizioAssegnato(giaAperta ? null : riga);
-    riga.style.display = giaAperta ? "none" : "";
-  });
-});
-</script>
-
-<div class="card">
-  <h2>Crea compiti</h2>
-  {% if appello.chiuso %}
-  <p class="muted">Appello chiuso: non è possibile generare nuovi blocchi finché non lo riapri.</p>
-  {% else %}
-  {% if not esercizi_assegnati %}
-  <p class="muted">Assegna prima almeno un esercizio qui sopra.</p>
-  {% endif %}
-  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/genera-compiti"
-        id="form-genera-compiti"
-        data-obbligatori-assegnati="{{ esercizi_assegnati|selectattr('obbligatorio')|list|length }}"
-        data-obbligatori-attesi="{{ consegna_effettivo }}">
-    <div class="form-grid">
-      <div><label>Numero studenti</label><input type="number" name="numero_studenti" value="1" min="0" required></div>
-    </div>
-    <button type="submit" {% if not esercizi_assegnati %}disabled{% endif %}>Genera nuovo blocco di compiti</button>
-  </form>
-  <p class="muted" style="margin-top:0.5rem">
-    Ogni generazione crea un nuovo blocco (un proprio file PDF con i compiti e uno con la
-    griglia delle soluzioni); il foglio di riferimento con le risposte corrette è comune a
-    tutti i blocchi e viene creato solo la prima volta.
-  </p>
-  <script>
-  (function () {
-    var form = document.getElementById("form-genera-compiti");
-    if (!form) return;
-    form.addEventListener("submit", function (ev) {
-      var assegnati = parseInt(form.dataset.obbligatoriAssegnati, 10);
-      var attesi = parseInt(form.dataset.obbligatoriAttesi, 10);
-      if (assegnati !== attesi) {
-        var msg = "Questo appello ha " + assegnati + " esercizi obbligatori assegnati, ma le " +
-          "impostazioni del corso ne prevedono " + attesi + ". Procedere comunque?";
-        if (!window.confirm(msg)) {
-          ev.preventDefault();
-        }
-      }
-    });
-  })();
-  </script>
-  {% endif %}
-  {% if riferimento_tex_esiste %}
-  <p>
-    <strong>Foglio di riferimento</strong> (testo e risposte corrette, comune a tutti i blocchi, da pubblicare online):
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riferimento.tex">.tex</a>
-    {% if riferimento_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riferimento.pdf">.pdf</a>{% endif %}
-  </p>
-  {% endif %}
-  {% if blocchi %}
-  {% if blocchi|length > 1 %}
-  <p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/tutti.pdf">Scarica tutti i blocchi insieme in un unico PDF</a></p>
-  {% endif %}
-  <table>
-    <tr><th>Blocco</th><th>Studenti</th><th>Creato il</th><th>Testo</th><th>Griglia soluzioni</th><th></th></tr>
-    {% for b in blocchi %}
-    <tr>
-      <td>{{ b.numero }}</td>
-      <td>{{ b.numero_studenti }}</td>
-      <td class="muted">{{ b.creato_il or 'recuperato (generato prima di questo aggiornamento)' }}</td>
-      <td>
-        <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/testo.tex">.tex</a>
-        {% if b.pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/testo.pdf">.pdf</a>{% endif %}
-      </td>
-      <td>
-        <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/griglia.html">.html</a> ·
-        <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/griglia.tex">.tex</a>
-        {% if b.griglia_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/griglia.pdf">.pdf</a>{% endif %}
-      </td>
-      <td>
-        {% if not appello.chiuso %}
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/elimina"
-              onsubmit="return confirm('Eliminare il blocco {{ b.numero }} ({{ b.numero_studenti }} compiti)? Possibile solo se non ha già risultati registrati.');">
-          <button type="submit" class="danger">Elimina</button>
-        </form>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% endif %}
-  <p class="muted">{{ compiti|length }} compiti registrati in totale.</p>
-</div>
-
-</div>
-{% endif %}
-
-<div class="tab-pane" data-pane="valutazione" style="display:none">
-  {% if not raggruppamento %}
-  {% if appello.chiuso %}
-  <div class="card">
-    <p class="muted">Appello chiuso: per correggere compiti o segnare assenze, riaprilo prima dalla scheda Impostazioni.</p>
-  </div>
-  {% else %}
-  <div class="card">
-    <h2>Correzione</h2>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" autocomplete="off">
-      <div class="form-grid">
-        <div style="position:relative">
-          <label>Matricola o nome</label>
-          <input name="matricola" id="input-matricola" autocomplete="off" required>
-          <div id="suggerimenti-studenti" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-          <div id="matricola-nome-risolto" class="muted" style="margin-top:0.25rem"></div>
-        </div>
-        <div style="position:relative">
-          <label>Codice compito</label>
-          <input name="codice" id="input-codice" autocomplete="off" required>
-          <div id="suggerimenti-codici" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-        </div>
-        <div><label>Stringa risposte</label><input name="risposte" id="input-risposte" autocomplete="off" required placeholder="es. ABCXB ADCEB A" style="font-family:monospace"></div>
-      </div>
-      <button type="submit">Vai al riepilogo</button>
-    </form>
-    <script>
-    (function () {
-      formattaRisposte(document.getElementById("input-risposte"));
-      var inputMatricola = document.getElementById("input-matricola");
-      var nomeRisolto = document.getElementById("matricola-nome-risolto");
-      creaAutocomplete(
-        inputMatricola, document.getElementById("suggerimenti-studenti"),
-        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
-        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
-        function (s) { return s.matricola; },
-        function (dati, valoreDigitato) {
-          var match = dati.filter(function (s) { return s.matricola === valoreDigitato; })[0];
-          nomeRisolto.textContent = match ? (match.cognome + " " + match.nome) : "";
-        }
-      );
-      var inputCodice = document.getElementById("input-codice");
-      inputCodice.dataset.minChars = 4;
-      creaAutocomplete(
-        inputCodice, document.getElementById("suggerimenti-codici"),
-        function (p) { return "/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/api/compiti/cerca?prefix=" + encodeURIComponent(p); },
-        function (c) { return c; },
-        function (c) { return c; }
-      );
-    })();
-    </script>
-
-
-    <h2 style="margin-top:1.5rem">Segna assente o ritirato</h2>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/assenze/segna">
-      <div class="form-grid">
-        <div style="position:relative">
-          <label>Matricola o nome</label>
-          <input name="matricola" id="input-matricola-assenza" autocomplete="off" required>
-          <div id="suggerimenti-studenti-assenza" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-        </div>
-        <div>
-          <label>Esito</label>
-          <select name="esito">
-            <option value="assente">Assente</option>
-            <option value="ritirato">Ritirato</option>
-          </select>
-        </div>
-      </div>
-      <button type="submit">Segna</button>
-    </form>
-    <script>
-    creaAutocomplete(
-      document.getElementById("input-matricola-assenza"), document.getElementById("suggerimenti-studenti-assenza"),
-      function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
-      function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
-      function (s) { return s.matricola; }
-    );
-    </script>
-  </div>
-  {% endif %}
-
-  <div class="card">
-    <h2>Risultati inseriti ({{ risultati|length }})</h2>
-    <table>
-      <tr><th>Studente</th><th>Matricola</th><th>Esito</th><th style="text-align:right"></th></tr>
-      {% for r in risultati %}
+    <table style="margin-top:0.75rem">
+      <tr><th>Prova</th><th>Data</th><th></th></tr>
+      {% for m in raggruppamento.membri %}
       <tr>
+        <td>{{ m.nome }}</td>
+        <td>{{ m.data or '-' }}</td>
         <td>
-          <button type="button" class="link-simile btn-dettaglio-risultato" data-matricola="{{ r.matricola }}">{{ r.cognome }} {{ r.nome }}</button>
-        </td>
-        <td>{{ r.matricola }}</td>
-        <td>
-          {% if r.esito == 'rifiutato' %}<span class="badge badge-warn">rifiutato</span> <span class="muted">({{ r.voto }})</span>
-          {% elif r.esito != 'voto' %}{{ r.esito }}
-          {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
-          {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
-          {% else %}{{ r.voto }}{% endif %}
-          {% if r.verbalizzato %} <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>{% endif %}
-        </td>
-        <td style="white-space:nowrap; text-align:right">
-          {% if appello.chiuso %}
-          <span class="muted">appello chiuso</span>
-          {% elif not r.verbalizzato %}
-          {% if r.esito in ('voto', 'rifiutato') %}
-          <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica"
-             class="button {{ 'warning' if r.valutazione_sospesa else 'secondary' }}" style="margin-top:0">{{ 'Completa valutazione' if r.valutazione_sospesa else 'Modifica' }}</a>
-          {% endif %}
-          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/elimina"
-                onsubmit="return confirm('Eliminare il risultato di {{ r.cognome }} {{ r.nome }} per questo appello?');">
-            <button type="submit" class="danger">Elimina</button>
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ m.id }}/elimina"
+                onsubmit="return confirm('Eliminare la prova {{ m.nome }} da questo raggruppamento? Le altre prove e il raggruppamento restano intatti.');">
+            <button type="submit" class="danger">Elimina questa prova</button>
           </form>
-          {% else %}
-          <span class="muted">non modificabile</span>
-          {% endif %}
-        </td>
-      </tr>
-      <tr class="riga-dettaglio-risultato" data-matricola="{{ r.matricola }}" style="display:none">
-        <td colspan="4"></td>
-      </tr>
-      {% endfor %}
-    </table>
-    <p>
-      Scarica elenco risultati:
-      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.tex">.tex</a> ·
-      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.pdf">.pdf</a>
-    </p>
-  </div>
-
-  <details class="card">
-    <summary>Esporta voti per la segreteria</summary>
-    <p class="muted" style="margin-top:1rem">
-      Carica il file "Lista Studenti Esame" scaricato dalla segreteria: per ogni studente con una
-      valutazione già completata e confermata viene compilata la colonna Esito (voto, ASS, RIT o 0 per
-      insufficiente) e la colonna Domande d'esame (testo salvato nelle impostazioni del corso); il file
-      compilato viene subito riproposto per il download, senza salvare nulla su disco.
-    </p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esporta-voti" enctype="multipart/form-data">
-      <input type="file" name="file" accept=".csv" required>
-      <button type="submit">Compila e scarica</button>
-    </form>
-  </details>
-  <script>
-  document.querySelectorAll(".btn-dettaglio-risultato").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var riga = document.querySelector('.riga-dettaglio-risultato[data-matricola="' + btn.dataset.matricola + '"]');
-      var giaAperta = riga.style.display !== "none";
-      riga.style.display = giaAperta ? "none" : "";
-      if (giaAperta || riga.dataset.caricata) return;
-      fetch("/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/" + btn.dataset.matricola + "/dettaglio-inline")
-        .then(function (r) { return r.text(); })
-        .then(function (html) {
-          riga.querySelector("td").innerHTML = html;
-          riga.dataset.caricata = "1";
-          renderizzaLatex(riga);
-        });
-    });
-  });
-  </script>
-
-  {% if valutazioni_sospese %}
-  <div class="card">
-    <h2>Valutazioni in sospeso ({{ valutazioni_sospese|length }})</h2>
-    <p class="muted" style="margin-top:0">Compiti con esercizi obbligatori o domande aperte la cui
-      valutazione è stata rimandata: il voto mostrato è provvisorio (calcolato assumendo il punteggio
-      massimo per le posizioni ancora da giudicare) e lo studente non compare tra i verbalizzabili
-      finché non si completa la valutazione.</p>
-    <table>
-      <tr><th>Studente</th><th>Matricola</th><th>Voto provvisorio</th><th></th></tr>
-      {% for r in valutazioni_sospese %}
-      <tr>
-        <td>{{ r.cognome }} {{ r.nome }}</td>
-        <td>{{ r.matricola }}</td>
-        <td class="muted">{{ r.voto }}</td>
-        <td>
-          {% if appello.chiuso %}<span class="muted">appello chiuso</span>
-          {% else %}<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica" class="button warning" style="margin-top:0">Completa valutazione</a>
-          {% endif %}
         </td>
       </tr>
       {% endfor %}
     </table>
   </div>
   {% endif %}
-  {% endif %}
+</div>
 
+{% if raggruppamento %}
+{% for md in membri_dati %}
+{% set pane_suffix = "-" ~ md.appello.id %}
+{% include "_tab_creazione.html" %}
+{% include "_tab_valutazione.html" %}
+{% endfor %}
+{% else %}
+{% set md = {
+  "appello": appello, "compiti": compiti, "risultati": risultati, "valutazioni_sospese": valutazioni_sospese,
+  "esercizi_assegnati": esercizi_assegnati, "esercizi_disponibili": esercizi_disponibili, "argomenti": argomenti,
+  "blocchi": blocchi, "riferimento_pdf_esiste": riferimento_pdf_esiste, "riferimento_tex_esiste": riferimento_tex_esiste,
+  "votomin_effettivo": votomin_effettivo, "consegna_effettivo": consegna_effettivo,
+} %}
+{% set pane_suffix = "" %}
+{% include "_tab_creazione.html" %}
+{% include "_tab_valutazione.html" %}
+{% endif %}
+
+<div class="tab-pane" data-pane="verbalizzati" style="display:none">
   <div class="card">
     <h2>Verbalizzazione ({{ idonei|length }} idonei non ancora verbalizzati)</h2>
     {% if idonei %}
@@ -661,9 +192,60 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
     {% endif %}
     {% endif %}
   </div>
-</div>
 
-<div class="tab-pane" data-pane="verbalizzati" style="display:none">
+  {% if raggruppamento and da_confermare_raggruppamento %}
+  <div class="card">
+    <h2>Verbalizzazione voti raggruppamento (da confermare, {{ da_confermare_raggruppamento|length }})</h2>
+    <p class="muted" style="margin-top:0">Studenti trovati con la nota "prove parziali" in un'esportazione voti
+      caricata per una prova membro, con voto combinato già pronto: conferma la verbalizzazione, o rimuovili
+      dall'elenco se non pertinenti.</p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/verbalizza-multipli">
+      <table>
+        <tr>
+          <th><input type="checkbox" id="checkbox-tutti-da-confermare" style="width:auto" checked></th>
+          <th>Studente</th><th>Matricola</th><th>Voto</th><th></th>
+        </tr>
+        {% for r in da_confermare_raggruppamento %}
+        <tr>
+          <td><input type="checkbox" name="matricole" value="{{ r.matricola }}" class="campo-da-confermare-incluso" style="width:auto" checked></td>
+          <td>{{ r.cognome }} {{ r.nome }}</td>
+          <td>{{ r.matricola }}</td>
+          <td>{{ r.voto }}</td>
+          <td>
+            <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/raggruppamento-da-confermare/{{ r.matricola }}/rimuovi">
+              <button type="submit" class="secondary" style="margin-top:0">Rimuovi dall'elenco</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      <button type="submit" id="btn-verbalizza-da-confermare">Verbalizza tutti ({{ da_confermare_raggruppamento|length }})</button>
+    </form>
+    <script>
+    (function () {
+      var checkboxTutti = document.getElementById("checkbox-tutti-da-confermare");
+      var campi = document.querySelectorAll(".campo-da-confermare-incluso");
+      var bottone = document.getElementById("btn-verbalizza-da-confermare");
+      function aggiorna() {
+        var n = Array.prototype.filter.call(campi, function (c) { return c.checked; }).length;
+        bottone.textContent = "Verbalizza " + (n === campi.length ? "tutti" : "selezionati") + " (" + n + ")";
+        bottone.disabled = n === 0;
+      }
+      checkboxTutti.addEventListener("change", function () {
+        campi.forEach(function (c) { c.checked = checkboxTutti.checked; });
+        aggiorna();
+      });
+      campi.forEach(function (c) {
+        c.addEventListener("change", function () {
+          checkboxTutti.checked = Array.prototype.every.call(campi, function (x) { return x.checked; });
+          aggiorna();
+        });
+      });
+    })();
+    </script>
+  </div>
+  {% endif %}
+
   <div class="card">
     <h2>Voti verbalizzati ({{ verbalizzati|length }})</h2>
     {% if verbalizzati %}
@@ -690,7 +272,6 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
   </div>
 </div>
 
-{% if not raggruppamento %}
 <div class="tab-pane" data-pane="orali" style="display:none">
   <div class="card">
     <h2>Orale da svolgere ({{ orali_da_svolgere|length }})</h2>
@@ -731,12 +312,56 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
     {% endif %}
   </div>
 </div>
-{% endif %}
 
 {% if statistiche %}
 <div class="tab-pane" data-pane="statistiche" style="display:none">
+  {% if raggruppamento %}
   <div class="card">
-    <h2>Riepilogo</h2>
+    <h2>Per prova</h2>
+    <table>
+      <tr><th>Prova</th><th>Corretti</th><th>Promossi</th><th>Insufficienti</th><th>Media finale</th></tr>
+      {% for m in statistiche_confronto.membri %}
+      <tr>
+        <td>{{ m.appello_nome }}</td>
+        <td>{{ m.totale }}</td>
+        <td>{{ m.promossi }} {% if m.promossi_pct is not none %}<span class="muted">({{ m.promossi_pct }}%)</span>{% endif %}</td>
+        <td>{{ m.insufficienti }} {% if m.insufficienti_pct is not none %}<span class="muted">({{ m.insufficienti_pct }}%)</span>{% endif %}</td>
+        <td>{{ m.media_finale if m.media_finale is not none else '-' }}</td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td><strong>Combinato</strong></td>
+        <td>{{ statistiche_confronto.combinato.totale }}</td>
+        <td>{{ statistiche_confronto.combinato.promossi }} {% if statistiche_confronto.combinato.promossi_pct is not none %}<span class="muted">({{ statistiche_confronto.combinato.promossi_pct }}%)</span>{% endif %}</td>
+        <td>{{ statistiche_confronto.combinato.insufficienti }} {% if statistiche_confronto.combinato.insufficienti_pct is not none %}<span class="muted">({{ statistiche_confronto.combinato.insufficienti_pct }}%)</span>{% endif %}</td>
+        <td>{{ statistiche_confronto.combinato.media_finale if statistiche_confronto.combinato.media_finale is not none else '-' }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Confronto</h2>
+    <p class="muted">
+      <span style="display:inline-block; width:0.7rem; height:0.7rem; background:#93c5fd; border-radius:2px"></span> Esami svolti
+      &nbsp;&nbsp;
+      <span style="display:inline-block; width:0.7rem; height:0.7rem; background:#22c55e; border-radius:2px"></span> Promossi
+    </p>
+    <div style="overflow-x:auto">
+      <svg width="{{ statistiche_confronto.andamento.larghezza }}" height="{{ statistiche_confronto.andamento.margine_top + statistiche_confronto.andamento.altezza + 30 }}" style="min-width:100%; color:var(--text)">
+        {% for g in statistiche_confronto.andamento.gruppi %}
+        <rect x="{{ g.x_totale }}" y="{{ g.y_totale }}" width="22" height="{{ g.h_totale }}" fill="#93c5fd"></rect>
+        <text x="{{ g.x_totale + 11 }}" y="{{ g.y_totale - 4 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ g.totale }}</text>
+        <rect x="{{ g.x_promossi }}" y="{{ g.y_promossi }}" width="22" height="{{ g.h_promossi }}" fill="#22c55e"></rect>
+        <text x="{{ g.x_promossi + 11 }}" y="{{ g.y_promossi - 4 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ g.promossi }}</text>
+        <text x="{{ g.x_centro }}" y="{{ statistiche_confronto.andamento.margine_top + statistiche_confronto.andamento.altezza + 18 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ g.nome }}</text>
+        {% endfor %}
+      </svg>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Riepilogo{% if raggruppamento %} combinato{% endif %}</h2>
     <p class="muted" style="margin-top:0">Esiti su {{ statistiche.totale }} compiti corretti (voto minimo {{ statistiche.votomin }}).</p>
     <div class="stats-grid">
       <div class="stat-tile stat-ok">
@@ -874,8 +499,9 @@ document.querySelectorAll(".btn-mostra-testo").forEach(function (btn) {
     // riporta subito il cursore sul campo matricola: con centinaia di studenti da
     // correggere in fila, non dover ricliccare ogni volta sul campo fa risparmiare
     // un bel po' di movimenti ripetuti.
-    if (nome === "valutazione") {
-      var campo = document.getElementById("input-matricola");
+    if (nome.indexOf("valutazione") === 0) {
+      var pane = document.querySelector('.tab-pane[data-pane="' + nome + '"]');
+      var campo = pane && pane.querySelector(".campo-input-matricola");
       if (campo) campo.focus();
     }
   }

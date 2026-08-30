@@ -96,10 +96,16 @@ def calcola_raggruppamento(tag: str, raggruppamento_id: int) -> RaggruppamentoRe
             voti = voti_per_matricola[matricola][-len(membri):]
             media = sum(voti) / len(voti)
             voto = ceil(media) if media >= 18 else int(media)
+            # Se lo studente ha già completato l'orale (unico per il raggruppamento, può
+            # essere stato richiesto su una qualunque prova membro), il suo voto finale non
+            # va sovrascritto da un ricalcolo della media: voto_scritto tiene comunque
+            # traccia della media appena calcolata come riferimento.
             conn.execute(
-                "INSERT INTO risultati (matricola, appello_id, voto) VALUES (?,?,?) "
-                "ON CONFLICT(matricola, appello_id) DO UPDATE SET voto=excluded.voto",
-                (matricola, raggruppamento.appello_id, voto),
+                "INSERT INTO risultati (matricola, appello_id, voto, voto_scritto) VALUES (?,?,?,?) "
+                "ON CONFLICT(matricola, appello_id) DO UPDATE SET "
+                "voto=CASE WHEN risultati.orale_svolto=1 THEN risultati.voto ELSE excluded.voto END, "
+                "voto_scritto=excluded.voto_scritto",
+                (matricola, raggruppamento.appello_id, voto, voto),
             )
             n += 1
         conn.commit()

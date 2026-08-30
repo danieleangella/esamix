@@ -327,6 +327,13 @@ def conferma_risultato(
     punteggi_obbligatori = punteggi_obbligatori or {}
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
+    # Se questa prova è membro di un raggruppamento, l'orale è unico per l'intero
+    # raggruppamento (non per la singola prova parziale): la richiesta va quindi
+    # registrata sulla riga del raggruppamento invece che su quella della prova.
+    raggruppamento_membro = (
+        corsi_service.get_raggruppamento_by_membro(tag, appello_id) if appello.membro_raggruppamento else None
+    )
+    richiedi_orale_su_prova = richiedi_orale and raggruppamento_membro is None
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         studente, compito = _carica_dati_correzione(conn, matricola, appello_id, codice)
@@ -393,9 +400,23 @@ def conferma_risultato(
             (
                 matricola, appello_id, compito["id"], risposte, voto, voto, insufficiente,
                 json.dumps(punteggi_obbligatori) if punteggi_obbligatori else None,
-                richiedi_orale, False, orale_motivazione or None, sospendi_valutazione,
+                richiedi_orale_su_prova, False, orale_motivazione or None if richiedi_orale_su_prova else None,
+                sospendi_valutazione,
             ),
         )
+        if richiedi_orale and raggruppamento_membro is not None:
+            # L'orale richiesto su una prova membro va sulla riga "combinata" del
+            # raggruppamento (può non esistere ancora, se il voto combinato non è mai
+            # stato calcolato): CASE protegge un orale già svolto lì da una richiesta
+            # tardiva ripetuta su un'altra prova membro dello stesso raggruppamento.
+            conn.execute(
+                "INSERT INTO risultati (matricola, appello_id, richiede_orale, orale_motivazione, esito) "
+                "VALUES (?,?,1,?,'voto') "
+                "ON CONFLICT(matricola, appello_id) DO UPDATE SET "
+                "richiede_orale=CASE WHEN risultati.orale_svolto=1 THEN risultati.richiede_orale ELSE 1 END, "
+                "orale_motivazione=CASE WHEN risultati.orale_svolto=1 THEN risultati.orale_motivazione ELSE excluded.orale_motivazione END",
+                (matricola, raggruppamento_membro.appello_id, orale_motivazione or None),
+            )
         if richiedi_orale and corso.orale_dopo_richiesta:
             conn.execute(
                 "INSERT INTO orale_obbligatorio (matricola, motivazione, origine) VALUES (?,?,?) "

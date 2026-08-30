@@ -154,3 +154,46 @@ def annulla_verbalizzazione(tag: str, appello_id: int, matricola: str) -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+def list_da_confermare_raggruppamento(tag: str, appello_id: int) -> list[dict]:
+    """Studenti trovati con la nota "prove parziali" nell'ultimo file caricato per
+    l'esportazione voti segreteria di una prova membro di questo raggruppamento, con voto
+    combinato già pronto: in attesa che il docente confermi la verbalizzazione a mano
+    (non viene fatta automaticamente dal solo caricamento del CSV)."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        rows = conn.execute(
+            "SELECT r.*, s.nome, s.cognome FROM risultati r "
+            "JOIN studenti s ON s.matricola = r.matricola "
+            "WHERE r.appello_id=? AND r.raggruppamento_da_confermare=1 AND r.verbalizzato=0 "
+            "ORDER BY s.cognome, s.nome",
+            (appello_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def segna_da_confermare_raggruppamento(tag: str, appello_id: int, matricola: str) -> None:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute(
+            "UPDATE risultati SET raggruppamento_da_confermare=1 WHERE matricola=? AND appello_id=?",
+            (matricola, appello_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def rimuovi_da_confermare_raggruppamento(tag: str, appello_id: int, matricola: str) -> None:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute(
+            "UPDATE risultati SET raggruppamento_da_confermare=0 WHERE matricola=? AND appello_id=?",
+            (matricola, appello_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()

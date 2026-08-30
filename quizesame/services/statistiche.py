@@ -206,6 +206,21 @@ def _andamento_appelli(per_appello: list[dict]) -> dict:
     }
 
 
+def confronto_raggruppamento(tag: str, raggruppamento) -> dict:
+    """Statistiche di ciascuna prova membro affiancate a quelle del voto combinato del
+    raggruppamento, per la scheda Statistiche della sua pagina."""
+    membri = [
+        {"appello_id": m.id, "appello_nome": m.nome, **calcola(tag, m.id)}
+        for m in raggruppamento.membri
+    ]
+    combinato = calcola(tag, raggruppamento.appello_id)
+    voci_andamento = [
+        {"appello_nome": m["appello_nome"], "totale": m["totale"], "promossi": m["promossi"]}
+        for m in membri
+    ] + [{"appello_nome": "Combinato", "totale": combinato["totale"], "promossi": combinato["promossi"]}]
+    return {"membri": membri, "combinato": combinato, "andamento": _andamento_appelli(voci_andamento)}
+
+
 def calcola_corso(tag: str) -> dict:
     """Le stesse statistiche di `calcola`, ma aggregate su tutti gli appelli del corso
     (esclusi i raggruppamenti, che non hanno propri risultati ma calcolano una media di

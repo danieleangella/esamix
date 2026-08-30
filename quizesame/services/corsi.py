@@ -428,12 +428,22 @@ def chiudi_appello(tag: str, appello_id: int) -> None:
     """Un appello chiuso non accetta più correzioni, modifiche o eliminazioni di
     risultati, verbalizzazioni/rifiuti, né generazione/eliminazione di blocchi o modifica
     degli esercizi assegnati: serve a "congelare" un appello quando è del tutto concluso
-    (nessun idoneo da verbalizzare, nessun orale da svolgere)."""
+    (nessun idoneo da verbalizzare, nessun orale da svolgere). Se è il raggruppamento
+    stesso a essere chiuso, la chiusura si propaga a tutte le sue prove membro, così
+    anche correggerle risulta bloccato."""
     update_appello(tag, appello_id, chiuso=True)
+    raggruppamento = get_raggruppamento_by_appello(tag, appello_id)
+    if raggruppamento:
+        for membro in raggruppamento.membri:
+            update_appello(tag, membro.id, chiuso=True)
 
 
 def riapri_appello(tag: str, appello_id: int) -> None:
     update_appello(tag, appello_id, chiuso=False)
+    raggruppamento = get_raggruppamento_by_appello(tag, appello_id)
+    if raggruppamento:
+        for membro in raggruppamento.membri:
+            update_appello(tag, membro.id, chiuso=False)
 
 
 class AppelloChiuso(ValueError):
@@ -507,6 +517,20 @@ def get_raggruppamento_by_appello(tag: str, appello_id: int) -> Optional[Raggrup
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         row = conn.execute("SELECT * FROM raggruppamenti WHERE appello_id=?", (appello_id,)).fetchone()
+        return _row_to_raggruppamento(conn, row) if row else None
+    finally:
+        conn.close()
+
+
+def get_raggruppamento_by_membro(tag: str, appello_id: int) -> Optional[Raggruppamento]:
+    """Il raggruppamento di cui questo appello è una prova membro (si assume che un
+    appello sia membro di un solo raggruppamento, unico caso d'uso reale)."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        row = conn.execute(
+            "SELECT r.* FROM raggruppamenti r JOIN raggruppamento_membri rm ON rm.raggruppamento_id = r.id "
+            "WHERE rm.appello_id=?", (appello_id,),
+        ).fetchone()
         return _row_to_raggruppamento(conn, row) if row else None
     finally:
         conn.close()

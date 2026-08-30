@@ -1,0 +1,194 @@
+<div class="tab-pane" data-pane="valutazione{{ pane_suffix }}" style="display:none">
+  {% if md.appello.chiuso %}
+  <div class="card">
+    <p class="muted">Appello chiuso: per correggere compiti o segnare assenze, riaprilo prima dalla scheda Impostazioni.</p>
+  </div>
+  {% else %}
+  <div class="card">
+    <h2>Correzione</h2>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi" autocomplete="off">
+      <div class="form-grid">
+        <div style="position:relative">
+          <label>Matricola o nome</label>
+          <input name="matricola" class="campo-input-matricola" autocomplete="off" required>
+          <div class="campo-suggerimenti-studenti sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+          <div class="campo-matricola-nome-risolto muted" style="margin-top:0.25rem"></div>
+        </div>
+        <div style="position:relative">
+          <label>Codice compito</label>
+          <input name="codice" class="campo-input-codice" autocomplete="off" required>
+          <div class="campo-suggerimenti-codici sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+        </div>
+        <div><label>Stringa risposte</label><input name="risposte" class="campo-input-risposte" autocomplete="off" required placeholder="es. ABCXB ADCEB A" style="font-family:monospace"></div>
+      </div>
+      <button type="submit">Vai al riepilogo</button>
+    </form>
+    <script>
+    (function () {
+      var root = document.currentScript.closest(".tab-pane");
+      formattaRisposte(root.querySelector(".campo-input-risposte"));
+      var inputMatricola = root.querySelector(".campo-input-matricola");
+      var nomeRisolto = root.querySelector(".campo-matricola-nome-risolto");
+      creaAutocomplete(
+        inputMatricola, root.querySelector(".campo-suggerimenti-studenti"),
+        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+        function (s) { return s.matricola; },
+        function (dati, valoreDigitato) {
+          var match = dati.filter(function (s) { return s.matricola === valoreDigitato; })[0];
+          nomeRisolto.textContent = match ? (match.cognome + " " + match.nome) : "";
+        }
+      );
+      var inputCodice = root.querySelector(".campo-input-codice");
+      inputCodice.dataset.minChars = 4;
+      creaAutocomplete(
+        inputCodice, root.querySelector(".campo-suggerimenti-codici"),
+        function (p) { return "/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/api/compiti/cerca?prefix=" + encodeURIComponent(p); },
+        function (c) { return c; },
+        function (c) { return c; }
+      );
+    })();
+    </script>
+
+
+    <h2 style="margin-top:1.5rem">Segna assente o ritirato</h2>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/assenze/segna">
+      <div class="form-grid">
+        <div style="position:relative">
+          <label>Matricola o nome</label>
+          <input name="matricola" class="campo-input-matricola-assenza" autocomplete="off" required>
+          <div class="campo-suggerimenti-studenti-assenza sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+        </div>
+        <div>
+          <label>Esito</label>
+          <select name="esito">
+            <option value="assente">Assente</option>
+            <option value="ritirato">Ritirato</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit">Segna</button>
+    </form>
+    <script>
+    (function () {
+      var root = document.currentScript.closest(".tab-pane");
+      creaAutocomplete(
+        root.querySelector(".campo-input-matricola-assenza"), root.querySelector(".campo-suggerimenti-studenti-assenza"),
+        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+        function (s) { return s.matricola; }
+      );
+    })();
+    </script>
+  </div>
+
+  <div class="card">
+    <h2>Risultati inseriti ({{ md.risultati|length }})</h2>
+    <table>
+      <tr><th>Studente</th><th>Matricola</th><th>Esito</th><th style="text-align:right"></th></tr>
+      {% for r in md.risultati %}
+      <tr>
+        <td>
+          <button type="button" class="link-simile btn-dettaglio-risultato" data-matricola="{{ r.matricola }}">{{ r.cognome }} {{ r.nome }}</button>
+        </td>
+        <td>{{ r.matricola }}</td>
+        <td>
+          {% if r.esito == 'rifiutato' %}<span class="badge badge-warn">rifiutato</span> <span class="muted">({{ r.voto }})</span>
+          {% elif r.esito != 'voto' %}{{ r.esito }}
+          {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
+          {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
+          {% else %}{{ r.voto }}{% endif %}
+          {% if r.verbalizzato %} <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>{% endif %}
+        </td>
+        <td style="white-space:nowrap; text-align:right">
+          {% if md.appello.chiuso %}
+          <span class="muted">appello chiuso</span>
+          {% elif not r.verbalizzato %}
+          {% if r.esito in ('voto', 'rifiutato') %}
+          <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/modifica"
+             class="button {{ 'warning' if r.valutazione_sospesa else 'secondary' }}" style="margin-top:0">{{ 'Completa valutazione' if r.valutazione_sospesa else 'Modifica' }}</a>
+          {% endif %}
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/elimina"
+                onsubmit="return confirm('Eliminare il risultato di {{ r.cognome }} {{ r.nome }} per questo appello?');">
+            <button type="submit" class="danger">Elimina</button>
+          </form>
+          {% else %}
+          <span class="muted">non modificabile</span>
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="riga-dettaglio-risultato" data-matricola="{{ r.matricola }}" style="display:none">
+        <td colspan="4"></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p>
+      Scarica elenco risultati:
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati.tex">.tex</a> ·
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati.pdf">.pdf</a>
+    </p>
+  </div>
+
+  <details class="card">
+    <summary>Esporta voti per la segreteria</summary>
+    <p class="muted" style="margin-top:1rem">
+      Carica il file "Lista Studenti Esame" scaricato dalla segreteria: per ogni studente con una
+      valutazione già completata e confermata viene compilata la colonna Esito (voto, ASS, RIT o 0 per
+      insufficiente) e la colonna Domande d'esame (testo salvato nelle impostazioni del corso); il file
+      compilato viene subito riproposto per il download, senza salvare nulla su disco.
+      {% if raggruppamento %}Se una riga contiene la nota "prove parziali", lo studente non viene compilato
+      qui ma segnalato (se il voto combinato è già pronto) nell'elenco da confermare della scheda "Voti
+      verbalizzati".{% endif %}
+    </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esporta-voti" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".csv" required>
+      <button type="submit">Compila e scarica</button>
+    </form>
+  </details>
+  <script>
+  (function () {
+    var root = document.currentScript.closest(".tab-pane");
+    root.querySelectorAll(".btn-dettaglio-risultato").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var riga = root.querySelector('.riga-dettaglio-risultato[data-matricola="' + btn.dataset.matricola + '"]');
+        var giaAperta = riga.style.display !== "none";
+        riga.style.display = giaAperta ? "none" : "";
+        if (giaAperta || riga.dataset.caricata) return;
+        fetch("/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/" + btn.dataset.matricola + "/dettaglio-inline")
+          .then(function (r) { return r.text(); })
+          .then(function (html) {
+            riga.querySelector("td").innerHTML = html;
+            riga.dataset.caricata = "1";
+            renderizzaLatex(riga);
+          });
+      });
+    });
+  })();
+  </script>
+
+  {% if md.valutazioni_sospese %}
+  <div class="card">
+    <h2>Valutazioni in sospeso ({{ md.valutazioni_sospese|length }})</h2>
+    <p class="muted" style="margin-top:0">Compiti con esercizi obbligatori o domande aperte la cui
+      valutazione è stata rimandata: il voto mostrato è provvisorio (calcolato assumendo il punteggio
+      massimo per le posizioni ancora da giudicare) e lo studente non compare tra i verbalizzabili
+      finché non si completa la valutazione.</p>
+    <table>
+      <tr><th>Studente</th><th>Matricola</th><th>Voto provvisorio</th><th></th></tr>
+      {% for r in md.valutazioni_sospese %}
+      <tr>
+        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>{{ r.matricola }}</td>
+        <td class="muted">{{ r.voto }}</td>
+        <td>
+          {% if md.appello.chiuso %}<span class="muted">appello chiuso</span>
+          {% else %}<a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/modifica" class="button warning" style="margin-top:0">Completa valutazione</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
