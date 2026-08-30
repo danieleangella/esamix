@@ -55,31 +55,7 @@
       </td>
     </tr>
     <tr class="riga-anteprima-esercizio" data-esercizio="{{ e.id }}" style="display:none">
-      <td colspan="5">
-        <p class="muted" style="margin-top:0.5rem">Anteprima di tutte le varianti:</p>
-        {% for v in e.varianti %}
-        <div class="card" style="background:var(--bg); margin-bottom:0.75rem">
-          <strong>Variante {{ loop.index }}</strong>
-          <p style="white-space:pre-wrap; margin:0.5rem 0">{{ v.testo }}</p>
-          {% if e.aperta %}
-          <p class="muted" style="margin:0.2rem 0">Domanda aperta: nessuna risposta a scelta multipla.</p>
-          {% else %}
-          <p style="margin:0.2rem 0"><span class="badge badge-ok">Corretta</span> {{ v.risposte[0] }}</p>
-          {% for r in v.risposte[1:] %}
-          <p style="margin:0.2rem 0"><span class="badge badge-err">x</span> {{ r }}</p>
-          {% endfor %}
-          {% endif %}
-        </div>
-        {% else %}
-        <p class="muted">Nessuna variante ancora inserita.</p>
-        {% endfor %}
-        {% if e.soluzione %}
-        <div class="card" style="background:var(--bg)">
-          <strong>Soluzione/suggerimento</strong>
-          <p style="white-space:pre-wrap; margin:0.5rem 0 0">{{ e.soluzione }}</p>
-        </div>
-        {% endif %}
-      </td>
+      <td colspan="5"><p class="muted" style="margin-top:0.5rem">Anteprima di tutte le varianti:</p></td>
     </tr>
     <tr class="riga-modifica-esercizio" data-esercizio="{{ e.id }}" style="display:none">
       <td colspan="5">
@@ -174,11 +150,23 @@
         var giaAperta = riga.style.display !== "none";
         chiudiTutte(giaAperta ? null : riga);
         riga.style.display = giaAperta ? "none" : "";
-        if (!giaAperta && alApertura) alApertura(riga);
+        if (!giaAperta && alApertura) alApertura(riga, btn);
       });
     });
   }
-  collega(".btn-anteprima-esercizio", ".riga-anteprima-esercizio", renderizzaLatex);
+  // caricata via fetch solo alla prima apertura invece di essere pre-generata per ogni
+  // esercizio della banca (con centinaia di esercizi appesantiva ogni caricamento della
+  // pagina, anche se la riga restava nascosta).
+  collega(".btn-anteprima-esercizio", ".riga-anteprima-esercizio", function (riga, btn) {
+    if (riga.dataset.caricata) { renderizzaLatex(riga); return; }
+    fetch("/corsi/{{ corso.tag }}/esercizi/" + btn.dataset.esercizio + "/anteprima")
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        riga.querySelector("td").insertAdjacentHTML("beforeend", html);
+        riga.dataset.caricata = "1";
+        renderizzaLatex(riga);
+      });
+  });
   collega(".btn-modifica-esercizio", ".riga-modifica-esercizio");
 })();
 </script>

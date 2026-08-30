@@ -193,13 +193,24 @@ def _ensure_schema_current(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+_schema_verificati: set[str] = set()
+
+
 def get_connection(db_path: Path) -> sqlite3.Connection:
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    _ensure_schema_current(conn)
+    # ogni servizio apre/chiude una propria connessione per ogni chiamata (una pagina può
+    # arrivare a farne decine): rieseguire lo script di creazione tabelle e i PRAGMA
+    # table_info di _ensure_schema_current su ognuna di esse è un lavoro ripetuto inutile,
+    # dato che lo schema non cambia sotto i piedi del processo se non passando da qui.
+    # Va verificato una sola volta per file di database per ogni esecuzione del programma.
+    chiave = str(db_path.resolve())
+    if chiave not in _schema_verificati:
+        _ensure_schema_current(conn)
+        _schema_verificati.add(chiave)
     return conn
 
 

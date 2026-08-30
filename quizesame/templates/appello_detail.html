@@ -106,28 +106,7 @@
       </td>
     </tr>
     <tr class="riga-anteprima-assegnato" data-esercizio="{{ e.id }}" style="display:none">
-      <td colspan="5">
-        {% for v in e.varianti %}
-        <div class="card" style="background:var(--bg); margin-bottom:0.75rem">
-          <strong>Variante {{ loop.index }}</strong>
-          <p style="white-space:pre-wrap; margin:0.5rem 0">{{ v.testo }}</p>
-          {% if e.aperta %}
-          <p class="muted" style="margin:0.2rem 0">Domanda aperta: nessuna risposta a scelta multipla.</p>
-          {% else %}
-          <p style="margin:0.2rem 0"><span class="badge badge-ok">Corretta</span> {{ v.risposte[0] }}</p>
-          {% for r in v.risposte[1:] %}
-          <p style="margin:0.2rem 0"><span class="badge badge-err">x</span> {{ r }}</p>
-          {% endfor %}
-          {% endif %}
-        </div>
-        {% endfor %}
-        {% if e.soluzione %}
-        <div class="card" style="background:var(--bg)">
-          <strong>Soluzione/suggerimento</strong>
-          <p style="white-space:pre-wrap; margin:0.5rem 0 0">{{ e.soluzione }}</p>
-        </div>
-        {% endif %}
-      </td>
+      <td colspan="5"></td>
     </tr>
     {% endfor %}
   </table>
@@ -176,28 +155,7 @@
           </td>
         </tr>
         <tr class="riga-anteprima-disponibile" data-esercizio="{{ e.id }}" style="display:none">
-          <td colspan="5">
-            {% for v in e.varianti %}
-            <div class="card" style="background:var(--bg); margin-bottom:0.75rem">
-              <strong>Variante {{ loop.index }}</strong>
-              <p style="white-space:pre-wrap; margin:0.5rem 0">{{ v.testo }}</p>
-              {% if e.aperta %}
-              <p class="muted" style="margin:0.2rem 0">Domanda aperta: nessuna risposta a scelta multipla.</p>
-              {% else %}
-              <p style="margin:0.2rem 0"><span class="badge badge-ok">Corretta</span> {{ v.risposte[0] }}</p>
-              {% for r in v.risposte[1:] %}
-              <p style="margin:0.2rem 0"><span class="badge badge-err">x</span> {{ r }}</p>
-              {% endfor %}
-              {% endif %}
-            </div>
-            {% endfor %}
-            {% if e.soluzione %}
-            <div class="card" style="background:var(--bg)">
-              <strong>Soluzione/suggerimento</strong>
-              <p style="white-space:pre-wrap; margin:0.5rem 0 0">{{ e.soluzione }}</p>
-            </div>
-            {% endif %}
-          </td>
+          <td colspan="5"></td>
         </tr>
         {% endfor %}
       </table>
@@ -227,7 +185,15 @@
         var riga = document.querySelector('.riga-anteprima-disponibile[data-esercizio="' + btn.dataset.esercizio + '"]');
         var giaAperta = riga.style.display !== "none";
         riga.style.display = giaAperta ? "none" : "";
-        if (!giaAperta) renderizzaLatex(riga);
+        if (giaAperta) return;
+        if (riga.dataset.caricata) { renderizzaLatex(riga); return; }
+        fetch("/corsi/{{ corso.tag }}/esercizi/" + btn.dataset.esercizio + "/anteprima")
+          .then(function (r) { return r.text(); })
+          .then(function (html) {
+            riga.querySelector("td").innerHTML = html;
+            riga.dataset.caricata = "1";
+            renderizzaLatex(riga);
+          });
       });
     });
   })();
@@ -278,7 +244,15 @@ document.querySelectorAll(".btn-anteprima-assegnato").forEach(function (btn) {
     var riga = document.querySelector('.riga-anteprima-assegnato[data-esercizio="' + btn.dataset.esercizio + '"]');
     var giaAperta = riga.style.display !== "none";
     riga.style.display = giaAperta ? "none" : "";
-    if (!giaAperta) renderizzaLatex(riga);
+    if (giaAperta) return;
+    if (riga.dataset.caricata) { renderizzaLatex(riga); return; }
+    fetch("/corsi/{{ corso.tag }}/esercizi/" + btn.dataset.esercizio + "/anteprima")
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        riga.querySelector("td").innerHTML = html;
+        riga.dataset.caricata = "1";
+        renderizzaLatex(riga);
+      });
   });
 });
 </script>

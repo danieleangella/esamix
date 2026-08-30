@@ -342,7 +342,7 @@ def genera_compiti(tag: str, appello_id: int, numero_studenti: int = Form(...)):
         "Blocco": compiti_service.path_blocco(tag, appello_id, result.numero, "tex"),
         "Griglia": compiti_service.path_griglia(tag, appello_id, result.numero, "tex"),
     }
-    if result.riferimento_generato:
+    if result.riferimento_generato or not compiti_service.path_riferimento(tag, appello_id, "pdf").exists():
         da_compilare["Riferimento"] = compiti_service.path_riferimento(tag, appello_id, "tex")
     with ThreadPoolExecutor(max_workers=len(da_compilare)) as pool:
         risultati_compilazione = dict(zip(da_compilare, pool.map(compiti_service.compila_pdf, da_compilare.values())))
@@ -864,6 +864,18 @@ async def importa_da_corso(tag: str, request: Request):
     report = studenti_service.importa_da_altro_corso(tag, tag_sorgente, matricole)
     msg = f"Import da {tag_sorgente}: {report.inseriti} inseriti, {report.aggiornati} aggiornati, {report.saltati} saltati"
     return flash_redirect(f"/corsi/{tag}/studenti", msg, "error" if report.errori else "success")
+
+
+@app.get("/corsi/{tag}/esercizi/{esercizio_id}/anteprima", response_class=HTMLResponse)
+def anteprima_esercizio(request: Request, tag: str, esercizio_id: int):
+    """Frammento HTML con testo/risposte/soluzione di tutte le varianti di un esercizio,
+    caricato via fetch solo quando l'utente apre l'anteprima: con banche di centinaia di
+    esercizi, generare questo blocco per ognuno di essi dentro ogni pagina che li elenca
+    (anche se nascosto) appesantisce inutilmente ogni caricamento."""
+    esercizio = esercizi_service.get_esercizio(tag, esercizio_id)
+    if esercizio is None:
+        return HTMLResponse("Esercizio non trovato", status_code=404)
+    return templates.TemplateResponse(request, "_esercizio_anteprima.html", {"e": esercizio})
 
 
 @app.get("/corsi/{tag}/esercizi", response_class=HTMLResponse)

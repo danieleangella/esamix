@@ -100,6 +100,13 @@
 (function () {
   var forms = document.querySelectorAll(".form-esercizio");
   forms.forEach(function (form) {
+    // questo script è incluso una volta per ogni esercizio nelle pagine che ne elencano
+    // molti (es. banca esercizi con la riga "Modifica" di ognuno): senza questa guardia,
+    // ogni inclusione rieseguirebbe la selezione sopra su TUTTI i form già nel DOM,
+    // riattaccando gli stessi listener più volte (click che aggiungono più varianti alla
+    // volta, sempre di più man mano che la pagina ha più esercizi).
+    if (form.dataset.iniz) return;
+    form.dataset.iniz = "1";
     var container = form.querySelector(".varianti-container");
     var tplVariante = form.querySelector(".tpl-variante");
     var tplSbagliata = form.querySelector(".tpl-sbagliata");
