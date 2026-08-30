@@ -365,11 +365,11 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
   {% if not raggruppamento %}
   <div class="card">
     <h2>Correzione</h2>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi">
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" autocomplete="off">
       <div class="form-grid">
         <div style="position:relative">
           <label>Matricola o nome</label>
-          <input name="matricola" id="input-matricola" autocomplete="new-password" required>
+          <input name="matricola" id="input-matricola" autocomplete="off" required>
           <div id="suggerimenti-studenti" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
           <div id="matricola-nome-risolto" class="muted" style="margin-top:0.25rem"></div>
         </div>
@@ -378,7 +378,7 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
           <input name="codice" id="input-codice" autocomplete="off" required>
           <div id="suggerimenti-codici" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
         </div>
-        <div><label>Stringa risposte</label><input name="risposte" required placeholder="es. ABCXBADCEBA"></div>
+        <div><label>Stringa risposte</label><input name="risposte" autocomplete="off" required placeholder="es. ABCXBADCEBA"></div>
       </div>
       <button type="submit">Vai al riepilogo</button>
     </form>
@@ -423,7 +423,7 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
       <div class="form-grid">
         <div style="position:relative">
           <label>Matricola o nome</label>
-          <input name="matricola" id="input-matricola-assenza" autocomplete="new-password" required>
+          <input name="matricola" id="input-matricola-assenza" autocomplete="off" required>
           <div id="suggerimenti-studenti-assenza" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
         </div>
         <div>

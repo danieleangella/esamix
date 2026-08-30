@@ -14,7 +14,7 @@
 {% endif %}
 
 <div class="card">
-  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/conferma" id="form-riepilogo">
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/conferma" id="form-riepilogo" autocomplete="off">
   <input type="hidden" name="matricola" value="{{ v.matricola }}">
   <input type="hidden" name="codice" value="{{ v.codice }}">
   <input type="hidden" name="modifica" value="{{ '1' if modifica else '' }}">
@@ -26,7 +26,7 @@
   <div class="form-grid">
     <div>
       <label class="muted" style="font-size:0.85rem">Risposte inserite (modificabile)</label>
-      <input name="risposte" value="{{ v.risposte }}" style="font-family:monospace; font-size:1.4rem; letter-spacing:0.3em">
+      <input name="risposte" value="{{ v.risposte }}" autocomplete="off" style="font-family:monospace; font-size:1.4rem; letter-spacing:0.3em">
       <button type="submit" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" formnovalidate class="secondary" style="margin-top:0.4rem">Ricalcola con queste risposte</button>
     </div>
     <div>
