@@ -28,11 +28,11 @@
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/modifica">
       <div class="form-grid">
         <div><label>Nome</label><input name="nome" value="{{ appello.nome }}" required></div>
-        <div><label>Data</label><input name="data" value="{{ appello.data or '' }}" placeholder="dd/mm/yyyy"></div>
+        <div><label>Data</label><input type="date" name="data" value="{{ appello.data | data_iso }}"></div>
       </div>
       <p class="muted" style="margin-top:0.75rem">Orale (mostrato in testa al foglio dei risultati se qualcuno è in attesa):</p>
       <div class="form-grid">
-        <div><label>Data orale</label><input name="orale_data" value="{{ appello.orale_data or '' }}" placeholder="dd/mm/yyyy"></div>
+        <div><label>Data orale</label><input type="date" name="orale_data" value="{{ appello.orale_data | data_iso }}"></div>
         <div><label>Ora</label><input name="orale_ora" value="{{ appello.orale_ora or '' }}" placeholder="es. 9:00"></div>
         <div><label>Aula</label><input name="orale_aula" value="{{ appello.orale_aula or '' }}"></div>
       </div>

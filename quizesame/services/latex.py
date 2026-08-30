@@ -102,9 +102,15 @@ def intestazione_breve(ctx: LatexContext) -> str:
     )
 
 
-def intestazione(ctx: LatexContext, codice) -> str:
+def intestazione(ctx: LatexContext, codice, posizioni: list[dict]) -> str:
+    """`posizioni` (vedi mischia()) determina quante caselle mette la griglia delle
+    risposte in testa al foglio (una per esercizio del compito) e quali sono domande
+    aperte (casella con un grande "-" invece del numero, dato che non c'è una lettera
+    da scrivere)."""
     griglia = "".join(
-        f"\\fbox{{\\parbox{{20pt}}{{\\scriptsize {i + 1}}}}}" for i in range(11)
+        "\\fbox{\\parbox{20pt}{\\centering\\Large -}}" if p["aperta"]
+        else f"\\fbox{{\\parbox{{20pt}}{{\\scriptsize {i + 1}}}}}"
+        for i, p in enumerate(posizioni)
     )
     return (
         "\\begin{flushright}\n"
@@ -112,7 +118,7 @@ def intestazione(ctx: LatexContext, codice) -> str:
         "\\begin{framed}\n"
         "{\\it Nome:}\\enspace\\hrulefill\\quad \n"
         "{\\it Cognome:}\\enspace\\hrulefill\\newline\n"
-        f"{{\\it Corso:}}\\enspace{{\\hrulefill\\bf ({{\\scriptsize {ctx.tag}}})}}\\quad\n"
+        f"{{\\it Corso:}}\\enspace{{\\bf {ctx.corso}}}\\quad\n"
         "{\\it Matricola:}\\enspace\\hrulefill\\quad\\newline\n"
         f"{{\\it Data:}}\\enspace{{\\bf {ctx.appello_data}}}\\newline\n\n\\medskip\n\n"
         f"{{\\it Risposte:}}\\enspace{{\\Huge\\bf{griglia}}}\n"
@@ -269,9 +275,9 @@ def crea_file_blocco(ctx: LatexContext, esercizi_struct: list[dict], numero_stud
         while code in codici_usati:
             code = randint(0, 999999)
         codici_usati.add(code)
-        tex += intestazione(ctx, code)
-        tex += "\\begin{small}\n\n\\begin{multicols}{2}\n\\setcounter{ex}{0}\n"
         posizioni = mischia(esercizi_struct)
+        tex += intestazione(ctx, code, posizioni)
+        tex += "\\begin{small}\n\n\\begin{multicols}{2}\n\\setcounter{ex}{0}\n"
         # "-" segnala una domanda aperta: nessuna lettera "corretta" da confrontare, il
         # punteggio per quella posizione lo assegna sempre il docente in correzione.
         griglia = "".join("-" if p["aperta"] else LETTERE[p["indice_corretta"]] for p in posizioni)

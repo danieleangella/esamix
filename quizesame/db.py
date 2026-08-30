@@ -198,8 +198,12 @@ _schema_verificati: set[str] = set()
 
 
 def get_connection(db_path: Path) -> sqlite3.Connection:
+    """Va chiamata solo su un database già esistente (o dentro init_db, che crea la
+    cartella apposta): NON crea più la cartella del corso al volo, perché farlo qui
+    significava che anche un semplice GET su un corso già eliminato (es. un link vecchio,
+    o una scheda del browser rimasta aperta) lo faceva silenziosamente resuscitare vuoto,
+    con conseguente conferma della cancellazione e ricomparsa fantasma del corso."""
     db_path = Path(db_path)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -216,4 +220,8 @@ def get_connection(db_path: Path) -> sqlite3.Connection:
 
 
 def init_db(db_path: Path) -> None:
+    """Unico punto che crea davvero un nuovo corso da zero: qui (e solo qui) è corretto
+    creare anche la cartella, perché chi chiama sa di voler creare un corso nuovo."""
+    db_path = Path(db_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     get_connection(db_path).close()

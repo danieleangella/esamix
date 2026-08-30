@@ -37,6 +37,29 @@ def _static_version() -> str:
         return "0"
 
 
+def _data_it_a_iso(data: str) -> str:
+    """Converte una data 'gg/mm/aaaa' (formato in cui l'app salva le date) in 'aaaa-mm-gg'
+    (formato richiesto da <input type="date"> per precompilare il selettore): stringa
+    vuota se la data manca o non è nel formato atteso."""
+    try:
+        g, m, a = (data or "").strip().split("/")
+        return f"{int(a):04d}-{int(m):02d}-{int(g):02d}"
+    except ValueError:
+        return ""
+
+
+def _data_iso_a_it(data: str) -> str:
+    """Converte una data 'aaaa-mm-gg' (formato inviato da <input type="date">) nel formato
+    'gg/mm/aaaa' con cui l'app salva le date altrove (testo dei compiti, verbali, ecc.):
+    stringa vuota se la data manca o non è nel formato atteso."""
+    try:
+        a, m, g = (data or "").strip().split("-")
+        return f"{int(g):02d}/{int(m):02d}/{int(a):04d}"
+    except ValueError:
+        return ""
+
+
+templates.env.filters["data_iso"] = _data_it_a_iso
 templates.env.globals["static_version"] = _static_version
 templates.env.globals["get_app_settings"] = app_config_service.get_settings
 
@@ -282,7 +305,7 @@ def elimina_corso(tag: str):
 @app.post("/corsi/{tag}/appelli/nuovo")
 def crea_appello(tag: str, nome: str = Form(...), tipo: str = Form("appello"), data: str = Form("")):
     try:
-        corsi_service.create_appello(tag, nome=nome.strip(), tipo=tipo, data=data.strip() or None)
+        corsi_service.create_appello(tag, nome=nome.strip(), tipo=tipo, data=_data_iso_a_it(data) or None)
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}", str(e), "error")
     return flash_redirect(f"/corsi/{tag}", "Appello creato")
@@ -342,8 +365,8 @@ def modifica_appello(
 ):
     try:
         corsi_service.update_appello(
-            tag, appello_id, nome=nome, data=data or None,
-            orale_data=orale_data or None, orale_ora=orale_ora or None, orale_aula=orale_aula or None,
+            tag, appello_id, nome=nome, data=_data_iso_a_it(data) or None,
+            orale_data=_data_iso_a_it(orale_data) or None, orale_ora=orale_ora or None, orale_aula=orale_aula or None,
         )
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error")
