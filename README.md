@@ -99,6 +99,9 @@ Ogni corso è una cartella dentro `corsi/`, con il proprio database (`db.sqlite`
 testi generati (`corsi/<corso>/output/`). I dati non vengono mai inviati altrove: tutto
 resta sul computer su cui gira l'app.
 
+Dalla pagina Impostazioni di un corso (o dalle Impostazioni generali dell'app, per tutti
+i corsi insieme) si può scaricare in qualsiasi momento un **backup** in formato zip.
+
 ## Importare i dati di un corso già gestito con la vecchia versione a riga di comando
 
 Dalla pagina "Migrazione dati legacy" si può cercare e importare un `db.sqlite`

@@ -15,6 +15,13 @@
     poi nella scheda <strong>Impostazioni</strong> del corso e valgono per tutti i suoi
     appelli.
   </p>
+  <p>
+    Dalla scheda Impostazioni si scarica anche un <strong>backup</strong> (zip con
+    database e tutti i file generati) del singolo corso, oppure — dalle Impostazioni
+    dell'app — un backup completo con tutti i corsi insieme. Un corso si può anche
+    <strong>eliminare definitivamente</strong> (con doppia conferma): azione
+    irreversibile, senza backup automatico, quindi conviene farne uno prima.
+  </p>
 </div>
 
 <div class="card">
@@ -29,14 +36,26 @@
   </p>
   <p>
     Un esercizio assegnato a un appello può essere marcato <strong>obbligatorio</strong>:
-    richiede sia la risposta a scelta multipla sia lo svolgimento scritto. Gli esercizi
-    di un appello si possono esportare/importare in JSON per condividerli con un collega
-    o riusarli in un altro corso.
+    richiede sia la risposta a scelta multipla sia lo svolgimento scritto. Un esercizio
+    può anche essere una <strong>domanda aperta</strong> (nessuna risposta a scelta
+    multipla): in correzione il punteggio va sempre assegnato a mano dal docente.
+    Facoltativamente si può indicare una <strong>difficoltà</strong> (da una a tre
+    stelline) e una <strong>soluzione o suggerimento</strong>, che compare in un riquadro
+    nel foglio di riferimento dell'appello.
   </p>
   <p>
-    Cliccando sul nome di un esercizio nella banca del corso si apre un'anteprima di
-    tutte le sue varianti, con la risposta corretta e quelle sbagliate ben distinte e le
-    eventuali formule LaTeX renderizzate.
+    Gli esercizi si possono esportare/importare in JSON (dalla banca del corso, o dalla
+    scheda Testo di un appello per assegnarli subito) per condividerli con un collega o
+    riusarli in un altro corso: prima di importare viene sempre chiesta conferma su quali
+    esercizi importare, segnalando quelli già identici a uno esistente nella banca.
+  </p>
+  <p>
+    Cliccando sul nome di un esercizio (nella banca del corso, o tra gli esercizi
+    assegnati/disponibili di un appello) si apre un'anteprima di tutte le sue varianti,
+    con la risposta corretta e quelle sbagliate ben distinte, le eventuali formule LaTeX
+    renderizzate, ed eventuali appelli a cui è già assegnato. Dalla banca esercizi si può
+    anche cercare ed eliminare automaticamente eventuali <strong>doppioni</strong> (stesso
+    testo e stesse risposte in ogni variante).
   </p>
 </div>
 
@@ -56,6 +75,12 @@
     codici) — a meno che qualche blocco non abbia già risultati registrati, nel qual
     caso la modifica viene bloccata per non invalidare compiti già corretti.
   </p>
+  <p class="muted">
+    Un blocco senza risultati registrati si può eliminare; con più blocchi generati, si
+    possono anche scaricare tutti insieme in un unico PDF. Un intero appello si può
+    eliminare anche se ha già risultati registrati, ma con doppia conferma: verranno
+    persi insieme a esercizi assegnati, blocchi e compiti.
+  </p>
 </div>
 
 <div class="card">
@@ -72,7 +97,16 @@
     Se un esercizio obbligatorio non è stato svolto, il compito risulta automaticamente
     insufficiente. Se è stato svolto e la risposta a scelta multipla è corretta, il
     riepilogo chiede di giudicare lo svolgimento scritto assegnando un punteggio tra il
-    valore di una risposta sbagliata e quello di una corretta.
+    valore di una risposta sbagliata e quello di una corretta. Le domande aperte
+    richiedono sempre un punteggio assegnato a mano, fino a un massimo impostabile nelle
+    Impostazioni del corso ("Punteggio massimo domanda aperta", può superare i punti di
+    una risposta corretta).
+  </p>
+  <p>
+    Se in quel momento non si vuole ancora giudicare uno o più di questi punteggi, si può
+    salvare un voto provvisorio con <strong>"Completa successivamente"</strong>: il
+    compito compare nella sezione "Valutazioni in sospeso" dell'appello finché non si
+    completa la valutazione (da "Modifica"), e nel frattempo non è verbalizzabile.
   </p>
   <p>
     Un esito già inserito si può modificare in qualsiasi momento (voto e/o risposte, con
@@ -125,8 +159,14 @@
     L'importazione da CSV funziona con qualunque file, indipendentemente dall'ordine o dal
     numero delle colonne: dopo aver caricato il file si sceglie quale colonna usare per
     matricola, cognome e nome (proposta già automaticamente se il file ha un'intestazione
-    con nomi riconoscibili), poi si vede un'anteprima riga per riga di cosa verrà inserito
-    o aggiornato prima di confermare davvero l'importazione.
+    con nomi riconoscibili) e quante righe iniziali ignorare (es. l'intestazione, o
+    eventuali righe di preambolo prima di essa). Prima di confermare davvero
+    l'importazione si vede un'anteprima riga per riga di cosa verrà inserito o
+    aggiornato, con la possibilità di deselezionare le singole righe da non importare.
+  </p>
+  <p class="muted">
+    Anche la ricerca nell'elenco studenti di un corso suggerisce autocompletamenti mentre
+    si digita.
   </p>
   <p>
     Dal bottone "Modifica" nell'elenco studenti si può correggere anche la matricola, o
