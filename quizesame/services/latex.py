@@ -158,6 +158,15 @@ def tex_esercizio(exx) -> str:
     return out
 
 
+def tex_esercizio_aperto(testo: str) -> str:
+    """Domanda aperta: nessuna lista di risposte a scelta multipla, solo spazio bianco in
+    cui lo studente scrive la risposta a mano."""
+    out = "\n\\begin{ex}\n" + testo + "\n\\end{ex}\n\n"
+    out += "\\vspace{3cm}\n"
+    out += "\\begin{center}\n\\noindent\\rule{0.3\\textwidth}{0.4pt}\n\\end{center}\n"
+    return out
+
+
 def stampa_codici(ctx: LatexContext, studenti) -> str:
     tex = intestazione_breve(ctx)
     tex += (
@@ -171,21 +180,30 @@ def stampa_codici(ctx: LatexContext, studenti) -> str:
 
 
 def mischia(esercizi_struct: list[dict]) -> list[dict]:
-    """esercizi_struct: [{esercizio_id, obbligatorio, varianti: [{variante_id, testo, risposte}]}, ...]
+    """esercizi_struct: [{esercizio_id, obbligatorio, aperta, varianti: [{variante_id, testo, risposte}]}, ...]
     Sceglie una variante a caso (probabilità uniforme tra le sue) per ciascun esercizio —
     esercizi diversi possono avere un numero diverso di varianti, non serve che sia lo
     stesso per tutti — mischia l'ordine delle risposte e l'ordine degli esercizi nel
     compito. Ritorna, per ciascuna posizione nel compito risultante:
-    {esercizio_id, variante_id, obbligatorio, testo, risposte, indice_corretta}."""
+    {esercizio_id, variante_id, obbligatorio, aperta, testo, risposte, indice_corretta}.
+    Per una domanda aperta (senza risposte a scelta multipla) risposte è vuota e
+    indice_corretta è None: non c'è nulla da mischiare né una lettera "corretta"."""
     posizioni = []
     for es in esercizi_struct:
         variante = copy.deepcopy(es["varianti"][randint(0, len(es["varianti"]) - 1)])
+        if es.get("aperta"):
+            posizioni.append({
+                "esercizio_id": es["esercizio_id"], "variante_id": variante["variante_id"],
+                "obbligatorio": es["obbligatorio"], "aperta": True, "testo": variante["testo"],
+                "risposte": [], "indice_corretta": None,
+            })
+            continue
         risposte = variante["risposte"]
         corretta = risposte[0]
         random.shuffle(risposte)
         posizioni.append({
             "esercizio_id": es["esercizio_id"], "variante_id": variante["variante_id"],
-            "obbligatorio": es["obbligatorio"], "testo": variante["testo"],
+            "obbligatorio": es["obbligatorio"], "aperta": False, "testo": variante["testo"],
             "risposte": risposte, "indice_corretta": risposte.index(corretta),
         })
     random.shuffle(posizioni)
@@ -206,7 +224,16 @@ def crea_file_riferimento(ctx: LatexContext, esercizi_struct: list[dict]) -> str
     tex += "\n\\begin{multicols}{2}\n\\setcounter{ex}{0}\n"
     for es in esercizi_struct:
         for variante in es["varianti"]:
-            tex += tex_esercizio([variante["testo"], variante["risposte"]])
+            if es.get("aperta"):
+                tex += tex_esercizio_aperto(variante["testo"])
+            else:
+                tex += tex_esercizio([variante["testo"], variante["risposte"]])
+        if es.get("soluzione"):
+            tex += (
+                "\\begin{center}\\fbox{\\parbox{0.9\\linewidth}{\\small "
+                f"{{\\bfseries Soluzione/suggerimento:}} {es['soluzione']}"
+                "}}\\end{center}\n\n"
+            )
     tex += "\\end{multicols}\n\n"
     tex += "\n\n\\end{document}"
     return tex
@@ -237,16 +264,21 @@ def crea_file_blocco(ctx: LatexContext, esercizi_struct: list[dict], numero_stud
         tex += intestazione(ctx, code)
         tex += "\\begin{small}\n\n\\begin{multicols}{2}\n\\setcounter{ex}{0}\n"
         posizioni = mischia(esercizi_struct)
-        griglia = "".join(LETTERE[p["indice_corretta"]] for p in posizioni)
+        # "-" segnala una domanda aperta: nessuna lettera "corretta" da confrontare, il
+        # punteggio per quella posizione lo assegna sempre il docente in correzione.
+        griglia = "".join("-" if p["aperta"] else LETTERE[p["indice_corretta"]] for p in posizioni)
         studenti.append((code, griglia, [
             {
                 "esercizio_id": p["esercizio_id"], "variante_id": p["variante_id"], "obbligatorio": p["obbligatorio"],
-                "risposte": p["risposte"],
+                "aperta": p["aperta"], "risposte": p["risposte"],
             }
             for p in posizioni
         ]))
         for p in posizioni:
-            tex += tex_esercizio([p["testo"], p["risposte"]])
+            if p["aperta"]:
+                tex += tex_esercizio_aperto(p["testo"])
+            else:
+                tex += tex_esercizio([p["testo"], p["risposte"]])
         tex += "\\end{multicols}\n\\end{small}\n\n\\vfill\n"
         tex += regole(ctx)
         tex += "\\clearpage\n\n"

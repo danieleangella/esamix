@@ -13,6 +13,25 @@
   <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
 </div>
 
+{% if duplicati %}
+<div class="card">
+  <h2>Possibili doppioni ({{ duplicati|length }} gruppi)</h2>
+  <p class="muted" style="margin-top:0">Esercizi con lo stesso testo e le stesse risposte in ogni variante. Tienine uno per gruppo ed elimina gli altri (non è possibile eliminare un esercizio già assegnato a un appello).</p>
+  {% for gruppo in duplicati %}
+  <div style="padding:0.6rem 0; {% if not loop.first %}border-top:1px solid var(--border);{% endif %}">
+    {% for e in gruppo %}
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:0.15rem 0">
+      <span>{{ e.nome or ('#' ~ e.id) }} <span class="muted">({{ e.varianti|length }} variante/i)</span></span>
+      <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/elimina">
+        <button type="submit" class="secondary">Elimina</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <div class="card">
   <h2>Banca esercizi del corso ({{ esercizi|length }})</h2>
   {% if esercizi %}
@@ -20,7 +39,11 @@
     <tr><th>Nome</th><th>Argomento</th><th>Varianti</th><th>Anteprima</th><th></th></tr>
     {% for e in esercizi %}
     <tr>
-      <td><button type="button" class="link-simile btn-anteprima-esercizio" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button></td>
+      <td>
+        <button type="button" class="link-simile btn-anteprima-esercizio" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button>
+        {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
+        {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
+      </td>
       <td>{{ e.argomento or '-' }}</td>
       <td>{{ e.varianti|length }}</td>
       <td class="muted">{{ (e.varianti[0].testo if e.varianti else '')[:80] }}&hellip;</td>
@@ -38,14 +61,24 @@
         <div class="card" style="background:var(--bg); margin-bottom:0.75rem">
           <strong>Variante {{ loop.index }}</strong>
           <p style="white-space:pre-wrap; margin:0.5rem 0">{{ v.testo }}</p>
+          {% if e.aperta %}
+          <p class="muted" style="margin:0.2rem 0">Domanda aperta: nessuna risposta a scelta multipla.</p>
+          {% else %}
           <p style="margin:0.2rem 0"><span class="badge badge-ok">Corretta</span> {{ v.risposte[0] }}</p>
           {% for r in v.risposte[1:] %}
           <p style="margin:0.2rem 0"><span class="badge badge-err">x</span> {{ r }}</p>
           {% endfor %}
+          {% endif %}
         </div>
         {% else %}
         <p class="muted">Nessuna variante ancora inserita.</p>
         {% endfor %}
+        {% if e.soluzione %}
+        <div class="card" style="background:var(--bg)">
+          <strong>Soluzione/suggerimento</strong>
+          <p style="white-space:pre-wrap; margin:0.5rem 0 0">{{ e.soluzione }}</p>
+        </div>
+        {% endif %}
       </td>
     </tr>
     <tr class="riga-modifica-esercizio" data-esercizio="{{ e.id }}" style="display:none">

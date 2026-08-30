@@ -133,6 +133,7 @@ class RigaRisposta:
     esercizio_id: int
     esercizio_nome: str
     obbligatorio: bool
+    aperta: bool
     lettera_data: str
     lettera_corretta: str
     svolta: bool  # ha dato una risposta (diversa da 'X') in quella posizione
@@ -150,6 +151,7 @@ class ValutazionePreliminare:
     righe: list[RigaRisposta] = field(default_factory=list)
     non_svolte_obbligatorie: list[RigaRisposta] = field(default_factory=list)
     da_valutare: list[RigaRisposta] = field(default_factory=list)
+    domande_aperte: list[RigaRisposta] = field(default_factory=list)
     orale_obbligatorio: Optional[dict] = None
 
 
@@ -157,13 +159,15 @@ def _righe_risposta(tag: str, compito_id: int, soluzioni: str, risposte: str) ->
     righe = []
     for pos in compiti_service.list_posizioni_compito(tag, compito_id):
         i = pos["posizione"]
+        aperta = bool(pos["aperta"])
         lettera_data = risposte[i].upper() if i < len(risposte) else "X"
         lettera_corretta = soluzioni[i].upper() if i < len(soluzioni) else "?"
-        svolta = lettera_data != "X"
+        svolta = (not aperta) and lettera_data != "X"
         righe.append(RigaRisposta(
             posizione=i, esercizio_id=pos["esercizio_id"],
             esercizio_nome=pos["esercizio_nome"] or f"Esercizio #{pos['esercizio_id']}",
-            obbligatorio=bool(pos["obbligatorio"]), lettera_data=lettera_data, lettera_corretta=lettera_corretta,
+            obbligatorio=bool(pos["obbligatorio"]), aperta=aperta,
+            lettera_data=lettera_data, lettera_corretta=lettera_corretta,
             svolta=svolta, corretta=svolta and lettera_data == lettera_corretta,
         ))
     return righe
@@ -175,7 +179,9 @@ def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, r
     obbligatori: non svolti (compito automaticamente insufficiente) o svolti con la
     risposta multiple-choice corretta (il docente deve ancora giudicare lo svolgimento
     scritto e assegnare un punteggio) — un obbligatorio svolto ma con risposta sbagliata
-    non richiede invece nessuna valutazione aggiuntiva, conta come risposta sbagliata."""
+    non richiede invece nessuna valutazione aggiuntiva, conta come risposta sbagliata. Le
+    domande aperte (senza risposta a scelta multipla) richiedono sempre un punteggio
+    assegnato a mano dal docente, indipendentemente dal fatto che siano obbligatorie."""
     corso = corsi_service.get_corso(tag)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
@@ -184,13 +190,14 @@ def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, r
         voto_base = valuta(soluzioni, risposte, corso.risposta_corretta, corso.risposta_sbagliata, corso.risposta_vuota)
 
         righe = _righe_risposta(tag, compito["id"], soluzioni, risposte)
-        non_svolte = [r for r in righe if r.obbligatorio and not r.svolta]
-        da_valutare = [r for r in righe if r.obbligatorio and r.svolta and r.corretta]
+        non_svolte = [r for r in righe if r.obbligatorio and not r.aperta and not r.svolta]
+        da_valutare = [r for r in righe if r.obbligatorio and not r.aperta and r.svolta and r.corretta]
+        domande_aperte = [r for r in righe if r.aperta]
 
         return ValutazionePreliminare(
             matricola=studente["matricola"], nome=studente["nome"], cognome=studente["cognome"],
             codice=codice, risposte=risposte, voto_base=voto_base, righe=righe,
-            non_svolte_obbligatorie=non_svolte, da_valutare=da_valutare,
+            non_svolte_obbligatorie=non_svolte, da_valutare=da_valutare, domande_aperte=domande_aperte,
             orale_obbligatorio=_orale_obbligatorio(conn, studente["matricola"]),
         )
     finally:
@@ -257,7 +264,8 @@ def conferma_risultato(
 
         non_svolte_obbligatorie = [
             p for p in compiti_service.list_posizioni_compito(tag, compito["id"])
-            if p["obbligatorio"] and (p["posizione"] >= len(risposte) or risposte[p["posizione"]].upper() == "X")
+            if p["obbligatorio"] and not p["aperta"]
+            and (p["posizione"] >= len(risposte) or risposte[p["posizione"]].upper() == "X")
         ]
         insufficiente = bool(non_svolte_obbligatorie)
         votomin = corsi_service.effective_votomin(corso, appello)

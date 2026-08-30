@@ -8,7 +8,7 @@ from typing import Optional
 from quizesame import config, db
 from quizesame.services import esercizi as esercizi_service
 from quizesame.services import corsi as corsi_service
-from quizesame.services.latex import LatexContext, crea_file_riferimento, crea_file_blocco, crea_file_griglia
+from quizesame.services.latex import LatexContext, crea_file_riferimento, crea_file_blocco, crea_file_griglia, BEGIN_DOCUMENT
 
 
 @dataclass
@@ -35,7 +35,7 @@ def _esercizi_per_generazione(tag: str, appello_id: int):
 
     return [
         {
-            "esercizio_id": e.id, "obbligatorio": e.obbligatorio,
+            "esercizio_id": e.id, "obbligatorio": e.obbligatorio, "aperta": e.aperta, "soluzione": e.soluzione,
             "varianti": [{"variante_id": v.id, "testo": v.testo, "risposte": list(v.risposte)} for v in e.varianti],
         }
         for e in esercizi
@@ -213,10 +213,10 @@ def genera_blocco(tag: str, appello_id: int, numero_studenti: int) -> BloccoResu
                 for indice, p in enumerate(posizioni):
                     conn.execute(
                         "INSERT INTO compito_esercizi (compito_id, posizione, esercizio_id, variante_id, "
-                        "obbligatorio, risposte_mischiate) VALUES (?,?,?,?,?,?)",
+                        "obbligatorio, aperta, risposte_mischiate) VALUES (?,?,?,?,?,?,?)",
                         (
                             compito_id, indice, p["esercizio_id"], p["variante_id"], p["obbligatorio"],
-                            json.dumps(p["risposte"]),
+                            p["aperta"], json.dumps(p["risposte"]),
                         ),
                     )
                 inseriti += 1
@@ -308,10 +308,10 @@ def rigenera_tutto(tag: str, appello_id: int) -> RigenerazioneResult | None:
                     for indice, p in enumerate(posizioni):
                         conn.execute(
                             "INSERT INTO compito_esercizi (compito_id, posizione, esercizio_id, variante_id, "
-                            "obbligatorio, risposte_mischiate) VALUES (?,?,?,?,?,?)",
+                            "obbligatorio, aperta, risposte_mischiate) VALUES (?,?,?,?,?,?,?)",
                             (
                                 compito_id, indice, p["esercizio_id"], p["variante_id"], p["obbligatorio"],
-                                json.dumps(p["risposte"]),
+                                p["aperta"], json.dumps(p["risposte"]),
                             ),
                         )
                 except Exception:
@@ -381,7 +381,7 @@ def list_posizioni_compito(tag: str, compito_id: int) -> list[dict]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         rows = conn.execute(
-            "SELECT ce.posizione, ce.obbligatorio, ce.risposte_mischiate, e.id AS esercizio_id, "
+            "SELECT ce.posizione, ce.obbligatorio, ce.aperta, ce.risposte_mischiate, e.id AS esercizio_id, "
             "e.nome AS esercizio_nome FROM compito_esercizi ce JOIN esercizi e ON e.id = ce.esercizio_id "
             "WHERE ce.compito_id=? ORDER BY ce.posizione",
             (compito_id,),
@@ -422,6 +422,59 @@ def get_blocco(tag: str, appello_id: int, numero: int) -> Optional[dict]:
         return dict(row) if row else None
     finally:
         conn.close()
+
+
+def elimina_blocco(tag: str, appello_id: int, numero: int) -> None:
+    """Elimina un blocco e i suoi compiti, rifiutando l'operazione se ha già risultati
+    registrati (perderebbero il compito a cui sono legati)."""
+    if numero in blocchi_con_risultati(tag, appello_id):
+        raise ValueError(
+            f"Il blocco {numero} ha già risultati registrati: non può essere eliminato "
+            "senza perdere quei dati."
+        )
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        blocco = conn.execute(
+            "SELECT id FROM blocchi WHERE appello_id=? AND numero=?", (appello_id, numero)
+        ).fetchone()
+        if blocco is None:
+            raise ValueError(f"Blocco {numero} non trovato")
+        compiti_ids = [r["id"] for r in conn.execute("SELECT id FROM compiti WHERE blocco_id=?", (blocco["id"],))]
+        for cid in compiti_ids:
+            conn.execute("DELETE FROM compito_esercizi WHERE compito_id=?", (cid,))
+        conn.execute("DELETE FROM compiti WHERE blocco_id=?", (blocco["id"],))
+        conn.execute("DELETE FROM blocchi WHERE id=?", (blocco["id"],))
+        conn.commit()
+    finally:
+        conn.close()
+    for ext in ("tex", "pdf", "aux", "log", "synctex.gz"):
+        path_blocco(tag, appello_id, numero, ext).unlink(missing_ok=True)
+        path_griglia(tag, appello_id, numero, ext).unlink(missing_ok=True)
+
+
+def path_blocchi_uniti(tag: str, appello_id: int, ext: str) -> Path:
+    appello = corsi_service.get_appello(tag, appello_id)
+    return _out_dir(tag) / f"blocchi-{appello.slug}.{ext}"
+
+
+def genera_blocchi_uniti(tag: str, appello_id: int) -> Path:
+    """Concatena il .tex di tutti i blocchi già generati per questo appello in un unico
+    file, per poterli scaricare/stampare tutti insieme in un solo PDF invece che uno alla
+    volta quando un appello ne ha più di uno."""
+    blocchi = list_blocchi(tag, appello_id)
+    corpi = []
+    for b in blocchi:
+        tex_path = path_blocco(tag, appello_id, b["numero"], "tex")
+        if not tex_path.exists():
+            continue
+        testo = tex_path.read_text(encoding="utf-8")
+        corpi.append(testo.removeprefix(BEGIN_DOCUMENT).removesuffix("\n\n\\end{document}"))
+    if not corpi:
+        raise ValueError("Nessun blocco generato per questo appello")
+    tex = BEGIN_DOCUMENT + "\\clearpage\n".join(corpi) + "\n\n\\end{document}"
+    path = path_blocchi_uniti(tag, appello_id, "tex")
+    _salva_testo(path, tex)
+    return path
 
 
 def cerca_codici(tag: str, appello_id: int, prefisso: str, limite: int = 10) -> list[str]:

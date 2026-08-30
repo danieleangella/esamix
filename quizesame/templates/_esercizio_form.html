@@ -9,10 +9,30 @@
       </datalist>
     </div>
     <div><label>Note (opzionali)</label><input name="note" value="{{ esercizio.note or '' if esercizio is defined else '' }}"></div>
+    <div>
+      <label>Difficoltà (opzionale)</label>
+      <select name="difficolta">
+        <option value="" {% if not (esercizio is defined and esercizio.difficolta) %}selected{% endif %}>-- non indicata --</option>
+        <option value="1" {% if esercizio is defined and esercizio.difficolta == 1 %}selected{% endif %}>★☆☆</option>
+        <option value="2" {% if esercizio is defined and esercizio.difficolta == 2 %}selected{% endif %}>★★☆</option>
+        <option value="3" {% if esercizio is defined and esercizio.difficolta == 3 %}selected{% endif %}>★★★</option>
+      </select>
+    </div>
     {% if appello is defined %}
     <div><label style="display:inline-flex; align-items:center; gap:0.4rem"><input type="checkbox" name="obbligatorio" style="width:auto" {% if esercizio is defined and esercizio.obbligatorio %}checked{% endif %}> Obbligatorio (consegna e svolgimento richiesti)</label></div>
     {% endif %}
   </div>
+
+  <label style="margin-top:0.75rem">Soluzione o suggerimento (opzionale)</label>
+  <textarea name="soluzione" rows="2" placeholder="Se compilata, appare in un riquadro nel foglio di riferimento dell'appello">{{ esercizio.soluzione or '' if esercizio is defined else '' }}</textarea>
+
+  <div style="margin-top:0.75rem">
+    <label style="display:inline-flex; align-items:center; gap:0.4rem">
+      <input type="checkbox" name="aperta" class="campo-aperta" style="width:auto" {% if esercizio is defined and esercizio.aperta %}checked{% endif %}>
+      Domanda aperta (nessuna risposta a scelta multipla: il punteggio andrà assegnato a mano in correzione)
+    </label>
+  </div>
+
   <p class="muted" style="margin-top:0.75rem">
     Ogni variante è un modo alternativo di porre lo stesso esercizio (la generazione dei
     compiti ne sceglie una a caso per ogni studente); testo in LaTeX.
@@ -29,18 +49,20 @@
       <input type="hidden" class="campo-vidx" name="variante_idx" value="{{ vidx }}">
       <label>Testo del quesito</label>
       <textarea class="campo-testo" name="testo_{{ vidx }}" rows="2">{{ v.testo }}</textarea>
-      <label>Risposta corretta</label>
-      <input class="campo-corretta" name="corretta_{{ vidx }}" value="{{ v.risposte[0] }}">
-      <label>Risposte sbagliate</label>
-      <div class="sbagliate-container">
-        {% for r in v.risposte[1:] %}
-        <div style="display:flex; gap:0.5rem; margin-bottom:0.4rem; align-items:center">
-          <input class="campo-sbagliata" name="sbagliata_{{ vidx }}" value="{{ r }}" style="flex:1">
-          <button type="button" class="secondary btn-rimuovi-sbagliata">&times;</button>
+      <div class="blocco-risposte-multiple">
+        <label>Risposta corretta</label>
+        <input class="campo-corretta" name="corretta_{{ vidx }}" value="{{ v.risposte[0] if v.risposte else '' }}">
+        <label>Risposte sbagliate</label>
+        <div class="sbagliate-container">
+          {% for r in v.risposte[1:] %}
+          <div style="display:flex; gap:0.5rem; margin-bottom:0.4rem; align-items:center">
+            <input class="campo-sbagliata" name="sbagliata_{{ vidx }}" value="{{ r }}" style="flex:1">
+            <button type="button" class="secondary btn-rimuovi-sbagliata">&times;</button>
+          </div>
+          {% endfor %}
         </div>
-        {% endfor %}
+        <button type="button" class="secondary btn-aggiungi-sbagliata">+ Aggiungi risposta sbagliata</button>
       </div>
-      <button type="button" class="secondary btn-aggiungi-sbagliata">+ Aggiungi risposta sbagliata</button>
     </div>
     {% endfor %}
   </div>
@@ -56,11 +78,13 @@
       <input type="hidden" class="campo-vidx">
       <label>Testo del quesito</label>
       <textarea class="campo-testo" rows="2"></textarea>
-      <label>Risposta corretta</label>
-      <input class="campo-corretta">
-      <label>Risposte sbagliate</label>
-      <div class="sbagliate-container"></div>
-      <button type="button" class="secondary btn-aggiungi-sbagliata">+ Aggiungi risposta sbagliata</button>
+      <div class="blocco-risposte-multiple">
+        <label>Risposta corretta</label>
+        <input class="campo-corretta">
+        <label>Risposte sbagliate</label>
+        <div class="sbagliate-container"></div>
+        <button type="button" class="secondary btn-aggiungi-sbagliata">+ Aggiungi risposta sbagliata</button>
+      </div>
     </div>
   </template>
 
@@ -123,12 +147,26 @@
       collegaVariante(node, vidx);
       container.appendChild(node);
       aggiungiSbagliata(node.querySelector(".sbagliate-container"), vidx);
+      aggiornaVisibilitaRisposte();
     }
 
     blocchiEsistenti.forEach(function (node) {
       var vidx = parseInt(node.querySelector(".campo-vidx").value, 10);
       collegaVariante(node, vidx);
     });
+
+    // una domanda aperta non ha risposte a scelta multipla: nasconde quei campi in ogni
+    // variante (il server li ignora comunque, ma mostrarli confonderebbe inutilmente).
+    // Dichiarata prima di aggiungiVariante(), che la richiama subito se il form parte senza varianti.
+    var campoAperta = form.querySelector(".campo-aperta");
+    function aggiornaVisibilitaRisposte() {
+      var aperta = campoAperta.checked;
+      form.querySelectorAll(".blocco-risposte-multiple").forEach(function (blocco) {
+        blocco.style.display = aperta ? "none" : "";
+      });
+    }
+    campoAperta.addEventListener("change", aggiornaVisibilitaRisposte);
+    aggiornaVisibilitaRisposte();
 
     form.querySelector(".btn-aggiungi-variante").addEventListener("click", aggiungiVariante);
     if (blocchiEsistenti.length === 0) aggiungiVariante();

@@ -111,6 +111,15 @@ def _parse_varianti_form(form) -> list[dict]:
     return varianti
 
 
+def _parse_esercizio_extra_form(form) -> dict:
+    difficolta_raw = (form.get("difficolta") or "").strip()
+    return {
+        "difficolta": int(difficolta_raw) if difficolta_raw else None,
+        "soluzione": (form.get("soluzione") or "").strip(),
+        "aperta": bool(form.get("aperta")),
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, q: str = ""):
     corsi = corsi_service.list_corsi()
@@ -306,6 +315,15 @@ def modifica_appello(
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Impostazioni appello salvate")
 
 
+@app.post("/corsi/{tag}/appelli/{appello_id}/elimina")
+def elimina_appello(tag: str, appello_id: int):
+    try:
+        corsi_service.elimina_appello(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error")
+    return flash_redirect(f"/corsi/{tag}", "Appello eliminato")
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/genera-compiti")
 def genera_compiti(tag: str, appello_id: int, numero_studenti: int = Form(...)):
     try:
@@ -372,6 +390,27 @@ def scarica_blocco_pdf(tag: str, appello_id: int, numero: int):
     if not path.exists():
         return PlainTextResponse("PDF non ancora compilato", status_code=404)
     return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/blocchi/{numero}/elimina")
+def elimina_blocco(tag: str, appello_id: int, numero: int):
+    try:
+        compiti_service.elimina_blocco(tag, appello_id, numero)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Blocco {numero} eliminato", anchor="creazione")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/blocchi/tutti.pdf")
+def scarica_blocchi_pdf(tag: str, appello_id: int):
+    try:
+        tex_path = compiti_service.genera_blocchi_uniti(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+    compilazione = compiti_service.compila_pdf(tex_path)
+    if not compilazione.ok:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error", anchor="creazione")
+    return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/blocchi/{numero}/griglia.tex", response_class=PlainTextResponse)
@@ -458,29 +497,18 @@ def sposta_giu_esercizio(tag: str, appello_id: int, esercizio_id: int):
 async def nuovo_esercizio_appello(tag: str, appello_id: int, request: Request):
     form = await request.form()
     varianti = _parse_varianti_form(form)
+    extra = _parse_esercizio_extra_form(form)
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
         esercizi_service.crea_e_assegna(
             tag, appello_id, nome=(form.get("nome") or "").strip(),
             note=(form.get("note") or "").strip(), varianti=varianti,
             obbligatorio=bool(form.get("obbligatorio")), argomento=(form.get("argomento") or "").strip(),
+            **extra,
         )
         msg = "Esercizio creato e assegnato" + _rigenera_se_necessario(tag, appello_id)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
-
-
-@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-legacy")
-def importa_esercizi_legacy(tag: str, appello_id: int, cartella: str = Form(...)):
-    try:
-        _proteggi_modifica_esercizi(tag, appello_id)
-        n = esercizi_service.importa_da_cartella_legacy(tag, cartella, appello_id)
-        msg = f"Importati {n} esercizi dalla cartella legacy" + _rigenera_se_necessario(tag, appello_id)
-    except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
-    except Exception as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Errore import: {e}", "error", anchor="creazione")
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
 
 
@@ -495,12 +523,39 @@ def esporta_esercizi(tag: str, appello_id: int):
     )
 
 
-@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-json")
-async def importa_esercizi_json(tag: str, appello_id: int, file: UploadFile = File(...)):
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-json", response_class=HTMLResponse)
+async def importa_esercizi_json(request: Request, tag: str, appello_id: int, file: UploadFile = File(...)):
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
-        contenuto = json.loads((await file.read()).decode("utf-8"))
-        n = esercizi_service.importa_json(tag, appello_id, contenuto)
+        contenuto_bytes = await file.read()
+        contenuto = json.loads(contenuto_bytes.decode("utf-8"))
+        candidati = esercizi_service.anteprima_importa_json(tag, contenuto)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"File non valido: {e}", "error", anchor="creazione")
+    if not candidati:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Il file non contiene esercizi", "error", anchor="creazione")
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    return templates.TemplateResponse(request, "esercizi_importa_conferma.html", {
+        "corso": corso, "appello": appello, "candidati": candidati,
+        "dati_json": json.dumps(contenuto, ensure_ascii=False),
+    })
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-json/conferma")
+async def importa_esercizi_json_conferma(request: Request, tag: str, appello_id: int):
+    form = await request.form()
+    try:
+        _proteggi_modifica_esercizi(tag, appello_id)
+        contenuto = json.loads(form.get("dati_json") or "{}")
+        candidati = esercizi_service.anteprima_importa_json(tag, contenuto)
+        indici_scelti = {int(i) for i in form.getlist("importa_idx")}
+        scelti = [c for i, c in enumerate(candidati) if i in indici_scelti]
+        if not scelti:
+            return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessun esercizio selezionato per l'import", "error", anchor="creazione")
+        n = esercizi_service.importa_json(tag, appello_id, scelti)
         msg = f"Importati {n} esercizi dal file" + _rigenera_se_necessario(tag, appello_id)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
@@ -558,7 +613,7 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
 
     punteggi_obbligatori = {}
-    for r in valutazione.da_valutare:
+    for r in valutazione.da_valutare + valutazione.domande_aperte:
         valore = form.get(f"punteggio_{r.posizione}")
         if valore is not None and valore != "":
             punteggi_obbligatori[r.posizione] = int(valore)
@@ -833,6 +888,7 @@ def esercizi_list(request: Request, tag: str, da: str = ""):
         "corso": corso, "esercizi": esercizi, "corsi_suggeriti": corsi_suggeriti, "altri_corsi": altri_corsi,
         "corso_sorgente": corso_sorgente, "esercizi_sorgente": esercizi_sorgente,
         "argomenti": esercizi_service.list_argomenti(tag), "blocchi_generati": blocchi_generati,
+        "duplicati": esercizi_service.trova_duplicati(tag),
     })
 
 
@@ -851,10 +907,11 @@ async def collega_importa_esercizi(tag: str, request: Request):
 async def nuovo_esercizio(tag: str, request: Request):
     form = await request.form()
     varianti = _parse_varianti_form(form)
+    extra = _parse_esercizio_extra_form(form)
     try:
         esercizi_service.create_esercizio(
             tag, nome=(form.get("nome") or "").strip(), note=(form.get("note") or "").strip(), varianti=varianti,
-            argomento=(form.get("argomento") or "").strip(),
+            argomento=(form.get("argomento") or "").strip(), **extra,
         )
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/esercizi", str(e), "error")
@@ -865,6 +922,7 @@ async def nuovo_esercizio(tag: str, request: Request):
 async def modifica_esercizio(tag: str, esercizio_id: int, request: Request):
     form = await request.form()
     varianti = _parse_varianti_form(form)
+    extra = _parse_esercizio_extra_form(form)
     appelli_coinvolti = esercizi_service.appelli_che_usano(tag, esercizio_id)
     try:
         for appello_id in appelli_coinvolti:
@@ -873,7 +931,7 @@ async def modifica_esercizio(tag: str, esercizio_id: int, request: Request):
             compiti_service.svuota_blocchi_appello(tag, appello_id)
         esercizi_service.aggiorna_esercizio(
             tag, esercizio_id, nome=(form.get("nome") or "").strip(), note=(form.get("note") or "").strip(),
-            argomento=(form.get("argomento") or "").strip(), varianti=varianti,
+            argomento=(form.get("argomento") or "").strip(), varianti=varianti, **extra,
         )
         msg = "Esercizio aggiornato"
         for appello_id in appelli_coinvolti:

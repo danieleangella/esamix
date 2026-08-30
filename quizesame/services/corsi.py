@@ -246,6 +246,42 @@ def create_appello(
         conn.close()
 
 
+def elimina_appello(tag: str, appello_id: int) -> None:
+    """Elimina un appello e tutto ciò che gli è assegnato (esercizi assegnati, blocchi,
+    compiti, eventuale raggruppamento). Rifiuta se ha già risultati registrati: in quel
+    caso andrebbero persi voti reali senza modo di recuperarli."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        appello = conn.execute("SELECT slug FROM appelli WHERE id=?", (appello_id,)).fetchone()
+        if appello is None:
+            raise ValueError(f"Appello #{appello_id} non trovato")
+        n_risultati = conn.execute(
+            "SELECT COUNT(*) c FROM risultati WHERE appello_id=?", (appello_id,)
+        ).fetchone()["c"]
+        if n_risultati:
+            raise ValueError(
+                f"Questo appello ha già {n_risultati} risultati registrati: non può essere eliminato."
+            )
+        compiti_ids = [r["id"] for r in conn.execute("SELECT id FROM compiti WHERE appello_id=?", (appello_id,))]
+        for cid in compiti_ids:
+            conn.execute("DELETE FROM compito_esercizi WHERE compito_id=?", (cid,))
+        conn.execute("DELETE FROM compiti WHERE appello_id=?", (appello_id,))
+        conn.execute("DELETE FROM blocchi WHERE appello_id=?", (appello_id,))
+        conn.execute("DELETE FROM appello_esercizi WHERE appello_id=?", (appello_id,))
+        conn.execute("DELETE FROM raggruppamento_membri WHERE appello_id=?", (appello_id,))
+        conn.execute("DELETE FROM raggruppamenti WHERE appello_id=?", (appello_id,))
+        conn.execute("DELETE FROM appelli WHERE id=?", (appello_id,))
+        slug = appello["slug"]
+        conn.commit()
+    finally:
+        conn.close()
+
+    out_dir = config.corso_dir(tag) / "output"
+    if out_dir.exists():
+        for p in out_dir.glob(f"*{slug}*"):
+            p.unlink(missing_ok=True)
+
+
 def update_appello(tag: str, appello_id: int, **fields) -> None:
     if not fields:
         return

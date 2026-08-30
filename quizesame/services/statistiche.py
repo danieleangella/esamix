@@ -85,13 +85,15 @@ def _statistiche_esercizi(tag: str, conn, risultati: list[dict]) -> list[dict]:
             continue
         soluzioni, risposte = compito["soluzioni"], r["risposte"]
         posizioni = conn.execute(
-            "SELECT ce.posizione, ce.esercizio_id, ce.risposte_mischiate, e.nome FROM compito_esercizi ce "
+            "SELECT ce.posizione, ce.esercizio_id, ce.aperta, ce.risposte_mischiate, e.nome FROM compito_esercizi ce "
             "JOIN esercizi e ON e.id = ce.esercizio_id WHERE ce.compito_id=?",
             (r["compito_id"],),
         ).fetchall()
         for pos in posizioni:
             i = pos["posizione"]
-            if i >= len(risposte) or i >= len(soluzioni):
+            # una domanda aperta non ha una lettera "corretta" con cui confrontare la
+            # risposta: non ha senso conteggiarla come esercizio sbagliato/corretto qui.
+            if pos["aperta"] or i >= len(risposte) or i >= len(soluzioni):
                 continue
             lettera_data = risposte[i].upper()
             lettera_corretta = soluzioni[i].upper()

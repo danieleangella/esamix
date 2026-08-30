@@ -26,6 +26,9 @@ class Esercizio:
     nome: Optional[str]
     note: Optional[str]
     argomento: Optional[str] = None
+    difficolta: Optional[int] = None  # 1-3 stelline, opzionale
+    soluzione: Optional[str] = None  # se non vuota, va nel foglio di riferimento
+    aperta: bool = False  # domanda aperta: nessuna risposta a scelta multipla, punteggio manuale
     varianti: list[Variante] = field(default_factory=list)
     assegnato_il: Optional[str] = None  # valorizzato solo da list_esercizi_appello
     obbligatorio: bool = False  # valorizzato solo da list_esercizi_appello
@@ -38,8 +41,9 @@ def _row_to_esercizio(conn, row, assegnato_il: Optional[str] = None, obbligatori
     ).fetchall()
     varianti = [Variante(id=v["id"], testo=v["testo"], risposte=json.loads(v["risposte_json"])) for v in varianti_rows]
     return Esercizio(
-        id=row["id"], nome=row["nome"], note=row["note"], argomento=row["argomento"], varianti=varianti,
-        assegnato_il=assegnato_il, obbligatorio=obbligatorio,
+        id=row["id"], nome=row["nome"], note=row["note"], argomento=row["argomento"],
+        difficolta=row["difficolta"], soluzione=row["soluzione"], aperta=bool(row["aperta"]),
+        varianti=varianti, assegnato_il=assegnato_il, obbligatorio=obbligatorio,
     )
 
 
@@ -68,7 +72,11 @@ def list_esercizi(tag: str) -> list[Esercizio]:
         rows = conn.execute("SELECT * FROM esercizi ORDER BY id").fetchall()
         varianti = _varianti_di(conn, [r["id"] for r in rows])
         return [
-            Esercizio(id=r["id"], nome=r["nome"], note=r["note"], argomento=r["argomento"], varianti=varianti[r["id"]])
+            Esercizio(
+                id=r["id"], nome=r["nome"], note=r["note"], argomento=r["argomento"],
+                difficolta=r["difficolta"], soluzione=r["soluzione"], aperta=bool(r["aperta"]),
+                varianti=varianti[r["id"]],
+            )
             for r in rows
         ]
     finally:
@@ -95,6 +103,17 @@ def get_esercizio(tag: str, esercizio_id: int) -> Optional[Esercizio]:
         conn.close()
 
 
+def trova_duplicati(tag: str) -> list[list[Esercizio]]:
+    """Raggruppa gli esercizi della banca del corso che hanno esattamente lo stesso testo
+    e le stesse risposte in ogni variante: gruppi con più di un esercizio sono probabili
+    doppioni (es. importati più volte), da ripulire tenendone solo uno."""
+    gruppi: dict[frozenset, list[Esercizio]] = {}
+    for e in list_esercizi(tag):
+        firma = _firma_varianti([{"testo": v.testo, "risposte": v.risposte} for v in e.varianti])
+        gruppi.setdefault(firma, []).append(e)
+    return [g for g in gruppi.values() if len(g) > 1]
+
+
 def appelli_che_usano(tag: str, esercizio_id: int) -> list[int]:
     """Appelli a cui questo esercizio della banca è assegnato: modificarne testo/varianti
     può richiedere di rigenerare i blocchi già generati su ciascuno di essi."""
@@ -110,17 +129,18 @@ def appelli_che_usano(tag: str, esercizio_id: int) -> list[int]:
 
 def aggiorna_esercizio(
     tag: str, esercizio_id: int, nome: str, note: str, varianti: list[dict], argomento: str = "",
+    difficolta: Optional[int] = None, soluzione: str = "", aperta: bool = False,
 ) -> Esercizio:
     """Sostituisce nome/note/argomento e tutte le varianti di un esercizio della banca già
     esistente. Le vecchie varianti vengono cancellate e ricreate: i loro id cambiano, quindi
     va chiamata solo dopo aver protetto/rigenerato gli appelli che lo usano (vedi
     appelli_che_usano) se hanno già blocchi di compiti generati."""
-    varianti = _valida_varianti(varianti)
+    varianti = _valida_varianti(varianti, aperta)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         cur = conn.execute(
-            "UPDATE esercizi SET nome=?, argomento=?, note=? WHERE id=?",
-            (nome or None, argomento.strip() or None, note or None, esercizio_id),
+            "UPDATE esercizi SET nome=?, argomento=?, note=?, difficolta=?, soluzione=?, aperta=? WHERE id=?",
+            (nome or None, argomento.strip() or None, note or None, difficolta, soluzione.strip() or None, aperta, esercizio_id),
         )
         if cur.rowcount == 0:
             raise ValueError(f"Esercizio #{esercizio_id} non trovato")
@@ -136,11 +156,14 @@ def aggiorna_esercizio(
     return get_esercizio(tag, esercizio_id)
 
 
-def _valida_varianti(varianti: list[dict]) -> list[dict]:
+def _valida_varianti(varianti: list[dict], aperta: bool = False) -> list[dict]:
     varianti = [v for v in varianti if v.get("testo", "").strip()]
     if not varianti:
         raise ValueError("Serve almeno una variante con un testo")
     for v in varianti:
+        if aperta:
+            v["risposte"] = []
+            continue
         risposte = [r for r in v.get("risposte", []) if r and r.strip()]
         if len(risposte) < 2:
             raise ValueError("Ogni variante richiede la risposta corretta e almeno una sbagliata")
@@ -148,15 +171,19 @@ def _valida_varianti(varianti: list[dict]) -> list[dict]:
     return varianti
 
 
-def create_esercizio(tag: str, nome: str, note: str, varianti: list[dict], argomento: str = "") -> Esercizio:
-    """varianti: [{"testo": ..., "risposte": [corretta, sbagliata1, ...]}, ...]"""
-    varianti = _valida_varianti(varianti)
+def create_esercizio(
+    tag: str, nome: str, note: str, varianti: list[dict], argomento: str = "",
+    difficolta: Optional[int] = None, soluzione: str = "", aperta: bool = False,
+) -> Esercizio:
+    """varianti: [{"testo": ..., "risposte": [corretta, sbagliata1, ...]}, ...] (risposte
+    ignorate se aperta=True: una domanda aperta non ha scelte multiple)."""
+    varianti = _valida_varianti(varianti, aperta)
 
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         cur = conn.execute(
-            "INSERT INTO esercizi (nome, argomento, note) VALUES (?, ?, ?)",
-            (nome or None, argomento.strip() or None, note or None),
+            "INSERT INTO esercizi (nome, argomento, note, difficolta, soluzione, aperta) VALUES (?,?,?,?,?,?)",
+            (nome or None, argomento.strip() or None, note or None, difficolta, soluzione.strip() or None, aperta),
         )
         esercizio_id = cur.lastrowid
         for v in varianti:
@@ -197,7 +224,9 @@ def list_esercizi_appello(tag: str, appello_id: int) -> list[Esercizio]:
         varianti = _varianti_di(conn, [r["id"] for r in rows])
         return [
             Esercizio(
-                id=r["id"], nome=r["nome"], note=r["note"], argomento=r["argomento"], varianti=varianti[r["id"]],
+                id=r["id"], nome=r["nome"], note=r["note"], argomento=r["argomento"],
+                difficolta=r["difficolta"], soluzione=r["soluzione"], aperta=bool(r["aperta"]),
+                varianti=varianti[r["id"]],
                 assegnato_il=r["data_assegnazione"], obbligatorio=bool(r["obbligatorio"]),
             )
             for r in rows
@@ -274,8 +303,12 @@ def rimuovi_da_appello(tag: str, appello_id: int, esercizio_id: int) -> None:
 def crea_e_assegna(
     tag: str, appello_id: int, nome: str, note: str, varianti: list[dict],
     obbligatorio: bool = False, argomento: str = "",
+    difficolta: Optional[int] = None, soluzione: str = "", aperta: bool = False,
 ) -> Esercizio:
-    esercizio = create_esercizio(tag, nome, note, varianti, argomento=argomento)
+    esercizio = create_esercizio(
+        tag, nome, note, varianti, argomento=argomento,
+        difficolta=difficolta, soluzione=soluzione, aperta=aperta,
+    )
     assegna_a_appello(tag, appello_id, esercizio.id, obbligatorio=obbligatorio)
     return esercizio
 
@@ -289,6 +322,7 @@ def esporta_esercizi_appello(tag: str, appello_id: int) -> dict:
         "esercizi": [
             {
                 "nome": e.nome, "argomento": e.argomento, "note": e.note, "obbligatorio": e.obbligatorio,
+                "difficolta": e.difficolta, "soluzione": e.soluzione, "aperta": e.aperta,
                 "varianti": [{"testo": v.testo, "risposte": list(v.risposte)} for v in e.varianti],
             }
             for e in esercizi
@@ -296,19 +330,50 @@ def esporta_esercizi_appello(tag: str, appello_id: int) -> dict:
     }
 
 
-def importa_json(tag: str, appello_id: int, dati: dict) -> int:
-    """Importa gli esercizi esportati con esporta_esercizi_appello (da un altro corso, o
-    condivisi da un collega): li crea nella banca di questo corso e li assegna subito a
-    questo appello."""
-    esercizi = dati.get("esercizi")
-    if not isinstance(esercizi, list):
+def _firma_varianti(varianti: list[dict]) -> frozenset:
+    """Un esercizio è considerato identico a un altro se hanno lo stesso insieme di
+    varianti (stesso testo e stesse risposte in ciascuna, indipendentemente dall'ordine):
+    usata per segnalare i doppioni prima di importare, non per bloccare l'importazione —
+    la decisione se duplicare comunque resta al docente."""
+    return frozenset((v.get("testo", "").strip(), tuple(v.get("risposte") or [])) for v in varianti)
+
+
+def anteprima_importa_json(tag: str, dati: dict) -> list[dict]:
+    """Per ogni esercizio del file da importare, controlla se è identico (stesso testo e
+    stesse risposte in ogni variante) a uno già presente nella banca del corso: prepara
+    l'elenco mostrato per la conferma prima di creare davvero qualcosa."""
+    esercizi_input = dati.get("esercizi")
+    if not isinstance(esercizi_input, list):
         raise ValueError("File non valido: manca la lista 'esercizi'")
+    esistenti = list_esercizi(tag)
+    firme_esistenti = {
+        _firma_varianti([{"testo": v.testo, "risposte": v.risposte} for v in e.varianti]): e
+        for e in esistenti
+    }
+    risultato = []
+    for e in esercizi_input:
+        varianti = e.get("varianti") or []
+        duplicato = firme_esistenti.get(_firma_varianti(varianti))
+        risultato.append({
+            "nome": e.get("nome") or "", "argomento": e.get("argomento") or "", "note": e.get("note") or "",
+            "obbligatorio": bool(e.get("obbligatorio")), "difficolta": e.get("difficolta"),
+            "soluzione": e.get("soluzione") or "", "aperta": bool(e.get("aperta")), "varianti": varianti,
+            "duplicato_di": (duplicato.nome or f"#{duplicato.id}") if duplicato else None,
+        })
+    return risultato
+
+
+def importa_json(tag: str, appello_id: int, esercizi: list[dict]) -> int:
+    """Crea nella banca di questo corso e assegna subito all'appello gli esercizi scelti
+    dal docente nella pagina di conferma (vedi anteprima_importa_json): a differenza delle
+    versioni precedenti non importa più l'intero file alla cieca."""
     n = 0
     for e in esercizi:
         crea_e_assegna(
             tag, appello_id, nome=e.get("nome") or "", note=e.get("note") or "",
             varianti=e.get("varianti") or [], obbligatorio=bool(e.get("obbligatorio")),
-            argomento=e.get("argomento") or "",
+            argomento=e.get("argomento") or "", difficolta=e.get("difficolta"),
+            soluzione=e.get("soluzione") or "", aperta=bool(e.get("aperta")),
         )
         n += 1
     return n

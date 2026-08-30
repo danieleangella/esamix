@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Importa esercizi · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#creazione">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Importa esercizi</span>
+{% endblock %}
+{% block content %}
+<h1>Importa esercizi da file</h1>
+<p class="muted">
+  Scegli quali esercizi importare (verranno creati nella banca del corso e assegnati a questo appello).
+  Quelli segnalati come già presenti hanno lo stesso testo e le stesse risposte di un esercizio esistente:
+  di default non vengono re-importati, ma puoi comunque spuntarli per creare un doppione.
+</p>
+
+<form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/importa-json/conferma">
+  <textarea name="dati_json" style="display:none">{{ dati_json }}</textarea>
+
+  <div class="card">
+    {% for c in candidati %}
+    <div style="padding:0.75rem 0; {% if not loop.first %}border-top:1px solid var(--border);{% endif %}">
+      <label style="display:flex; align-items:flex-start; gap:0.6rem; cursor:pointer">
+        <input type="checkbox" name="importa_idx" value="{{ loop.index0 }}" style="width:auto; margin-top:0.25rem"
+               {% if not c.duplicato_di %}checked{% endif %}>
+        <span>
+          <strong>{{ c.nome or ('Esercizio ' ~ loop.index) }}</strong>
+          {% if c.argomento %}<span class="muted">— {{ c.argomento }}</span>{% endif %}
+          {% if c.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
+          <br>
+          <span class="muted">{{ c.varianti|length }} variante/i</span>
+          {% if c.duplicato_di %}
+          <br><span class="badge badge-warn">esiste già nella banca del corso, come "{{ c.duplicato_di }}"</span>
+          {% endif %}
+          <br>
+          <span class="muted" style="white-space:pre-wrap">{{ (c.varianti[0].testo if c.varianti else '')[:150] }}{% if c.varianti and c.varianti[0].testo|length > 150 %}…{% endif %}</span>
+        </span>
+      </label>
+    </div>
+    {% endfor %}
+  </div>
+
+  <button type="submit">Importa selezionati</button>
+  <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#creazione" style="margin-left:1rem">Annulla</a>
+</form>
+{% endblock %}

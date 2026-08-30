@@ -159,12 +159,16 @@ ADDITIVE_COLUMNS = {
     ],
     "esercizi": [
         ("argomento", "TEXT"),
+        ("difficolta", "INTEGER"),
+        ("soluzione", "TEXT"),
+        ("aperta", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
     "compiti": [
         ("blocco_id", "INTEGER REFERENCES blocchi(id)"),
     ],
     "compito_esercizi": [
         ("risposte_mischiate", "TEXT"),
+        ("aperta", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
     "appelli": [
         ("orale_data", "TEXT"),

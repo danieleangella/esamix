@@ -42,6 +42,10 @@
     <tr>
       <td>{{ r.esercizio_nome }}</td>
       <td>{{ 'sì' if r.obbligatorio else '-' }}</td>
+      {% if r.aperta %}
+      <td colspan="2" class="muted">domanda aperta: vedi punteggio da assegnare sotto</td>
+      <td><span class="badge badge-info">domanda aperta</span></td>
+      {% else %}
       <td>{{ r.lettera_data }}</td>
       <td>{{ r.lettera_corretta }}</td>
       <td>
@@ -49,6 +53,7 @@
         {% elif r.corretta %}<span class="badge badge-ok">corretta</span>
         {% else %}<span class="badge badge-warn">sbagliata</span>{% endif %}
       </td>
+      {% endif %}
     </tr>
     {% endfor %}
   </table>
@@ -78,6 +83,22 @@
         <input type="number" class="campo-punteggio-obbligatorio" name="punteggio_{{ r.posizione }}"
                min="{{ corso.risposta_sbagliata }}" max="{{ corso.risposta_corretta }}"
                value="{{ punteggi_proposti.get(r.posizione, corso.risposta_corretta) }}">
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if v.domande_aperte %}
+    <h2 style="margin-top:1.5rem">Punteggio domande aperte</h2>
+    <p class="muted">Nessuna risposta a scelta multipla: assegna un punteggio in base a quanto scritto sul
+      compito, tra {{ corso.risposta_sbagliata }} e {{ corso.risposta_corretta }}.</p>
+    {% for r in v.domande_aperte %}
+    <div class="form-grid" style="margin-top:0.5rem">
+      <div>
+        <label>{{ r.esercizio_nome }}</label>
+        <input type="number" class="campo-punteggio-aperta" name="punteggio_{{ r.posizione }}" required
+               min="{{ corso.risposta_sbagliata }}" max="{{ corso.risposta_corretta }}"
+               value="{{ punteggi_proposti.get(r.posizione, '') }}">
       </div>
     </div>
     {% endfor %}
@@ -157,22 +178,28 @@
   }
   sincronizzaCheckbox();
 
-  var campiPunteggio = document.querySelectorAll(".campo-punteggio-obbligatorio");
-  if (!campiPunteggio.length) return;
+  var campiObbligatorio = document.querySelectorAll(".campo-punteggio-obbligatorio");
+  var campiAperta = document.querySelectorAll(".campo-punteggio-aperta");
+  if (!campiObbligatorio.length && !campiAperta.length) return;
   // voto_base ha già contato ogni obbligatorio "da valutare" come risposta corretta
-  // (dato che la lettera scelta era corretta): la parte fissa del voto è quella meno
-  // il contributo di quelle posizioni, a cui si riaggiungono i punteggi scelti qui.
-  var baseFissa = {{ v.voto_base }} - campiPunteggio.length * {{ corso.risposta_corretta }};
+  // (lettera scelta corretta) e ogni domanda aperta come risposta vuota (nessuna lettera
+  // possibile): la parte fissa del voto è quella meno il contributo di quelle posizioni,
+  // a cui si riaggiungono i punteggi assegnati qui.
+  var baseFissa = {{ v.voto_base }}
+    - campiObbligatorio.length * {{ corso.risposta_corretta }}
+    - campiAperta.length * {{ corso.risposta_vuota }};
   var votoModificatoAMano = false;
   votoFinale.addEventListener("input", function () { votoModificatoAMano = true; });
   function ricalcola() {
     if (votoModificatoAMano) return;
     var somma = baseFissa;
-    campiPunteggio.forEach(function (input) { somma += parseInt(input.value, 10) || 0; });
+    campiObbligatorio.forEach(function (input) { somma += parseInt(input.value, 10) || 0; });
+    campiAperta.forEach(function (input) { somma += parseInt(input.value, 10) || 0; });
     votoFinale.value = somma;
     aggiornaStatoOrale();
   }
-  campiPunteggio.forEach(function (input) { input.addEventListener("input", ricalcola); });
+  campiObbligatorio.forEach(function (input) { input.addEventListener("input", ricalcola); });
+  campiAperta.forEach(function (input) { input.addEventListener("input", ricalcola); });
 })();
 </script>
 {% endblock %}

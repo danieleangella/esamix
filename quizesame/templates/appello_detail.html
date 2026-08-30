@@ -40,6 +40,15 @@
     </form>
   </div>
 
+  <div class="card">
+    <h2>Elimina appello</h2>
+    <p class="muted">Possibile solo se non ha già risultati registrati.</p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/elimina"
+          onsubmit="return confirm('Eliminare definitivamente l\'appello {{ appello.nome }} (esercizi assegnati, blocchi e compiti compresi)?');">
+      <button type="submit" class="danger">Elimina questo appello</button>
+    </form>
+  </div>
+
   {% if raggruppamento %}
   <div class="card">
     <h2>Raggruppamento</h2>
@@ -61,7 +70,7 @@
   <h2>Esercizi assegnati ({{ esercizi_assegnati|length }})</h2>
   {% if esercizi_assegnati %}
   <table>
-    <tr><th></th><th>Nome</th><th>Varianti</th><th>Assegnato il</th><th>Obbligatorio</th><th></th></tr>
+    <tr><th></th><th>Nome</th><th>Varianti</th><th>Obbligatorio</th><th></th></tr>
     {% for e in esercizi_assegnati %}
     <tr>
       <td style="white-space:nowrap">
@@ -72,21 +81,52 @@
           <button type="submit" class="secondary" {% if loop.last %}disabled{% endif %} title="Sposta giù">&darr;</button>
         </form>
       </td>
-      <td>{{ e.nome or ('#' ~ e.id) }}</td>
-      <td>{{ e.varianti|length }}</td>
-      <td class="muted">{{ e.assegnato_il }}</td>
       <td>
+        <button type="button" class="link-simile btn-anteprima-assegnato" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button>
+        {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
+        {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
+      </td>
+      <td>{{ e.varianti|length }}</td>
+      <td>
+        {% if e.aperta %}
+        <span class="muted">n/d (domanda aperta)</span>
+        {% else %}
         <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/obbligatorio">
           <input type="hidden" name="obbligatorio" value="{{ '' if e.obbligatorio else 'on' }}">
           <button type="submit" class="{{ 'secondary' if not e.obbligatorio else '' }}">
             {{ 'sì (consegna e svolgimento richiesti)' if e.obbligatorio else 'no' }}
           </button>
         </form>
+        {% endif %}
       </td>
       <td>
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/rimuovi">
           <button type="submit" class="secondary">Rimuovi</button>
         </form>
+      </td>
+    </tr>
+    <tr class="riga-anteprima-assegnato" data-esercizio="{{ e.id }}" style="display:none">
+      <td colspan="5">
+        {% for v in e.varianti %}
+        <div class="card" style="background:var(--bg); margin-bottom:0.75rem">
+          <strong>Variante {{ loop.index }}</strong>
+          <p style="white-space:pre-wrap; margin:0.5rem 0">{{ v.testo }}</p>
+          {% if e.aperta %}
+          <p class="muted" style="margin:0.2rem 0">Domanda aperta: nessuna risposta a scelta multipla.</p>
+          {% else %}
+          <p style="margin:0.2rem 0"><span class="badge badge-ok">Corretta</span> {{ v.risposte[0] }}</p>
+          {% for r in v.risposte[1:] %}
+          <p style="margin:0.2rem 0"><span class="badge badge-err">x</span> {{ r }}</p>
+          {% endfor %}
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% if e.soluzione %}
+        <div class="card" style="background:var(--bg)">
+          <strong>Soluzione/suggerimento</strong>
+          <p style="white-space:pre-wrap; margin:0.5rem 0 0">{{ e.soluzione }}</p>
+        </div>
+        {% endif %}
       </td>
     </tr>
     {% endfor %}
@@ -98,6 +138,12 @@
   {% else %}
   <p class="muted">Nessun esercizio ancora assegnato a questo appello.</p>
   {% endif %}
+
+  <details style="margin-top:0.75rem">
+    <summary>Crea un nuovo esercizio</summary>
+    {% set action = "/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/esercizi/nuovo" %}
+    {% include "_esercizio_form.html" %}
+  </details>
 
   {% if esercizi_disponibili %}
   <details style="margin-top:0.75rem">
@@ -118,10 +164,40 @@
         {% for e in esercizi_disponibili %}
         <tr data-nome="{{ (e.nome or '') | lower }}" data-testo="{{ (e.varianti[0].testo if e.varianti else '') | lower }}" data-argomento="{{ e.argomento or '' }}">
           <td><input type="checkbox" name="esercizio_ids" value="{{ e.id }}" style="width:auto"></td>
-          <td>{{ e.nome or ('#' ~ e.id) }}</td>
+          <td>
+            {{ e.nome or ('#' ~ e.id) }}
+            {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
+            {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
+          </td>
           <td>{{ e.argomento or '-' }}</td>
           <td>{{ e.varianti|length }}</td>
-          <td class="muted">{{ (e.varianti[0].testo if e.varianti else '')[:80] }}&hellip;</td>
+          <td class="muted">
+            <button type="button" class="link-simile btn-anteprima-disponibile" data-esercizio="{{ e.id }}">{{ (e.varianti[0].testo if e.varianti else '')[:80] }}&hellip;</button>
+          </td>
+        </tr>
+        <tr class="riga-anteprima-disponibile" data-esercizio="{{ e.id }}" style="display:none">
+          <td colspan="5">
+            {% for v in e.varianti %}
+            <div class="card" style="background:var(--bg); margin-bottom:0.75rem">
+              <strong>Variante {{ loop.index }}</strong>
+              <p style="white-space:pre-wrap; margin:0.5rem 0">{{ v.testo }}</p>
+              {% if e.aperta %}
+              <p class="muted" style="margin:0.2rem 0">Domanda aperta: nessuna risposta a scelta multipla.</p>
+              {% else %}
+              <p style="margin:0.2rem 0"><span class="badge badge-ok">Corretta</span> {{ v.risposte[0] }}</p>
+              {% for r in v.risposte[1:] %}
+              <p style="margin:0.2rem 0"><span class="badge badge-err">x</span> {{ r }}</p>
+              {% endfor %}
+              {% endif %}
+            </div>
+            {% endfor %}
+            {% if e.soluzione %}
+            <div class="card" style="background:var(--bg)">
+              <strong>Soluzione/suggerimento</strong>
+              <p style="white-space:pre-wrap; margin:0.5rem 0 0">{{ e.soluzione }}</p>
+            </div>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </table>
@@ -145,31 +221,24 @@
     }
     ricerca.addEventListener("input", applica);
     argomento.addEventListener("change", applica);
+
+    document.querySelectorAll(".btn-anteprima-disponibile").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var riga = document.querySelector('.riga-anteprima-disponibile[data-esercizio="' + btn.dataset.esercizio + '"]');
+        var giaAperta = riga.style.display !== "none";
+        riga.style.display = giaAperta ? "none" : "";
+        if (!giaAperta) renderizzaLatex(riga);
+      });
+    });
   })();
   </script>
   {% endif %}
-
-  <details style="margin-top:0.75rem">
-    <summary>Crea un nuovo esercizio (verrà salvato nella banca del corso e assegnato qui)</summary>
-    {% set action = "/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/esercizi/nuovo" %}
-    {% include "_esercizio_form.html" %}
-  </details>
-
-  <details style="margin-top:0.75rem">
-    <summary>Importa esercizi da una cartella nel vecchio formato (legacy)</summary>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/importa-legacy">
-      <label>Percorso della cartella esercizi (con testi.py)</label>
-      <input name="cartella" placeholder="/percorso/assoluto/alla/cartella/esercizi" required>
-      <button type="submit">Importa</button>
-    </form>
-  </details>
 
   {% if esercizi_assegnati %}
   <details style="margin-top:0.75rem">
     <summary>Esporta gli esercizi di questo appello</summary>
     <p class="muted" style="margin-top:1rem">
-      Scarica un file con gli esercizi assegnati a questo appello (testo e varianti):
-      un collega può importarlo nel proprio corso con "Importa esercizi da un file" qui sotto.
+      Scarica un file con gli esercizi assegnati a questo appello (testo e varianti).
     </p>
     <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/esporta">Scarica esercizi.json</a>
   </details>
@@ -189,7 +258,7 @@
 (function () {
   var blocchiEsistono = {{ 'true' if blocchi else 'false' }};
   if (!blocchiEsistono) return;
-  var azioniSensibili = ["/obbligatorio", "/rimuovi", "/esercizi/assegna", "/esercizi/nuovo", "/importa-legacy", "/importa-json"];
+  var azioniSensibili = ["/obbligatorio", "/rimuovi", "/esercizi/assegna", "/esercizi/nuovo", "/importa-json"];
   document.querySelectorAll("form").forEach(function (form) {
     var action = form.getAttribute("action") || "";
     if (!azioniSensibili.some(function (suffix) { return action.endsWith(suffix); })) return;
@@ -202,6 +271,16 @@
     });
   });
 })();
+</script>
+<script>
+document.querySelectorAll(".btn-anteprima-assegnato").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var riga = document.querySelector('.riga-anteprima-assegnato[data-esercizio="' + btn.dataset.esercizio + '"]');
+    var giaAperta = riga.style.display !== "none";
+    riga.style.display = giaAperta ? "none" : "";
+    if (!giaAperta) renderizzaLatex(riga);
+  });
+});
 </script>
 
 <div class="card">
@@ -248,8 +327,11 @@
   </p>
   {% endif %}
   {% if blocchi %}
+  {% if blocchi|length > 1 %}
+  <p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/tutti.pdf">Scarica tutti i blocchi insieme in un unico PDF</a></p>
+  {% endif %}
   <table>
-    <tr><th>Blocco</th><th>Studenti</th><th>Creato il</th><th>Testo</th><th>Griglia soluzioni</th></tr>
+    <tr><th>Blocco</th><th>Studenti</th><th>Creato il</th><th>Testo</th><th>Griglia soluzioni</th><th></th></tr>
     {% for b in blocchi %}
     <tr>
       <td>{{ b.numero }}</td>
@@ -263,6 +345,12 @@
         <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/griglia.html">.html</a> ·
         <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/griglia.tex">.tex</a>
         {% if b.griglia_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/griglia.pdf">.pdf</a>{% endif %}
+      </td>
+      <td>
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/elimina"
+              onsubmit="return confirm('Eliminare il blocco {{ b.numero }} ({{ b.numero_studenti }} compiti)? Possibile solo se non ha già risultati registrati.');">
+          <button type="submit" class="secondary">Elimina</button>
+        </form>
       </td>
     </tr>
     {% endfor %}
