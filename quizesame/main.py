@@ -22,6 +22,7 @@ from quizesame.services import verbalizzazione as verbalizzazione_service
 from quizesame.services import migrazione as migrazione_service
 from quizesame.services import statistiche as statistiche_service
 from quizesame.services import app_config as app_config_service
+from quizesame.services import esportazione as esportazione_service
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
@@ -867,6 +868,22 @@ def scarica_risultati_pdf(tag: str, appello_id: int):
     if not compilazione.ok:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error", anchor="valutazione")
     return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esporta-voti")
+async def esporta_voti(tag: str, appello_id: int, file: UploadFile = File(...)):
+    contenuto = await file.read()
+    try:
+        dati, n_compilati = esportazione_service.compila_export_voti(tag, appello_id, contenuto)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+    return Response(
+        dati, media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{file.filename}"',
+            "X-Studenti-Compilati": str(n_compilati),
+        },
+    )
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/verbalizza/{matricola}")

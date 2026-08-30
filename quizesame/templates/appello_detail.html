@@ -486,6 +486,20 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
       <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.pdf">.pdf</a>
     </p>
   </div>
+
+  <details class="card">
+    <summary>Esporta voti per la segreteria</summary>
+    <p class="muted" style="margin-top:1rem">
+      Carica il file "Lista Studenti Esame" scaricato dalla segreteria: per ogni studente con una
+      valutazione già completata e confermata viene compilata la colonna Esito (voto, ASS, RIT o 0 per
+      insufficiente) e la colonna Domande d'esame (testo salvato nelle impostazioni del corso); il file
+      compilato viene subito riproposto per il download, senza salvare nulla su disco.
+    </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esporta-voti" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".csv" required>
+      <button type="submit">Compila e scarica</button>
+    </form>
+  </details>
   <script>
   document.querySelectorAll(".btn-dettaglio-risultato").forEach(function (btn) {
     btn.addEventListener("click", function () {
