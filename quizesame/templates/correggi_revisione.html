@@ -26,7 +26,7 @@
   <div class="form-grid">
     <div>
       <label class="muted" style="font-size:0.85rem">Risposte inserite (modificabile)</label>
-      <input name="risposte" value="{{ v.risposte }}" autocomplete="off" style="font-family:monospace; font-size:1.4rem; letter-spacing:0.3em">
+      <input name="risposte" id="input-risposte-riepilogo" value="{{ v.risposte }}" autocomplete="off" style="font-family:monospace; font-size:1.4rem; letter-spacing:0.1em">
       <button type="submit" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" formnovalidate class="secondary" style="margin-top:0.4rem">Ricalcola con queste risposte</button>
     </div>
     <div>
@@ -37,17 +37,19 @@
   <p class="muted" style="margin-top:1rem">Voto calcolato dalla griglia di risposte: <strong>{{ v.voto_base }}</strong></p>
 
   <table>
-    <tr><th>Esercizio</th><th>Obbligatorio</th><th>Risposta data</th><th>Risposta corretta</th><th>Esito</th></tr>
+    <tr><th>Esercizio</th><th>Obbligatorio</th><th>Risposta data / corretta</th><th>Esito</th></tr>
     {% for r in v.righe %}
     <tr>
-      <td>{{ r.esercizio_nome }}</td>
+      <td>{{ r.posizione + 1 }}. {{ r.esercizio_nome }}</td>
       <td>{{ 'sì' if r.obbligatorio else '-' }}</td>
       {% if r.aperta %}
-      <td colspan="2" class="muted">domanda aperta: vedi punteggio da assegnare sotto</td>
+      <td class="muted">domanda aperta: vedi punteggio da assegnare sotto</td>
       <td><span class="badge badge-info">domanda aperta</span></td>
       {% else %}
-      <td>{{ r.lettera_data }}</td>
-      <td>{{ r.lettera_corretta }}</td>
+      <td style="text-align:center; font-family:monospace; font-size:1.1rem; line-height:1.5">
+        <div>{{ r.lettera_data }}</div>
+        <div style="color:var(--ok-text); font-weight:bold">{{ r.lettera_corretta }}</div>
+      </td>
       <td>
         {% if not r.svolta %}<span class="muted">non data</span>
         {% elif r.corretta %}<span class="badge badge-ok">corretta</span>
@@ -77,13 +79,11 @@
     <p class="muted">Risposta multiple-choice corretta: giudica lo svolgimento scritto e assegna
       un punteggio tra {{ corso.risposta_sbagliata }} (come sbagliato) e {{ corso.risposta_corretta }} (come corretto).</p>
     {% for r in v.da_valutare %}
-    <div class="form-grid" style="margin-top:0.5rem">
-      <div>
-        <label>{{ r.esercizio_nome }}</label>
-        <input type="number" class="campo-punteggio-obbligatorio" name="punteggio_{{ r.posizione }}"
-               min="{{ corso.risposta_sbagliata }}" max="{{ corso.risposta_corretta }}"
-               value="{{ punteggi_proposti.get(r.posizione, corso.risposta_corretta) }}">
-      </div>
+    <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.5rem">
+      <label style="flex:1">{{ r.posizione + 1 }}. {{ r.esercizio_nome }}</label>
+      <input type="number" class="campo-punteggio-obbligatorio" name="punteggio_{{ r.posizione }}"
+             min="{{ corso.risposta_sbagliata }}" max="{{ corso.risposta_corretta }}"
+             value="{{ punteggi_proposti.get(r.posizione, corso.risposta_corretta) }}" style="width:5rem">
     </div>
     {% endfor %}
     {% endif %}
@@ -93,18 +93,17 @@
     <p class="muted">Nessuna risposta a scelta multipla: assegna un punteggio in base a quanto scritto sul
       compito, tra {{ corso.risposta_sbagliata }} e {{ corso.punteggio_max_aperta }}.</p>
     {% for r in v.domande_aperte %}
-    <div class="form-grid" style="margin-top:0.5rem">
-      <div>
-        <label>{{ r.esercizio_nome }}</label>
-        <input type="number" class="campo-punteggio-aperta" name="punteggio_{{ r.posizione }}" required
-               min="{{ corso.risposta_sbagliata }}" max="{{ corso.punteggio_max_aperta }}"
-               value="{{ punteggi_proposti.get(r.posizione, '') }}">
-      </div>
+    <div style="display:flex; align-items:center; gap:0.6rem; margin-top:0.5rem">
+      <label style="flex:1">{{ r.posizione + 1 }}. {{ r.esercizio_nome }}</label>
+      <input type="number" class="campo-punteggio-aperta" name="punteggio_{{ r.posizione }}" required
+             min="{{ corso.risposta_sbagliata }}" max="{{ corso.punteggio_max_aperta }}"
+             value="{{ punteggi_proposti.get(r.posizione, '') }}" style="width:5rem">
     </div>
     {% endfor %}
     {% endif %}
 
-    <div class="form-grid" style="margin-top:1rem">
+    <hr style="margin:1.5rem 0; border:none; border-top:1px solid var(--border)">
+    <div class="form-grid">
       <div><label>Voto finale</label><input type="number" name="voto_finale" id="voto-finale" value="{{ voto_proposto }}"></div>
     </div>
 
@@ -143,6 +142,7 @@
 </div>
 <script>
 (function () {
+  formattaRisposte(document.getElementById("input-risposte-riepilogo"));
   var votoFinale = document.getElementById("voto-finale");
   var checkboxOrale = document.getElementById("checkbox-richiedi-orale");
   var boxMotivazione = document.getElementById("box-motivazione-orale");

@@ -21,7 +21,7 @@
     {% for a in appelli %}
     {% set s = statistiche[a.id] %}
     <tr>
-      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}">{{ a.nome }}</a></td>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}" style="text-decoration:none; font-weight:500">{{ a.nome }}</a></td>
       <td>{{ a.tipo }}</td>
       <td>{{ a.data or '-' }}</td>
       <td>

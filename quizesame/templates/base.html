@@ -75,6 +75,19 @@
       if (ev.target !== input) suggerimentiEl.style.display = "none";
     });
   }
+
+  // Stringa risposte del compito: sempre maiuscola e raggruppata ogni 5 caratteri per
+  // leggerla più facilmente (es. "ABCXB ADCEB A"), ma il valore inviato al server resta
+  // sempre senza spazi (vedi anche lo strip lato server, per sicurezza).
+  function formattaRisposte(input) {
+    function aggiorna() {
+      var pulita = input.value.toUpperCase().replace(/\s+/g, "");
+      var gruppi = pulita.match(/.{1,5}/g);
+      input.value = gruppi ? gruppi.join(" ") : "";
+    }
+    input.addEventListener("input", aggiorna);
+    aggiorna();
+  }
   </script>
 </head>
 <body>

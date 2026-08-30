@@ -4,7 +4,7 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <span class="current">{{ appello.nome }}</span>
 {% endblock %}
 {% block content %}
-<h1>{{ appello.nome }} <span class="muted">({{ appello.tipo }})</span></h1>
+<h1>{{ corso.nome }} - {{ appello.nome }} <span class="muted">({{ appello.tipo }})</span></h1>
 
 <div class="tabs" id="tabs-appello">
   <a href="#impostazioni" data-tab="impostazioni">Impostazioni</a>
@@ -386,12 +386,13 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
           <input name="codice" id="input-codice" autocomplete="off" required>
           <div id="suggerimenti-codici" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
         </div>
-        <div><label>Stringa risposte</label><input name="risposte" autocomplete="off" required placeholder="es. ABCXBADCEBA"></div>
+        <div><label>Stringa risposte</label><input name="risposte" id="input-risposte" autocomplete="off" required placeholder="es. ABCXB ADCEB A" style="font-family:monospace"></div>
       </div>
       <button type="submit">Vai al riepilogo</button>
     </form>
     <script>
     (function () {
+      formattaRisposte(document.getElementById("input-risposte"));
       var inputMatricola = document.getElementById("input-matricola");
       var nomeRisolto = document.getElementById("matricola-nome-risolto");
       creaAutocomplete(

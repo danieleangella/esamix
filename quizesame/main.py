@@ -684,6 +684,7 @@ def correggi(
     request: Request, tag: str, appello_id: int, matricola: str = Form(...), codice: str = Form(...),
     risposte: str = Form(...), modifica: str = Form(""),
 ):
+    risposte = risposte.strip().replace(" ", "").upper()
     try:
         valutazione = correzione_service.valuta_preliminare(tag, appello_id, matricola, codice, risposte)
     except Exception as e:
@@ -696,7 +697,7 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
     form = await request.form()
     matricola = form.get("matricola") or ""
     codice = form.get("codice") or ""
-    risposte = form.get("risposte") or ""
+    risposte = (form.get("risposte") or "").strip().replace(" ", "").upper()
     azione = form.get("azione") or "salva"
     sospendi_valutazione = bool(form.get("sospendi_valutazione"))
     orale_motivazione = (form.get("orale_motivazione") or "").strip()
