@@ -24,5 +24,9 @@
 <p class="muted" style="margin-top:0.5rem">
   {% if appelli_assegnato %}Assegnato a: {{ appelli_assegnato | map(attribute='nome') | join(', ') }}
   {% else %}Non ancora assegnato a nessun appello.{% endif %}
+  {% if utilizzo_altrove %}
+  · anche in altri corsi:
+  {% for u in utilizzo_altrove %}{{ u.corso_nome }} ({{ u.appello_nome }}){% if not loop.last %}, {% endif %}{% endfor %}
+  {% endif %}
 </p>
 {% endif %}

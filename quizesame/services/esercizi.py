@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from quizesame import config, db
+from quizesame.services import corsi as corsi_service
 
 
 @dataclass
@@ -125,6 +126,32 @@ def appelli_che_usano(tag: str, esercizio_id: int) -> list[int]:
         return [r["appello_id"] for r in rows]
     finally:
         conn.close()
+
+
+def utilizzo_in_altri_corsi(tag: str, esercizio_id: int) -> list[dict]:
+    """Un esercizio importato da un altro corso (o esportato e riusato altrove) diventa
+    una copia indipendente, con un id nuovo, nel database del corso di destinazione: non
+    esiste un id condiviso tra le copie per risalire direttamente a dove altro è usato.
+    Cerca quindi, in tutti gli altri corsi, esercizi con lo stesso testo e le stesse
+    risposte in ogni variante (stessa firma usata per i doppioni) e ritorna a quali
+    appelli di quei corsi sono assegnati, per segnalarlo in anteprima."""
+    esercizio = get_esercizio(tag, esercizio_id)
+    if esercizio is None:
+        return []
+    firma_target = _firma_varianti([{"testo": v.testo, "risposte": v.risposte} for v in esercizio.varianti])
+    risultati = []
+    for corso in corsi_service.list_corsi():
+        if corso.tag == tag:
+            continue
+        for e in list_esercizi(corso.tag):
+            firma = _firma_varianti([{"testo": v.testo, "risposte": v.risposte} for v in e.varianti])
+            if firma != firma_target:
+                continue
+            for appello_id in appelli_che_usano(corso.tag, e.id):
+                appello = corsi_service.get_appello(corso.tag, appello_id)
+                if appello:
+                    risultati.append({"corso_nome": corso.nome, "corso_tag": corso.tag, "appello_nome": appello.nome})
+    return risultati
 
 
 def aggiorna_esercizio(

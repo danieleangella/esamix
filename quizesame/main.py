@@ -986,8 +986,9 @@ def anteprima_esercizio(request: Request, tag: str, esercizio_id: int):
             corsi_service.get_appello(tag, aid) for aid in esercizi_service.appelli_che_usano(tag, esercizio_id)
         ) if a is not None
     ]
+    utilizzo_altrove = esercizi_service.utilizzo_in_altri_corsi(tag, esercizio_id)
     return templates.TemplateResponse(request, "_esercizio_anteprima.html", {
-        "e": esercizio, "appelli_assegnato": appelli_assegnato,
+        "e": esercizio, "appelli_assegnato": appelli_assegnato, "utilizzo_altrove": utilizzo_altrove,
     })
 
 

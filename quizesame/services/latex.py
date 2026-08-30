@@ -154,19 +154,29 @@ def regole(ctx: LatexContext) -> str:
     )
 
 
-def tex_esercizio(exx) -> str:
+def _prefisso_obbligatorio(ctx: LatexContext, obbligatorio: bool) -> str:
+    """La frase sugli esercizi obbligatori (impostazione del corso) va anteposta, in
+    grassetto, al testo di ogni esercizio marcato obbligatorio: non solo ricordata una
+    volta nel riquadro delle regole generali."""
+    if not obbligatorio:
+        return ""
+    frase = _text_consegna(ctx).strip()
+    return f"\\textbf{{{frase}}} " if frase else ""
+
+
+def tex_esercizio(ctx: LatexContext, exx, obbligatorio: bool = False) -> str:
     testo, risposte = exx[0], exx[1]
-    out = "\n\\begin{ex}\n" + testo + "\n\\begin{description}\n"
+    out = "\n\\begin{ex}\n" + _prefisso_obbligatorio(ctx, obbligatorio) + testo + "\n\\begin{description}\n"
     for sol in risposte:
         out += f"\\item[{LETTERE[risposte.index(sol)]}] {sol}\n"
     out += "\\end{description}\n\\end{ex}\n\n"
     return out
 
 
-def tex_esercizio_aperto(testo: str) -> str:
+def tex_esercizio_aperto(ctx: LatexContext, testo: str, obbligatorio: bool = False) -> str:
     """Domanda aperta: nessuna lista di risposte a scelta multipla, solo spazio bianco in
     cui lo studente scrive la risposta a mano."""
-    out = "\n\\begin{ex}\n" + testo + "\n\\end{ex}\n\n"
+    out = "\n\\begin{ex}\n" + _prefisso_obbligatorio(ctx, obbligatorio) + testo + "\n\\end{ex}\n\n"
     out += "\\vspace{3cm}\n"
     return out
 
@@ -219,36 +229,41 @@ def mischia(esercizi_struct: list[dict]) -> list[dict]:
 
 
 def crea_file_riferimento(ctx: LatexContext, esercizi_struct: list[dict]) -> str:
-    """Foglio di riferimento (testo + risposta corretta sempre "A" per ogni variante di
-    ogni esercizio): pensato per essere pubblicato online, comune a tutti i blocchi di
-    compiti prodotti per questo appello, e generato una sola volta."""
+    """Foglio di riferimento (risposta corretta sempre "A"): pensato per essere
+    pubblicato online, comune a tutti i blocchi di compiti prodotti per questo appello, e
+    generato una sola volta. Non elenca le varianti esercizio per esercizio, ma le
+    raggruppa in "compiti" completi (Compito A con la prima variante di ognuno, Compito B
+    con la seconda, ...): tanti quante il numero massimo di varianti tra gli esercizi
+    assegnati, ripetendo ciclicamente le varianti di chi ne ha di meno."""
+    n_varianti_max = max((len(es["varianti"]) for es in esercizi_struct), default=0)
     tex = BEGIN_DOCUMENT
     tex += intestazione_breve(ctx)
     tex += (
         "\\begin{center}\n"
-        "{\\small\\it (foglio di riferimento: tutte le varianti di ogni esercizio, la risposta corretta \\`e sempre \"A\")}\n"
+        "{\\small\\it (foglio di riferimento: un compito completo per ogni combinazione "
+        "di varianti degli esercizi, la risposta corretta \\`e sempre \"A\")}\n"
         "\\end{center}\n\\vspace{1cm}\n\n"
     )
-    tex += "\n\\begin{multicols}{2}\n\\setcounter{ex}{0}\n"
-    for es in esercizi_struct:
-        varianti = es["varianti"]
-        for i, variante in enumerate(varianti):
+    for indice_compito in range(n_varianti_max):
+        if indice_compito > 0:
+            tex += "\\clearpage\n\n"
+        tex += f"\\begin{{center}}{{\\bfseries Compito {LETTERE.get(indice_compito, indice_compito + 1)}}}\\end{{center}}\n\\vspace{{0.5cm}}\n\n"
+        tex += "\\begin{multicols}{2}\n\\setcounter{ex}{0}\n"
+        for es in esercizi_struct:
+            varianti = es["varianti"]
+            variante = varianti[indice_compito % len(varianti)]
             if es.get("aperta"):
-                tex += tex_esercizio_aperto(variante["testo"])
+                tex += tex_esercizio_aperto(ctx, variante["testo"], es.get("obbligatorio", False))
             else:
-                tex += tex_esercizio([variante["testo"], variante["risposte"]])
-            # la soluzione (se presente) va subito dopo il testo dell'ultima variante
-            # stampata di questo esercizio, prima della riga che lo separa dal successivo.
-            if i == len(varianti) - 1 and es.get("soluzione"):
+                tex += tex_esercizio(ctx, [variante["testo"], variante["risposte"]], es.get("obbligatorio", False))
+            if es.get("soluzione"):
                 tex += (
                     "\\begin{center}\\fbox{\\parbox{0.9\\linewidth}{\\small "
                     f"{{\\bfseries Soluzione/suggerimento:}} {es['soluzione']}"
                     "}}\\end{center}\n\n"
                 )
-            if i < len(varianti) - 1:
-                tex += _separatore_esercizio()
-        tex += _separatore_esercizio()
-    tex += "\\end{multicols}\n\n"
+            tex += _separatore_esercizio()
+        tex += "\\end{multicols}\n\n"
     tex += "\n\n\\end{document}"
     return tex
 
@@ -290,9 +305,9 @@ def crea_file_blocco(ctx: LatexContext, esercizi_struct: list[dict], numero_stud
         ]))
         for p in posizioni:
             if p["aperta"]:
-                tex += tex_esercizio_aperto(p["testo"])
+                tex += tex_esercizio_aperto(ctx, p["testo"], p["obbligatorio"])
             else:
-                tex += tex_esercizio([p["testo"], p["risposte"]])
+                tex += tex_esercizio(ctx, [p["testo"], p["risposte"]], p["obbligatorio"])
             tex += _separatore_esercizio()
         tex += "\\end{multicols}\n\\end{small}\n\n\\vfill\n"
         tex += regole(ctx)
