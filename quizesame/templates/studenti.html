@@ -59,7 +59,7 @@
 
 <details class="card collassabile">
   <summary>Importa da CSV</summary>
-  <p class="muted" style="margin-top:1rem">Formato: matricola,nome,cognome. Una riga per studente; le matricole già presenti vengono aggiornate, non duplicate.</p>
+  <p class="muted" style="margin-top:1rem">Una riga per studente. Le colonne possono essere in qualsiasi ordine e averne anche di superflue: nel passo successivo si sceglie quale colonna usare per matricola, nome e cognome, con un'anteprima e la conferma prima di scrivere davvero i dati.</p>
   <form method="post" action="/corsi/{{ corso.tag }}/studenti/importa-csv" enctype="multipart/form-data">
     <input type="file" name="file" accept=".csv" required>
     <button type="submit">Importa</button>

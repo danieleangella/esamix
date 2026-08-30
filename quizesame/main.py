@@ -729,7 +729,10 @@ def studenti_list(request: Request, tag: str, q: str = "", da: str = ""):
 
 @app.post("/corsi/{tag}/studenti/nuovo")
 def nuovo_studente(tag: str, matricola: str = Form(...), nome: str = Form(...), cognome: str = Form(...)):
-    studenti_service.upsert_studente(tag, matricola, nome, cognome)
+    try:
+        studenti_service.crea_studente(tag, matricola, nome, cognome)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/studenti", str(e), "error")
     return flash_redirect(f"/corsi/{tag}/studenti", "Studente salvato")
 
 
@@ -751,10 +754,47 @@ def elimina_studente(tag: str, matricola: str):
     return flash_redirect(f"/corsi/{tag}/studenti", "Studente eliminato")
 
 
-@app.post("/corsi/{tag}/studenti/importa-csv")
-async def importa_csv(tag: str, file: UploadFile = File(...)):
+@app.post("/corsi/{tag}/studenti/importa-csv", response_class=HTMLResponse)
+async def importa_csv(request: Request, tag: str, file: UploadFile = File(...)):
     content = await file.read()
-    report = studenti_service.importa_csv(tag, content)
+    anteprima = studenti_service.anteprima_csv(content)
+    if anteprima["n_colonne"] == 0:
+        return flash_redirect(f"/corsi/{tag}/studenti", "Il file CSV è vuoto", "error")
+    corso = corsi_service.get_corso(tag)
+    return templates.TemplateResponse(request, "csv_mappatura.html", {"corso": corso, "anteprima": anteprima})
+
+
+@app.post("/corsi/{tag}/studenti/importa-csv/verifica", response_class=HTMLResponse)
+async def importa_csv_verifica(request: Request, tag: str):
+    form = await request.form()
+    csv_testo = form.get("csv_testo", "")
+    ha_intestazione = form.get("ha_intestazione") == "1"
+    matricola_idx, nome_idx, cognome_idx = form.get("matricola_idx"), form.get("nome_idx"), form.get("cognome_idx")
+    laurea_idx = form.get("laurea_idx") or None
+    if matricola_idx is None or nome_idx is None or cognome_idx is None or "" in (matricola_idx, nome_idx, cognome_idx):
+        return flash_redirect(f"/corsi/{tag}/studenti", "Seleziona una colonna per matricola, nome e cognome", "error")
+    corso = corsi_service.get_corso(tag)
+    verifica = studenti_service.verifica_import_csv(
+        tag, csv_testo, ha_intestazione, int(matricola_idx), int(nome_idx), int(cognome_idx),
+        int(laurea_idx) if laurea_idx is not None else None,
+    )
+    return templates.TemplateResponse(request, "csv_conferma.html", {
+        "corso": corso, "verifica": verifica, "csv_testo": csv_testo, "ha_intestazione": ha_intestazione,
+        "matricola_idx": matricola_idx, "nome_idx": nome_idx, "cognome_idx": cognome_idx, "laurea_idx": laurea_idx,
+    })
+
+
+@app.post("/corsi/{tag}/studenti/importa-csv/conferma")
+async def importa_csv_conferma(request: Request, tag: str):
+    form = await request.form()
+    csv_testo = form.get("csv_testo", "")
+    ha_intestazione = form.get("ha_intestazione") == "1"
+    laurea_idx = form.get("laurea_idx") or None
+    report = studenti_service.importa_csv_mappato(
+        tag, csv_testo, ha_intestazione,
+        int(form.get("matricola_idx")), int(form.get("nome_idx")), int(form.get("cognome_idx")),
+        int(laurea_idx) if laurea_idx is not None else None,
+    )
     msg = f"Import: {report.inseriti} inseriti, {report.aggiornati} aggiornati, {report.saltati} saltati"
     return flash_redirect(f"/corsi/{tag}/studenti", msg, "error" if report.errori else "success")
 

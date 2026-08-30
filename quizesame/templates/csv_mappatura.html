@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Importa da CSV · {{ corso.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a> <span class="sep">›</span> <span class="current">Importa da CSV</span>
+{% endblock %}
+{% block content %}
+<h1>Importa studenti da CSV</h1>
+<p class="muted">
+  {% if anteprima.ha_intestazione %}Il file ha una riga di intestazione: le colonne sono state proposte in base ai nomi trovati.
+  {% else %}Il file non sembra avere una riga di intestazione: le colonne sono numerate.{% endif %}
+  Controlla o correggi l'abbinamento qui sotto prima di procedere.
+</p>
+
+<form method="post" action="/corsi/{{ corso.tag }}/studenti/importa-csv/verifica">
+  <textarea name="csv_testo" style="display:none">{{ anteprima.csv_testo }}</textarea>
+  <input type="hidden" name="ha_intestazione" value="{{ '1' if anteprima.ha_intestazione else '' }}">
+
+  <div class="card">
+    <h2>Abbinamento colonne</h2>
+    <div class="form-grid">
+      <div>
+        <label>Matricola</label>
+        <select name="matricola_idx" required>
+          <option value="">-- scegli --</option>
+          {% for c in anteprima.colonne %}<option value="{{ loop.index0 }}" {% if anteprima.matricola_idx == loop.index0 %}selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Cognome</label>
+        <select name="cognome_idx" required>
+          <option value="">-- scegli --</option>
+          {% for c in anteprima.colonne %}<option value="{{ loop.index0 }}" {% if anteprima.cognome_idx == loop.index0 %}selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Nome</label>
+        <select name="nome_idx" required>
+          <option value="">-- scegli --</option>
+          {% for c in anteprima.colonne %}<option value="{{ loop.index0 }}" {% if anteprima.nome_idx == loop.index0 %}selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Corso di laurea (facoltativo)</label>
+        <select name="laurea_idx">
+          <option value="">-- nessuna --</option>
+          {% for c in anteprima.colonne %}<option value="{{ loop.index0 }}" {% if anteprima.laurea_idx == loop.index0 %}selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Anteprima del file ({{ anteprima.totale_righe }} righe di dati{% if anteprima.totale_righe > anteprima.righe_anteprima|length %}, prime {{ anteprima.righe_anteprima|length }} mostrate{% endif %})</h2>
+    <div style="overflow-x:auto">
+      <table>
+        <tr>{% for c in anteprima.colonne %}<th>{{ c }}</th>{% endfor %}</tr>
+        {% for r in anteprima.righe_anteprima %}
+        <tr>{% for cella in r %}<td>{{ cella }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+
+  <button type="submit">Continua</button>
+  <a href="/corsi/{{ corso.tag }}/studenti" style="margin-left:1rem">Annulla</a>
+</form>
+{% endblock %}

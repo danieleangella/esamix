@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Conferma importazione · {{ corso.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a> <span class="sep">›</span> <span class="current">Conferma importazione</span>
+{% endblock %}
+{% block content %}
+<h1>Conferma importazione</h1>
+
+<div class="card">
+  <h2>Riepilogo</h2>
+  <div class="stats-grid">
+    <div class="stat-tile stat-ok">
+      <div class="stat-value">{{ verifica.nuovi }}</div>
+      <div class="stat-label">Nuovi studenti</div>
+    </div>
+    <div class="stat-tile stat-info">
+      <div class="stat-value">{{ verifica.aggiornati }}</div>
+      <div class="stat-label">Aggiornamenti</div>
+    </div>
+    <div class="stat-tile {{ 'stat-warn' if verifica.errori else '' }}">
+      <div class="stat-value">{{ verifica.errori }}</div>
+      <div class="stat-label">Righe con errori (saltate)</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Dettaglio righe</h2>
+  <div style="overflow-x:auto">
+    <table>
+      <tr><th>Riga</th><th>Esito</th><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
+      {% for r in verifica.righe %}
+      <tr>
+        <td>{{ r.numero_riga }}</td>
+        <td>
+          {% if r.stato == 'nuovo' %}<span class="badge badge-ok">nuovo</span>
+          {% elif r.stato == 'aggiornamento' %}<span class="badge badge-warn">aggiornamento</span>
+          {% else %}<span class="badge badge-err">errore</span>{% endif %}
+        </td>
+        {% if r.errore %}
+        <td colspan="3" class="muted">{{ r.errore }}</td>
+        {% else %}
+        <td>{{ r.matricola }}</td>
+        <td>{{ r.cognome }}</td>
+        <td>{{ r.nome }}</td>
+        {% endif %}
+        <td class="muted">
+          {% if r.stato == 'aggiornamento' %}era: {{ r.cognome_attuale }} {{ r.nome_attuale }}{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+<form method="post" action="/corsi/{{ corso.tag }}/studenti/importa-csv/conferma">
+  <textarea name="csv_testo" style="display:none">{{ csv_testo }}</textarea>
+  <input type="hidden" name="ha_intestazione" value="{{ '1' if ha_intestazione else '' }}">
+  <input type="hidden" name="matricola_idx" value="{{ matricola_idx }}">
+  <input type="hidden" name="nome_idx" value="{{ nome_idx }}">
+  <input type="hidden" name="cognome_idx" value="{{ cognome_idx }}">
+  <input type="hidden" name="laurea_idx" value="{{ laurea_idx or '' }}">
+  {% if verifica.nuovi or verifica.aggiornati %}
+  <button type="submit">Conferma importazione di {{ verifica.nuovi + verifica.aggiornati }} studenti</button>
+  {% else %}
+  <p class="muted">Nessuna riga valida da importare.</p>
+  {% endif %}
+  <a href="/corsi/{{ corso.tag }}/studenti" style="margin-left:1rem">Annulla</a>
+</form>
+{% endblock %}

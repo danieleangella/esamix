@@ -188,6 +188,29 @@ def get_studente(tag: str, matricola: str) -> Optional[Studente]:
         conn.close()
 
 
+def crea_studente(tag: str, matricola: str, nome: str, cognome: str, laurea_ctype: Optional[str] = None) -> None:
+    """A differenza di upsert_studente, rifiuta la matricola se già assegnata a qualcun
+    altro: usata dal form "Aggiungi studente", dove un inserimento con matricola sbagliata
+    non deve sovrascrivere in silenzio lo studente già presente."""
+    matricola = _clean(matricola)
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        esistente = conn.execute(
+            "SELECT nome, cognome FROM studenti WHERE matricola=?", (matricola,)
+        ).fetchone()
+        if esistente:
+            raise ValueError(
+                f"La matricola {matricola} è già assegnata a {esistente['cognome']} {esistente['nome']}"
+            )
+        conn.execute(
+            "INSERT INTO studenti (matricola, nome, cognome, laurea_ctype) VALUES (?,?,?,?)",
+            (matricola, _clean(nome), _clean(cognome), laurea_ctype or None),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def upsert_studente(tag: str, matricola: str, nome: str, cognome: str, laurea_ctype: Optional[str] = None) -> None:
     matricola = _clean(matricola)
     conn = db.get_connection(config.corso_db_path(tag))
@@ -261,33 +284,145 @@ class ImportReport:
             self.errori = []
 
 
-def importa_csv(tag: str, file_bytes: bytes) -> ImportReport:
-    """Formato atteso: matricola,nome,cognome[,laurea_ctype]. Robusto a BOM UTF-8."""
-    text = file_bytes.decode("utf-8-sig")
-    reader = csv.reader(io.StringIO(text))
+_SINONIMI_MATRICOLA = ["matricola", "id", "codice", "numero matricola", "n. matricola", "n matricola", "student id"]
+_SINONIMI_NOME = ["nome", "first name", "firstname"]
+_SINONIMI_COGNOME = ["cognome", "last name", "lastname", "surname"]
+_SINONIMI_LAUREA = ["laurea", "corso di laurea", "laurea_ctype", "ctype"]
+
+
+def _rileva_intestazione(testo: str) -> bool:
+    """File diversi possono avere colonne in ordine diverso, o colonne in più: prima di
+    importare si chiede sempre all'utente quale colonna usare per cosa (vedi
+    anteprima_csv), ma per proporre un abbinamento già corretto serve prima capire se la
+    prima riga è un'intestazione (nomi di colonna) o già un dato."""
+    try:
+        return csv.Sniffer().has_header(testo[:4096])
+    except csv.Error:
+        return False
+
+
+def _indovina_colonna(intestazioni: list[str], sinonimi: list[str]) -> Optional[int]:
+    for i, h in enumerate(intestazioni):
+        if h.strip().lower() in sinonimi:
+            return i
+    return None
+
+
+def _righe_csv(testo: str) -> list[list[str]]:
+    return [r for r in csv.reader(io.StringIO(testo)) if any(cell.strip() for cell in r)]
+
+
+def anteprima_csv(file_bytes: bytes) -> dict:
+    """Analizza un CSV appena caricato: rileva se ha una riga di intestazione e propone
+    automaticamente quali colonne usare per matricola/nome/cognome/laurea in base al nome
+    delle colonne (se presente); l'utente conferma o corregge la proposta prima che
+    qualunque dato venga scritto (vedi verifica_import_csv)."""
+    testo = file_bytes.decode("utf-8-sig")
+    righe = _righe_csv(testo)
+    if not righe:
+        return {
+            "csv_testo": testo, "colonne": [], "n_colonne": 0, "ha_intestazione": False,
+            "righe_anteprima": [], "totale_righe": 0,
+            "matricola_idx": None, "nome_idx": None, "cognome_idx": None, "laurea_idx": None,
+        }
+    ha_intestazione = _rileva_intestazione(testo)
+    n_colonne = max(len(r) for r in righe)
+    if ha_intestazione:
+        intestazioni = (righe[0] + [""] * n_colonne)[:n_colonne]
+        righe_dati = righe[1:]
+    else:
+        intestazioni = [f"Colonna {i + 1}" for i in range(n_colonne)]
+        righe_dati = righe
+
+    return {
+        "csv_testo": testo, "colonne": intestazioni, "n_colonne": n_colonne, "ha_intestazione": ha_intestazione,
+        "righe_anteprima": [(r + [""] * n_colonne)[:n_colonne] for r in righe_dati[:8]],
+        "totale_righe": len(righe_dati),
+        "matricola_idx": _indovina_colonna(intestazioni, _SINONIMI_MATRICOLA) if ha_intestazione else (0 if n_colonne > 0 else None),
+        "nome_idx": _indovina_colonna(intestazioni, _SINONIMI_NOME) if ha_intestazione else (1 if n_colonne > 1 else None),
+        "cognome_idx": _indovina_colonna(intestazioni, _SINONIMI_COGNOME) if ha_intestazione else (2 if n_colonne > 2 else None),
+        "laurea_idx": _indovina_colonna(intestazioni, _SINONIMI_LAUREA) if ha_intestazione else None,
+    }
+
+
+def _estrai_righe_csv(
+    csv_testo: str, ha_intestazione: bool, matricola_idx: int, nome_idx: int, cognome_idx: int,
+    laurea_idx: Optional[int] = None,
+) -> list[dict]:
+    righe = _righe_csv(csv_testo)
+    if ha_intestazione and righe:
+        righe = righe[1:]
+    max_idx = max(i for i in (matricola_idx, nome_idx, cognome_idx, laurea_idx) if i is not None)
+    estratte = []
+    for numero, row in enumerate(righe, start=1):
+        if len(row) <= max_idx:
+            estratte.append({"numero_riga": numero, "errore": f"colonne insufficienti ({row})"})
+            continue
+        matricola = _clean(row[matricola_idx])
+        if not matricola:
+            estratte.append({"numero_riga": numero, "errore": "matricola mancante"})
+            continue
+        estratte.append({
+            "numero_riga": numero, "matricola": matricola,
+            "nome": _clean(row[nome_idx]), "cognome": _clean(row[cognome_idx]),
+            "laurea_ctype": _clean(row[laurea_idx]) if laurea_idx is not None and row[laurea_idx].strip() else None,
+            "errore": None,
+        })
+    return estratte
+
+
+def verifica_import_csv(
+    tag: str, csv_testo: str, ha_intestazione: bool, matricola_idx: int, nome_idx: int, cognome_idx: int,
+    laurea_idx: Optional[int] = None,
+) -> dict:
+    """Estrae e classifica ogni riga (nuovo studente / aggiornamento di uno già presente /
+    errore) senza scrivere nulla nel database: usata per mostrare all'utente esattamente
+    cosa succederà, con l'elenco completo, prima di confermare l'importazione vera."""
+    righe = _estrai_righe_csv(csv_testo, ha_intestazione, matricola_idx, nome_idx, cognome_idx, laurea_idx)
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        esistenti = {
+            r["matricola"]: r for r in conn.execute("SELECT matricola, nome, cognome FROM studenti")
+        }
+    finally:
+        conn.close()
+    nuovi = aggiornati = errori = 0
+    for r in righe:
+        if r.get("errore"):
+            errori += 1
+            r["stato"] = "errore"
+        elif r["matricola"] in esistenti:
+            aggiornati += 1
+            r["stato"] = "aggiornamento"
+            r["nome_attuale"] = esistenti[r["matricola"]]["nome"]
+            r["cognome_attuale"] = esistenti[r["matricola"]]["cognome"]
+        else:
+            nuovi += 1
+            r["stato"] = "nuovo"
+    return {"righe": righe, "nuovi": nuovi, "aggiornati": aggiornati, "errori": errori}
+
+
+def importa_csv_mappato(
+    tag: str, csv_testo: str, ha_intestazione: bool, matricola_idx: int, nome_idx: int, cognome_idx: int,
+    laurea_idx: Optional[int] = None,
+) -> ImportReport:
+    """Scrive nel database le righe con la mappatura di colonne scelta e confermata
+    dall'utente (vedi verifica_import_csv per l'anteprima mostrata prima di questa)."""
+    righe = _estrai_righe_csv(csv_testo, ha_intestazione, matricola_idx, nome_idx, cognome_idx, laurea_idx)
     report = ImportReport()
     conn = db.get_connection(config.corso_db_path(tag))
     try:
-        for i, row in enumerate(reader, start=1):
-            if not row or not any(cell.strip() for cell in row):
-                continue
-            if len(row) < 3:
-                report.errori.append(f"Riga {i}: colonne insufficienti ({row})")
+        for r in righe:
+            if r.get("errore"):
+                report.errori.append(f"Riga {r['numero_riga']}: {r['errore']}")
                 report.saltati += 1
                 continue
-            matricola = _clean(row[0])
-            nome = _clean(row[1])
-            cognome = _clean(row[2])
-            laurea_ctype = _clean(row[3]) if len(row) > 3 and row[3].strip() else None
-            if not matricola:
-                report.errori.append(f"Riga {i}: matricola mancante")
-                report.saltati += 1
-                continue
-            existing = conn.execute("SELECT 1 FROM studenti WHERE matricola=?", (matricola,)).fetchone()
+            existing = conn.execute("SELECT 1 FROM studenti WHERE matricola=?", (r["matricola"],)).fetchone()
             conn.execute(
                 "INSERT INTO studenti (matricola, nome, cognome, laurea_ctype) VALUES (?,?,?,?) "
-                "ON CONFLICT(matricola) DO UPDATE SET nome=excluded.nome, cognome=excluded.cognome",
-                (matricola, nome, cognome, laurea_ctype),
+                "ON CONFLICT(matricola) DO UPDATE SET nome=excluded.nome, cognome=excluded.cognome, "
+                "laurea_ctype=excluded.laurea_ctype",
+                (r["matricola"], r["nome"], r["cognome"], r["laurea_ctype"]),
             )
             if existing:
                 report.aggiornati += 1
