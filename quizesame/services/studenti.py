@@ -312,12 +312,13 @@ def _righe_csv(testo: str) -> list[list[str]]:
     return [r for r in csv.reader(io.StringIO(testo)) if any(cell.strip() for cell in r)]
 
 
-def anteprima_csv(file_bytes: bytes) -> dict:
-    """Analizza un CSV appena caricato: rileva se ha una riga di intestazione e propone
-    automaticamente quali colonne usare per matricola/nome/cognome/laurea in base al nome
-    delle colonne (se presente); l'utente conferma o corregge la proposta prima che
-    qualunque dato venga scritto (vedi verifica_import_csv)."""
-    testo = file_bytes.decode("utf-8-sig")
+def analizza_csv_testo(testo: str, forza_intestazione: Optional[bool] = None) -> dict:
+    """Analizza il testo di un CSV: rileva se ha una riga di intestazione (a meno che
+    `forza_intestazione` non la imponga esplicitamente, per quando il rilevamento
+    automatico sbaglia e l'utente lo corregge a mano) e propone automaticamente quali
+    colonne usare per matricola/nome/cognome/laurea in base al nome delle colonne (se
+    presente); l'utente conferma o corregge la proposta prima che qualunque dato venga
+    scritto (vedi verifica_import_csv)."""
     righe = _righe_csv(testo)
     if not righe:
         return {
@@ -325,7 +326,7 @@ def anteprima_csv(file_bytes: bytes) -> dict:
             "righe_anteprima": [], "totale_righe": 0,
             "matricola_idx": None, "nome_idx": None, "cognome_idx": None, "laurea_idx": None,
         }
-    ha_intestazione = _rileva_intestazione(testo)
+    ha_intestazione = forza_intestazione if forza_intestazione is not None else _rileva_intestazione(testo)
     n_colonne = max(len(r) for r in righe)
     if ha_intestazione:
         intestazioni = (righe[0] + [""] * n_colonne)[:n_colonne]
@@ -343,6 +344,11 @@ def anteprima_csv(file_bytes: bytes) -> dict:
         "cognome_idx": _indovina_colonna(intestazioni, _SINONIMI_COGNOME) if ha_intestazione else (2 if n_colonne > 2 else None),
         "laurea_idx": _indovina_colonna(intestazioni, _SINONIMI_LAUREA) if ha_intestazione else None,
     }
+
+
+def anteprima_csv(file_bytes: bytes) -> dict:
+    """Come analizza_csv_testo, ma a partire dai byte di un file appena caricato."""
+    return analizza_csv_testo(file_bytes.decode("utf-8-sig"))
 
 
 def _estrai_righe_csv(

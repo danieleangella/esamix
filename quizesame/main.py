@@ -863,6 +863,16 @@ async def importa_csv(request: Request, tag: str, file: UploadFile = File(...)):
     return templates.TemplateResponse(request, "csv_mappatura.html", {"corso": corso, "anteprima": anteprima})
 
 
+@app.post("/corsi/{tag}/studenti/importa-csv/ricalcola", response_class=HTMLResponse)
+async def importa_csv_ricalcola(request: Request, tag: str):
+    form = await request.form()
+    csv_testo = form.get("csv_testo", "")
+    ha_intestazione = bool(form.get("ha_intestazione"))
+    corso = corsi_service.get_corso(tag)
+    anteprima = studenti_service.analizza_csv_testo(csv_testo, forza_intestazione=ha_intestazione)
+    return templates.TemplateResponse(request, "csv_mappatura.html", {"corso": corso, "anteprima": anteprima})
+
+
 @app.post("/corsi/{tag}/studenti/importa-csv/verifica", response_class=HTMLResponse)
 async def importa_csv_verifica(request: Request, tag: str):
     form = await request.form()
