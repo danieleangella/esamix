@@ -251,6 +251,55 @@ def calcola_corso(tag: str) -> dict:
         "media_finale": media(voti_finali_tutti),
         "distribuzione": _distribuzione_e_gaussiana(voti_finali_tutti),
         "per_appello": per_appello, "andamento": _andamento_appelli(per_appello),
+        "voti_finali": voti_finali_tutti,
+    }
+
+
+def calcola_multi_corsi(tags: list[str]) -> dict:
+    """Le stesse statistiche di `calcola_corso`, ma aggregate su un insieme scelto di
+    corsi (non necessariamente tutti quelli dell'installazione): per la pagina
+    "Statistiche generali", dove si possono selezionare/deselezionare i corsi da
+    includere."""
+    per_corso = []
+    totale = promossi = insufficienti = in_attesa_orale = orali_svolti = 0
+    voti_finali_tutti: list[int] = []
+    voti_scritti_tutti: list[int] = []
+    voti_orali_tutti: list[int] = []
+
+    for tag in tags:
+        corso = corsi_service.get_corso(tag)
+        stat = calcola_corso(tag)
+        if stat["totale"] == 0:
+            continue
+        per_corso.append({
+            "corso_tag": tag, "corso_nome": corso.nome, "corso_anno": corso.anno,
+            "totale": stat["totale"], "promossi": stat["promossi"], "insufficienti": stat["insufficienti"],
+            "promossi_pct": stat["promossi_pct"], "insufficienti_pct": stat["insufficienti_pct"],
+            "media_finale": stat["media_finale"],
+        })
+        totale += stat["totale"]
+        promossi += stat["promossi"]
+        insufficienti += stat["insufficienti"]
+        in_attesa_orale += stat["in_attesa_orale"]
+        orali_svolti += stat["orali_svolti"]
+        voti_finali_tutti.extend(stat["voti_finali"])
+        if stat["media_scritto"] is not None:
+            voti_scritti_tutti.append(stat["media_scritto"])
+        if stat["media_orale"] is not None:
+            voti_orali_tutti.append(stat["media_orale"])
+
+    media = lambda lista: round(sum(lista) / len(lista), 2) if lista else None  # noqa: E731
+    pct = lambda n: round(100 * n / totale) if totale else None  # noqa: E731
+
+    return {
+        "totale": totale, "promossi": promossi, "insufficienti": insufficienti,
+        "in_attesa_orale": in_attesa_orale, "orali_svolti": orali_svolti,
+        "promossi_pct": pct(promossi), "insufficienti_pct": pct(insufficienti),
+        "in_attesa_orale_pct": pct(in_attesa_orale), "orali_svolti_pct": pct(orali_svolti),
+        "media_scritto": media(voti_scritti_tutti), "media_orale": media(voti_orali_tutti),
+        "media_finale": media(voti_finali_tutti),
+        "distribuzione": _distribuzione_e_gaussiana(voti_finali_tutti),
+        "per_corso": per_corso,
     }
 
 

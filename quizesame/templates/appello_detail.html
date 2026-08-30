@@ -98,9 +98,10 @@
 
 {% if appello.chiuso %}
 <div class="card">
-  <p class="muted">Appello chiuso: per modificare gli esercizi assegnati o generare nuovi blocchi, riaprilo prima dalla scheda Impostazioni.</p>
+  <p class="muted">Appello chiuso: gli esercizi assegnati e i file già generati restano consultabili, ma non è
+    possibile modificarli o generare nuovi blocchi finché non lo riapri dalla scheda Impostazioni.</p>
 </div>
-{% else %}
+{% endif %}
 
 <div class="card">
   <h2>Esercizi assegnati ({{ esercizi_assegnati|length }})</h2>
@@ -110,12 +111,17 @@
     {% for e in esercizi_assegnati %}
     <tr>
       <td style="white-space:nowrap">
+        {% if appello.chiuso %}
+        <button type="button" class="secondary" disabled title="Sposta su">&uarr;</button>
+        <button type="button" class="secondary" disabled title="Sposta giù">&darr;</button>
+        {% else %}
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/sposta-su">
           <button type="submit" class="secondary" {% if loop.first %}disabled{% endif %} title="Sposta su">&uarr;</button>
         </form>
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/sposta-giu">
           <button type="submit" class="secondary" {% if loop.last %}disabled{% endif %} title="Sposta giù">&darr;</button>
         </form>
+        {% endif %}
       </td>
       <td>
         <button type="button" class="link-simile btn-anteprima-assegnato" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button>
@@ -126,6 +132,8 @@
       <td>
         {% if e.aperta %}
         <span class="muted">n/d (domanda aperta)</span>
+        {% elif appello.chiuso %}
+        {{ 'sì (consegna e svolgimento richiesti)' if e.obbligatorio else 'no' }}
         {% else %}
         <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/obbligatorio">
           <input type="hidden" name="obbligatorio" value="{{ '' if e.obbligatorio else 'on' }}">
@@ -137,10 +145,12 @@
       </td>
       <td style="white-space:nowrap">
         <button type="button" class="secondary btn-modifica-assegnato" data-esercizio="{{ e.id }}">Modifica</button>
+        {% if not appello.chiuso %}
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/{{ e.id }}/rimuovi"
               onsubmit="return confirm('Rimuovere l\'esercizio {{ e.nome or ('#' ~ e.id) }} da questo appello?');">
           <button type="submit" class="danger">Rimuovi</button>
         </form>
+        {% endif %}
       </td>
     </tr>
     <tr class="riga-anteprima-assegnato" data-esercizio="{{ e.id }}" style="display:none">
@@ -166,13 +176,15 @@
   <p class="muted">Nessun esercizio ancora assegnato a questo appello.</p>
   {% endif %}
 
+  {% if not appello.chiuso %}
   <details style="margin-top:0.75rem">
     <summary>Crea un nuovo esercizio</summary>
     {% set action = "/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/esercizi/nuovo" %}
     {% include "_esercizio_form.html" %}
   </details>
+  {% endif %}
 
-  {% if esercizi_disponibili %}
+  {% if esercizi_disponibili and not appello.chiuso %}
   <details style="margin-top:0.75rem">
     <summary>Assegna esercizi dalla banca del corso ({{ esercizi_disponibili|length }} disponibili)</summary>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/assegna" style="margin-top:1rem">
@@ -258,6 +270,7 @@
   </details>
   {% endif %}
 
+  {% if not appello.chiuso %}
   <details style="margin-top:0.75rem">
     <summary>Importa esercizi da un file</summary>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esercizi/importa-json" enctype="multipart/form-data">
@@ -266,6 +279,7 @@
       <button type="submit">Importa</button>
     </form>
   </details>
+  {% endif %}
 </div>
 
 <script>
@@ -321,6 +335,9 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
 
 <div class="card">
   <h2>Crea compiti</h2>
+  {% if appello.chiuso %}
+  <p class="muted">Appello chiuso: non è possibile generare nuovi blocchi finché non lo riapri.</p>
+  {% else %}
   {% if not esercizi_assegnati %}
   <p class="muted">Assegna prima almeno un esercizio qui sopra.</p>
   {% endif %}
@@ -355,6 +372,7 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
     });
   })();
   </script>
+  {% endif %}
   {% if riferimento_tex_esiste %}
   <p>
     <strong>Foglio di riferimento</strong> (testo e risposte corrette, comune a tutti i blocchi, da pubblicare online):
@@ -383,10 +401,12 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
         {% if b.griglia_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/griglia.pdf">.pdf</a>{% endif %}
       </td>
       <td>
+        {% if not appello.chiuso %}
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/blocchi/{{ b.numero }}/elimina"
               onsubmit="return confirm('Eliminare il blocco {{ b.numero }} ({{ b.numero_studenti }} compiti)? Possibile solo se non ha già risultati registrati.');">
           <button type="submit" class="danger">Elimina</button>
         </form>
+        {% endif %}
       </td>
     </tr>
     {% endfor %}
@@ -395,7 +415,6 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
   <p class="muted">{{ compiti|length }} compiti registrati in totale.</p>
 </div>
 
-{% endif %}
 </div>
 {% endif %}
 
@@ -488,9 +507,7 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
       {% for r in risultati %}
       <tr>
         <td>
-          {% if r.esito in ('voto', 'rifiutato') %}
           <button type="button" class="link-simile btn-dettaglio-risultato" data-matricola="{{ r.matricola }}">{{ r.cognome }} {{ r.nome }}</button>
-          {% else %}{{ r.cognome }} {{ r.nome }}{% endif %}
         </td>
         <td>{{ r.matricola }}</td>
         <td>

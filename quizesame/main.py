@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from fastapi import FastAPI, Form, Request, UploadFile, File
+from fastapi import FastAPI, Form, Query, Request, UploadFile, File
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -154,6 +154,18 @@ def home(request: Request, q: str = ""):
     riepilogo_globale = statistiche_service.calcola_globale() if app_settings.mostra_riepilogo_home else None
     return templates.TemplateResponse(request, "corsi_list.html", {
         "corsi": corsi, "q": q, "risultati_ricerca": risultati_ricerca, "riepilogo_globale": riepilogo_globale,
+    })
+
+
+@app.get("/statistiche-generali", response_class=HTMLResponse)
+def statistiche_generali(request: Request, corsi: list[str] = Query(None)):
+    tutti_corsi = corsi_service.list_corsi()
+    tags_selezionati = set(corsi) if corsi is not None else {c.tag for c in tutti_corsi}
+    statistiche = statistiche_service.calcola_multi_corsi(
+        [c.tag for c in tutti_corsi if c.tag in tags_selezionati]
+    )
+    return templates.TemplateResponse(request, "statistiche_generali.html", {
+        "corsi": tutti_corsi, "tags_selezionati": tags_selezionati, "statistiche": statistiche,
     })
 
 
