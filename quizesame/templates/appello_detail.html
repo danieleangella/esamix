@@ -4,7 +4,7 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <span class="current">{{ appello.nome }}</span>
 {% endblock %}
 {% block content %}
-<h1>{{ corso.nome }} - {{ appello.nome }} <span class="muted">({{ appello.tipo }})</span></h1>
+<h1>{{ corso.nome }} - {{ appello.nome }}{% if appello.tipo != 'appello' %} <span class="muted">({{ appello.tipo }})</span>{% endif %}</h1>
 
 <div class="tabs" id="tabs-appello">
   {% if not raggruppamento %}<a href="#creazione" data-tab="creazione">Testo</a>{% endif %}
@@ -447,10 +447,10 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
   </div>
 
   <div class="card">
-    <h2>Risultati inseriti ({{ risultati | rejectattr('verbalizzato') | list | length }})</h2>
+    <h2>Risultati inseriti ({{ risultati|length }})</h2>
     <table>
       <tr><th>Studente</th><th>Matricola</th><th>Esito</th><th style="text-align:right"></th></tr>
-      {% for r in risultati if not r.verbalizzato %}
+      {% for r in risultati %}
       <tr>
         <td>
           {% if r.esito == 'voto' %}
@@ -463,8 +463,10 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
           {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
           {% else %}{{ r.voto }}{% endif %}
+          {% if r.verbalizzato %} <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>{% endif %}
         </td>
         <td style="white-space:nowrap; text-align:right">
+          {% if not r.verbalizzato %}
           {% if r.esito == 'voto' %}
           <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica"
              class="button {{ 'warning' if r.valutazione_sospesa else 'secondary' }}" style="margin-top:0">{{ 'Completa valutazione' if r.valutazione_sospesa else 'Modifica' }}</a>
@@ -473,6 +475,9 @@ document.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
                 onsubmit="return confirm('Eliminare il risultato di {{ r.cognome }} {{ r.nome }} per questo appello?');">
             <button type="submit" class="danger">Elimina</button>
           </form>
+          {% else %}
+          <span class="muted">non modificabile</span>
+          {% endif %}
         </td>
       </tr>
       <tr class="riga-dettaglio-risultato" data-matricola="{{ r.matricola }}" style="display:none">

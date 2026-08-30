@@ -16,8 +16,8 @@
     {% if risultato.insufficiente_per_obbligatorio %} · <span class="badge badge-warn">insufficiente per obbligatorio non svolto</span>{% endif %}
   </p>
   {% endif %}
-  {% if risultato.orale_motivazione %}
-  <p class="muted">Motivazione orale (visibile solo al docente): {{ risultato.orale_motivazione }}</p>
+  {% if risultato.richiede_orale %}
+  <p><strong>Orale richiesto</strong>{% if risultato.orale_motivazione %} ({{ risultato.orale_motivazione }}){% endif %}</p>
   {% endif %}
 
   {% if righe %}
