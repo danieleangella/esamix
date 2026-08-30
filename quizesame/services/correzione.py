@@ -93,8 +93,9 @@ def _carica_dati_correzione(conn, matricola: str, appello_id: int, codice: str):
     ).fetchone()
     if esistente and esistente["verbalizzato"]:
         raise GiaVerbalizzato(
-            f"Lo studente {matricola} ha già un voto verbalizzato per questo appello: "
-            "non può essere corretto di nuovo."
+            f"Lo studente {matricola} ha già un voto verbalizzato per questo appello: non può essere "
+            "corretto di nuovo. Se serve davvero rifarlo, prima annulla la verbalizzazione dalla scheda "
+            "\"Voti verbalizzati\" di questo appello."
         )
 
     compito = conn.execute(
