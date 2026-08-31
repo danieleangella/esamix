@@ -1,6 +1,7 @@
 import base64
 import json
 import math
+import re
 import traceback
 import webbrowser
 from datetime import date
@@ -1835,13 +1836,28 @@ def help_page(request: Request):
     return templates.TemplateResponse(request, "help.html", {})
 
 
+def _versione_app() -> Optional[str]:
+    """Legge la versione da pyproject.toml nella cartella del progetto: così l'about
+    mostra sempre quella del codice sorgente presente sul disco (es. subito dopo un
+    ./aggiorna.sh), anche quando il pacchetto Python installato in modalità "editable"
+    non viene reinstallato a ogni aggiornamento e ha quindi metadati non più aggiornati.
+    Ripiega sui metadati del pacchetto installato solo se pyproject.toml non si trova."""
+    try:
+        testo = (PACKAGE_DIR.parent / "pyproject.toml").read_text(encoding="utf-8")
+        corrispondenza = re.search(r'(?m)^version\s*=\s*"([^"]+)"', testo)
+        if corrispondenza:
+            return corrispondenza.group(1)
+    except OSError:
+        pass
+    try:
+        return version("quizesame")
+    except PackageNotFoundError:
+        return None
+
+
 @app.get("/about", response_class=HTMLResponse)
 def about_page(request: Request):
-    try:
-        versione = version("quizesame")
-    except PackageNotFoundError:
-        versione = None
-    return templates.TemplateResponse(request, "about.html", {"versione": versione})
+    return templates.TemplateResponse(request, "about.html", {"versione": _versione_app()})
 
 
 @app.get("/migrazione", response_class=HTMLResponse)
