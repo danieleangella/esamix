@@ -713,63 +713,75 @@ def scarica_griglia_html(request: Request, tag: str, appello_id: int, numero: in
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/assegna")
 async def assegna_esercizio(tag: str, appello_id: int, request: Request):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
     form = await request.form()
     esercizio_ids = [int(v) for v in form.getlist("esercizio_ids")]
     obbligatorio = bool(form.get("obbligatorio"))
     if not esercizio_ids:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessun esercizio selezionato", "error", anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessun esercizio selezionato", "error", anchor=anchor)
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
         for esercizio_id in esercizio_ids:
             esercizi_service.assegna_a_appello(tag, appello_id, esercizio_id, obbligatorio=obbligatorio)
         msg = f"{len(esercizio_ids)} esercizi assegnati" + _rigenera_se_necessario(tag, appello_id)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/rimuovi")
 def rimuovi_esercizio(tag: str, appello_id: int, esercizio_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
         esercizi_service.rimuovi_da_appello(tag, appello_id, esercizio_id)
         msg = "Esercizio rimosso dall'appello" + _rigenera_se_necessario(tag, appello_id)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/obbligatorio")
 def imposta_obbligatorio(tag: str, appello_id: int, esercizio_id: int, obbligatorio: str = Form("")):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
         esercizi_service.imposta_obbligatorio(tag, appello_id, esercizio_id, bool(obbligatorio))
         msg = "Esercizio aggiornato" + _rigenera_se_necessario(tag, appello_id)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/sposta-su")
 def sposta_su_esercizio(tag: str, appello_id: int, esercizio_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
     try:
         esercizi_service.sposta_esercizio(tag, appello_id, esercizio_id, -1)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Ordine aggiornato", anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Ordine aggiornato", anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/sposta-giu")
 def sposta_giu_esercizio(tag: str, appello_id: int, esercizio_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
     try:
         esercizi_service.sposta_esercizio(tag, appello_id, esercizio_id, 1)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Ordine aggiornato", anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Ordine aggiornato", anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/nuovo")
 async def nuovo_esercizio_appello(tag: str, appello_id: int, request: Request):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
     form = await request.form()
     varianti = _parse_varianti_form(form)
     extra = _parse_esercizio_extra_form(form)
@@ -783,8 +795,8 @@ async def nuovo_esercizio_appello(tag: str, appello_id: int, request: Request):
         )
         msg = "Esercizio creato e assegnato" + _rigenera_se_necessario(tag, appello_id)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/esercizi/esporta")
@@ -837,19 +849,20 @@ async def importa_esercizi_json_banca_conferma(tag: str, request: Request):
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-json", response_class=HTMLResponse)
 async def importa_esercizi_json(request: Request, tag: str, appello_id: int, file: UploadFile = File(...)):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
         contenuto_bytes = await file.read()
         contenuto = json.loads(contenuto_bytes.decode("utf-8"))
         candidati = esercizi_service.anteprima_importa_json(tag, contenuto)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     except Exception as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"File non valido: {e}", "error", anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"File non valido: {e}", "error", anchor=anchor)
     if not candidati:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Il file non contiene esercizi", "error", anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Il file non contiene esercizi", "error", anchor=anchor)
     corso = corsi_service.get_corso(tag)
-    appello = corsi_service.get_appello(tag, appello_id)
     return templates.TemplateResponse(request, "esercizi_importa_conferma.html", {
         "corso": corso, "appello": appello, "candidati": candidati,
         "dati_json": json.dumps(contenuto, ensure_ascii=False),
@@ -858,6 +871,8 @@ async def importa_esercizi_json(request: Request, tag: str, appello_id: int, fil
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-json/conferma")
 async def importa_esercizi_json_conferma(request: Request, tag: str, appello_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
     form = await request.form()
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
@@ -866,14 +881,14 @@ async def importa_esercizi_json_conferma(request: Request, tag: str, appello_id:
         indici_scelti = {int(i) for i in form.getlist("importa_idx")}
         scelti = [c for i, c in enumerate(candidati) if i in indici_scelti]
         if not scelti:
-            return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessun esercizio selezionato per l'import", "error", anchor="creazione")
+            return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessun esercizio selezionato per l'import", "error", anchor=anchor)
         n = esercizi_service.importa_json(tag, appello_id, scelti)
         msg = f"Importati {n} esercizi dal file" + _rigenera_se_necessario(tag, appello_id)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     except Exception as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Errore import: {e}", "error", anchor="creazione")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor="creazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Errore import: {e}", "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
 def _render_correggi_revisione(
@@ -1059,7 +1074,7 @@ def dettaglio_risultato(request: Request, tag: str, appello_id: int, matricola: 
     try:
         dettaglio = correzione_service.dettaglio_risultato(tag, appello_id, matricola)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=_anchor_membro(appello, "valutazione"))
     return templates.TemplateResponse(request, "risultato_dettaglio.html", {
         "corso": corso, "appello": appello, "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
         "storico": dettaglio["storico"],
@@ -1083,11 +1098,13 @@ def dettaglio_risultato_inline(request: Request, tag: str, appello_id: int, matr
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}/elimina")
 def elimina_risultato(tag: str, appello_id: int, matricola: str):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "valutazione")
     try:
         correzione_service.elimina_risultato(tag, appello_id, matricola)
     except Exception as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Risultato eliminato", anchor="valutazione")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Risultato eliminato", anchor=anchor)
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}/modifica", response_class=HTMLResponse)
@@ -1101,7 +1118,8 @@ def modifica_risultato_form(request: Request, tag: str, appello_id: int, matrico
             raise ValueError("Questo risultato non è associato a un compito con codice (es. calcolato da un raggruppamento)")
         valutazione = correzione_service.valuta_preliminare(tag, appello_id, matricola, r["codice"], r["risposte"] or "")
     except Exception as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="valutazione")
+        appello = corsi_service.get_appello(tag, appello_id)
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=_anchor_membro(appello, "valutazione"))
     punteggi_esistenti = json.loads(r["punteggi_obbligatori"]) if r["punteggi_obbligatori"] else {}
     punteggi_proposti = {int(k): v for k, v in punteggi_esistenti.items()}
     return _render_correggi_revisione(
@@ -1123,7 +1141,8 @@ def scarica_risultati_pdf(tag: str, appello_id: int):
     tex_path.write_text(tex, encoding="utf-8")
     compilazione = compiti_service.compila_pdf(tex_path)
     if not compilazione.ok:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error", anchor="valutazione")
+        appello = corsi_service.get_appello(tag, appello_id)
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error", anchor=_anchor_membro(appello, "valutazione"))
     return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
 
 
@@ -1217,6 +1236,7 @@ def esporta_voti(request: Request, tag: str, appello_id: int):
         return templates.TemplateResponse(request, "esporta_voti_conferma.html", {
             "corso": corso, "appello": appello_singolo, "compilati": compilati if raggruppamento else [],
             "extra": extra, "csv_testo": testo, "codifica": codifica, "filename": filename,
+            "anchor_ritorno": anchor_errore,
         })
     return Response(
         testo.encode(codifica), media_type="text/csv",

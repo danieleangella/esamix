@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Conferma esportazione voti · {{ appello.nome }}{% endblock %}
 {% block breadcrumb %}
-<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#risultati">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Conferma esportazione voti</span>
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor_ritorno }}">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Conferma esportazione voti</span>
 {% endblock %}
 {% block content %}
 <h1>Conferma esportazione voti</h1>
