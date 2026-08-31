@@ -77,6 +77,7 @@ class Appello:
     orale_ora: Optional[str] = None
     orale_aula: Optional[str] = None
     chiuso: bool = False
+    iscritti_manuale: Optional[int] = None
 
 
 @dataclass
@@ -324,6 +325,7 @@ def _row_to_appello(conn, row) -> Appello:
         orale_ora=row["orale_ora"] if "orale_ora" in chiavi else None,
         orale_aula=row["orale_aula"] if "orale_aula" in chiavi else None,
         chiuso=bool(row["chiuso"]) if "chiuso" in chiavi else False,
+        iscritti_manuale=row["iscritti_manuale"] if "iscritti_manuale" in chiavi and row["iscritti_manuale"] is not None else None,
     )
 
 

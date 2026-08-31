@@ -55,7 +55,7 @@
   });
   </script>
   <table style="margin-top:0.75rem">
-    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA</th><th>Risultato</th><th></th></tr>
+    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th><a href="/corsi/{{ corso.tag }}/studenti?q={{ q }}&amp;filtro={{ filtro }}&amp;dsa={{ '' if dsa == '1' else '1' }}" title="{{ 'Rimuovi il filtro DSA' if dsa == '1' else 'Mostra solo studenti DSA' }}">DSA{% if dsa == '1' %} &#9660;{% endif %}</a></th><th>Risultato</th><th></th></tr>
     {% for s in studenti %}
     {% set st = stato_esame.get(s.matricola) %}
     <tr>

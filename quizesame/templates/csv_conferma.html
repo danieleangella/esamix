@@ -17,6 +17,10 @@
       <div class="stat-value">{{ verifica.aggiornati }}</div>
       <div class="stat-label">Aggiornamenti</div>
     </div>
+    <div class="stat-tile">
+      <div class="stat-value">{{ verifica.duplicati }}</div>
+      <div class="stat-label">Già presenti (identici)</div>
+    </div>
     <div class="stat-tile {{ 'stat-warn' if verifica.errori else '' }}">
       <div class="stat-value">{{ verifica.errori }}</div>
       <div class="stat-label">Righe con errori (saltate)</div>
@@ -38,16 +42,17 @@
     <div style="overflow-x:auto">
       <table>
         <tr>
-          <th><input type="checkbox" id="checkbox-tutte-righe" style="width:auto" checked></th>
+          <th><input type="checkbox" id="checkbox-tutte-righe" style="width:auto" {% if verifica.duplicati == 0 %}checked{% endif %}></th>
           <th>Riga</th><th>Esito</th><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th>
         </tr>
         {% for r in verifica.righe %}
         <tr>
-          <td>{% if not r.errore %}<input type="checkbox" name="righe_incluse" value="{{ r.numero_riga }}" class="campo-riga-inclusa" style="width:auto" checked>{% endif %}</td>
+          <td>{% if not r.errore %}<input type="checkbox" name="righe_incluse" value="{{ r.numero_riga }}" class="campo-riga-inclusa" style="width:auto" {% if r.stato != 'duplicato' %}checked{% endif %}>{% endif %}</td>
           <td>{{ r.numero_riga }}</td>
           <td>
             {% if r.stato == 'nuovo' %}<span class="badge badge-ok">nuovo</span>
             {% elif r.stato == 'aggiornamento' %}<span class="badge badge-warn">aggiornamento</span>
+            {% elif r.stato == 'duplicato' %}<span class="badge badge-info">già presente</span>
             {% else %}<span class="badge badge-err">errore</span>{% endif %}
           </td>
           {% if r.errore %}

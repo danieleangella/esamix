@@ -146,6 +146,19 @@ CREATE TABLE IF NOT EXISTS compito_esercizi (
     PRIMARY KEY (compito_id, posizione)
 );
 
+-- Ultimo file "Lista Studenti Esame" caricato dalla segreteria per un appello: da qui si
+-- ricavano sia l'elenco degli iscritti (per l'appello di presenza e il controllo in fase
+-- di correzione) sia, su richiesta, il file compilato da riproporre alla segreteria. Il
+-- testo è già decodificato (non i byte grezzi) così da poterlo ripubblicare con la stessa
+-- codifica rilevata al momento del caricamento.
+CREATE TABLE IF NOT EXISTS appello_segreteria_csv (
+    appello_id INTEGER PRIMARY KEY REFERENCES appelli(id),
+    nome_file TEXT NOT NULL,
+    contenuto TEXT NOT NULL,
+    codifica TEXT NOT NULL,
+    caricato_il TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS risultati (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     matricola TEXT NOT NULL REFERENCES studenti(matricola),
@@ -215,6 +228,7 @@ ADDITIVE_COLUMNS = {
         ("orale_ora", "TEXT"),
         ("orale_aula", "TEXT"),
         ("chiuso", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("iscritti_manuale", "INTEGER"),
     ],
 }
 

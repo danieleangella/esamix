@@ -17,12 +17,11 @@
   <h2>Appelli</h2>
   {% if appelli %}
   <table>
-    <tr><th>Nome</th><th>Tipo</th><th>Data</th><th>Risultati</th><th>Voto medio</th><th></th></tr>
+    <tr><th>Nome</th><th>Data</th><th>Risultati</th><th>Voto medio</th><th></th></tr>
     {% for a in appelli %}
     {% set s = statistiche[a.id] %}
     <tr>
       <td><a href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}" style="text-decoration:none; font-weight:500">{{ a.nome }}</a></td>
-      <td>{{ a.tipo }}</td>
       <td>{{ a.data or '-' }}</td>
       <td>
         {% if s.totale %}
@@ -46,13 +45,6 @@
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/nuovo" style="margin-top:1rem">
     <div class="form-grid">
       <div><label>Nome</label><input name="nome" required placeholder="es. Primo appello"></div>
-      <div>
-        <label>Tipo</label>
-        <select name="tipo">
-          <option value="appello" selected>Appello</option>
-          <option value="straordinario">Appello straordinario</option>
-        </select>
-      </div>
       <div><label>Data (opzionale)</label><input type="date" name="data"></div>
     </div>
     <button type="submit">Crea appello</button>

@@ -15,10 +15,6 @@
   <textarea name="csv_testo" style="display:none">{{ anteprima.csv_testo }}</textarea>
 
   <div class="card">
-    <label>Ignora le prime <input type="number" name="righe_da_ignorare" value="{{ 1 if anteprima.ha_intestazione else 0 }}" min="0" style="width:4rem; display:inline-block"> righe del file (es. intestazione)</label>
-  </div>
-
-  <div class="card">
     <h2>Abbinamento colonne</h2>
     <div class="form-grid">
       <div>
@@ -50,6 +46,10 @@
         </select>
       </div>
     </div>
+  </div>
+
+  <div class="card">
+    <label>Ignora le prime <input type="number" name="righe_da_ignorare" value="{{ 1 if anteprima.ha_intestazione else 0 }}" min="0" style="width:4rem; display:inline-block"> righe del file (es. intestazione)</label>
   </div>
 
   <div class="card">

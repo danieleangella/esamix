@@ -1,0 +1,253 @@
+<div class="tab-pane" data-pane="compiti{{ pane_suffix }}" style="display:none">
+
+{% if md.appello.chiuso %}
+<div class="card">
+  <p class="muted">Appello chiuso: non è possibile modificare gli iscritti o generare nuovi blocchi finché non lo riapri dalla scheda Impostazioni.</p>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Iscritti{% if md.numero_iscritti is not none %} ({{ md.numero_iscritti }}){% endif %}</h2>
+  {% if md.segreteria_csv %}
+  <p class="muted" style="margin-top:0">
+    File caricato: <strong>{{ md.segreteria_csv.nome_file }}</strong> (il {{ md.segreteria_csv.caricato_il }}) —
+    <strong>{{ md.iscritti|length }}</strong> iscritti trovati. Questo numero ha sempre la precedenza su un
+    eventuale numero inserito a mano.
+  </p>
+  <p class="muted">
+    Elenco per fare l'appello (per segnare le presenze):
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti.csv">.csv</a> ·
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti.pdf">.pdf</a>
+  </p>
+  {% if not md.appello.chiuso %}
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/segreteria-csv/elimina"
+        onsubmit="return confirm('Rimuovere il file caricato? Il numero di iscritti tornerà a quello eventualmente inserito a mano, e non sarà più possibile compilare il file per la segreteria finché non ne carichi uno nuovo.');">
+    <button type="submit" class="secondary">Rimuovi file caricato</button>
+  </form>
+  {% endif %}
+  {% else %}
+  <p class="muted" style="margin-top:0">
+    Nessun file della segreteria ancora caricato: se non lo carichi, indica qui a mano il numero di iscritti
+    (usato per il numero suggerito di compiti da generare qui sotto).
+  </p>
+  {% if not md.appello.chiuso %}
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale" style="margin-bottom:0.75rem">
+    <div class="form-grid">
+      <div><label>Numero di iscritti (facoltativo)</label><input type="number" name="iscritti_manuale" min="0" value="{{ md.appello.iscritti_manuale or '' }}"></div>
+    </div>
+    <button type="submit" class="secondary">Salva</button>
+  </form>
+  {% endif %}
+  {% endif %}
+
+  {% if not md.appello.chiuso %}
+  <details style="margin-top:0.75rem" {% if not md.segreteria_csv %}open{% endif %}>
+    <summary>{{ 'Aggiorna' if md.segreteria_csv else 'Carica' }} il file della segreteria ("Lista Studenti Esame")</summary>
+    <p class="muted" style="margin-top:1rem">
+      Caricalo qui una volta sola: da questo file si ricava sia il numero di iscritti (con priorità su quello
+      inserito a mano) sia l'elenco per fare l'appello. Servirà anche per compilare il file da restituire alla
+      segreteria, dalla scheda Valutazione scritti — se è presente questo elenco, correggere o segnare
+      assente/ritirato uno studente che non vi compare non è consentito.
+    </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/segreteria-csv" enctype="multipart/form-data">
+      <input type="file" name="file" accept=".csv" required>
+      <button type="submit">Carica</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Crea compiti</h2>
+  {% if md.avviso_pochi_compiti %}
+  <div class="flash flash-warning" style="margin-bottom:1rem">
+    Attenzione: sono stati generati {{ md.compiti|length }} compiti in totale, ma risultano
+    {{ md.numero_iscritti }} iscritti: genera almeno un altro blocco prima dell'appello.
+  </div>
+  {% endif %}
+  {% if md.appello.chiuso %}
+  <p class="muted">Appello chiuso: non è possibile generare nuovi blocchi finché non lo riapri.</p>
+  {% else %}
+  {% if not md.esercizi_assegnati %}
+  <p class="muted">Assegna prima almeno un esercizio dalla scheda Testo.</p>
+  {% endif %}
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/genera-compiti"
+        class="form-genera-compiti"
+        data-obbligatori-assegnati="{{ md.esercizi_assegnati|selectattr('obbligatorio')|list|length }}"
+        data-obbligatori-attesi="{{ md.consegna_effettivo }}">
+    <div class="form-grid">
+      <div><label>Numero studenti</label><input type="number" name="numero_studenti" value="{{ md.numero_studenti_suggerito }}" min="0" required></div>
+    </div>
+    <button type="submit" {% if not md.esercizi_assegnati %}disabled{% endif %}>Genera nuovo blocco di compiti</button>
+  </form>
+  <p class="muted" style="margin-top:0.5rem">
+    Ogni generazione crea un nuovo blocco (un proprio file PDF con i compiti e uno con la
+    griglia delle soluzioni); il foglio di riferimento con le risposte corrette è comune a
+    tutti i blocchi e viene creato solo la prima volta. Il numero suggerito qui sopra genera un
+    totale di compiti leggermente superiore (+10%) al numero di iscritti.
+  </p>
+  <script>
+  (function () {
+    var root = document.currentScript.closest(".tab-pane");
+    var form = root.querySelector(".form-genera-compiti");
+    if (!form) return;
+    form.addEventListener("submit", function (ev) {
+      var assegnati = parseInt(form.dataset.obbligatoriAssegnati, 10);
+      var attesi = parseInt(form.dataset.obbligatoriAttesi, 10);
+      if (assegnati !== attesi) {
+        var msg = "Questo appello ha " + assegnati + " esercizi obbligatori assegnati, ma le " +
+          "impostazioni del corso ne prevedono " + attesi + ". Procedere comunque?";
+        if (!window.confirm(msg)) {
+          ev.preventDefault();
+        }
+      }
+    });
+  })();
+  </script>
+  {% endif %}
+  {% if md.riferimento_tex_esiste %}
+  <p>
+    <strong>Foglio di riferimento</strong> (testo e risposte corrette, comune a tutti i blocchi, da pubblicare online):
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.tex">.tex</a>
+    {% if md.riferimento_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.pdf">.pdf</a>{% endif %}
+  </p>
+  {% endif %}
+  {% if md.blocchi %}
+  {% if md.blocchi|length > 1 %}
+  <p><a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/tutti.pdf">Scarica tutti i blocchi insieme in un unico PDF</a></p>
+  {% endif %}
+  <table>
+    <tr><th>Blocco</th><th>Studenti</th><th>Creato il</th><th>Testo</th><th>Griglia soluzioni</th><th></th></tr>
+    {% for b in md.blocchi %}
+    <tr>
+      <td>{{ b.numero }}</td>
+      <td>{{ b.numero_studenti }}</td>
+      <td class="muted">{{ b.creato_il or 'recuperato (generato prima di questo aggiornamento)' }}</td>
+      <td>
+        <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/testo.tex">.tex</a>
+        {% if b.pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/testo.pdf">.pdf</a>{% endif %}
+      </td>
+      <td>
+        <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/griglia.html">.html</a> ·
+        <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/griglia.tex">.tex</a>
+        {% if b.griglia_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/griglia.pdf">.pdf</a>{% endif %}
+      </td>
+      <td>
+        {% if not md.appello.chiuso %}
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/elimina"
+              onsubmit="return confirm('Eliminare il blocco {{ b.numero }} ({{ b.numero_studenti }} compiti)? Possibile solo se non ha già risultati registrati.');">
+          <button type="submit" class="danger">Elimina</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  <p class="muted">{{ md.compiti|length }} compiti registrati in totale.</p>
+</div>
+
+{% if md.ammessi is defined %}
+<div class="card">
+  <h2>Studenti ammessi e aule ({{ md.ammessi|length }})</h2>
+  <p class="muted" style="margin-top:0">
+    Scarica elenco ammessi:
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi.csv">.csv</a> ·
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi.pdf">.pdf</a>
+  </p>
+  <table>
+    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA</th><th>Aula</th><th></th></tr>
+    {% for s in md.ammessi %}
+    <tr>
+      <td>{{ s.matricola }}</td>
+      <td>{{ s.cognome }}</td>
+      <td>{{ s.nome }}</td>
+      <td>{% if s.dsa %}<span class="badge badge-info">DSA</span>{% endif %}</td>
+      <td>
+        {% if md.aule %}
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/{{ s.matricola }}/assegna-manuale">
+          <select name="aula_id" style="width:auto" onchange="this.form.requestSubmit()">
+            <option value="">non assegnata</option>
+            {% for a in md.aule %}<option value="{{ a.id }}" {% if s.aula_id == a.id %}selected{% endif %}>{{ a.nome }}</option>{% endfor %}
+          </select>
+        </form>
+        {% else %}
+        <span class="muted">{{ s.aula_nome or 'nessuna aula configurata' }}</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if s.in_deroga %}
+        <span class="badge badge-warn" title="Aggiunto a mano: non soddisfa i requisiti automatici di ammissione">in deroga</span>
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi/{{ s.matricola }}/rimuovi"
+              onsubmit="return confirm('Rimuovere {{ s.cognome }} {{ s.nome }} dagli ammessi a questa prova?');">
+          <button type="submit" class="secondary" style="margin-top:0">Rimuovi</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <details style="margin-top:0.75rem">
+    <summary>Aggiungi manualmente uno studente (anche se non soddisfa i requisiti)</summary>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi/aggiungi" style="margin-top:1rem" autocomplete="off">
+      <div class="form-grid">
+        <div style="position:relative">
+          <label>Matricola o nome</label>
+          <input name="matricola" class="campo-input-matricola-ammesso" autocomplete="off" required>
+          <div class="campo-suggerimenti-studenti-ammesso sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:0.5rem">Uno studente aggiunto così comparirà nell'elenco ammessi con l'avviso "in deroga", anche se
+        non ha superato la prova precedente (o non rispetta la soglia di matricola sulla prima prova).</p>
+      <button type="submit" class="secondary">Aggiungi</button>
+    </form>
+    <script>
+    (function () {
+      var root = document.currentScript.closest(".tab-pane");
+      creaAutocomplete(
+        root.querySelector(".campo-input-matricola-ammesso"), root.querySelector(".campo-suggerimenti-studenti-ammesso"),
+        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+        function (s) { return s.matricola; }
+      );
+    })();
+    </script>
+  </details>
+
+  <h3 style="margin-top:1.5rem">Aule di questa prova</h3>
+  {% if md.aule %}
+  <table>
+    <tr><th>Nome</th><th>Capienza</th><th></th></tr>
+    {% for a in md.aule %}
+    <tr>
+      <td>{{ a.nome }}</td>
+      <td>{{ a.capienza }}</td>
+      <td>
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/{{ a.id }}/elimina"
+              onsubmit="return confirm('Eliminare l\'aula {{ a.nome }}? Gli studenti già assegnati resteranno senza aula.');">
+          <button type="submit" class="danger">Elimina</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nessuna aula ancora configurata per questa prova.</p>
+  {% endif %}
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/nuova" style="margin-top:0.75rem">
+    <div class="form-grid">
+      <div><label>Nome aula</label><input name="nome" required></div>
+      <div><label>Capienza</label><input type="number" name="capienza" min="1" required></div>
+    </div>
+    <button type="submit" class="secondary">Aggiungi aula</button>
+  </form>
+  {% if md.aule %}
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/assegna" style="margin-top:0.75rem">
+    <button type="submit">Assegna automaticamente gli ammessi non ancora fissati a mano</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+
+</div>

@@ -5,7 +5,7 @@
     <div><label>Nome (etichetta breve, opzionale)</label><input name="nome" value="{{ esercizio.nome or '' if esercizio is defined else '' }}" placeholder="es. Area triangolo"></div>
     <div>
       <label>Argomento (opzionale)</label>
-      <input name="argomento" value="{{ esercizio.argomento or '' if esercizio is defined else '' }}" list="lista-argomenti" placeholder="es. Geometria analitica">
+      <input name="argomento" value="{{ esercizio.argomento or '' if esercizio is defined else '' }}" list="lista-argomenti" autocomplete="off" placeholder="es. Geometria analitica">
       <datalist id="lista-argomenti">
         {% for a in (argomenti or []) %}<option value="{{ a }}">{% endfor %}
       </datalist>

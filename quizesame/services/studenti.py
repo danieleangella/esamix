@@ -447,20 +447,26 @@ def verifica_import_csv(
         }
     finally:
         conn.close()
-    nuovi = aggiornati = errori = 0
+    nuovi = aggiornati = errori = duplicati = 0
     for r in righe:
         if r.get("errore"):
             errori += 1
             r["stato"] = "errore"
         elif r["matricola"] in esistenti:
-            aggiornati += 1
-            r["stato"] = "aggiornamento"
-            r["nome_attuale"] = esistenti[r["matricola"]]["nome"]
-            r["cognome_attuale"] = esistenti[r["matricola"]]["cognome"]
+            attuale = esistenti[r["matricola"]]
+            r["nome_attuale"] = attuale["nome"]
+            r["cognome_attuale"] = attuale["cognome"]
+            if attuale["nome"].strip().lower() == r["nome"].strip().lower() and \
+                    attuale["cognome"].strip().lower() == r["cognome"].strip().lower():
+                duplicati += 1
+                r["stato"] = "duplicato"
+            else:
+                aggiornati += 1
+                r["stato"] = "aggiornamento"
         else:
             nuovi += 1
             r["stato"] = "nuovo"
-    return {"righe": righe, "nuovi": nuovi, "aggiornati": aggiornati, "errori": errori}
+    return {"righe": righe, "nuovi": nuovi, "aggiornati": aggiornati, "errori": errori, "duplicati": duplicati}
 
 
 def importa_csv_mappato(

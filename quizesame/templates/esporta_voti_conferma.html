@@ -6,18 +6,44 @@
 {% block content %}
 <h1>Conferma esportazione voti</h1>
 
+{% if extra %}
 <div class="card">
+  <h2>Studenti da aggiungere a mano ({{ extra|length }})</h2>
+  <p class="muted" style="margin-top:0">
+    Questi studenti hanno una valutazione registrata in EsaMiX, ma la loro matricola non compare affatto
+    nel file "{{ filename }}" caricato: il file compilato qui sotto non ha una riga in cui scriverli,
+    quindi vanno aggiunti a mano sul sistema della segreteria. L'elenco qui sotto è pronto da copiare e
+    incollare (una riga per studente, colonne separate da tabulazione: Matricola, Cognome, Nome, Esito).
+  </p>
+  <table>
+    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Esito</th></tr>
+    {% for r in extra %}
+    <tr><td>{{ r.matricola }}</td><td>{{ r.cognome }}</td><td>{{ r.nome }}</td><td>{{ r.voto_label }}</td></tr>
+    {% endfor %}
+  </table>
+  <label style="margin-top:0.75rem">Da copiare</label>
+  <textarea readonly rows="{{ extra|length }}" style="font-family:monospace" onclick="this.select()">{% for r in extra %}{{ r.matricola }}	{{ r.cognome }}	{{ r.nome }}	{{ r.voto_label }}
+{% endfor %}</textarea>
+</div>
+{% endif %}
+
+<div class="card">
+  {% if compilati %}
   <p class="muted" style="margin-top:0">
     Il file è stato compilato per {{ compilati|length }} studenti. Scegli quali verbalizzare subito (torneranno
     nella scheda "Voti verbalizzati"): deselezionali se preferisci scaricare solo il file, senza verbalizzare
     nulla in questo momento.
   </p>
+  {% else %}
+  <p class="muted" style="margin-top:0">Il file è pronto per il download.</p>
+  {% endif %}
 
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esporta-voti/conferma" id="form-esporta-voti-conferma">
     <textarea name="csv_testo" style="display:none">{{ csv_testo }}</textarea>
     <input type="hidden" name="codifica" value="{{ codifica }}">
     <input type="hidden" name="filename" value="{{ filename }}">
 
+    {% if compilati %}
     <table>
       <tr>
         <th><input type="checkbox" id="checkbox-tutti-compilati" style="width:auto" checked></th>
@@ -35,8 +61,12 @@
 
     <button type="submit" id="btn-conferma-verbalizza">Conferma e verbalizza ({{ compilati|length }})</button>
     <button type="button" id="btn-scarica-senza-verbalizzare" class="secondary">Scarica senza verbalizzare</button>
+    {% else %}
+    <button type="submit">Scarica il file compilato</button>
+    {% endif %}
   </form>
 </div>
+{% if compilati %}
 <script>
 (function () {
   var checkboxTutti = document.getElementById("checkbox-tutti-compilati");
@@ -63,4 +93,5 @@
   });
 })();
 </script>
+{% endif %}
 {% endblock %}
