@@ -18,9 +18,17 @@
   <p>
     Dalla scheda Impostazioni si scarica anche un <strong>backup</strong> (zip con
     database e tutti i file generati) del singolo corso, oppure — dalle Impostazioni
-    dell'app — un backup completo con tutti i corsi insieme. Un corso si può anche
-    <strong>eliminare definitivamente</strong> (con doppia conferma): azione
-    irreversibile, senza backup automatico, quindi conviene farne uno prima.
+    dell'app — un backup completo con tutti i corsi insieme. Ogni riquadro delle
+    Impostazioni ha il proprio pulsante Salva, così si può salvare una singola sezione
+    senza dover compilare anche le altre.
+  </p>
+  <p>
+    Un corso si può <strong>eliminare definitivamente</strong> scrivendo il suo tag in
+    una casella di conferma (azione irreversibile, senza backup automatico, quindi
+    conviene farne uno prima). Questa stessa richiesta di scrivere una frase per
+    confermare — invece di un secondo popup generico — vale per tutte le azioni più
+    delicate dell'app (eliminare un appello con risultati già registrati, ripristinare
+    un backup che sovrascrive corsi esistenti, eliminare tutti i dati).
   </p>
 </div>
 
@@ -60,9 +68,39 @@
 </div>
 
 <div class="card">
-  <h2>Generare i compiti</h2>
+  <h2>Un appello, scheda per scheda</h2>
   <p>
-    Dalla scheda <strong>Testo</strong> di un appello, "Genera nuovo blocco di compiti"
+    La pagina di un appello si apre sulla scheda <strong>Home</strong>: data, compiti
+    stampati, iscritti/presenti/ritirati/sufficienti e una barra di avanzamento (colorata
+    in base alla percentuale: rossa sotto il 30%, arancione fino al 60%, gialla fino al
+    99%, verde al 100%) che riassume a che punto si è nel flusso testo → stampa →
+    valutazione → eventuali orali → chiusura. Le altre schede sono <strong>Testo</strong>
+    (esercizi assegnati), <strong>Compiti d'esame</strong> (iscritti e generazione dei
+    blocchi, vedi sotto), <strong>Valutazione scritti</strong>, <strong>Orali</strong>,
+    <strong>Voti verbalizzati</strong>, <strong>Statistiche</strong> e
+    <strong>Impostazioni</strong>.
+  </p>
+</div>
+
+<div class="card">
+  <h2>Iscritti e generazione dei compiti</h2>
+  <p>
+    Nella scheda <strong>Compiti d'esame</strong> si indicano gli iscritti a un appello,
+    in uno di tre modi: caricando una volta sola il file "Lista Studenti Esame" scaricato
+    dalla segreteria (da cui si ricava anche l'elenco per fare l'appello e, più avanti, il
+    file compilato da restituire), aggiungendoli singolarmente a mano per nome o
+    matricola, oppure — più rapidamente ma senza un elenco nominale — indicando solo un
+    numero. Il file della segreteria, quando caricato, ha sempre la precedenza sugli
+    altri due.
+  </p>
+  <p>
+    Quando è stato indicato un elenco nominale (file o aggiunta a mano), correggere o
+    segnare assente/ritirato uno studente che non vi compare non è consentito: serve
+    prima aggiungerlo all'elenco. Il numero di iscritti determina anche il numero
+    suggerito di compiti da generare (con un margine del +10%).
+  </p>
+  <p>
+    Dalla stessa scheda, "Genera nuovo blocco di compiti"
     crea un <strong>blocco</strong>: un insieme di compiti (uno per studente, con codice
     univoco) stampati insieme. Si possono generare più blocchi nel tempo per lo stesso
     appello (es. per chi arriva più tardi, o per aule diverse). Il <strong>foglio di
@@ -73,13 +111,15 @@
     Se si modificano gli esercizi assegnati dopo aver già generato un blocco, l'app
     chiede conferma e rigenera automaticamente tutti i blocchi esistenti (con nuovi
     codici) — a meno che qualche blocco non abbia già risultati registrati, nel qual
-    caso la modifica viene bloccata per non invalidare compiti già corretti.
+    caso la modifica viene bloccata per non invalidare compiti già corretti. Il testo si
+    aggiorna subito; i PDF si ricompilano in background, quindi possono restare quelli
+    vecchi per qualche istante dopo il salvataggio.
   </p>
   <p class="muted">
     Un blocco senza risultati registrati si può eliminare; con più blocchi generati, si
     possono anche scaricare tutti insieme in un unico PDF. Un intero appello si può
-    eliminare anche se ha già risultati registrati, ma con doppia conferma: verranno
-    persi insieme a esercizi assegnati, blocchi e compiti.
+    eliminare anche se ha già risultati registrati, scrivendo il suo nome in una casella
+    di conferma: verranno persi insieme a esercizi assegnati, blocchi e compiti.
   </p>
 </div>
 
@@ -112,6 +152,13 @@
     Un esito già inserito si può modificare in qualsiasi momento (voto e/o risposte, con
     ricalcolo) finché non è verbalizzato. Per chi non si è presentato o si è ritirato
     durante la prova, si usa "Segna assente o ritirato" invece della correzione normale.
+    Se è stato indicato un elenco iscritti (vedi sopra), correggere o segnare
+    assente/ritirato uno studente che non vi compare è bloccato.
+  </p>
+  <p>
+    La pagina di un singolo compito corretto mostra anche, in fondo, un link discreto
+    "Modifica" (finché l'appello non è chiuso) e lo storico dello studente in questo
+    corso, con il compito corrente evidenziato tra gli altri appelli già sostenuti.
   </p>
 </div>
 
@@ -119,12 +166,14 @@
   <h2>Orale</h2>
   <p>
     Nella scheda <strong>Orali</strong> di un appello compaiono gli studenti in attesa:
-    per ciascuno si registra l'esito (voto assegnato, assente, o insufficiente). Nelle
-    impostazioni del corso si può decidere se, una volta richiesto l'orale a uno
-    studente, resti obbligatorio per lui in tutti gli appelli successivi (anche in un
-    altro anno accademico, se lo studente viene importato da un corso precedente), ed
-    eventualmente attivare una soglia automatica ("obbligatorio dopo N compiti con voto
-    sotto M", con la possibilità di contare anche i ritirati).
+    per ciascuno si registra l'esito (voto assegnato, assente, o insufficiente). Un
+    riquadro a scomparsa più sotto, "Orali svolti", raccoglie invece chi lo ha già
+    sostenuto, con l'indicazione di quanti. Nelle impostazioni del corso si può decidere
+    se, una volta richiesto l'orale a uno studente, resti obbligatorio per lui in tutti
+    gli appelli successivi (anche in un altro anno accademico, se lo studente viene
+    importato da un corso precedente), ed eventualmente attivare una soglia automatica
+    ("obbligatorio dopo N compiti con voto sotto M", con la possibilità di contare anche
+    i ritirati).
   </p>
 </div>
 
@@ -132,17 +181,32 @@
   <h2>Verbalizzazione e statistiche</h2>
   <p>
     Gli studenti idonei non ancora verbalizzati compaiono in fondo alla scheda
-    "Valutazione scritti"; una volta verbalizzato, un esito non è più modificabile o
-    eliminabile. La scheda <strong>Statistiche</strong> di un appello mostra promossi e
-    insufficienti (con percentuali), medie scritto/orale, distribuzione dei voti
-    confrontata con una gaussiana teorica (con asimmetria, curtosi e una misura sintetica
-    della distanza dalla campana teorica), e gli esercizi più sbagliati con la
-    percentuale di ciascuna risposta sbagliata scelta.
+    "Valutazione scritti", con un pulsante "Verbalizza" per ciascuno (oltre a quello per
+    verbalizzarli tutti insieme) e uno per rifiutare il voto; una volta verbalizzato, un
+    esito non è più modificabile o eliminabile. Chi ha sostenuto l'orale è segnalato come
+    tale sia tra i risultati inseriti sia tra i voti verbalizzati.
+  </p>
+  <p>
+    La scheda <strong>Statistiche</strong> di un appello mostra promossi e insufficienti
+    (con percentuali, evidenziate in rosso se gli insufficienti superano il 50%), medie
+    scritto/orale/variazione dopo l'orale, distribuzione dei voti confrontata con una
+    gaussiana teorica (asimmetria, curtosi e una misura sintetica della distanza dalla
+    campana teorica, anch'essa in rosso se indica una forma molto diversa da quella
+    attesa), e gli esercizi più sbagliati con la percentuale di ciascuna risposta
+    sbagliata scelta. Passando il mouse sul nome di ogni indice compare una breve nota su
+    cosa indica e come leggerlo.
   </p>
   <p>
     La scheda <strong>Statistiche</strong> del corso (accanto ad Appelli/Studenti/
     Esercizi) aggrega gli stessi numeri su tutti gli appelli, con una tabella e un
     grafico dell'andamento di esami svolti e promossi appello per appello.
+  </p>
+  <p>
+    La pagina <strong>Statistiche generali</strong> (raggiungibile scegliendo più corsi
+    dalla homepage) aggrega più corsi insieme — un filtro per nome aiuta a selezionare
+    rapidamente tutte le edizioni dello stesso insegnamento — e mostra anche l'andamento
+    per anno accademico: numero di studenti e percentuale di promossi, oltre a due
+    grafici con la variazione nel tempo di percentuale promossi e voto medio.
   </p>
 </div>
 
@@ -152,7 +216,9 @@
     Si aggiungono singolarmente (rifiuta una matricola già assegnata a un altro
     studente), si importano da CSV, o si importano da un altro corso (solo chi non ha
     ancora superato l'esame in quello di origine — utile a inizio anno per ripescare chi
-    deve ripetere). Cliccando su nome o cognome di uno studente si apre una pagina di
+    deve ripetere; un filtro opzionale restringe ulteriormente a chi non lo ha ancora
+    <em>sostenuto</em> nemmeno una volta, escludendo anche chi ha già tentato senza
+    superarlo). Cliccando su nome o cognome di uno studente si apre una pagina di
     riepilogo con tutti i suoi esami, suddivisi per anno accademico.
   </p>
   <p>
@@ -191,32 +257,44 @@
   </p>
   <p>
     Una prova membro non ha più una pagina propria: tutto vive nella pagina del
-    raggruppamento, con una scheda "Testo N"/"Valutazione N" per ciascuna prova (in
-    ordine di data) e delle schede globali — <strong>Risultati</strong> (elenco
-    combinato, verbalizzazione ed esportazione .tex/.pdf/segreteria), <strong>Orali</strong>
-    (l'orale è unico per il raggruppamento: se richiesto durante la correzione di una
-    prova, il suo voto sostituisce la media delle prove parziali una volta svolto),
-    <strong>Voti verbalizzati</strong>, <strong>Statistiche</strong> (per prova e
-    combinate) e <strong>Impostazioni</strong>.
+    raggruppamento, con una riga di tab per ciascuna prova (nell'ordine, col nome vero
+    della prova seguito dai pulsanti "Testo"/"Compiti d'esame"/"Valutazione") e delle
+    schede globali — <strong>Risultati</strong> (elenco combinato, verbalizzazione ed
+    esportazione .tex/.pdf/segreteria), <strong>Orali</strong> (l'orale è unico per il
+    raggruppamento: se richiesto durante la correzione di una prova, il suo voto
+    sostituisce la media delle prove parziali una volta svolto), <strong>Voti
+    verbalizzati</strong>, <strong>Statistiche</strong> (per prova e combinate) e
+    <strong>Impostazioni</strong>.
   </p>
   <p>
     Alla seconda prova (e successive) può partecipare solo chi ha superato la prova
     precedente con il voto minimo delle prove parziali; in Impostazioni si può anche
     fissare una <strong>matricola minima</strong> per escludere dalla prima prova gli
-    iscritti di anni precedenti. Nella scheda Testo di ciascuna prova si trova l'elenco
-    degli studenti ammessi (esportabile in .csv e .pdf, quest'ultimo pensato per fare
-    l'appello in aula), insieme alla gestione delle <strong>aule</strong>: si possono
-    definire più aule con una capienza, e assegnare automaticamente gli ammessi in
-    ordine di cognome, proporzionalmente alla capienza di ciascuna (le assegnazioni
-    fatte a mano non vengono mai toccate da un successivo ricalcolo automatico). Uno
-    studente che non soddisfa i requisiti si può comunque aggiungere a mano all'elenco
-    ammessi di una prova: comparirà con l'avviso "in deroga" (anche nell'export csv/pdf),
-    e si può togliere di nuovo in qualsiasi momento.
+    iscritti di anni precedenti. Il numero di compiti suggerito per ciascuna prova si
+    basa proprio su questo elenco di ammessi, non sugli iscritti generali del
+    raggruppamento.
+  </p>
+  <p>
+    Nella scheda Compiti d'esame di ciascuna prova, dietro un dettaglio a scomparsa
+    (solo il PDF resta visibile di default, per velocità), si trova l'elenco degli
+    studenti ammessi — con eventuali note DSA/in deroga — esportabile in .csv e .pdf
+    (quest'ultimo pensato per fare l'appello in aula, con una riga di separazione tra uno
+    studente e l'altro e la casella di presenza come prima colonna), insieme alla
+    gestione delle <strong>aule</strong>: si possono definire più aule con una capienza,
+    e assegnare automaticamente gli ammessi in ordine di cognome, proporzionalmente alla
+    capienza di ciascuna (le assegnazioni fatte a mano non vengono mai toccate da un
+    successivo ricalcolo automatico). Uno studente che non soddisfa i requisiti si può
+    comunque aggiungere a mano all'elenco ammessi di una prova: comparirà con l'avviso
+    "in deroga" (anche nell'export csv/pdf), e si può togliere di nuovo in qualsiasi
+    momento.
   </p>
   <p>
     L'esportazione voti per la segreteria, dalla scheda Risultati, chiede conferma prima
     di verbalizzare: si può scegliere quali studenti compilati verbalizzare subito
-    (torneranno tra i "Voti verbalizzati") e quali lasciare solo nel file scaricato.
+    (torneranno tra i "Voti verbalizzati") e quali lasciare solo nel file scaricato. Se
+    qualche studente ha una valutazione da esportare ma la sua matricola non compare nel
+    file caricato, compare un avviso con l'elenco pronto da copiare e incollare, per
+    aggiungerlo a mano sul sistema della segreteria.
   </p>
 </div>
 
@@ -226,7 +304,14 @@
     Distinte dalle impostazioni di un singolo corso: dal link <strong>Impostazioni</strong>
     nel menu in alto si imposta il nome del docente (mostrato accanto al titolo "EsaMiX")
     e si può disattivare il riquadro di riepilogo generale (esami svolti e sufficienze su
-    tutti i corsi) che compare in homepage.
+    tutti i corsi) che compare in homepage. Da qui si scaricano e ripristinano anche i
+    backup di tutti i corsi insieme.
+  </p>
+  <p>
+    In fondo alla pagina, <strong>"Elimina tutti i dati"</strong> cancella
+    definitivamente ogni corso dell'installazione (studenti, esercizi, appelli,
+    risultati): richiede di scrivere la frase di conferma indicata, ed è irreversibile —
+    conviene scaricare un backup completo prima di usarla.
   </p>
 </div>
 

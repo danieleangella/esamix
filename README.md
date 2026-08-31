@@ -119,6 +119,9 @@ resta sul computer su cui gira l'app.
 
 Dalla pagina Impostazioni di un corso (o dalle Impostazioni generali dell'app, per tutti
 i corsi insieme) si può scaricare in qualsiasi momento un **backup** in formato zip.
+Sempre dalle Impostazioni generali dell'app è possibile eliminare definitivamente tutti
+i corsi presenti (azione irreversibile, protetta da una frase di conferma da scrivere):
+conviene farne un backup prima.
 
 ## Importare i dati di un corso già gestito con la vecchia versione a riga di comando
 
