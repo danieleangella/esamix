@@ -211,3 +211,8 @@ code { background: #f1f2f4; padding: 0.1rem 0.3rem; border-radius: 4px; }
 .stat-tile.stat-danger .stat-value { color: var(--err-text); }
 .stat-label-info { cursor: help; text-decoration: underline dotted; text-decoration-color: var(--muted); }
 .campo-obbligatorio::after { content: " *"; color: var(--err-text); }
+
+@keyframes easter-egg-cade {
+  from { transform: translateY(0) rotate(0deg); opacity: 1; }
+  to { transform: translateY(105vh) rotate(360deg); opacity: 0.9; }
+}

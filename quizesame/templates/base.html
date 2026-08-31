@@ -264,6 +264,55 @@
       });
     });
   })();
+
+  // Easter egg: il classico Konami code (↑↑↓↓←→←→BA), attivo in qualunque pagina
+  // dell'app tranne mentre si sta scrivendo dentro un campo di testo.
+  (function () {
+    var sequenza = [
+      "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
+      "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a",
+    ];
+    var progresso = 0;
+    document.addEventListener("keydown", function (ev) {
+      var tag = (ev.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      var tasto = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
+      progresso = (tasto === sequenza[progresso]) ? progresso + 1 : (tasto === sequenza[0] ? 1 : 0);
+      if (progresso === sequenza.length) {
+        progresso = 0;
+        lanciaEasterEgg();
+      }
+    });
+
+    function lanciaEasterEgg() {
+      var emoji = ["🎓", "✅", "💯", "📝", "🎉", "⭐"];
+      var pioggia = document.createElement("div");
+      pioggia.style.cssText = "position:fixed; inset:0; pointer-events:none; z-index:9999; overflow:hidden;";
+      document.body.appendChild(pioggia);
+      for (var i = 0; i < 60; i++) {
+        var pezzo = document.createElement("span");
+        pezzo.textContent = emoji[Math.floor(Math.random() * emoji.length)];
+        var durata = 2.5 + Math.random() * 1.5;
+        var ritardo = Math.random() * 1.2;
+        pezzo.style.cssText =
+          "position:absolute; top:-2rem; left:" + (Math.random() * 100) + "vw;" +
+          "font-size:" + (1.2 + Math.random() * 1.3) + "rem;" +
+          "animation: easter-egg-cade " + durata + "s linear " + ritardo + "s 1;";
+        pioggia.appendChild(pezzo);
+      }
+      var messaggio = document.createElement("div");
+      messaggio.textContent = "100 e lode! Hai trovato l'easter egg di EsaMiX 🎓";
+      messaggio.style.cssText =
+        "position:fixed; left:50%; top:1.5rem; transform:translateX(-50%); z-index:10000;" +
+        "background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:10px;" +
+        "padding:0.75rem 1.25rem; font-weight:600; box-shadow:0 4px 16px rgba(0,0,0,0.25);";
+      document.body.appendChild(messaggio);
+      setTimeout(function () {
+        pioggia.remove();
+        messaggio.remove();
+      }, 4200);
+    }
+  })();
   </script>
 </body>
 </html>
