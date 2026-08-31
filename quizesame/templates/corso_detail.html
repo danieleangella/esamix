@@ -45,7 +45,7 @@
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/nuovo" style="margin-top:1rem">
     <div class="form-grid">
       <div><label class="campo-obbligatorio">Nome</label><input name="nome" required placeholder="es. Primo appello"></div>
-      <div><label>Data</label><input type="date" name="data"></div>
+      <div><label>Data</label><input type="date" name="data" min="2001-01-01" max="2099-12-31"></div>
     </div>
     <button type="submit">Crea appello</button>
   </form>

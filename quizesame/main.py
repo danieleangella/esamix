@@ -58,15 +58,24 @@ def _data_it_a_iso(data: str) -> str:
 def _data_iso_a_it(data: str) -> str:
     """Converte una data 'aaaa-mm-gg' (formato inviato da <input type="date">) nel formato
     'gg/mm/aaaa' con cui l'app salva le date altrove (testo dei compiti, verbali, ecc.):
-    stringa vuota se la data manca o non è nel formato atteso."""
+    stringa vuota se la data manca o non è nel formato atteso. Solleva ValueError se
+    l'anno è fuori dall'intervallo 2001-2099 (tipicamente un errore di battitura o di
+    scorrimento del selettore)."""
+    dato = (data or "").strip()
+    if not dato:
+        return ""
     try:
-        a, m, g = (data or "").strip().split("-")
-        return f"{int(g):02d}/{int(m):02d}/{int(a):04d}"
+        a, m, g = dato.split("-")
+        anno, mese, giorno = int(a), int(m), int(g)
     except ValueError:
         return ""
+    if not (2001 <= anno <= 2099):
+        raise ValueError(f"Data non valida: l'anno deve essere compreso tra il 2001 e il 2099 (hai indicato {anno})")
+    return f"{giorno:02d}/{mese:02d}/{anno:04d}"
 
 
 templates.env.filters["data_iso"] = _data_it_a_iso
+templates.env.filters["js"] = lambda value: json.dumps(str(value))
 templates.env.globals["static_version"] = _static_version
 templates.env.globals["get_app_settings"] = app_config_service.get_settings
 
@@ -81,7 +90,9 @@ def _anchor_membro(appello, base: str) -> str:
     return f"{base}-{appello.id}" if appello.membro_raggruppamento else base
 
 
-def flash_redirect(url: str, message: str, kind: str = "success", anchor: str = "") -> RedirectResponse:
+def flash_redirect(
+    url: str, message: str, kind: str = "success", anchor: str = "", dettaglio: str = "",
+) -> RedirectResponse:
     from urllib.parse import quote
     sep = "&" if "?" in url else "?"
     # l'anchor va anche nella query string (oltre che nel fragment): un fragment non
@@ -91,6 +102,10 @@ def flash_redirect(url: str, message: str, kind: str = "success", anchor: str = 
     params = f"msg={quote(message)}&kind={kind}"
     if anchor:
         params += f"&anchor={quote(anchor)}"
+    if dettaglio:
+        # usato per errori con un dettaglio lungo (es. log di compilazione LaTeX): il
+        # template mostra questo testo in un riquadro copiabile che non sparisce da solo.
+        params += f"&dettaglio={quote(dettaglio)}"
     suffisso = f"#{anchor}" if anchor else ""
     return RedirectResponse(f"{url}{sep}{params}{suffisso}", status_code=303)
 
@@ -120,7 +135,16 @@ def _proteggi_modifica_esercizi(tag: str, appello_id: int) -> None:
 
 def _compila_in_background(percorsi: list) -> None:
     with ThreadPoolExecutor(max_workers=len(percorsi)) as pool:
-        list(pool.map(compiti_service.compila_pdf, percorsi))
+        risultati = list(pool.map(compiti_service.compila_pdf, percorsi))
+    for percorso, comp in zip(percorsi, risultati):
+        if not comp.ok:
+            # non c'è una richiesta HTTP a cui agganciare un flash (la compilazione gira
+            # dopo che la risposta è già stata inviata): l'errore resta comunque visibile
+            # nel terminale da cui gira l'app, e il PDF vecchio (se esisteva) non viene
+            # toccato, quindi il link non punta a un file rotto.
+            print(f"Compilazione PDF fallita per {percorso}: {comp.messaggio}")
+            if comp.errore_dettagliato:
+                print(comp.errore_dettagliato)
 
 
 def _rigenera_se_necessario(tag: str, appello_id: int, background_tasks: Optional[BackgroundTasks] = None) -> str:
@@ -257,6 +281,16 @@ def modifica_impostazioni_app(
         docente=docente.strip(), mostra_riepilogo_home=bool(mostra_riepilogo_home),
     )
     return flash_redirect("/impostazioni", "Impostazioni salvate")
+
+
+@app.post("/impostazioni/controlla-aggiornamenti")
+def controlla_aggiornamenti_app():
+    disponibile, errore = aggiornamenti_service.forza_controllo()
+    if errore:
+        return flash_redirect("/impostazioni", f"Controllo aggiornamenti non riuscito: {errore}", "error")
+    if disponibile:
+        return flash_redirect("/impostazioni", "È disponibile un aggiornamento: usa ./aggiorna.sh (o aggiorna.bat) per scaricarlo")
+    return flash_redirect("/impostazioni", "Nessun aggiornamento disponibile: hai già la versione più recente")
 
 
 FRASE_CONFERMA_ELIMINA_TUTTO = "ELIMINA TUTTO"
@@ -646,6 +680,7 @@ def genera_compiti(tag: str, appello_id: int, numero_studenti: int = Form(...)):
         da_compilare["Riferimento"] = compiti_service.path_riferimento(tag, appello_id, "tex")
     with ThreadPoolExecutor(max_workers=len(da_compilare)) as pool:
         risultati_compilazione = dict(zip(da_compilare, pool.map(compiti_service.compila_pdf, da_compilare.values())))
+    dettaglio = ""
     for etichetta in ["Riferimento", "Blocco", "Griglia"]:
         if etichetta not in risultati_compilazione:
             continue
@@ -653,11 +688,13 @@ def genera_compiti(tag: str, appello_id: int, numero_studenti: int = Form(...)):
         msg += f". {etichetta}: " + comp.messaggio
         if not comp.ok:
             kind = "error"
+            if comp.errore_dettagliato and not dettaglio:
+                dettaglio = f"{etichetta}:\n{comp.errore_dettagliato}"
 
     if result.avviso_obbligatori:
         msg += " " + result.avviso_obbligatori
         kind = "warning" if kind == "success" else kind
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, kind, anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, kind, anchor=anchor, dettaglio=dettaglio)
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/riferimento.tex", response_class=PlainTextResponse)
@@ -713,7 +750,10 @@ def scarica_blocchi_pdf(tag: str, appello_id: int):
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     compilazione = compiti_service.compila_pdf(tex_path)
     if not compilazione.ok:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error", anchor=anchor)
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error",
+            anchor=anchor, dettaglio=compilazione.errore_dettagliato or "",
+        )
     return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
 
 
@@ -1185,7 +1225,10 @@ def scarica_risultati_pdf(tag: str, appello_id: int):
     compilazione = compiti_service.compila_pdf(tex_path)
     if not compilazione.ok:
         appello = corsi_service.get_appello(tag, appello_id)
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error", anchor=_anchor_membro(appello, "valutazione"))
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error",
+            anchor=_anchor_membro(appello, "valutazione"), dettaglio=compilazione.errore_dettagliato or "",
+        )
     return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
 
 
@@ -1279,7 +1322,10 @@ def scarica_iscritti_pdf(tag: str, appello_id: int):
     tex_path.write_text(tex, encoding="utf-8")
     compilazione = compiti_service.compila_pdf(tex_path)
     if not compilazione.ok:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error", anchor=anchor)
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error",
+            anchor=anchor, dettaglio=compilazione.errore_dettagliato or "",
+        )
     return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
 
 
@@ -1477,7 +1523,10 @@ def scarica_ammessi_pdf(tag: str, appello_id: int):
     tex_path.write_text(tex, encoding="utf-8")
     compilazione = compiti_service.compila_pdf(tex_path)
     if not compilazione.ok:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error", anchor=f"compiti-{appello_id}")
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error",
+            anchor=f"compiti-{appello_id}", dettaglio=compilazione.errore_dettagliato or "",
+        )
     return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
 
 

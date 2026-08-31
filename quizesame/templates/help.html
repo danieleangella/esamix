@@ -6,8 +6,8 @@
 {% block content %}
 <h1>Guida</h1>
 
-<div class="card">
-  <h2>Corsi</h2>
+<details class="card" open>
+  <summary>Corsi</summary>
   <p>
     Ogni corso rappresenta un insegnamento in un anno accademico (es. "Geometria O-Z,
     2025/2026") e ha un proprio database indipendente. Si crea dalla homepage ("Nuovo
@@ -30,10 +30,10 @@
     delicate dell'app (eliminare un appello con risultati già registrati, ripristinare
     un backup che sovrascrive corsi esistenti, eliminare tutti i dati).
   </p>
-</div>
+</details>
 
-<div class="card">
-  <h2>Esercizi</h2>
+<details class="card">
+  <summary>Esercizi</summary>
   <p>
     La banca esercizi di un corso è condivisa tra tutti i suoi appelli: uno stesso
     esercizio (con le sue varianti) può essere assegnato a più appelli. Il testo può
@@ -65,10 +65,10 @@
     anche cercare ed eliminare automaticamente eventuali <strong>doppioni</strong> (stesso
     testo e stesse risposte in ogni variante).
   </p>
-</div>
+</details>
 
-<div class="card">
-  <h2>Un appello, scheda per scheda</h2>
+<details class="card">
+  <summary>Un appello, scheda per scheda</summary>
   <p>
     La pagina di un appello si apre sulla scheda <strong>Home</strong>: data, compiti
     stampati, iscritti/presenti/ritirati/sufficienti e una barra di avanzamento (colorata
@@ -80,18 +80,18 @@
     <strong>Voti verbalizzati</strong>, <strong>Statistiche</strong> e
     <strong>Impostazioni</strong>.
   </p>
-</div>
+</details>
 
-<div class="card">
-  <h2>Iscritti e generazione dei compiti</h2>
+<details class="card">
+  <summary>Iscritti e generazione dei compiti</summary>
   <p>
     Nella scheda <strong>Compiti d'esame</strong> si indicano gli iscritti a un appello,
     in uno di tre modi: caricando una volta sola il file "Lista Studenti Esame" scaricato
     dalla segreteria (da cui si ricava anche l'elenco per fare l'appello e, più avanti, il
     file compilato da restituire), aggiungendoli singolarmente a mano per nome o
-    matricola, oppure — più rapidamente ma senza un elenco nominale — indicando solo un
-    numero. Il file della segreteria, quando caricato, ha sempre la precedenza sugli
-    altri due.
+    matricola (dietro una tendina apribile), oppure — più rapidamente ma senza un elenco
+    nominale — indicando solo un numero. Il file della segreteria, quando caricato, ha
+    sempre la precedenza sugli altri due.
   </p>
   <p>
     Quando è stato indicato un elenco nominale (file o aggiunta a mano), correggere o
@@ -113,7 +113,9 @@
     codici) — a meno che qualche blocco non abbia già risultati registrati, nel qual
     caso la modifica viene bloccata per non invalidare compiti già corretti. Il testo si
     aggiorna subito; i PDF si ricompilano in background, quindi possono restare quelli
-    vecchi per qualche istante dopo il salvataggio.
+    vecchi per qualche istante dopo il salvataggio. Se la compilazione LaTeX fallisce,
+    il messaggio d'errore resta visibile (in un riquadro copiabile) finché non lo chiudi
+    tu, invece di sparire da solo.
   </p>
   <p class="muted">
     Un blocco senza risultati registrati si può eliminare; con più blocchi generati, si
@@ -121,10 +123,10 @@
     eliminare anche se ha già risultati registrati, scrivendo il suo nome in una casella
     di conferma: verranno persi insieme a esercizi assegnati, blocchi e compiti.
   </p>
-</div>
+</details>
 
-<div class="card">
-  <h2>Correzione</h2>
+<details class="card">
+  <summary>Correzione</summary>
   <p>
     Dalla scheda <strong>Valutazione scritti</strong>, si inserisce matricola (o nome,
     con autocompletamento), codice del compito e la stringa di risposte data. Si arriva
@@ -160,10 +162,10 @@
     "Modifica" (finché l'appello non è chiuso) e lo storico dello studente in questo
     corso, con il compito corrente evidenziato tra gli altri appelli già sostenuti.
   </p>
-</div>
+</details>
 
-<div class="card">
-  <h2>Orale</h2>
+<details class="card">
+  <summary>Orale</summary>
   <p>
     Nella scheda <strong>Orali</strong> di un appello compaiono gli studenti in attesa:
     per ciascuno si registra l'esito (voto assegnato, assente, o insufficiente). Un
@@ -175,10 +177,10 @@
     ("obbligatorio dopo N compiti con voto sotto M", con la possibilità di contare anche
     i ritirati).
   </p>
-</div>
+</details>
 
-<div class="card">
-  <h2>Verbalizzazione e statistiche</h2>
+<details class="card">
+  <summary>Verbalizzazione e statistiche</summary>
   <p>
     Gli studenti idonei non ancora verbalizzati compaiono in fondo alla scheda
     "Valutazione scritti", con un pulsante "Verbalizza" per ciascuno (oltre a quello per
@@ -208,10 +210,10 @@
     per anno accademico: numero di studenti e percentuale di promossi, oltre a due
     grafici con la variazione nel tempo di percentuale promossi e voto medio.
   </p>
-</div>
+</details>
 
-<div class="card">
-  <h2>Studenti</h2>
+<details class="card">
+  <summary>Studenti</summary>
   <p>
     Si aggiungono singolarmente (rifiuta una matricola già assegnata a un altro
     studente), si importano da CSV, o si importano da un altro corso (solo chi non ha
@@ -229,6 +231,9 @@
     eventuali righe di preambolo prima di essa). Prima di confermare davvero
     l'importazione si vede un'anteprima riga per riga di cosa verrà inserito o
     aggiornato, con la possibilità di deselezionare le singole righe da non importare.
+    Il file può essere codificato in UTF-8 o Windows-1252 (il più comune per i CSV
+    esportati da Excel): l'app riconosce automaticamente quale dei due usare, per non
+    corrompere nomi e cognomi accentati.
   </p>
   <p class="muted">
     Anche la ricerca nell'elenco studenti di un corso suggerisce autocompletamenti mentre
@@ -246,10 +251,10 @@
     stessa indicazione compare anche nell'elenco ammessi di una prova parziale (vedi
     Raggruppamenti).
   </p>
-</div>
+</details>
 
-<div class="card">
-  <h2>Raggruppamenti</h2>
+<details class="card">
+  <summary>Raggruppamenti</summary>
   <p>
     Un raggruppamento combina più appelli (es. prove parziali) in un voto unico: la
     media dei voti di chi ha superato la soglia di <em>ciascuna</em> prova membro. Si
@@ -296,27 +301,29 @@
     file caricato, compare un avviso con l'elenco pronto da copiare e incollare, per
     aggiungerlo a mano sul sistema della segreteria.
   </p>
-</div>
+</details>
 
-<div class="card">
-  <h2>Impostazioni dell'app</h2>
+<details class="card">
+  <summary>Impostazioni dell'app</summary>
   <p>
     Distinte dalle impostazioni di un singolo corso: dal link <strong>Impostazioni</strong>
     nel menu in alto si imposta il nome del docente (mostrato accanto al titolo "EsaMiX")
     e si può disattivare il riquadro di riepilogo generale (esami svolti e sufficienze su
     tutti i corsi) che compare in homepage. Da qui si scaricano e ripristinano anche i
-    backup di tutti i corsi insieme.
+    backup di tutti i corsi insieme, e si può controllare subito se è disponibile un
+    aggiornamento (vedi sotto) senza aspettare il controllo automatico.
   </p>
   <p>
     In fondo alla pagina, <strong>"Elimina tutti i dati"</strong> cancella
     definitivamente ogni corso dell'installazione (studenti, esercizi, appelli,
-    risultati): richiede di scrivere la frase di conferma indicata, ed è irreversibile —
-    conviene scaricare un backup completo prima di usarla.
+    risultati): richiede di scrivere la frase di conferma indicata e un'ultima conferma
+    a comparsa, ed è irreversibile — conviene scaricare un backup completo prima di
+    usarla.
   </p>
-</div>
+</details>
 
-<div class="card" id="aggiornamento">
-  <h2>Aggiornamento</h2>
+<details class="card" id="aggiornamento">
+  <summary>Aggiornamento</summary>
   <p>
     Quando è disponibile una nuova versione, in homepage compare un avviso. Per
     installarla: su <strong>Linux/macOS</strong> esegui <code>./aggiorna.sh</code> dalla
@@ -325,15 +332,15 @@
     eventuali dipendenze cambiate, senza toccare i corsi già presenti nella cartella
     <code>corsi/</code>.
   </p>
-</div>
+</details>
 
-<div class="card">
-  <h2>Migrazione da dati legacy</h2>
+<details class="card">
+  <summary>Migrazione da dati legacy</summary>
   <p>
     Dalla pagina "Migrazione dati legacy" si importa un corso gestito con la vecchia CLI
     a riga di comando: serve una cartella con <code>db.sqlite</code> nella radice e gli
     esercizi in sottocartelle per appello (<code>&lt;appello&gt;/esercizi/testi.py</code>).
     L'importazione non modifica né cancella i file originali.
   </p>
-</div>
+</details>
 {% endblock %}

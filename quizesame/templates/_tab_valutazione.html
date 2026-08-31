@@ -116,7 +116,7 @@
              class="button {{ 'warning' if r.valutazione_sospesa else 'secondary' }}" style="margin-top:0">{{ 'Completa valutazione' if r.valutazione_sospesa else 'Modifica' }}</a>
           {% endif %}
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/elimina"
-                onsubmit="return confirm('Eliminare il risultato di {{ r.cognome }} {{ r.nome }} per questo appello?');">
+                onsubmit="return confirm({{ ('Eliminare il risultato di ' ~ r.cognome ~ ' ' ~ r.nome ~ ' per questo appello?')|js }});">
             <button type="submit" class="danger">Elimina</button>
           </form>
           {% else %}

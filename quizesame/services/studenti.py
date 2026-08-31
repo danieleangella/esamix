@@ -391,13 +391,22 @@ def _righe_csv(testo: str) -> list[list[str]]:
     return [r for r in csv.reader(io.StringIO(testo)) if any(cell.strip() for cell in r)]
 
 
+def _decodifica(file_bytes: bytes) -> str:
+    for codifica in ("utf-8-sig", "cp1252"):
+        try:
+            return file_bytes.decode(codifica)
+        except UnicodeDecodeError:
+            continue
+    raise ValueError("Non riconosco la codifica del file: attesi UTF-8 o Windows-1252")
+
+
 def anteprima_csv(file_bytes: bytes) -> dict:
     """Analizza un CSV appena caricato: rileva se ha una riga di intestazione e propone
     automaticamente quali colonne usare per matricola/nome/cognome/laurea in base al nome
     delle colonne (se presente); l'utente conferma o corregge la proposta (comprese
     eventuali righe iniziali da ignorare) prima che qualunque dato venga scritto (vedi
     verifica_import_csv)."""
-    testo = file_bytes.decode("utf-8-sig")
+    testo = _decodifica(file_bytes)
     righe = _righe_csv(testo)
     if not righe:
         return {

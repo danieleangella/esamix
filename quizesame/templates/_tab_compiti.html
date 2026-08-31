@@ -30,47 +30,48 @@
     Nessun file della segreteria ancora caricato: se non lo carichi, puoi aggiungere qui gli iscritti uno per
     uno (usato per l'elenco stampabile e per il numero suggerito di compiti da generare qui sotto).
   </p>
-  {% if md.iscritti_manuali %}
-  <table style="margin-top:0.5rem">
-    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
-    {% for s in md.iscritti_manuali %}
-    <tr>
-      <td>{{ s.matricola }}</td>
-      <td>{{ s.cognome }}</td>
-      <td>{{ s.nome }}</td>
-      <td>
-        {% if not md.appello.chiuso %}
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale/{{ s.matricola }}/rimuovi">
-          <button type="submit" class="secondary" style="margin-top:0">Rimuovi</button>
-        </form>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% endif %}
   {% if not md.appello.chiuso %}
-  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale/aggiungi" style="margin-top:0.75rem; margin-bottom:0.75rem" autocomplete="off">
-    <div class="form-grid">
-      <div style="position:relative">
-        <label class="campo-obbligatorio">Aggiungi iscritto (matricola o nome)</label>
-        <input name="matricola" class="campo-input-matricola-iscritto" autocomplete="off" required>
-        <div class="campo-suggerimenti-studenti-iscritto sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+  <details style="margin-top:0.5rem" {% if not md.iscritti_manuali %}open{% endif %}>
+    <summary>Aggiungi iscritti manualmente{% if md.iscritti_manuali %} ({{ md.iscritti_manuali|length }}){% endif %}</summary>
+    {% if md.iscritti_manuali %}
+    <table style="margin-top:0.75rem">
+      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
+      {% for s in md.iscritti_manuali %}
+      <tr>
+        <td>{{ s.matricola }}</td>
+        <td>{{ s.cognome }}</td>
+        <td>{{ s.nome }}</td>
+        <td>
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale/{{ s.matricola }}/rimuovi">
+            <button type="submit" class="secondary" style="margin-top:0">Rimuovi</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale/aggiungi" style="margin-top:0.75rem; margin-bottom:0.75rem" autocomplete="off">
+      <div class="form-grid">
+        <div style="position:relative">
+          <label class="campo-obbligatorio">Aggiungi iscritto (matricola o nome)</label>
+          <input name="matricola" class="campo-input-matricola-iscritto" autocomplete="off" required>
+          <div class="campo-suggerimenti-studenti-iscritto sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+        </div>
       </div>
-    </div>
-    <button type="submit" class="secondary">Aggiungi</button>
-  </form>
-  <script>
-  (function () {
-    var root = document.currentScript.closest(".tab-pane");
-    creaAutocomplete(
-      root.querySelector(".campo-input-matricola-iscritto"), root.querySelector(".campo-suggerimenti-studenti-iscritto"),
-      function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
-      function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
-      function (s) { return s.matricola; }
-    );
-  })();
-  </script>
+      <button type="submit" class="secondary">Aggiungi</button>
+    </form>
+    <script>
+    (function () {
+      var root = document.currentScript.closest(".tab-pane");
+      creaAutocomplete(
+        root.querySelector(".campo-input-matricola-iscritto"), root.querySelector(".campo-suggerimenti-studenti-iscritto"),
+        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+        function (s) { return s.matricola; }
+      );
+    })();
+    </script>
+  </details>
   <details style="margin-top:0.5rem">
     <summary>In alternativa, indica solo un numero (senza elenco nominale)</summary>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale" style="margin-top:1rem">
@@ -81,6 +82,13 @@
       <button type="submit" class="secondary">Salva</button>
     </form>
   </details>
+  {% elif md.iscritti_manuali %}
+  <table style="margin-top:0.5rem">
+    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th></tr>
+    {% for s in md.iscritti_manuali %}
+    <tr><td>{{ s.matricola }}</td><td>{{ s.cognome }}</td><td>{{ s.nome }}</td></tr>
+    {% endfor %}
+  </table>
   {% endif %}
   {% endif %}
 
@@ -227,7 +235,7 @@
           {% if s.in_deroga %}
           <span class="badge badge-warn" title="Aggiunto a mano: non soddisfa i requisiti automatici di ammissione">in deroga</span>
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi/{{ s.matricola }}/rimuovi"
-                onsubmit="return confirm('Rimuovere {{ s.cognome }} {{ s.nome }} dagli ammessi a questa prova?');">
+                onsubmit="return confirm({{ ('Rimuovere ' ~ s.cognome ~ ' ' ~ s.nome ~ ' dagli ammessi a questa prova?')|js }});">
             <button type="submit" class="secondary" style="margin-top:0">Rimuovi</button>
           </form>
           {% endif %}
@@ -273,7 +281,7 @@
       <td>{{ a.capienza }}</td>
       <td>
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/{{ a.id }}/elimina"
-              onsubmit="return confirm('Eliminare l\'aula {{ a.nome }}? Gli studenti già assegnati resteranno senza aula.');">
+              onsubmit="return confirm({{ ('Eliminare l\'aula ' ~ a.nome ~ '? Gli studenti già assegnati resteranno senza aula.')|js }});">
           <button type="submit" class="danger">Elimina</button>
         </form>
       </td>

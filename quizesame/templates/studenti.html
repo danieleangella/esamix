@@ -82,7 +82,7 @@
           <button type="submit">Salva</button>
         </form>
         <form method="post" action="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/elimina" class="inline"
-              onsubmit="return confirm('Eliminare {{ s.cognome }} {{ s.nome }} ({{ s.matricola }})? Possibile solo se non ha risultati registrati.');" style="margin-top:0.5rem">
+              onsubmit="return confirm({{ ('Eliminare ' ~ s.cognome ~ ' ' ~ s.nome ~ ' (' ~ s.matricola ~ ')? Possibile solo se non ha risultati registrati.')|js }});" style="margin-top:0.5rem">
           <button type="submit" class="danger">Elimina studente</button>
         </form>
       </td>

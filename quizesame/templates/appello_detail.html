@@ -153,11 +153,11 @@
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/modifica">
       <div class="form-grid">
         <div><label class="campo-obbligatorio">Nome</label><input name="nome" value="{{ appello.nome }}" required></div>
-        <div><label>Data</label><input type="date" name="data" value="{{ appello.data | data_iso }}"></div>
+        <div><label>Data</label><input type="date" name="data" value="{{ appello.data | data_iso }}" min="2001-01-01" max="2099-12-31"></div>
       </div>
       <p class="muted" style="margin-top:0.75rem">Orale (mostrato in testa al foglio dei risultati se qualcuno è in attesa):</p>
       <div class="form-grid">
-        <div><label>Data orale</label><input type="date" name="orale_data" value="{{ appello.orale_data | data_iso }}"></div>
+        <div><label>Data orale</label><input type="date" name="orale_data" value="{{ appello.orale_data | data_iso }}" min="2001-01-01" max="2099-12-31"></div>
         <div><label>Ora</label><input name="orale_ora" value="{{ appello.orale_ora or '' }}" placeholder="es. 9:00"></div>
         <div><label>Aula</label><input name="orale_aula" value="{{ appello.orale_aula or '' }}"></div>
       </div>
@@ -177,7 +177,7 @@
       da svolgere, puoi chiudere l'appello per evitare ulteriori modifiche accidentali.
       {% if raggruppamento %}Chiudere il raggruppamento chiude anche tutte le sue prove membro.{% endif %}</p>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/chiudi"
-          onsubmit="return confirm('Chiudere l\'appello {{ appello.nome }}? Non sarà più possibile correggere, verbalizzare o modificare gli esercizi assegnati finché non lo riapri.');">
+          onsubmit="return confirm({{ ('Chiudere l\'appello ' ~ appello.nome ~ '? Non sarà più possibile correggere, verbalizzare o modificare gli esercizi assegnati finché non lo riapri.')|js }});">
       <button type="submit" class="secondary">Chiudi appello</button>
     </form>
     {% endif %}
@@ -195,7 +195,7 @@
     <script>attivaConfermaTestuale(document.getElementById("form-elimina-appello"));</script>
     {% else %}
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/elimina"
-          onsubmit="return confirm('Eliminare definitivamente l\'appello {{ appello.nome }} (esercizi assegnati, blocchi e compiti compresi)?');">
+          onsubmit="return confirm({{ ('Eliminare definitivamente l\'appello ' ~ appello.nome ~ ' (esercizi assegnati, blocchi e compiti compresi)?')|js }});">
       <button type="submit" class="danger">Elimina questo appello</button>
     </form>
     {% endif %}
@@ -230,7 +230,7 @@
         <td>{{ m.data or '-' }}</td>
         <td>
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ m.id }}/elimina"
-                onsubmit="return confirm('Eliminare la prova {{ m.nome }} da questo raggruppamento? Le altre prove e il raggruppamento restano intatti.');">
+                onsubmit="return confirm({{ ('Eliminare la prova ' ~ m.nome ~ ' da questo raggruppamento? Le altre prove e il raggruppamento restano intatti.')|js }});">
             <button type="submit" class="danger">Elimina questa prova</button>
           </form>
         </td>
@@ -294,7 +294,7 @@
              class="button {{ 'warning' if r.valutazione_sospesa else 'secondary' }}" style="margin-top:0">{{ 'Completa valutazione' if r.valutazione_sospesa else 'Modifica' }}</a>
           {% endif %}
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/elimina"
-                onsubmit="return confirm('Eliminare il risultato di {{ r.cognome }} {{ r.nome }} per questo appello?');">
+                onsubmit="return confirm({{ ('Eliminare il risultato di ' ~ r.cognome ~ ' ' ~ r.nome ~ ' per questo appello?')|js }});">
             <button type="submit" class="danger">Elimina</button>
           </form>
           {% else %}
@@ -384,7 +384,7 @@
         <td class="muted">{{ r.data_verbalizzazione }}</td>
         <td style="text-align:right">
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/verbalizza/{{ r.matricola }}/annulla"
-                onsubmit="return confirm('Annullare la verbalizzazione di {{ r.cognome }} {{ r.nome }}? Tornerà tra gli idonei non ancora verbalizzati.');">
+                onsubmit="return confirm({{ ('Annullare la verbalizzazione di ' ~ r.cognome ~ ' ' ~ r.nome ~ '? Tornerà tra gli idonei non ancora verbalizzati.')|js }});">
             <button type="submit" class="secondary">Annulla verbalizzazione</button>
           </form>
         </td>

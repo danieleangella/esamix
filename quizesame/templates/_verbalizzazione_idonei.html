@@ -25,7 +25,7 @@
     {% for r in idonei %}
     <form method="post" id="form-verbalizza-{{ r.matricola }}" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/verbalizza/{{ r.matricola }}" style="display:none"></form>
     <form method="post" id="form-rifiuta-{{ r.matricola }}" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/rifiuta/{{ r.matricola }}"
-          onsubmit="return confirm('Rifiutare il voto di {{ r.cognome }} {{ r.nome }}? Dovrà ripresentarsi a un appello successivo.');" style="display:none"></form>
+          onsubmit="return confirm({{ ('Rifiutare il voto di ' ~ r.cognome ~ ' ' ~ r.nome ~ '? Dovrà ripresentarsi a un appello successivo.')|js }});" style="display:none"></form>
     {% endfor %}
     <script>
     (function () {
@@ -53,7 +53,7 @@
     <p class="muted">Nessuno studente idoneo in attesa di verbalizzazione.</p>
     {% if not orali_da_svolgere and not appello.chiuso %}
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/chiudi"
-          onsubmit="return confirm('Chiudere l\'appello {{ appello.nome }}? Non sarà più possibile correggere, verbalizzare o modificare gli esercizi assegnati finché non lo riapri.');">
+          onsubmit="return confirm({{ ('Chiudere l\'appello ' ~ appello.nome ~ '? Non sarà più possibile correggere, verbalizzare o modificare gli esercizi assegnati finché non lo riapri.')|js }});">
       <button type="submit" class="secondary">Chiudi appello</button>
     </form>
     {% endif %}

@@ -5,6 +5,7 @@ errore, il controllo fallisce silenziosamente e l'avviso semplicemente non compa
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 REPO_DIR = Path(__file__).resolve().parent.parent.parent
 INTERVALLO_CONTROLLO = timedelta(hours=6)
@@ -26,13 +27,34 @@ def aggiornamento_disponibile() -> bool:
     ora = datetime.now()
     if _cache["controllato_il"] is not None and ora - _cache["controllato_il"] < INTERVALLO_CONTROLLO:
         return _cache["disponibile"]
+    disponibile, _ = _controlla()
+    return disponibile
+
+
+def _controlla() -> tuple[bool, Optional[str]]:
+    """Esegue il controllo (git fetch + confronto con origin/main) e aggiorna la cache.
+    Restituisce (disponibile, errore): errore è None se il controllo è andato a buon
+    fine, altrimenti un messaggio leggibile sul perché non è stato possibile controllare."""
     disponibile = False
+    errore = None
     try:
         _git("fetch", "--quiet")
         dietro = int(_git("rev-list", "--count", "HEAD..origin/main") or "0")
         disponibile = dietro > 0
-    except Exception:
-        pass
-    _cache["controllato_il"] = ora
+    except FileNotFoundError:
+        errore = "git non è installato o non è nel PATH"
+    except subprocess.CalledProcessError as e:
+        errore = (e.stderr or str(e)).strip()
+    except subprocess.TimeoutExpired:
+        errore = "timeout durante il controllo (problema di connessione?)"
+    except Exception as e:
+        errore = str(e)
+    _cache["controllato_il"] = datetime.now()
     _cache["disponibile"] = disponibile
-    return disponibile
+    return disponibile, errore
+
+
+def forza_controllo() -> tuple[bool, Optional[str]]:
+    """Come aggiornamento_disponibile, ma ignora la cache: usato dal bottone "Controlla
+    aggiornamenti" nelle impostazioni, dove l'utente si aspetta un controllo immediato."""
+    return _controlla()

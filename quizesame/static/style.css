@@ -85,6 +85,19 @@ details.card > summary,
 summary::-webkit-details-marker { display: none; }
 details.card:not([open]) { padding-bottom: 1.25rem; }
 
+details.card > summary::after,
+.card details > summary::after,
+.card summary::after {
+  content: "▸";
+  display: inline-block;
+  margin-left: 0.45rem;
+  transition: transform 0.15s ease;
+}
+details.card[open] > summary::after,
+.card details[open] > summary::after {
+  transform: rotate(90deg);
+}
+
 .link-simile {
   background: none; border: none; margin: 0; padding: 0;
   color: var(--accent); font-weight: 500; font-size: inherit; cursor: pointer; text-align: left;

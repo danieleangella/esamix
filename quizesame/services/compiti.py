@@ -350,6 +350,19 @@ class CompilazioneResult:
     ok: bool
     messaggio: str
     pdf_path: Path | None = None
+    errore_dettagliato: str | None = None
+
+
+def _estrai_errore_latex(output: str) -> str:
+    """Isola dall'output di pdflatex (rumoroso: centinaia di righe di log) le righe utili
+    a capire cosa è andato storto: a partire dalla prima riga di errore (quelle che
+    iniziano con "!", come vuole la convenzione di LaTeX), o le ultime righe del log se
+    per qualche motivo non ne trova una."""
+    righe = output.splitlines()
+    for i, r in enumerate(righe):
+        if r.startswith("!"):
+            return "\n".join(righe[i:i + 20]).strip()
+    return "\n".join(righe[-25:]).strip()
 
 
 def compila_pdf(tex_path: Path) -> CompilazioneResult:
@@ -367,7 +380,7 @@ def compila_pdf(tex_path: Path) -> CompilazioneResult:
     try:
         # una sola passata: questi documenti non usano \ref/\cite/\tableofcontents, quindi
         # non c'è nulla che una seconda passata risolverebbe meglio della prima.
-        subprocess.run(
+        risultato = subprocess.run(
             ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", tex_path.name],
             cwd=out_dir, capture_output=True, text=True, timeout=120,
         )
@@ -378,7 +391,8 @@ def compila_pdf(tex_path: Path) -> CompilazioneResult:
     if pdf_path.exists():
         return CompilazioneResult(ok=True, messaggio="PDF compilato", pdf_path=pdf_path)
     return CompilazioneResult(
-        ok=False, messaggio="Compilazione PDF fallita: controlla il testo LaTeX degli esercizi"
+        ok=False, messaggio="Compilazione PDF fallita: controlla il testo LaTeX degli esercizi",
+        errore_dettagliato=_estrai_errore_latex(risultato.stdout or risultato.stderr or ""),
     )
 
 

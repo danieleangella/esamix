@@ -29,6 +29,15 @@
 </div>
 
 <div class="card">
+  <h2>Aggiornamenti</h2>
+  <p class="muted">Controlla subito se è disponibile una versione più recente del codice su GitHub
+    (l'app lo fa anche automaticamente ogni poche ore, mostrando un avviso in homepage).</p>
+  <form method="post" action="/impostazioni/controlla-aggiornamenti">
+    <button type="submit" class="secondary">Controlla aggiornamenti</button>
+  </form>
+</div>
+
+<div class="card">
   <h2>Backup</h2>
   <p class="muted">Scarica un archivio zip con il database e tutti i file generati (PDF/tex) di
     ogni corso: utile prima di modifiche importanti, o come copia di sicurezza periodica.</p>
@@ -53,7 +62,8 @@
     irreversibile, senza backup automatico: scaricane uno da qui sopra prima di procedere, se non l'hai
     già fatto.</p>
   {% if numero_corsi %}
-  <form method="post" action="/elimina-tutti-i-dati" id="form-elimina-tutti-i-dati">
+  <form method="post" action="/elimina-tutti-i-dati" id="form-elimina-tutti-i-dati"
+        onsubmit="return confirm('Ultima conferma: eliminare DAVVERO tutti i {{ numero_corsi }} corsi e tutti i dati contenuti? Non si può annullare.');">
     <label>Per confermare, scrivi <strong>{{ frase_conferma_elimina_tutto }}</strong> qui sotto</label>
     <input name="conferma" class="campo-conferma-testo" data-frase-attesa="{{ frase_conferma_elimina_tutto }}" autocomplete="off" style="max-width:20rem">
     <button type="submit" class="danger btn-conferma-testo" disabled style="margin-top:0.75rem">Elimina tutti i dati</button>

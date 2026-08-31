@@ -103,6 +103,17 @@
     campo.addEventListener("input", aggiorna);
     aggiorna();
   }
+
+  // Se l'URL punta a un'ancora dentro una tendina compattabile (<details>), la apre
+  // subito: altrimenti il contenuto linkato resterebbe nascosto.
+  document.addEventListener("DOMContentLoaded", function () {
+    if (!location.hash) return;
+    var bersaglio;
+    try { bersaglio = document.querySelector(location.hash); } catch (e) { return; }
+    if (!bersaglio) return;
+    var dettaglio = bersaglio.closest("details");
+    if (dettaglio) dettaglio.open = true;
+  });
   </script>
 </head>
 <body>
@@ -128,19 +139,40 @@
   </nav>
   <main class="container">
     {% set msg = request.query_params.get('msg') %}
+    {% set dettaglio = request.query_params.get('dettaglio') %}
     {% if msg %}
       <div class="flash flash-{{ request.query_params.get('kind', 'success') }}" id="flash-message">
         <span>{{ msg }}</span>
         <button type="button" class="flash-close" aria-label="Chiudi">&times;</button>
       </div>
+      {% if dettaglio %}
+      <div class="card" id="flash-dettaglio" style="margin-top:-0.5rem; margin-bottom:1.25rem">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem">
+          <strong>Dettaglio errore</strong>
+          <button type="button" class="secondary" id="btn-copia-dettaglio">Copia</button>
+        </div>
+        <pre style="white-space:pre-wrap; word-break:break-word; overflow-x:auto; margin-top:0.5rem; margin-bottom:0; font-size:0.85rem">{{ dettaglio }}</pre>
+      </div>
+      {% endif %}
       <script>
       (function () {
         var flash = document.getElementById("flash-message");
-        var timer = setTimeout(function () { flash.remove(); }, {{ 12000 if request.query_params.get('kind') == 'error' else 6000 }});
-        flash.querySelector(".flash-close").addEventListener("click", function () {
-          clearTimeout(timer);
-          flash.remove();
-        });
+        var haDettaglio = {{ 'true' if dettaglio else 'false' }};
+        flash.querySelector(".flash-close").addEventListener("click", function () { flash.remove(); });
+        if (!haDettaglio) {
+          var timer = setTimeout(function () { flash.remove(); }, {{ 12000 if request.query_params.get('kind') == 'error' else 6000 }});
+          flash.querySelector(".flash-close").addEventListener("click", function () { clearTimeout(timer); });
+        }
+        var btnCopia = document.getElementById("btn-copia-dettaglio");
+        if (btnCopia) {
+          btnCopia.addEventListener("click", function () {
+            var testo = document.querySelector("#flash-dettaglio pre").textContent;
+            navigator.clipboard.writeText(testo).then(function () {
+              btnCopia.textContent = "Copiato!";
+              setTimeout(function () { btnCopia.textContent = "Copia"; }, 1500);
+            });
+          });
+        }
       })();
       </script>
     {% endif %}

@@ -51,7 +51,7 @@
         <button type="button" class="secondary btn-modifica-assegnato" data-esercizio="{{ e.id }}">Modifica</button>
         {% if not md.appello.chiuso %}
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esercizi/{{ e.id }}/rimuovi"
-              onsubmit="return confirm('Rimuovere l\'esercizio {{ e.nome or ('#' ~ e.id) }} da questo appello?');">
+              onsubmit="return confirm({{ ('Rimuovere l\'esercizio ' ~ (e.nome or ('#' ~ e.id)) ~ ' da questo appello?')|js }});">
           <button type="submit" class="danger">Rimuovi</button>
         </form>
         {% endif %}

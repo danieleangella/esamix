@@ -23,7 +23,7 @@
     <div style="display:flex; justify-content:space-between; align-items:center; padding:0.15rem 0">
       <span>{{ e.nome or ('#' ~ e.id) }} <span class="muted">({{ e.varianti|length }} variante/i)</span></span>
       <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/elimina"
-            onsubmit="return confirm('Eliminare l\'esercizio {{ e.nome or ('#' ~ e.id) }}?');">
+            onsubmit="return confirm({{ ('Eliminare l\'esercizio ' ~ (e.nome or ('#' ~ e.id)) ~ '?')|js }});">
         <button type="submit" class="danger">Elimina</button>
       </form>
     </div>
@@ -51,7 +51,7 @@
       <td style="white-space:nowrap">
         <button type="button" class="secondary btn-modifica-esercizio" data-esercizio="{{ e.id }}">Modifica</button>
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/elimina"
-              onsubmit="return confirm('Eliminare l\'esercizio {{ e.nome or ('#' ~ e.id) }}?');">
+              onsubmit="return confirm({{ ('Eliminare l\'esercizio ' ~ (e.nome or ('#' ~ e.id)) ~ '?')|js }});">
           <button type="submit" class="danger">Elimina</button>
         </form>
       </td>
