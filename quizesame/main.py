@@ -1432,8 +1432,9 @@ def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro:
         lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") not in ("verbalizzato", "da_verbalizzare")]
     if dsa == "1":
         lista = [s for s in lista if s.dsa]
-    corsi_suggeriti = corsi_service.corsi_simili(tag)
-    altri_corsi = [c for c in corsi_service.list_corsi() if c.tag != tag]
+    tutti_corsi = corsi_service.list_corsi()
+    corsi_suggeriti = corsi_service.corsi_simili(corso, tutti_corsi)
+    altri_corsi = [c for c in tutti_corsi if c.tag != tag]
     corso_sorgente = corsi_service.get_corso(da) if da and config.corso_exists(da) else None
     studenti_sorgente = studenti_service.list_non_superati(da) if corso_sorgente else []
     return templates.TemplateResponse(request, "studenti.html", {
@@ -1586,8 +1587,9 @@ def anteprima_esercizio(request: Request, tag: str, esercizio_id: int):
 def esercizi_list(request: Request, tag: str, da: str = ""):
     corso = corsi_service.get_corso(tag)
     esercizi = esercizi_service.list_esercizi(tag)
-    corsi_suggeriti = corsi_service.corsi_simili(tag)
-    altri_corsi = [c for c in corsi_service.list_corsi() if c.tag != tag]
+    tutti_corsi = corsi_service.list_corsi()
+    corsi_suggeriti = corsi_service.corsi_simili(corso, tutti_corsi)
+    altri_corsi = [c for c in tutti_corsi if c.tag != tag]
 
     corso_sorgente = None
     esercizi_sorgente = []

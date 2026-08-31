@@ -95,11 +95,18 @@ def list_argomenti(tag: str) -> list[str]:
         conn.close()
 
 
+def get_esercizio_su_connessione(conn, esercizio_id: int) -> Optional[Esercizio]:
+    """Come get_esercizio, ma riusando una connessione già aperta dal chiamante: usata
+    dove va letto un esercizio per volta dentro un ciclo già scoped su una connessione
+    (es. le statistiche di un appello), per non aprirne una nuova ad ogni giro."""
+    row = conn.execute("SELECT * FROM esercizi WHERE id=?", (esercizio_id,)).fetchone()
+    return _row_to_esercizio(conn, row) if row else None
+
+
 def get_esercizio(tag: str, esercizio_id: int) -> Optional[Esercizio]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
-        row = conn.execute("SELECT * FROM esercizi WHERE id=?", (esercizio_id,)).fetchone()
-        return _row_to_esercizio(conn, row) if row else None
+        return get_esercizio_su_connessione(conn, esercizio_id)
     finally:
         conn.close()
 

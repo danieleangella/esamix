@@ -115,13 +115,15 @@ def list_corsi() -> list[Corso]:
     return sorted(corsi, key=lambda c: c.anno, reverse=True)
 
 
-def corsi_simili(tag: str) -> list[Corso]:
+def corsi_simili(corrente: Corso, tutti: list[Corso]) -> list[Corso]:
     """Altri corsi con stesso nome e stessa facoltà: tipicamente lo stesso corso ripetuto
-    in un anno diverso, quindi il candidato più probabile da cui importare esercizi."""
-    corrente = get_corso(tag)
+    in un anno diverso, quindi il candidato più probabile da cui importare esercizi.
+    Non legge dal database: `tutti` va calcolato una sola volta dal chiamante (con
+    list_corsi()) e riusato anche per altro, per non riaprire una connessione verso
+    ognuno dei corsi due volte sulla stessa pagina."""
     return [
-        c for c in list_corsi()
-        if c.tag != tag
+        c for c in tutti
+        if c.tag != corrente.tag
         and c.nome.strip().lower() == corrente.nome.strip().lower()
         and c.facolta.strip().lower() == corrente.facolta.strip().lower()
     ]

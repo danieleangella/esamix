@@ -122,7 +122,7 @@ def _statistiche_esercizi(tag: str, conn, risultati: list[dict]) -> list[dict]:
             {"testo": testo, "conteggio": n, "percentuale": round(100 * n / totale) if totale else 0}
             for testo, n in stat["risposte_sbagliate"].most_common()
         ]
-        esercizio = esercizi_service.get_esercizio(tag, esercizio_id)
+        esercizio = esercizi_service.get_esercizio_su_connessione(conn, esercizio_id)
         varianti_testo = [v.testo for v in esercizio.varianti] if esercizio else []
         elenco.append({
             "nome": stat["nome"], "corrette": stat["corrette"], "sbagliate": stat["sbagliate"],
@@ -133,9 +133,14 @@ def _statistiche_esercizi(tag: str, conn, risultati: list[dict]) -> list[dict]:
     return elenco
 
 
-def calcola(tag: str, appello_id: int) -> dict:
-    corso = corsi_service.get_corso(tag)
-    appello = corsi_service.get_appello(tag, appello_id)
+def calcola(tag: str, appello_id: int, includi_esercizi: bool = True, corso=None, appello=None) -> dict:
+    """`corso`/`appello`, se già disponibili al chiamante, evitano di riaprire una
+    connessione solo per rileggerli (rilevante quando questa funzione è chiamata in un
+    ciclo su più appelli/corsi, es. calcola_corso). `includi_esercizi=False` salta il
+    dettaglio "esercizi più sbagliati" (con le sue query per risultato e per esercizio),
+    utile quando il chiamante aggrega solo i totali e lo scarterebbe comunque."""
+    corso = corso or corsi_service.get_corso(tag)
+    appello = appello or corsi_service.get_appello(tag, appello_id)
     votomin = corsi_service.effective_votomin(corso, appello)
 
     conn = db.get_connection(config.corso_db_path(tag))
@@ -173,7 +178,8 @@ def calcola(tag: str, appello_id: int) -> dict:
             "in_attesa_orale_pct": pct(len(in_attesa_orale)), "orali_svolti_pct": pct(len(voti_orali)),
             "media_scritto": media(voti_scritti), "media_orale": media(voti_orali), "media_finale": media(voti_finali),
             "votomin": votomin, "distribuzione": _distribuzione_e_gaussiana(voti_finali),
-            "esercizi": _statistiche_esercizi(tag, conn, risultati), "voti_finali": voti_finali,
+            "esercizi": _statistiche_esercizi(tag, conn, risultati) if includi_esercizi else [],
+            "voti_finali": voti_finali,
         }
     finally:
         conn.close()
@@ -221,11 +227,17 @@ def confronto_raggruppamento(tag: str, raggruppamento) -> dict:
     return {"membri": membri, "combinato": combinato, "andamento": _andamento_appelli(voci_andamento)}
 
 
-def calcola_corso(tag: str) -> dict:
+def calcola_corso(tag: str, corso=None) -> dict:
     """Le stesse statistiche di `calcola`, ma aggregate su tutti gli appelli del corso
     (esclusi i raggruppamenti, che non hanno propri risultati ma calcolano una media di
     altri appelli): utile per farsi un'idea d'insieme sull'andamento dell'intero corso,
-    non solo di un singolo appello."""
+    non solo di un singolo appello. Qui non serve mai il dettaglio "esercizi più
+    sbagliati" di ogni appello (i chiamanti aggregano solo i totali), quindi si salta
+    sempre: su un corso con molti appelli evita centinaia di query e connessioni inutili.
+    `corso`, se già disponibile al chiamante (es. calcola_multi_corsi/calcola_globale,
+    che scorrono più corsi), evita di riaprire una connessione per rileggerlo qui e poi
+    di nuovo per ogni appello dentro `calcola`."""
+    corso = corso or corsi_service.get_corso(tag)
     appelli = corsi_service.list_appelli(tag, includi_raggruppamenti=False)
     per_appello = []
     totale = promossi = insufficienti = in_attesa_orale = orali_svolti = 0
@@ -234,7 +246,7 @@ def calcola_corso(tag: str) -> dict:
     voti_orali_tutti: list[int] = []
 
     for appello in appelli:
-        stat = calcola(tag, appello.id)
+        stat = calcola(tag, appello.id, includi_esercizi=False, corso=corso, appello=appello)
         if stat["totale"] == 0:
             continue
         per_appello.append({
@@ -291,7 +303,7 @@ def calcola_multi_corsi(tags: list[str]) -> dict:
 
     for tag in tags:
         corso = corsi_service.get_corso(tag)
-        stat = calcola_corso(tag)
+        stat = calcola_corso(tag, corso=corso)
         if stat["totale"] == 0:
             continue
         per_corso.append({
@@ -355,7 +367,7 @@ def calcola_globale() -> dict:
     sufficienze = 0
     anni_iniziali = []
     for corso in corsi:
-        stat = calcola_corso(corso.tag)
+        stat = calcola_corso(corso.tag, corso=corso)
         esami_svolti += stat["promossi"] + stat["insufficienti"]
         sufficienze += stat["promossi"]
         match = re.search(r"\d{4}", corso.anno or "")
