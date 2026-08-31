@@ -4,34 +4,40 @@
   <div class="stats-grid">
     <div class="stat-tile stat-ok">
       <div class="stat-value">{{ stat.promossi }} {% if stat.promossi_pct is not none %}<span class="stat-pct">({{ stat.promossi_pct }}%)</span>{% endif %}</div>
-      <div class="stat-label">Promossi</div>
+      <div class="stat-label"><span class="stat-label-info" title="Studenti con esito definitivo (voto o orale svolto) pari o sopra il voto minimo.">Promossi</span></div>
     </div>
-    <div class="stat-tile stat-warn">
+    <div class="stat-tile {{ 'stat-danger' if stat.insufficienti_pct is not none and stat.insufficienti_pct > 50 else 'stat-warn' }}">
       <div class="stat-value">{{ stat.insufficienti }} {% if stat.insufficienti_pct is not none %}<span class="stat-pct">({{ stat.insufficienti_pct }}%)</span>{% endif %}</div>
-      <div class="stat-label">Insufficienti</div>
+      <div class="stat-label"><span class="stat-label-info" title="Studenti con esito definitivo sotto il voto minimo. Una percentuale sopra il 50% (evidenziata in rosso) può segnalare un compito troppo difficile o una preparazione insufficiente.">Insufficienti</span></div>
     </div>
     <div class="stat-tile stat-info">
       <div class="stat-value">{{ stat.in_attesa_orale }} {% if stat.in_attesa_orale_pct is not none %}<span class="stat-pct">({{ stat.in_attesa_orale_pct }}%)</span>{% endif %}</div>
-      <div class="stat-label">In attesa di orale</div>
+      <div class="stat-label"><span class="stat-label-info" title="Studenti con scritto sufficiente che devono ancora sostenere l'orale richiesto.">In attesa di orale</span></div>
     </div>
     <div class="stat-tile stat-info">
       <div class="stat-value">{{ stat.orali_svolti }} {% if stat.orali_svolti_pct is not none %}<span class="stat-pct">({{ stat.orali_svolti_pct }}%)</span>{% endif %}</div>
-      <div class="stat-label">Orali svolti</div>
+      <div class="stat-label"><span class="stat-label-info" title="Studenti che hanno già sostenuto l'orale richiesto.">Orali svolti</span></div>
     </div>
   </div>
   <div class="stats-grid">
     <div class="stat-tile">
       <div class="stat-value">{{ stat.media_scritto if stat.media_scritto is not none else '-' }}</div>
-      <div class="stat-label">Media scritto</div>
+      <div class="stat-label"><span class="stat-label-info" title="Media dei voti dello scritto, prima di un eventuale orale.">Media scritto</span></div>
     </div>
     <div class="stat-tile">
       <div class="stat-value">{{ stat.media_orale if stat.media_orale is not none else '-' }}</div>
-      <div class="stat-label">Media orale</div>
+      <div class="stat-label"><span class="stat-label-info" title="Media dei voti assegnati in sede di orale.">Media orale</span></div>
     </div>
     <div class="stat-tile">
       <div class="stat-value">{{ stat.media_finale if stat.media_finale is not none else '-' }}</div>
-      <div class="stat-label">Media finale</div>
+      <div class="stat-label"><span class="stat-label-info" title="Media dei voti definitivi (scritto oppure orale, se svolto), tra i soli esiti con voto.">Media finale</span></div>
     </div>
+    {% if stat.n_variazioni_orali %}
+    <div class="stat-tile {{ 'stat-danger' if stat.media_variazione_orale is not none and stat.media_variazione_orale < 0 else 'stat-ok' }}">
+      <div class="stat-value">{{ '%+.2f' | format(stat.media_variazione_orale) if stat.media_variazione_orale is not none else '-' }}</div>
+      <div class="stat-label"><span class="stat-label-info" title="Variazione media tra voto finale e voto scritto per chi ha fatto l'orale (su {{ stat.n_variazioni_orali }} orali svolti). Negativa (in rosso) significa che l'orale ha in media abbassato il voto.">Variazione media dopo l'orale</span></div>
+    </div>
+    {% endif %}
   </div>
 </div>
 
@@ -58,15 +64,15 @@
   <div class="stats-grid">
     <div class="stat-tile">
       <div class="stat-value">{{ stat.distribuzione.asimmetria }}</div>
-      <div class="stat-label">Asimmetria (skewness)</div>
+      <div class="stat-label"><span class="stat-label-info" title="Simmetria della distribuzione: 0 = simmetrica. Positiva = coda di voti alti (più voti bassi della media); negativa = coda di voti bassi.">Asimmetria (skewness)</span></div>
     </div>
     <div class="stat-tile">
       <div class="stat-value">{{ stat.distribuzione.curtosi }}</div>
-      <div class="stat-label">Curtosi in eccesso</div>
+      <div class="stat-label"><span class="stat-label-info" title="Quanto la distribuzione è 'appuntita' rispetto a una gaussiana: 0 = normale, positiva = più concentrata attorno alla media, negativa = più piatta/dispersa.">Curtosi in eccesso</span></div>
     </div>
-    <div class="stat-tile">
+    <div class="stat-tile {{ 'stat-danger' if stat.distribuzione.distanza_gaussiana is not none and stat.distribuzione.distanza_gaussiana > 1 else '' }}">
       <div class="stat-value">{{ stat.distribuzione.distanza_gaussiana }}</div>
-      <div class="stat-label">Distanza dalla gaussiana</div>
+      <div class="stat-label"><span class="stat-label-info" title="Combina asimmetria e curtosi in un solo indice: più è vicino a 0, più i voti seguono una campana regolare. Sopra 1 (evidenziato in rosso) la distribuzione si discosta parecchio dalla forma attesa.">Distanza dalla gaussiana</span></div>
     </div>
   </div>
   <p class="muted" style="margin-top:0.75rem">

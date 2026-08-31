@@ -10,12 +10,15 @@
   <h2>Corsi inclusi</h2>
   <form method="get" action="/statistiche-generali">
     <p style="margin-top:0">
-      <button type="button" id="btn-seleziona-tutti" class="secondary" style="margin-top:0">Seleziona tutti</button>
-      <button type="button" id="btn-deseleziona-tutti" class="secondary" style="margin-top:0">Deseleziona tutti</button>
+      <input type="text" id="filtro-nome-corso" placeholder="Filtra per nome del corso..." style="max-width:20rem; display:inline-block">
+    </p>
+    <p>
+      <button type="button" id="btn-seleziona-tutti" class="secondary" style="margin-top:0">Seleziona visibili</button>
+      <button type="button" id="btn-deseleziona-tutti" class="secondary" style="margin-top:0">Deseleziona visibili</button>
     </p>
     <div class="form-grid">
       {% for c in corsi %}
-      <label style="display:flex; align-items:center; gap:0.4rem; font-weight:normal">
+      <label class="riga-corso-filtrabile" data-nome="{{ c.nome|lower }}" style="display:flex; align-items:center; gap:0.4rem; font-weight:normal">
         <input type="checkbox" name="corsi" value="{{ c.tag }}" class="campo-corso-incluso" style="width:auto" {% if c.tag in tags_selezionati %}checked{% endif %}>
         {{ c.nome }} <span class="muted">({{ c.anno }})</span>
       </label>
@@ -25,12 +28,21 @@
   </form>
   <script>
   (function () {
-    var campi = document.querySelectorAll(".campo-corso-incluso");
+    var righe = document.querySelectorAll(".riga-corso-filtrabile");
+    function visibili() {
+      return Array.prototype.filter.call(righe, function (r) { return r.style.display !== "none"; });
+    }
+    document.getElementById("filtro-nome-corso").addEventListener("input", function (ev) {
+      var q = ev.target.value.trim().toLowerCase();
+      righe.forEach(function (r) {
+        r.style.display = (!q || r.dataset.nome.indexOf(q) !== -1) ? "" : "none";
+      });
+    });
     document.getElementById("btn-seleziona-tutti").addEventListener("click", function () {
-      campi.forEach(function (c) { c.checked = true; });
+      visibili().forEach(function (r) { r.querySelector(".campo-corso-incluso").checked = true; });
     });
     document.getElementById("btn-deseleziona-tutti").addEventListener("click", function () {
-      campi.forEach(function (c) { c.checked = false; });
+      visibili().forEach(function (r) { r.querySelector(".campo-corso-incluso").checked = false; });
     });
   })();
   </script>
@@ -42,33 +54,33 @@
   <div class="stats-grid">
     <div class="stat-tile stat-ok">
       <div class="stat-value">{{ statistiche.promossi }} {% if statistiche.promossi_pct is not none %}<span class="stat-pct">({{ statistiche.promossi_pct }}%)</span>{% endif %}</div>
-      <div class="stat-label">Promossi</div>
+      <div class="stat-label"><span class="stat-label-info" title="Studenti con esito definitivo pari o sopra il voto minimo, nei corsi selezionati.">Promossi</span></div>
     </div>
-    <div class="stat-tile stat-warn">
+    <div class="stat-tile {{ 'stat-danger' if statistiche.insufficienti_pct is not none and statistiche.insufficienti_pct > 50 else 'stat-warn' }}">
       <div class="stat-value">{{ statistiche.insufficienti }} {% if statistiche.insufficienti_pct is not none %}<span class="stat-pct">({{ statistiche.insufficienti_pct }}%)</span>{% endif %}</div>
-      <div class="stat-label">Insufficienti</div>
+      <div class="stat-label"><span class="stat-label-info" title="Studenti con esito definitivo sotto il voto minimo. Sopra il 50% (in rosso) può segnalare una difficoltà diffusa.">Insufficienti</span></div>
     </div>
     <div class="stat-tile stat-info">
       <div class="stat-value">{{ statistiche.in_attesa_orale }} {% if statistiche.in_attesa_orale_pct is not none %}<span class="stat-pct">({{ statistiche.in_attesa_orale_pct }}%)</span>{% endif %}</div>
-      <div class="stat-label">In attesa di orale</div>
+      <div class="stat-label"><span class="stat-label-info" title="Studenti con scritto sufficiente in attesa di sostenere l'orale richiesto.">In attesa di orale</span></div>
     </div>
     <div class="stat-tile stat-info">
       <div class="stat-value">{{ statistiche.orali_svolti }} {% if statistiche.orali_svolti_pct is not none %}<span class="stat-pct">({{ statistiche.orali_svolti_pct }}%)</span>{% endif %}</div>
-      <div class="stat-label">Orali svolti</div>
+      <div class="stat-label"><span class="stat-label-info" title="Studenti che hanno già sostenuto l'orale richiesto.">Orali svolti</span></div>
     </div>
   </div>
   <div class="stats-grid">
     <div class="stat-tile">
       <div class="stat-value">{{ statistiche.media_scritto if statistiche.media_scritto is not none else '-' }}</div>
-      <div class="stat-label">Media scritto</div>
+      <div class="stat-label"><span class="stat-label-info" title="Media dei voti dello scritto, prima di un eventuale orale.">Media scritto</span></div>
     </div>
     <div class="stat-tile">
       <div class="stat-value">{{ statistiche.media_orale if statistiche.media_orale is not none else '-' }}</div>
-      <div class="stat-label">Media orale</div>
+      <div class="stat-label"><span class="stat-label-info" title="Media dei voti assegnati in sede di orale.">Media orale</span></div>
     </div>
     <div class="stat-tile">
       <div class="stat-value">{{ statistiche.media_finale if statistiche.media_finale is not none else '-' }}</div>
-      <div class="stat-label">Media finale</div>
+      <div class="stat-label"><span class="stat-label-info" title="Media dei voti definitivi, tra i soli esiti con voto.">Media finale</span></div>
     </div>
   </div>
 </div>
@@ -123,6 +135,34 @@
       {% endfor %}
     </svg>
   </div>
+
+  <p class="muted" style="margin-top:1.5rem">Andamento della percentuale di promossi per anno accademico.</p>
+  <div style="overflow-x:auto">
+    <svg width="{{ statistiche.andamento_promossi_pct.larghezza }}" height="{{ statistiche.andamento_promossi_pct.margine_top + statistiche.andamento_promossi_pct.altezza + 20 }}" style="min-width:100%; color:var(--text)">
+      {% if statistiche.andamento_promossi_pct.linea_points %}
+      <polyline fill="none" stroke="#22c55e" stroke-width="2" points="{{ statistiche.andamento_promossi_pct.linea_points }}"></polyline>
+      {% endif %}
+      {% for p in statistiche.andamento_promossi_pct.punti %}
+      <circle cx="{{ p.x }}" cy="{{ p.y }}" r="3" fill="#22c55e"></circle>
+      <text x="{{ p.x }}" y="{{ p.y - 8 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ p.valore }}%</text>
+      <text x="{{ p.x }}" y="{{ statistiche.andamento_promossi_pct.margine_top + statistiche.andamento_promossi_pct.altezza + 15 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ p.etichetta }}</text>
+      {% endfor %}
+    </svg>
+  </div>
+
+  <p class="muted" style="margin-top:1.5rem">Andamento del voto medio finale per anno accademico.</p>
+  <div style="overflow-x:auto">
+    <svg width="{{ statistiche.andamento_voto_medio.larghezza }}" height="{{ statistiche.andamento_voto_medio.margine_top + statistiche.andamento_voto_medio.altezza + 20 }}" style="min-width:100%; color:var(--text)">
+      {% if statistiche.andamento_voto_medio.linea_points %}
+      <polyline fill="none" stroke="#93c5fd" stroke-width="2" points="{{ statistiche.andamento_voto_medio.linea_points }}"></polyline>
+      {% endif %}
+      {% for p in statistiche.andamento_voto_medio.punti %}
+      <circle cx="{{ p.x }}" cy="{{ p.y }}" r="3" fill="#93c5fd"></circle>
+      <text x="{{ p.x }}" y="{{ p.y - 8 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ p.valore }}</text>
+      <text x="{{ p.x }}" y="{{ statistiche.andamento_voto_medio.margine_top + statistiche.andamento_voto_medio.altezza + 15 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ p.etichetta }}</text>
+      {% endfor %}
+    </svg>
+  </div>
 </div>
 {% endif %}
 
@@ -149,15 +189,15 @@
   <div class="stats-grid">
     <div class="stat-tile">
       <div class="stat-value">{{ statistiche.distribuzione.asimmetria }}</div>
-      <div class="stat-label">Asimmetria (skewness)</div>
+      <div class="stat-label"><span class="stat-label-info" title="Simmetria della distribuzione: 0 = simmetrica. Positiva = coda di voti alti; negativa = coda di voti bassi.">Asimmetria (skewness)</span></div>
     </div>
     <div class="stat-tile">
       <div class="stat-value">{{ statistiche.distribuzione.curtosi }}</div>
-      <div class="stat-label">Curtosi in eccesso</div>
+      <div class="stat-label"><span class="stat-label-info" title="Quanto la distribuzione è 'appuntita' rispetto a una gaussiana: 0 = normale, positiva = concentrata, negativa = piatta/dispersa.">Curtosi in eccesso</span></div>
     </div>
-    <div class="stat-tile">
+    <div class="stat-tile {{ 'stat-danger' if statistiche.distribuzione.distanza_gaussiana is not none and statistiche.distribuzione.distanza_gaussiana > 1 else '' }}">
       <div class="stat-value">{{ statistiche.distribuzione.distanza_gaussiana }}</div>
-      <div class="stat-label">Distanza dalla gaussiana</div>
+      <div class="stat-label"><span class="stat-label-info" title="Combina asimmetria e curtosi: più vicino a 0, più i voti seguono una campana regolare. Sopra 1 (in rosso) la distribuzione si discosta parecchio dalla forma attesa.">Distanza dalla gaussiana</span></div>
     </div>
   </div>
   {% endif %}

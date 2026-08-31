@@ -151,6 +151,23 @@ def list_non_superati(tag: str) -> list[Studente]:
         conn.close()
 
 
+def list_mai_sostenuto(tag: str) -> list[Studente]:
+    """Studenti di questo corso che non hanno ancora sostenuto l'esame nemmeno una volta
+    (nessun risultato registrato, nemmeno un tentativo insufficiente): filtro più stretto
+    di list_non_superati, per chi vuole importare in un altro corso solo chi non ha mai
+    provato, escludendo anche chi ha già tentato senza ancora superarlo."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        rows = conn.execute(
+            "SELECT s.* FROM studenti s WHERE NOT EXISTS ("
+            "  SELECT 1 FROM risultati r WHERE r.matricola = s.matricola"
+            ") ORDER BY s.cognome, s.nome"
+        ).fetchall()
+        return [_row_to_studente(r) for r in rows]
+    finally:
+        conn.close()
+
+
 def importa_da_altro_corso(tag: str, tag_sorgente: str, matricole: list[str]) -> "ImportReport":
     """Importa studenti scelti da un altro corso, solo se non hanno ancora superato
     l'esame in quello di origine. Stesso comportamento verso le matricole già presenti

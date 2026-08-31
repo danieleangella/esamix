@@ -104,14 +104,63 @@ def elimina_segreteria_csv(tag: str, appello_id: int) -> None:
         conn.close()
 
 
+def list_iscritti_manuali(tag: str, appello_id: int) -> list[dict]:
+    """Iscritti aggiunti a mano uno per uno (quando non è stato caricato un file della
+    segreteria): stessa forma dell'elenco derivato dal CSV."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        rows = conn.execute(
+            "SELECT s.matricola, s.nome, s.cognome, s.dsa FROM appello_iscritti_manuali im "
+            "JOIN studenti s ON s.matricola = im.matricola "
+            "WHERE im.appello_id=? ORDER BY s.cognome, s.nome",
+            (appello_id,),
+        ).fetchall()
+        return [
+            {"matricola": r["matricola"], "cognome": r["cognome"], "nome": r["nome"], "dsa": bool(r["dsa"])}
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
+def aggiungi_iscritto_manuale(tag: str, appello_id: int, matricola: str) -> None:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        studente = conn.execute("SELECT 1 FROM studenti WHERE matricola=?", (matricola,)).fetchone()
+        if studente is None:
+            raise ValueError(f"Nessuno studente con matricola '{matricola}' in questo corso")
+        conn.execute(
+            "INSERT INTO appello_iscritti_manuali (matricola, appello_id) VALUES (?,?) "
+            "ON CONFLICT(matricola, appello_id) DO NOTHING",
+            (matricola, appello_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def rimuovi_iscritto_manuale(tag: str, appello_id: int, matricola: str) -> None:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute(
+            "DELETE FROM appello_iscritti_manuali WHERE matricola=? AND appello_id=?", (matricola, appello_id)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def list_iscritti(tag: str, appello_id: int) -> Optional[list[dict]]:
-    """None se non è stato caricato nessun file per questo appello. Altrimenti l'elenco
-    degli iscritti (matricola/cognome/nome/dsa), ordinato per cognome poi nome: i dati
-    anagrafici vengono dall'anagrafica del corso quando lo studente è già censito,
-    altrimenti dalle colonne Cognome/Nome del file stesso (se presenti)."""
+    """None se non è stato caricato nessun file per questo appello e non è stato aggiunto
+    a mano nessuno studente. Il file della segreteria, quando presente, ha sempre la
+    precedenza sull'elenco aggiunto a mano. L'elenco (matricola/cognome/nome/dsa) è
+    ordinato per cognome poi nome: i dati anagrafici vengono dall'anagrafica del corso
+    quando lo studente è già censito, altrimenti (solo per il CSV) dalle colonne
+    Cognome/Nome del file stesso, se presenti."""
     riga_csv = get_segreteria_csv(tag, appello_id)
     if riga_csv is None:
-        return None
+        manuali = list_iscritti_manuali(tag, appello_id)
+        return manuali or None
     righe = list(csv.reader(io.StringIO(riga_csv["contenuto"])))
     indice_intestazione = _trova_intestazione(righe)
     intestazione = righe[indice_intestazione]

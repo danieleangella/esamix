@@ -33,7 +33,7 @@
   <form method="post" action="/migrazione/esegui">
     <div class="form-grid">
       <div style="grid-column: 1 / -1">
-        <label>Cartella principale del corso legacy</label>
+        <label class="campo-obbligatorio">Cartella principale del corso legacy</label>
         <div class="input-with-button">
           <input name="cartella" id="cartella-legacy" autocomplete="new-password" required placeholder="{{ legacy_root }}/NomeCartellaCorso">
           <button type="button" class="secondary" data-sfoglia-cartella="cartella-legacy">Sfoglia&hellip;</button>
@@ -43,9 +43,9 @@
 
     <div class="form-section-title">Dati del nuovo corso</div>
     <div class="form-grid">
-      <div><label>Nome corso</label><input name="nome" required placeholder="es. Geometria O-Z"></div>
+      <div><label class="campo-obbligatorio">Nome corso</label><input name="nome" required placeholder="es. Geometria O-Z"></div>
       <div><label>Anno accademico</label><input name="anno" placeholder="es. 2025/2026"></div>
-      <div><label>Tag (cartella, univoco)</label><input name="tag" required placeholder="es. GeoOZ-IngMEL-UniFi25"></div>
+      <div><label class="campo-obbligatorio">Tag (cartella, univoco)</label><input name="tag" required placeholder="es. GeoOZ-IngMEL-UniFi25"></div>
       <div><label>Facoltà</label><input name="facolta"></div>
       <div><label>Università</label><input name="universita"></div>
       <div><label>Docente</label><input name="docente"></div>

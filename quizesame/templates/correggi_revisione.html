@@ -43,6 +43,7 @@
     </div>
     <div class="muted" style="font-size:0.8rem; margin-top:0.5rem">Risposte corrette</div>
     <div style="font-family:monospace; font-size:1.4rem; letter-spacing:0.1em; color:var(--ok-text); font-weight:bold">{{ risposte_corrette_raggruppate }}</div>
+    <div style="font-family:monospace; font-size:1.4rem; letter-spacing:0.1em" title="✓ risposta giusta, ✗ risposta sbagliata o non data, · domanda aperta (valutata a mano)">{{ risposte_marcatura_raggruppata }}</div>
     <button type="submit" id="btn-ricalcola" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" formnovalidate class="secondary" disabled style="margin-top:0.6rem">Ricalcola con queste risposte</button>
   </div>
   {% if lunghezza_valida %}
@@ -148,7 +149,7 @@
       {% endif %}
     </div>
     <div id="box-motivazione-orale" style="display:none; margin-top:0.5rem">
-      <label>Motivazione (opzionale, visibile solo al docente)</label>
+      <label>Motivazione (visibile solo al docente)</label>
       <textarea name="orale_motivazione" rows="2"></textarea>
     </div>
 

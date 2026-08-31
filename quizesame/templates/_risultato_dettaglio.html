@@ -48,8 +48,11 @@
   <table>
     <tr><th>Appello</th><th>Esito</th><th>Orale</th></tr>
     {% for s in storico %}
-    <tr>
-      <td><a href="/corsi/{{ tag }}/appelli/{{ s.appello_id }}/risultati/{{ risultato.matricola }}">{{ s.appello_nome }}</a></td>
+    <tr {% if s.corrente %}style="background:var(--accent-bg, #eef2ff)"{% endif %}>
+      <td>
+        <a href="/corsi/{{ tag }}/appelli/{{ s.appello_id }}/risultati/{{ risultato.matricola }}">{{ s.appello_nome }}</a>
+        {% if s.corrente %} <span class="badge badge-info">questo compito</span>{% endif %}
+      </td>
       <td>
         {% if s.esito != 'voto' %}{{ s.esito }}
         {% else %}{{ s.voto }}{% endif %}
@@ -68,5 +71,8 @@
   <p style="margin-top:1rem">
     <a href="/corsi/{{ tag }}/appelli/{{ risultato.appello_id }}/risultati/{{ risultato.matricola }}" class="button secondary">Pagina del compito</a>
     <a href="/corsi/{{ tag }}/studenti/{{ risultato.matricola }}" class="button secondary">Pagina dello studente</a>
+    {% if not chiuso and risultato.esito in ('voto', 'rifiutato') and not risultato.verbalizzato %}
+    <a href="/corsi/{{ tag }}/appelli/{{ risultato.appello_id }}/risultati/{{ risultato.matricola }}/modifica" class="muted" style="margin-left:0.75rem; font-size:0.85rem">Modifica</a>
+    {% endif %}
   </p>
 </div>

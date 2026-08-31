@@ -16,13 +16,14 @@
     <a href="#home" data-tab="home">Home</a>
   </div>
   {% if raggruppamento %}
+  {% for m in raggruppamento.membri %}
   <div class="tabs">
-    {% for m in raggruppamento.membri %}
-    <a href="#creazione-{{ m.id }}" data-tab="creazione-{{ m.id }}">Testo {{ loop.index }}</a>
-    <a href="#compiti-{{ m.id }}" data-tab="compiti-{{ m.id }}">Compiti d'esame {{ loop.index }}</a>
-    <a href="#valutazione-{{ m.id }}" data-tab="valutazione-{{ m.id }}" class="{{ 'tab-disabilitata' if not membri_dati[loop.index0].blocchi }}">Valutazione {{ loop.index }}</a>
-    {% endfor %}
+    <span class="tabs-label">{{ m.nome }}:</span>
+    <a href="#creazione-{{ m.id }}" data-tab="creazione-{{ m.id }}">Testo</a>
+    <a href="#compiti-{{ m.id }}" data-tab="compiti-{{ m.id }}">Compiti d'esame</a>
+    <a href="#valutazione-{{ m.id }}" data-tab="valutazione-{{ m.id }}" class="{{ 'tab-disabilitata' if not membri_dati[loop.index0].blocchi }}">Valutazione</a>
   </div>
+  {% endfor %}
   <div class="tabs tabs-globali">
     <a href="#risultati" data-tab="risultati">Risultati</a>
     <a href="#orali" data-tab="orali" class="{{ 'tab-disabilitata' if not orali_richiesti }}">Orali</a>
@@ -47,8 +48,10 @@
   {% if raggruppamento %}
   <div class="card">
     <h2>Avanzamento raggruppamento ({{ riepilogo_home_raggruppamento.percentuale }}%)</h2>
+    {% set _pct = riepilogo_home_raggruppamento.percentuale %}
+    {% set _barra_colore = '#22c55e' if _pct >= 100 else ('#eab308' if _pct >= 60 else ('#f97316' if _pct >= 30 else '#ef4444')) %}
     <div style="background:var(--border); border-radius:4px; overflow:hidden; height:0.6rem; margin-bottom:1rem">
-      <div style="background:#22c55e; height:100%; width:{{ riepilogo_home_raggruppamento.percentuale }}%"></div>
+      <div style="background:{{ _barra_colore }}; height:100%; width:{{ _pct }}%"></div>
     </div>
     <table>
       <tr><th>Prova</th><th>Data</th><th>Compiti</th><th>Iscritti</th><th>Presenti</th><th>Ritirati</th><th>Sufficienti</th><th>Avanzamento</th></tr>
@@ -77,7 +80,7 @@
       <tr><th></th><th>Fase</th><th>Stato</th></tr>
       {% for f in rh.fasi %}
       <tr>
-        <td>{% if f.fatta %}<span class="badge badge-ok">fatto</span>{% elif f.in_corso %}<span class="badge badge-warn">in corso</span>{% else %}<span class="badge">da fare</span>{% endif %}</td>
+        <td>{% if f.fatta %}<span class="badge badge-ok">fatto</span>{% elif f.in_corso %}<span class="badge badge-warn">in corso</span>{% else %}<span class="badge badge-err">da fare</span>{% endif %}</td>
         <td>{{ f.nome }}</td>
         <td class="muted">{{ f.dettaglio }}</td>
       </tr>
@@ -116,15 +119,17 @@
 
   <div class="card">
     <h2>Avanzamento ({{ riepilogo_home.percentuale }}%)</h2>
+    {% set _pct = riepilogo_home.percentuale %}
+    {% set _barra_colore = '#22c55e' if _pct >= 100 else ('#eab308' if _pct >= 60 else ('#f97316' if _pct >= 30 else '#ef4444')) %}
     <div style="background:var(--border); border-radius:4px; overflow:hidden; height:0.6rem; margin-bottom:1rem">
-      <div style="background:#22c55e; height:100%; width:{{ riepilogo_home.percentuale }}%"></div>
+      <div style="background:{{ _barra_colore }}; height:100%; width:{{ _pct }}%"></div>
     </div>
     <p class="muted" style="margin-top:0">Cosa resta da fare, nell'ordine:</p>
     <table>
       <tr><th></th><th>Fase</th><th>Stato</th></tr>
       {% for f in riepilogo_home.fasi %}
       <tr>
-        <td>{% if f.fatta %}<span class="badge badge-ok">fatto</span>{% elif f.in_corso %}<span class="badge badge-warn">in corso</span>{% else %}<span class="badge">da fare</span>{% endif %}</td>
+        <td>{% if f.fatta %}<span class="badge badge-ok">fatto</span>{% elif f.in_corso %}<span class="badge badge-warn">in corso</span>{% else %}<span class="badge badge-err">da fare</span>{% endif %}</td>
         <td>{{ f.nome }}</td>
         <td class="muted">{{ f.dettaglio }}</td>
       </tr>
@@ -147,7 +152,7 @@
     </p>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/modifica">
       <div class="form-grid">
-        <div><label>Nome</label><input name="nome" value="{{ appello.nome }}" required></div>
+        <div><label class="campo-obbligatorio">Nome</label><input name="nome" value="{{ appello.nome }}" required></div>
         <div><label>Data</label><input type="date" name="data" value="{{ appello.data | data_iso }}"></div>
       </div>
       <p class="muted" style="margin-top:0.75rem">Orale (mostrato in testa al foglio dei risultati se qualcuno è in attesa):</p>
@@ -181,11 +186,13 @@
   <div class="card">
     <h2>Elimina appello</h2>
     {% if risultati %}
-    <p class="muted">Attenzione: ha già <strong>{{ risultati|length }}</strong> risultati registrati, che verranno eliminati insieme all'appello.</p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/elimina"
-          onsubmit="return confirm('Eliminare definitivamente l\'appello {{ appello.nome }} insieme ai suoi {{ risultati|length }} risultati registrati (esercizi assegnati, blocchi e compiti compresi)?') && confirm('Sei sicuro? I {{ risultati|length }} risultati registrati andranno persi per sempre.');">
-      <button type="submit" class="danger">Elimina questo appello</button>
+    <p class="muted">Attenzione: ha già <strong>{{ risultati|length }}</strong> risultati registrati, che verranno eliminati insieme all'appello.
+      Per confermare, scrivi <strong>{{ appello.nome }}</strong> qui sotto.</p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/elimina" id="form-elimina-appello">
+      <input class="campo-conferma-testo" data-frase-attesa="{{ appello.nome }}" autocomplete="off" style="max-width:20rem">
+      <button type="submit" class="danger btn-conferma-testo" disabled style="margin-top:0.75rem">Elimina questo appello</button>
     </form>
+    <script>attivaConfermaTestuale(document.getElementById("form-elimina-appello"));</script>
     {% else %}
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/elimina"
           onsubmit="return confirm('Eliminare definitivamente l\'appello {{ appello.nome }} (esercizi assegnati, blocchi e compiti compresi)?');">
@@ -247,7 +254,7 @@
   "esercizi_assegnati": esercizi_assegnati, "esercizi_disponibili": esercizi_disponibili, "argomenti": argomenti,
   "blocchi": blocchi, "riferimento_pdf_esiste": riferimento_pdf_esiste, "riferimento_tex_esiste": riferimento_tex_esiste,
   "votomin_effettivo": votomin_effettivo, "consegna_effettivo": consegna_effettivo,
-  "segreteria_csv": segreteria_csv, "iscritti": iscritti, "numero_iscritti": numero_iscritti,
+  "segreteria_csv": segreteria_csv, "iscritti": iscritti, "iscritti_manuali": iscritti_manuali, "numero_iscritti": numero_iscritti,
   "numero_studenti_suggerito": numero_studenti_suggerito, "avviso_pochi_compiti": avviso_pochi_compiti,
 } %}
 {% set pane_suffix = "" %}
@@ -275,7 +282,7 @@
           {% elif r.esito != 'voto' %}{{ r.esito }}
           {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
-          {% else %}{{ r.voto }}{% endif %}
+          {% else %}{{ r.voto }}{% if r.richiede_orale and r.orale_svolto %} <span class="badge badge-ok">orale svolto</span>{% endif %}{% endif %}
           {% if r.verbalizzato %} <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>{% endif %}
         </td>
         <td style="white-space:nowrap; text-align:right">
@@ -365,12 +372,15 @@
     <h2>Voti verbalizzati ({{ verbalizzati|length }})</h2>
     {% if verbalizzati %}
     <table>
-      <tr><th>Studente</th><th>Matricola</th><th>Voto</th><th>Data</th><th></th></tr>
+      <tr><th>Studente</th><th>Matricola</th><th>Voto</th><th>Orale</th><th>Data</th><th></th></tr>
       {% for r in verbalizzati %}
       <tr>
         <td>{{ r.cognome }} {{ r.nome }}</td>
         <td>{{ r.matricola }}</td>
         <td>{{ r.voto }}</td>
+        <td>
+          {% if r.richiede_orale %}<span class="badge badge-ok">orale svolto</span>{% else %}<span class="muted">non richiesto</span>{% endif %}
+        </td>
         <td class="muted">{{ r.data_verbalizzazione }}</td>
         <td style="text-align:right">
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/verbalizza/{{ r.matricola }}/annulla"
@@ -426,6 +436,26 @@
     <p class="muted">Nessuno studente in attesa di orale per questo appello.</p>
     {% endif %}
   </div>
+
+  <details class="card">
+    <summary>Orali svolti ({{ orali_svolti|length }})</summary>
+    {% if orali_svolti %}
+    <table style="margin-top:1rem">
+      <tr><th>Studente</th><th>Matricola</th><th>Voto scritto</th><th>Esito orale</th><th>Voto finale</th></tr>
+      {% for r in orali_svolti %}
+      <tr>
+        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>{{ r.matricola }}</td>
+        <td class="muted">{{ r.voto_scritto }}</td>
+        <td>{{ r.esito_orale }}</td>
+        <td>{{ r.voto if r.voto is not none else '-' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted" style="margin-top:1rem">Nessun orale ancora svolto per questo appello.</p>
+    {% endif %}
+  </details>
 </div>
 
 {% if statistiche %}

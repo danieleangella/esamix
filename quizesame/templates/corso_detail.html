@@ -44,8 +44,8 @@
   <summary>Nuovo appello</summary>
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/nuovo" style="margin-top:1rem">
     <div class="form-grid">
-      <div><label>Nome</label><input name="nome" required placeholder="es. Primo appello"></div>
-      <div><label>Data (opzionale)</label><input type="date" name="data"></div>
+      <div><label class="campo-obbligatorio">Nome</label><input name="nome" required placeholder="es. Primo appello"></div>
+      <div><label>Data</label><input type="date" name="data"></div>
     </div>
     <button type="submit">Crea appello</button>
   </form>
@@ -95,7 +95,7 @@
   <summary>Nuovo raggruppamento</summary>
   <form method="post" action="/corsi/{{ corso.tag }}/raggruppamenti/nuovo" style="margin-top:1rem">
     <div class="form-grid">
-      <div><label>Nome raggruppamento</label><input name="nome" required placeholder="es. Prove parziali"></div>
+      <div><label class="campo-obbligatorio">Nome raggruppamento</label><input name="nome" required placeholder="es. Prove parziali"></div>
     </div>
     <label style="margin-top:0.75rem">Prove da combinare (almeno due)</label>
     {% for a in appelli %}

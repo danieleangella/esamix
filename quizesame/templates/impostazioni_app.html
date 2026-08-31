@@ -45,4 +45,22 @@
     <button type="submit" class="secondary">Carica e scegli cosa ripristinare</button>
   </form>
 </div>
+
+<div class="card">
+  <h2>Elimina tutti i dati</h2>
+  <p class="muted">Elimina definitivamente <strong>tutti i {{ numero_corsi }} corsi</strong> di questa
+    installazione: studenti, esercizi, appelli e tutti i risultati registrati, in ogni corso. Azione
+    irreversibile, senza backup automatico: scaricane uno da qui sopra prima di procedere, se non l'hai
+    già fatto.</p>
+  {% if numero_corsi %}
+  <form method="post" action="/elimina-tutti-i-dati" id="form-elimina-tutti-i-dati">
+    <label>Per confermare, scrivi <strong>{{ frase_conferma_elimina_tutto }}</strong> qui sotto</label>
+    <input name="conferma" class="campo-conferma-testo" data-frase-attesa="{{ frase_conferma_elimina_tutto }}" autocomplete="off" style="max-width:20rem">
+    <button type="submit" class="danger btn-conferma-testo" disabled style="margin-top:0.75rem">Elimina tutti i dati</button>
+  </form>
+  <script>attivaConfermaTestuale(document.getElementById("form-elimina-tutti-i-dati"));</script>
+  {% else %}
+  <p class="muted">Non ci sono ancora corsi da eliminare.</p>
+  {% endif %}
+</div>
 {% endblock %}

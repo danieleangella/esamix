@@ -102,9 +102,9 @@
   <summary>Nuovo corso</summary>
   <form method="post" action="/corsi/nuovo" id="nuovo-corso-form" style="margin-top:1rem">
     <div class="form-grid">
-      <div style="grid-column: 1 / -1"><label>Nome corso</label><input name="nome" id="corso-nome" required placeholder="es. Geometria O-Z"></div>
+      <div style="grid-column: 1 / -1"><label class="campo-obbligatorio">Nome corso</label><input name="nome" id="corso-nome" required placeholder="es. Geometria O-Z"></div>
       <div><label>Anno accademico</label><input name="anno" id="corso-anno" placeholder="es. 2026/2027"></div>
-      <div><label>Tag (cartella, univoco)</label><input name="tag" id="corso-tag" required placeholder="es. GeoOZ-IngMEL-UniFi26"></div>
+      <div><label class="campo-obbligatorio">Tag (cartella, univoco)</label><input name="tag" id="corso-tag" required placeholder="es. GeoOZ-IngMEL-UniFi26"></div>
     </div>
 
     <div class="form-grid" style="margin-top:0.75rem">

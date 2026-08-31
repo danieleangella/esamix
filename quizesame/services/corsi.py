@@ -267,6 +267,17 @@ def elimina_corso(tag: str) -> None:
     db.dimentica_schema(config.corso_db_path(tag))
 
 
+def elimina_tutti_i_corsi() -> int:
+    """Elimina definitivamente TUTTI i corsi dell'installazione (studenti, esercizi,
+    appelli, risultati e ogni file generato). Azione irreversibile e senza backup: la
+    doppia conferma è responsabilità del chiamante. Ritorna quanti corsi sono stati
+    eliminati."""
+    corsi = list_corsi()
+    for corso in corsi:
+        elimina_corso(corso.tag)
+    return len(corsi)
+
+
 def get_corso(tag: str) -> Corso:
     meta = get_meta(tag)
     return Corso(

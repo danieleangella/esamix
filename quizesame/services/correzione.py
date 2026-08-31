@@ -538,9 +538,9 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
                 "punteggio_assegnato": punteggio_assegnato,
             })
 
-        storico = [
-            s for s in studenti_service.risultati_studente(tag, matricola) if s["appello_id"] != appello_id
-        ]
+        storico = studenti_service.risultati_studente(tag, matricola)
+        for s in storico:
+            s["corrente"] = s["appello_id"] == appello_id
         return {"risultato": risultato, "righe": righe, "storico": storico}
     finally:
         conn.close()
@@ -567,6 +567,21 @@ def list_orali_da_svolgere(tag: str, appello_id: int) -> list[dict]:
             "SELECT r.*, s.nome, s.cognome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
             "WHERE r.appello_id=? AND r.richiede_orale=1 AND r.orale_svolto=0 "
+            "ORDER BY s.cognome, s.nome",
+            (appello_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def list_orali_svolti(tag: str, appello_id: int) -> list[dict]:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        rows = conn.execute(
+            "SELECT r.*, s.nome, s.cognome FROM risultati r "
+            "JOIN studenti s ON s.matricola = r.matricola "
+            "WHERE r.appello_id=? AND r.richiede_orale=1 AND r.orale_svolto=1 "
             "ORDER BY s.cognome, s.nome",
             (appello_id,),
         ).fetchall()

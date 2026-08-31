@@ -88,6 +88,21 @@
     input.addEventListener("input", aggiorna);
     aggiorna();
   }
+
+  // Doppia conferma per azioni distruttive e irreversibili: invece di un secondo
+  // confirm() generico, tiene il bottone disabilitato finché l'utente non scrive
+  // esattamente la frase indicata nella casella di testo (confronto case-insensitive,
+  // spazi iniziali/finali ignorati).
+  function attivaConfermaTestuale(form) {
+    var campo = form.querySelector(".campo-conferma-testo");
+    var bottone = form.querySelector(".btn-conferma-testo");
+    var frase = (campo.dataset.fraseAttesa || "").trim().toLowerCase();
+    function aggiorna() {
+      bottone.disabled = campo.value.trim().toLowerCase() !== frase;
+    }
+    campo.addEventListener("input", aggiorna);
+    aggiorna();
+  }
   </script>
 </head>
 <body>

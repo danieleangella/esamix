@@ -167,6 +167,10 @@ def calcola(tag: str, appello_id: int, includi_esercizi: bool = True, corso=None
                 voti_scritti.append(v)
         voti_orali = [r["voto"] for r in risultati if r["orale_svolto"] and r["voto"] is not None]
         voti_finali = [r["voto"] for r in valutati if r["voto"] is not None]
+        variazioni_orali = [
+            r["voto"] - r["voto_scritto"] for r in risultati
+            if r["orale_svolto"] and r["voto"] is not None and r["voto_scritto"] is not None
+        ]
 
         media = lambda lista: round(sum(lista) / len(lista), 2) if lista else None  # noqa: E731
         pct = lambda n: round(100 * n / totale) if totale else None  # noqa: E731
@@ -177,6 +181,7 @@ def calcola(tag: str, appello_id: int, includi_esercizi: bool = True, corso=None
             "promossi_pct": pct(len(promossi)), "insufficienti_pct": pct(len(insufficienti)),
             "in_attesa_orale_pct": pct(len(in_attesa_orale)), "orali_svolti_pct": pct(len(voti_orali)),
             "media_scritto": media(voti_scritti), "media_orale": media(voti_orali), "media_finale": media(voti_finali),
+            "media_variazione_orale": media(variazioni_orali), "n_variazioni_orali": len(variazioni_orali),
             "votomin": votomin, "distribuzione": _distribuzione_e_gaussiana(voti_finali),
             "esercizi": _statistiche_esercizi(tag, conn, risultati) if includi_esercizi else [],
             "voti_finali": voti_finali,
@@ -209,6 +214,37 @@ def _andamento_appelli(per_appello: list[dict]) -> dict:
     return {
         "gruppi": gruppi, "larghezza": len(per_appello) * larghezza_gruppo,
         "altezza": altezza, "margine_top": margine_top,
+    }
+
+
+def _andamento_lineare(serie: list[dict], chiave: str) -> dict:
+    """Geometria di un grafico a linea per un valore numerico per periodo (es. percentuale
+    promossi o voto medio per anno accademico), stesso approccio di _andamento_appelli:
+    coordinate già calcolate qui per tenere il template semplice. I periodi senza dato
+    (None) restano fuori dalla linea, ma mantengono il loro posto sull'asse X."""
+    altezza = 140
+    margine_top = 14
+    larghezza_punto = 90
+    if not serie:
+        return {"punti": [], "linea_points": "", "larghezza": 0, "altezza": altezza, "margine_top": margine_top}
+    valori = [p[chiave] for p in serie if p[chiave] is not None]
+    if not valori:
+        return {"punti": [], "linea_points": "", "larghezza": len(serie) * larghezza_punto, "altezza": altezza, "margine_top": margine_top}
+    minimo, massimo = min(valori), max(valori)
+    if massimo == minimo:
+        minimo, massimo = minimo - 1, massimo + 1
+    punti = []
+    coords = []
+    for i, p in enumerate(serie):
+        x = i * larghezza_punto + larghezza_punto / 2
+        if p[chiave] is None:
+            continue
+        y = round(margine_top + altezza - (p[chiave] - minimo) / (massimo - minimo) * altezza, 1)
+        punti.append({"x": x, "y": y, "valore": p[chiave], "etichetta": p["etichetta"]})
+        coords.append(f"{x},{y}")
+    return {
+        "punti": punti, "linea_points": " ".join(coords),
+        "larghezza": len(serie) * larghezza_punto, "altezza": altezza, "margine_top": margine_top,
     }
 
 
@@ -354,6 +390,12 @@ def calcola_multi_corsi(tags: list[str]) -> dict:
         "per_corso": per_corso, "per_anno": per_anno,
         "andamento_anni": _andamento_appelli(
             [{"appello_nome": a["anno"], "totale": a["totale"], "promossi": a["promossi"]} for a in per_anno]
+        ),
+        "andamento_promossi_pct": _andamento_lineare(
+            [{"etichetta": a["anno"], "promossi_pct": a["promossi_pct"]} for a in per_anno], "promossi_pct"
+        ),
+        "andamento_voto_medio": _andamento_lineare(
+            [{"etichetta": a["anno"], "media_finale": a["media_finale"]} for a in per_anno], "media_finale"
         ),
     }
 

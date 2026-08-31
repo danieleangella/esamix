@@ -9,7 +9,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Form, Query, Request, UploadFile, File
+from fastapi import BackgroundTasks, FastAPI, Form, Query, Request, UploadFile, File
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -118,11 +118,19 @@ def _proteggi_modifica_esercizi(tag: str, appello_id: int) -> None:
         )
 
 
-def _rigenera_se_necessario(tag: str, appello_id: int) -> str:
+def _compila_in_background(percorsi: list) -> None:
+    with ThreadPoolExecutor(max_workers=len(percorsi)) as pool:
+        list(pool.map(compiti_service.compila_pdf, percorsi))
+
+
+def _rigenera_se_necessario(tag: str, appello_id: int, background_tasks: Optional[BackgroundTasks] = None) -> str:
     """Da chiamare dopo aver modificato gli esercizi assegnati a un appello: se erano già
-    stati generati blocchi, li rigenera (file di riferimento compreso) con i nuovi
-    esercizi, ricompila tutti i PDF in parallelo, e ritorna un suffisso da aggiungere al
-    messaggio di conferma."""
+    stati generati blocchi, li rigenera (file di riferimento compreso, sempre in modo
+    sincrono: i vecchi codici vanno invalidati subito) e ritorna un suffisso da aggiungere
+    al messaggio di conferma. La ricompilazione dei PDF (pdflatex, la parte lenta) viene
+    invece schedulata come background task quando il chiamante passa `background_tasks`
+    (così la risposta HTTP non resta bloccata per diversi secondi ad ogni piccola
+    modifica): il file .tex è comunque aggiornato subito, il PDF segue a breve."""
     risultato = compiti_service.rigenera_tutto(tag, appello_id)
     if risultato is None:
         return ""
@@ -131,8 +139,14 @@ def _rigenera_se_necessario(tag: str, appello_id: int) -> str:
     for b in blocchi:
         da_compilare.append(compiti_service.path_blocco(tag, appello_id, b["numero"], "tex"))
         da_compilare.append(compiti_service.path_griglia(tag, appello_id, b["numero"], "tex"))
-    with ThreadPoolExecutor(max_workers=len(da_compilare)) as pool:
-        list(pool.map(compiti_service.compila_pdf, da_compilare))
+    if background_tasks is not None:
+        background_tasks.add_task(_compila_in_background, da_compilare)
+        return (
+            f" {risultato.n_blocchi} blocco/i già generato/i sono stati rigenerati con i nuovi "
+            "esercizi (i vecchi codici sono stati eliminati); i PDF si stanno aggiornando in "
+            "background e saranno pronti tra qualche istante."
+        )
+    _compila_in_background(da_compilare)
     return (
         f" {risultato.n_blocchi} blocco/i già generato/i sono stati rigenerati con i nuovi "
         "esercizi (i vecchi codici sono stati eliminati)."
@@ -229,6 +243,8 @@ async def ripristina_backup_conferma(request: Request):
 def impostazioni_app(request: Request):
     return templates.TemplateResponse(request, "impostazioni_app.html", {
         "app_settings": app_config_service.get_settings(),
+        "numero_corsi": len(corsi_service.list_corsi()),
+        "frase_conferma_elimina_tutto": FRASE_CONFERMA_ELIMINA_TUTTO,
     })
 
 
@@ -241,6 +257,17 @@ def modifica_impostazioni_app(
         docente=docente.strip(), mostra_riepilogo_home=bool(mostra_riepilogo_home),
     )
     return flash_redirect("/impostazioni", "Impostazioni salvate")
+
+
+FRASE_CONFERMA_ELIMINA_TUTTO = "ELIMINA TUTTO"
+
+
+@app.post("/elimina-tutti-i-dati")
+def elimina_tutti_i_dati(conferma: str = Form("")):
+    if conferma.strip() != FRASE_CONFERMA_ELIMINA_TUTTO:
+        return flash_redirect("/impostazioni", "Testo di conferma non corretto: nessun dato è stato eliminato", "error")
+    n = corsi_service.elimina_tutti_i_corsi()
+    return flash_redirect("/impostazioni", f"Eliminati tutti i dati: {n} corsi rimossi definitivamente")
 
 
 @app.get("/studenti/{matricola}", response_class=HTMLResponse)
@@ -492,6 +519,7 @@ def _dati_appello(tag: str, corso, appello) -> dict:
         "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
         "segreteria_csv": esportazione_service.get_segreteria_csv(tag, appello.id),
         "iscritti": iscritti,
+        "iscritti_manuali": esportazione_service.list_iscritti_manuali(tag, appello.id),
         "numero_iscritti": numero_iscritti,
         "numero_studenti_suggerito": _numero_studenti_suggerito(numero_iscritti, len(compiti)),
         "avviso_pochi_compiti": numero_iscritti is not None and len(compiti) < numero_iscritti,
@@ -526,6 +554,7 @@ def appello_detail(request: Request, tag: str, appello_id: int):
     contesto = {
         "corso": corso, "appello": appello, "raggruppamento": raggruppamento,
         "orali_da_svolgere": correzione_service.list_orali_da_svolgere(tag, appello_id),
+        "orali_svolti": correzione_service.list_orali_svolti(tag, appello_id),
         "idonei": verbalizzazione_service.list_idonei(tag, appello_id),
         "verbalizzati": verbalizzazione_service.list_verbalizzati(tag, appello_id),
         "statistiche": statistiche_service.calcola(tag, appello_id),
@@ -533,11 +562,17 @@ def appello_detail(request: Request, tag: str, appello_id: int):
         "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
     }
     if raggruppamento:
-        contesto["membri_dati"] = [
-            {**_dati_appello(tag, corso, m), "aule": aule_service.list_aule(tag, m.id),
-             "ammessi": corsi_service.list_ammessi_prova(tag, raggruppamento, i)}
-            for i, m in enumerate(raggruppamento.membri)
-        ]
+        membri_dati = []
+        for i, m in enumerate(raggruppamento.membri):
+            dati_membro = _dati_appello(tag, corso, m)
+            ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, i)
+            # per una prova parziale il numero di studenti attesi si stima dagli ammessi
+            # (chi ha superato la prova precedente / rispetta la soglia di matricola),
+            # non dagli iscritti/CSV segreteria: quello riguarda l'intero raggruppamento,
+            # non la singola prova.
+            dati_membro["numero_studenti_suggerito"] = _numero_studenti_suggerito(len(ammessi), len(dati_membro["compiti"]))
+            membri_dati.append({**dati_membro, "aule": aule_service.list_aule(tag, m.id), "ammessi": ammessi})
+        contesto["membri_dati"] = membri_dati
         contesto["statistiche_confronto"] = statistiche_service.confronto_raggruppamento(tag, raggruppamento)
         contesto["risultati"] = correzione_service.list_risultati(tag, appello_id)
         contesto["segreteria_csv"] = esportazione_service.get_segreteria_csv(tag, appello_id)
@@ -712,7 +747,7 @@ def scarica_griglia_html(request: Request, tag: str, appello_id: int, numero: in
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/assegna")
-async def assegna_esercizio(tag: str, appello_id: int, request: Request):
+async def assegna_esercizio(tag: str, appello_id: int, request: Request, background_tasks: BackgroundTasks):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "creazione")
     form = await request.form()
@@ -724,33 +759,33 @@ async def assegna_esercizio(tag: str, appello_id: int, request: Request):
         _proteggi_modifica_esercizi(tag, appello_id)
         for esercizio_id in esercizio_ids:
             esercizi_service.assegna_a_appello(tag, appello_id, esercizio_id, obbligatorio=obbligatorio)
-        msg = f"{len(esercizio_ids)} esercizi assegnati" + _rigenera_se_necessario(tag, appello_id)
+        msg = f"{len(esercizio_ids)} esercizi assegnati" + _rigenera_se_necessario(tag, appello_id, background_tasks)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/rimuovi")
-def rimuovi_esercizio(tag: str, appello_id: int, esercizio_id: int):
+def rimuovi_esercizio(tag: str, appello_id: int, esercizio_id: int, background_tasks: BackgroundTasks):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "creazione")
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
         esercizi_service.rimuovi_da_appello(tag, appello_id, esercizio_id)
-        msg = "Esercizio rimosso dall'appello" + _rigenera_se_necessario(tag, appello_id)
+        msg = "Esercizio rimosso dall'appello" + _rigenera_se_necessario(tag, appello_id, background_tasks)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/obbligatorio")
-def imposta_obbligatorio(tag: str, appello_id: int, esercizio_id: int, obbligatorio: str = Form("")):
+def imposta_obbligatorio(tag: str, appello_id: int, esercizio_id: int, background_tasks: BackgroundTasks, obbligatorio: str = Form("")):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "creazione")
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
         esercizi_service.imposta_obbligatorio(tag, appello_id, esercizio_id, bool(obbligatorio))
-        msg = "Esercizio aggiornato" + _rigenera_se_necessario(tag, appello_id)
+        msg = "Esercizio aggiornato" + _rigenera_se_necessario(tag, appello_id, background_tasks)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
@@ -779,7 +814,7 @@ def sposta_giu_esercizio(tag: str, appello_id: int, esercizio_id: int):
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/nuovo")
-async def nuovo_esercizio_appello(tag: str, appello_id: int, request: Request):
+async def nuovo_esercizio_appello(tag: str, appello_id: int, request: Request, background_tasks: BackgroundTasks):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "creazione")
     form = await request.form()
@@ -793,7 +828,7 @@ async def nuovo_esercizio_appello(tag: str, appello_id: int, request: Request):
             obbligatorio=bool(form.get("obbligatorio")), argomento=(form.get("argomento") or "").strip(),
             **extra,
         )
-        msg = "Esercizio creato e assegnato" + _rigenera_se_necessario(tag, appello_id)
+        msg = "Esercizio creato e assegnato" + _rigenera_se_necessario(tag, appello_id, background_tasks)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
@@ -870,7 +905,7 @@ async def importa_esercizi_json(request: Request, tag: str, appello_id: int, fil
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-json/conferma")
-async def importa_esercizi_json_conferma(request: Request, tag: str, appello_id: int):
+async def importa_esercizi_json_conferma(request: Request, tag: str, appello_id: int, background_tasks: BackgroundTasks):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "creazione")
     form = await request.form()
@@ -883,7 +918,7 @@ async def importa_esercizi_json_conferma(request: Request, tag: str, appello_id:
         if not scelti:
             return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessun esercizio selezionato per l'import", "error", anchor=anchor)
         n = esercizi_service.importa_json(tag, appello_id, scelti)
-        msg = f"Importati {n} esercizi dal file" + _rigenera_se_necessario(tag, appello_id)
+        msg = f"Importati {n} esercizi dal file" + _rigenera_se_necessario(tag, appello_id, background_tasks)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     except Exception as e:
@@ -906,6 +941,12 @@ def _render_correggi_revisione(
     corretta_grezza = "".join(r.lettera_corretta for r in valutazione.righe)
     gruppi = [corretta_grezza[i:i + 5] for i in range(0, len(corretta_grezza), 5)]
     risposte_corrette_raggruppate = " ".join(gruppi)
+    # Un segno di spunta/croce sotto ogni lettera delle risposte corrette, allineato
+    # carattere per carattere (stesso raggruppamento a blocchi di 5): le domande aperte
+    # non hanno una lettera "corretta" da confrontare, quindi restano neutre.
+    marcatura_grezza = "".join("·" if r.aperta else ("✓" if r.corretta else "✗") for r in valutazione.righe)
+    gruppi_marcatura = [marcatura_grezza[i:i + 5] for i in range(0, len(marcatura_grezza), 5)]
+    risposte_marcatura_raggruppata = " ".join(gruppi_marcatura)
 
     avviso_idoneita = None
     if appello.membro_raggruppamento:
@@ -924,6 +965,7 @@ def _render_correggi_revisione(
         "punteggi_proposti": punteggi_proposti, "errore": errore,
         "richiedi_orale_checked": richiedi_orale_checked, "modifica": modifica,
         "risposte_corrette_raggruppate": risposte_corrette_raggruppate,
+        "risposte_marcatura_raggruppata": risposte_marcatura_raggruppata,
         "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
         "avviso_idoneita": avviso_idoneita,
     })
@@ -1077,7 +1119,7 @@ def dettaglio_risultato(request: Request, tag: str, appello_id: int, matricola: 
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=_anchor_membro(appello, "valutazione"))
     return templates.TemplateResponse(request, "risultato_dettaglio.html", {
         "corso": corso, "appello": appello, "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
-        "storico": dettaglio["storico"],
+        "storico": dettaglio["storico"], "chiuso": appello.chiuso,
     })
 
 
@@ -1090,9 +1132,10 @@ def dettaglio_risultato_inline(request: Request, tag: str, appello_id: int, matr
         dettaglio = correzione_service.dettaglio_risultato(tag, appello_id, matricola)
     except ValueError as e:
         return HTMLResponse(str(e), status_code=404)
+    appello = corsi_service.get_appello(tag, appello_id)
     return templates.TemplateResponse(request, "_risultato_dettaglio.html", {
         "corso_tag": tag, "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
-        "storico": dettaglio["storico"],
+        "storico": dettaglio["storico"], "chiuso": appello.chiuso,
     })
 
 
@@ -1187,6 +1230,25 @@ def imposta_iscritti_manuale(tag: str, appello_id: int, iscritti_manuale: str = 
     valore = int(iscritti_manuale) if iscritti_manuale.strip() else None
     corsi_service.update_appello(tag, appello_id, iscritti_manuale=valore)
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Numero di iscritti salvato", anchor=anchor)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/iscritti-manuale/aggiungi")
+def aggiungi_iscritto_manuale(tag: str, appello_id: int, matricola: str = Form(...)):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "compiti")
+    try:
+        esportazione_service.aggiungi_iscritto_manuale(tag, appello_id, matricola.strip())
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Iscritto aggiunto", anchor=anchor)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/iscritti-manuale/{matricola}/rimuovi")
+def rimuovi_iscritto_manuale(tag: str, appello_id: int, matricola: str):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "compiti")
+    esportazione_service.rimuovi_iscritto_manuale(tag, appello_id, matricola)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Iscritto rimosso", anchor=anchor)
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/iscritti.csv")
@@ -1420,7 +1482,7 @@ def scarica_ammessi_pdf(tag: str, appello_id: int):
 
 
 @app.get("/corsi/{tag}/studenti", response_class=HTMLResponse)
-def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro: str = "", dsa: str = ""):
+def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro: str = "", dsa: str = "", mai_sostenuto: str = ""):
     corso = corsi_service.get_corso(tag)
     lista = studenti_service.list_studenti(tag, q or None)
     stato_esame = verbalizzazione_service.stato_esame_studenti(tag)
@@ -1436,10 +1498,15 @@ def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro:
     corsi_suggeriti = corsi_service.corsi_simili(corso, tutti_corsi)
     altri_corsi = [c for c in tutti_corsi if c.tag != tag]
     corso_sorgente = corsi_service.get_corso(da) if da and config.corso_exists(da) else None
-    studenti_sorgente = studenti_service.list_non_superati(da) if corso_sorgente else []
+    if corso_sorgente and mai_sostenuto == "1":
+        studenti_sorgente = studenti_service.list_mai_sostenuto(da)
+    elif corso_sorgente:
+        studenti_sorgente = studenti_service.list_non_superati(da)
+    else:
+        studenti_sorgente = []
     return templates.TemplateResponse(request, "studenti.html", {
         "corso": corso, "studenti": lista, "q": q, "filtro": filtro, "dsa": dsa, "stato_esame": stato_esame,
-        "corsi_suggeriti": corsi_suggeriti, "altri_corsi": altri_corsi,
+        "corsi_suggeriti": corsi_suggeriti, "altri_corsi": altri_corsi, "mai_sostenuto": mai_sostenuto,
         "corso_sorgente": corso_sorgente, "studenti_sorgente": studenti_sorgente,
     })
 
@@ -1637,7 +1704,7 @@ async def nuovo_esercizio(tag: str, request: Request):
 
 
 @app.post("/corsi/{tag}/esercizi/{esercizio_id}/modifica")
-async def modifica_esercizio(tag: str, esercizio_id: int, request: Request):
+async def modifica_esercizio(tag: str, esercizio_id: int, request: Request, background_tasks: BackgroundTasks):
     form = await request.form()
     varianti = _parse_varianti_form(form)
     extra = _parse_esercizio_extra_form(form)
@@ -1655,7 +1722,7 @@ async def modifica_esercizio(tag: str, esercizio_id: int, request: Request):
         )
         msg = "Esercizio aggiornato"
         for appello_id in appelli_coinvolti:
-            msg += _rigenera_se_necessario(tag, appello_id)
+            msg += _rigenera_se_necessario(tag, appello_id, background_tasks)
     except ValueError as e:
         return flash_redirect(destinazione, str(e), "error", anchor=ancora)
     return flash_redirect(destinazione, msg, anchor=ancora)

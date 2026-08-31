@@ -15,17 +15,17 @@
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi" autocomplete="off">
       <div class="form-grid">
         <div style="position:relative">
-          <label>Matricola o nome</label>
+          <label class="campo-obbligatorio">Matricola o nome</label>
           <input name="matricola" class="campo-input-matricola" autocomplete="off" required>
           <div class="campo-suggerimenti-studenti sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
           <div class="campo-matricola-nome-risolto muted" style="margin-top:0.25rem"></div>
         </div>
         <div style="position:relative">
-          <label>Codice compito</label>
+          <label class="campo-obbligatorio">Codice compito</label>
           <input name="codice" class="campo-input-codice" autocomplete="off" required>
           <div class="campo-suggerimenti-codici sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
         </div>
-        <div><label>Stringa risposte</label><input name="risposte" class="campo-input-risposte" autocomplete="off" required placeholder="es. ABCXB ADCEB A" style="font-family:monospace"></div>
+        <div><label class="campo-obbligatorio">Stringa risposte</label><input name="risposte" class="campo-input-risposte" autocomplete="off" required placeholder="es. ABCXB ADCEB A" style="font-family:monospace"></div>
       </div>
       <button type="submit">Vai al riepilogo</button>
     </form>
@@ -61,7 +61,7 @@
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/assenze/segna">
       <div class="form-grid">
         <div style="position:relative">
-          <label>Matricola o nome</label>
+          <label class="campo-obbligatorio">Matricola o nome</label>
           <input name="matricola" class="campo-input-matricola-assenza" autocomplete="off" required>
           <div class="campo-suggerimenti-studenti-assenza sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
         </div>
@@ -104,7 +104,7 @@
           {% elif r.esito != 'voto' %}{{ r.esito }}
           {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
-          {% else %}{{ r.voto }}{% endif %}
+          {% else %}{{ r.voto }}{% if r.richiede_orale and r.orale_svolto %} <span class="badge badge-ok">orale svolto</span>{% endif %}{% endif %}
           {% if r.verbalizzato %} <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>{% endif %}
         </td>
         <td style="white-space:nowrap; text-align:right">

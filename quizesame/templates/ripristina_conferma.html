@@ -9,8 +9,8 @@
   stesso tag, il ripristino <strong>lo sostituisce interamente</strong> (dati attuali persi per
   sempre, senza backup automatico): l'avviso qui sotto lo segnala chiaramente.</p>
 
-<form method="post" action="/ripristina-backup/conferma"
-      onsubmit="return confirm('Ripristinare i corsi selezionati? Quelli già esistenti con lo stesso tag verranno sovrascritti completamente.') && confirm('Sei sicuro? I dati attuali dei corsi sovrascritti andranno persi per sempre.');">
+{% set qualcuno_sovrascritto = candidati | selectattr('esiste_gia') | list | length > 0 %}
+<form method="post" action="/ripristina-backup/conferma" id="form-ripristina-backup">
   <textarea name="dati_zip" style="display:none">{{ dati_zip }}</textarea>
   <div class="card">
     {% for c in candidati %}
@@ -23,7 +23,17 @@
     </div>
     {% endfor %}
   </div>
+  {% if qualcuno_sovrascritto %}
+  <div class="card">
+    <p class="muted" style="margin-top:0">Almeno un corso selezionato esiste già e verrà sovrascritto: per
+      confermare, scrivi <strong>SOVRASCRIVI</strong> qui sotto.</p>
+    <input class="campo-conferma-testo" data-frase-attesa="SOVRASCRIVI" autocomplete="off" style="max-width:20rem">
+  </div>
+  <button type="submit" class="danger btn-conferma-testo" disabled>Ripristina i corsi selezionati</button>
+  {% else %}
   <button type="submit" class="danger">Ripristina i corsi selezionati</button>
+  {% endif %}
   <a href="/impostazioni" class="muted" style="margin-left:1rem">Annulla</a>
 </form>
+<script>document.getElementById("form-ripristina-backup") && {{ 'attivaConfermaTestuale(document.getElementById("form-ripristina-backup"));' if qualcuno_sovrascritto else 'true;' }}</script>
 {% endblock %}

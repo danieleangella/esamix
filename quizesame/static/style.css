@@ -144,6 +144,7 @@ a.button:hover { opacity: 0.9; }
 .tabs a.active { background: var(--accent); color: white; border-color: var(--accent); }
 .tabs a.tab-disabilitata { color: var(--muted); opacity: 0.5; pointer-events: none; cursor: default; }
 .tabs.tabs-globali { border-top: 1px dashed var(--border); padding-top: 0.6rem; margin-top: -0.25rem; }
+.tabs-label { align-self: center; font-weight: 600; color: var(--muted); margin-right: -0.1rem; }
 
 .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; }
 .badge-ok { background: var(--ok-bg); color: var(--ok-text); }
@@ -194,3 +195,6 @@ code { background: #f1f2f4; padding: 0.1rem 0.3rem; border-radius: 4px; }
 .stat-tile.stat-ok .stat-value { color: var(--ok-text); }
 .stat-tile.stat-warn .stat-value { color: #92400e; }
 .stat-tile.stat-info .stat-value { color: #1d4ed8; }
+.stat-tile.stat-danger .stat-value { color: var(--err-text); }
+.stat-label-info { cursor: help; text-decoration: underline dotted; text-decoration-color: var(--muted); }
+.campo-obbligatorio::after { content: " *"; color: var(--err-text); }

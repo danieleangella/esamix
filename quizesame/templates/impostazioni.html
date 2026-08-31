@@ -13,40 +13,42 @@
   <a class="active" href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
 </div>
 
-<form method="post" action="/corsi/{{ corso.tag }}/impostazioni">
+<form method="post" action="/corsi/{{ corso.tag }}/impostazioni" id="form-impostazioni-corso">
 
   <div class="card">
     <h2>Dati del corso</h2>
     <div class="form-grid">
-      <div><label>Nome corso</label><input name="nome" value="{{ corso.nome }}" required></div>
+      <div><label class="campo-obbligatorio">Nome corso</label><input name="nome" value="{{ corso.nome }}" required></div>
       <div><label>Facoltà</label><input name="facolta" value="{{ corso.facolta }}"></div>
       <div><label>Università</label><input name="universita" value="{{ corso.universita }}"></div>
       <div><label>Anno accademico</label><input name="anno" value="{{ corso.anno }}"></div>
       <div><label>Docente</label><input name="docente" value="{{ corso.docente }}"></div>
     </div>
+    <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </div>
 
   <div class="card">
     <h2>Voti e punteggi</h2>
     <p class="muted" style="margin-top:0">Valgono per tutti gli appelli del corso.</p>
     <div class="form-grid">
-      <div><label>Voto minimo (appelli normali) <code class="muted">{votomin}</code></label><input type="number" name="votomin" value="{{ corso.votomin }}" required></div>
-      <div><label>Voto minimo (prove di un raggruppamento)</label><input type="number" name="votomin_raggruppamento" value="{{ corso.votomin_raggruppamento }}" required></div>
-      <div><label>N. esercizi obbligatori <code class="muted">{consegna}</code></label><input type="number" name="consegna" value="{{ corso.consegna }}" required></div>
+      <div><label class="campo-obbligatorio">Voto minimo (appelli normali) <code class="muted">{votomin}</code></label><input type="number" name="votomin" value="{{ corso.votomin }}" required></div>
+      <div><label class="campo-obbligatorio">Voto minimo (prove di un raggruppamento)</label><input type="number" name="votomin_raggruppamento" value="{{ corso.votomin_raggruppamento }}" required></div>
+      <div><label class="campo-obbligatorio">N. esercizi obbligatori <code class="muted">{consegna}</code></label><input type="number" name="consegna" value="{{ corso.consegna }}" required></div>
     </div>
     <div class="form-grid" style="margin-top:0.75rem">
-      <div><label>Punti risposta corretta <code class="muted">{corretta}</code></label><input type="number" name="risposta_corretta" value="{{ corso.risposta_corretta }}" required></div>
-      <div><label>Punti risposta sbagliata <code class="muted">{sbagliata}</code></label><input type="number" name="risposta_sbagliata" value="{{ corso.risposta_sbagliata }}" required></div>
-      <div><label>Punti risposta vuota <code class="muted">{vuota}</code></label><input type="number" name="risposta_vuota" value="{{ corso.risposta_vuota }}" required></div>
+      <div><label class="campo-obbligatorio">Punti risposta corretta <code class="muted">{corretta}</code></label><input type="number" name="risposta_corretta" value="{{ corso.risposta_corretta }}" required></div>
+      <div><label class="campo-obbligatorio">Punti risposta sbagliata <code class="muted">{sbagliata}</code></label><input type="number" name="risposta_sbagliata" value="{{ corso.risposta_sbagliata }}" required></div>
+      <div><label class="campo-obbligatorio">Punti risposta vuota <code class="muted">{vuota}</code></label><input type="number" name="risposta_vuota" value="{{ corso.risposta_vuota }}" required></div>
     </div>
     <div class="form-grid" style="margin-top:0.75rem">
       <div>
-        <label>Punteggio massimo domanda aperta</label>
+        <label class="campo-obbligatorio">Punteggio massimo domanda aperta</label>
         <input type="number" name="punteggio_max_aperta" value="{{ corso.punteggio_max_aperta }}" required>
         <p class="muted" style="margin-top:0.25rem">Punteggio massimo assegnabile in correzione a una domanda
           aperta (senza risposta a scelta multipla): può essere maggiore dei punti di una risposta corretta.</p>
       </div>
     </div>
+    <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </div>
 
   <div class="card">
@@ -74,12 +76,14 @@
         </label>
       </div>
     </div>
+    <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </div>
 
   <div class="card">
     <h2>Domande d'esame</h2>
     <p class="muted" style="margin-top:0">Testo libero, per uso amministrativo (es. in vista dell'esportazione dei risultati).</p>
     <textarea name="domande_esame" rows="3">{{ corso.domande_esame }}</textarea>
+    <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </div>
 
   <div class="card">
@@ -97,9 +101,8 @@
     <textarea name="frase_regole" id="frase-regole" rows="3">{{ corso.frase_regole }}</textarea>
     <button type="button" class="secondary btn-reset-default" data-target="frase-regole" data-default-tpl="tpl-default-frase-regole">Reimposta default</button>
     <template id="tpl-default-frase-regole">{{ default_frase_regole }}</template>
+    <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </div>
-
-  <button type="submit">Salva impostazioni</button>
 </form>
 
 <div class="card" style="margin-top:2rem">
@@ -113,11 +116,15 @@
   <h2>Elimina corso</h2>
   <p class="muted">Elimina definitivamente il corso "{{ corso.nome }}" ({{ corso.tag }}): studenti,
     esercizi, appelli e tutti i risultati registrati. Azione irreversibile, non c'è un backup.</p>
-  <form method="post" action="/corsi/{{ corso.tag }}/elimina"
-        onsubmit="return confirm('Eliminare DEFINITIVAMENTE il corso \'{{ corso.nome }}\' e tutto ciò che contiene (studenti, esercizi, appelli, risultati)?') && confirm('Sei sicuro? Non è possibile annullare questa operazione: tutti i dati del corso andranno persi per sempre.');">
-    <button type="submit" class="danger">Elimina questo corso</button>
+  <form method="post" action="/corsi/{{ corso.tag }}/elimina" id="form-elimina-corso">
+    <div>
+      <label>Per confermare, scrivi <strong>{{ corso.tag }}</strong> qui sotto</label>
+      <input class="campo-conferma-testo" data-frase-attesa="{{ corso.tag }}" autocomplete="off" style="max-width:20rem">
+    </div>
+    <button type="submit" class="danger btn-conferma-testo" disabled style="margin-top:0.75rem">Elimina questo corso</button>
   </form>
 </div>
+<script>document.getElementById("form-elimina-corso") && attivaConfermaTestuale(document.getElementById("form-elimina-corso"));</script>
 <script>
 (function () {
   var checkSoglia = document.getElementById("check-soglia-orale");

@@ -159,6 +159,17 @@ CREATE TABLE IF NOT EXISTS appello_segreteria_csv (
     caricato_il TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Iscritti aggiunti a mano uno per uno (alternativa al file della segreteria, quando non
+-- ancora caricato): a differenza del semplice numero manuale (appelli.iscritti_manuale),
+-- qui si tratta di un vero elenco nominale, usato anche per il controllo in correzione e
+-- per l'elenco stampabile, esattamente come l'elenco derivato dal file della segreteria
+-- (che però, quando presente, ha sempre la precedenza).
+CREATE TABLE IF NOT EXISTS appello_iscritti_manuali (
+    matricola TEXT NOT NULL REFERENCES studenti(matricola),
+    appello_id INTEGER NOT NULL REFERENCES appelli(id),
+    PRIMARY KEY (matricola, appello_id)
+);
+
 CREATE TABLE IF NOT EXISTS risultati (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     matricola TEXT NOT NULL REFERENCES studenti(matricola),

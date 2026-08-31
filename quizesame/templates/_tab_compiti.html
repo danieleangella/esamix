@@ -27,16 +27,60 @@
   {% endif %}
   {% else %}
   <p class="muted" style="margin-top:0">
-    Nessun file della segreteria ancora caricato: se non lo carichi, indica qui a mano il numero di iscritti
-    (usato per il numero suggerito di compiti da generare qui sotto).
+    Nessun file della segreteria ancora caricato: se non lo carichi, puoi aggiungere qui gli iscritti uno per
+    uno (usato per l'elenco stampabile e per il numero suggerito di compiti da generare qui sotto).
   </p>
+  {% if md.iscritti_manuali %}
+  <table style="margin-top:0.5rem">
+    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
+    {% for s in md.iscritti_manuali %}
+    <tr>
+      <td>{{ s.matricola }}</td>
+      <td>{{ s.cognome }}</td>
+      <td>{{ s.nome }}</td>
+      <td>
+        {% if not md.appello.chiuso %}
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale/{{ s.matricola }}/rimuovi">
+          <button type="submit" class="secondary" style="margin-top:0">Rimuovi</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
   {% if not md.appello.chiuso %}
-  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale" style="margin-bottom:0.75rem">
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale/aggiungi" style="margin-top:0.75rem; margin-bottom:0.75rem" autocomplete="off">
     <div class="form-grid">
-      <div><label>Numero di iscritti (facoltativo)</label><input type="number" name="iscritti_manuale" min="0" value="{{ md.appello.iscritti_manuale or '' }}"></div>
+      <div style="position:relative">
+        <label class="campo-obbligatorio">Aggiungi iscritto (matricola o nome)</label>
+        <input name="matricola" class="campo-input-matricola-iscritto" autocomplete="off" required>
+        <div class="campo-suggerimenti-studenti-iscritto sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+      </div>
     </div>
-    <button type="submit" class="secondary">Salva</button>
+    <button type="submit" class="secondary">Aggiungi</button>
   </form>
+  <script>
+  (function () {
+    var root = document.currentScript.closest(".tab-pane");
+    creaAutocomplete(
+      root.querySelector(".campo-input-matricola-iscritto"), root.querySelector(".campo-suggerimenti-studenti-iscritto"),
+      function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+      function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+      function (s) { return s.matricola; }
+    );
+  })();
+  </script>
+  <details style="margin-top:0.5rem">
+    <summary>In alternativa, indica solo un numero (senza elenco nominale)</summary>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale" style="margin-top:1rem">
+      <div class="form-grid">
+        <div><label>Numero di iscritti (facoltativo)</label><input type="number" name="iscritti_manuale" min="0" value="{{ md.appello.iscritti_manuale or '' }}"></div>
+      </div>
+      <p class="muted" style="margin-top:0.5rem">Usato solo se non hai aggiunto nessuno studente nell'elenco qui sopra.</p>
+      <button type="submit" class="secondary">Salva</button>
+    </form>
+  </details>
   {% endif %}
   {% endif %}
 
@@ -76,7 +120,7 @@
         data-obbligatori-assegnati="{{ md.esercizi_assegnati|selectattr('obbligatorio')|list|length }}"
         data-obbligatori-attesi="{{ md.consegna_effettivo }}">
     <div class="form-grid">
-      <div><label>Numero studenti</label><input type="number" name="numero_studenti" value="{{ md.numero_studenti_suggerito }}" min="0" required></div>
+      <div><label class="campo-obbligatorio">Numero studenti</label><input type="number" name="numero_studenti" value="{{ md.numero_studenti_suggerito }}" min="0" required></div>
     </div>
     <button type="submit" {% if not md.esercizi_assegnati %}disabled{% endif %}>Genera nuovo blocco di compiti</button>
   </form>
@@ -151,71 +195,75 @@
 <div class="card">
   <h2>Studenti ammessi e aule ({{ md.ammessi|length }})</h2>
   <p class="muted" style="margin-top:0">
-    Scarica elenco ammessi:
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi.csv">.csv</a> ·
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi.pdf">.pdf</a>
+    Scarica elenco ammessi: <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi.pdf">.pdf</a>
   </p>
-  <table>
-    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA</th><th>Aula</th><th></th></tr>
-    {% for s in md.ammessi %}
-    <tr>
-      <td>{{ s.matricola }}</td>
-      <td>{{ s.cognome }}</td>
-      <td>{{ s.nome }}</td>
-      <td>{% if s.dsa %}<span class="badge badge-info">DSA</span>{% endif %}</td>
-      <td>
-        {% if md.aule %}
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/{{ s.matricola }}/assegna-manuale">
-          <select name="aula_id" style="width:auto" onchange="this.form.requestSubmit()">
-            <option value="">non assegnata</option>
-            {% for a in md.aule %}<option value="{{ a.id }}" {% if s.aula_id == a.id %}selected{% endif %}>{{ a.nome }}</option>{% endfor %}
-          </select>
-        </form>
-        {% else %}
-        <span class="muted">{{ s.aula_nome or 'nessuna aula configurata' }}</span>
-        {% endif %}
-      </td>
-      <td>
-        {% if s.in_deroga %}
-        <span class="badge badge-warn" title="Aggiunto a mano: non soddisfa i requisiti automatici di ammissione">in deroga</span>
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi/{{ s.matricola }}/rimuovi"
-              onsubmit="return confirm('Rimuovere {{ s.cognome }} {{ s.nome }} dagli ammessi a questa prova?');">
-          <button type="submit" class="secondary" style="margin-top:0">Rimuovi</button>
-        </form>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
 
-  <details style="margin-top:0.75rem">
-    <summary>Aggiungi manualmente uno studente (anche se non soddisfa i requisiti)</summary>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi/aggiungi" style="margin-top:1rem" autocomplete="off">
-      <div class="form-grid">
-        <div style="position:relative">
-          <label>Matricola o nome</label>
-          <input name="matricola" class="campo-input-matricola-ammesso" autocomplete="off" required>
-          <div class="campo-suggerimenti-studenti-ammesso sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+  <details style="margin-top:0.5rem">
+    <summary>Elenco dettagliato e assegnazione aule</summary>
+    <p class="muted" style="margin-top:1rem">
+      Scarica anche in <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi.csv">.csv</a>
+    </p>
+    <table>
+      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA</th><th>Aula</th><th></th></tr>
+      {% for s in md.ammessi %}
+      <tr>
+        <td>{{ s.matricola }}</td>
+        <td>{{ s.cognome }}</td>
+        <td>{{ s.nome }}</td>
+        <td>{% if s.dsa %}<span class="badge badge-info">DSA</span>{% endif %}</td>
+        <td>
+          {% if md.aule %}
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/{{ s.matricola }}/assegna-manuale">
+            <select name="aula_id" style="width:auto" onchange="this.form.requestSubmit()">
+              <option value="">non assegnata</option>
+              {% for a in md.aule %}<option value="{{ a.id }}" {% if s.aula_id == a.id %}selected{% endif %}>{{ a.nome }}</option>{% endfor %}
+            </select>
+          </form>
+          {% else %}
+          <span class="muted">{{ s.aula_nome or 'nessuna aula configurata' }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if s.in_deroga %}
+          <span class="badge badge-warn" title="Aggiunto a mano: non soddisfa i requisiti automatici di ammissione">in deroga</span>
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi/{{ s.matricola }}/rimuovi"
+                onsubmit="return confirm('Rimuovere {{ s.cognome }} {{ s.nome }} dagli ammessi a questa prova?');">
+            <button type="submit" class="secondary" style="margin-top:0">Rimuovi</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    <details style="margin-top:0.75rem">
+      <summary>Aggiungi manualmente uno studente (anche se non soddisfa i requisiti)</summary>
+      <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi/aggiungi" style="margin-top:1rem" autocomplete="off">
+        <div class="form-grid">
+          <div style="position:relative">
+            <label class="campo-obbligatorio">Matricola o nome</label>
+            <input name="matricola" class="campo-input-matricola-ammesso" autocomplete="off" required>
+            <div class="campo-suggerimenti-studenti-ammesso sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+          </div>
         </div>
-      </div>
-      <p class="muted" style="margin-top:0.5rem">Uno studente aggiunto così comparirà nell'elenco ammessi con l'avviso "in deroga", anche se
-        non ha superato la prova precedente (o non rispetta la soglia di matricola sulla prima prova).</p>
-      <button type="submit" class="secondary">Aggiungi</button>
-    </form>
-    <script>
-    (function () {
-      var root = document.currentScript.closest(".tab-pane");
-      creaAutocomplete(
-        root.querySelector(".campo-input-matricola-ammesso"), root.querySelector(".campo-suggerimenti-studenti-ammesso"),
-        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
-        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
-        function (s) { return s.matricola; }
-      );
-    })();
-    </script>
-  </details>
+        <p class="muted" style="margin-top:0.5rem">Uno studente aggiunto così comparirà nell'elenco ammessi con l'avviso "in deroga", anche se
+          non ha superato la prova precedente (o non rispetta la soglia di matricola sulla prima prova).</p>
+        <button type="submit" class="secondary">Aggiungi</button>
+      </form>
+      <script>
+      (function () {
+        var root = document.currentScript.closest(".tab-pane");
+        creaAutocomplete(
+          root.querySelector(".campo-input-matricola-ammesso"), root.querySelector(".campo-suggerimenti-studenti-ammesso"),
+          function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+          function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+          function (s) { return s.matricola; }
+        );
+      })();
+      </script>
+    </details>
 
-  <h3 style="margin-top:1.5rem">Aule di questa prova</h3>
+    <h3 style="margin-top:1.5rem">Aule di questa prova</h3>
   {% if md.aule %}
   <table>
     <tr><th>Nome</th><th>Capienza</th><th></th></tr>
@@ -237,8 +285,8 @@
   {% endif %}
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/nuova" style="margin-top:0.75rem">
     <div class="form-grid">
-      <div><label>Nome aula</label><input name="nome" required></div>
-      <div><label>Capienza</label><input type="number" name="capienza" min="1" required></div>
+      <div><label class="campo-obbligatorio">Nome aula</label><input name="nome" required></div>
+      <div><label class="campo-obbligatorio">Capienza</label><input type="number" name="capienza" min="1" required></div>
     </div>
     <button type="submit" class="secondary">Aggiungi aula</button>
   </form>
@@ -247,6 +295,7 @@
     <button type="submit">Assegna automaticamente gli ammessi non ancora fissati a mano</button>
   </form>
   {% endif %}
+  </details>
 </div>
 {% endif %}
 

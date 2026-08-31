@@ -16,11 +16,16 @@
 <form method="post" action="{{ '/corsi/' ~ corso.tag ~ '/appelli/' ~ appello.id ~ '/esercizi/importa-json/conferma' if appello else '/corsi/' ~ corso.tag ~ '/esercizi/importa-json/conferma' }}">
   <textarea name="dati_json" style="display:none">{{ dati_json }}</textarea>
 
+  <p style="margin-top:0">
+    <button type="button" id="btn-seleziona-tutti-esercizi" class="secondary" style="margin-top:0">Seleziona tutti (importa tutto)</button>
+    <button type="button" id="btn-deseleziona-tutti-esercizi" class="secondary" style="margin-top:0">Deseleziona tutti</button>
+  </p>
+
   <div class="card">
     {% for c in candidati %}
     <div style="padding:0.75rem 0; {% if not loop.first %}border-top:1px solid var(--border);{% endif %}">
       <label style="display:flex; align-items:flex-start; gap:0.6rem; cursor:pointer">
-        <input type="checkbox" name="importa_idx" value="{{ loop.index0 }}" style="width:auto; margin-top:0.25rem"
+        <input type="checkbox" name="importa_idx" value="{{ loop.index0 }}" class="campo-esercizio-incluso" style="width:auto; margin-top:0.25rem"
                {% if not c.duplicato_di %}checked{% endif %}>
         <span>
           <strong>{{ c.nome or ('Esercizio ' ~ loop.index) }}</strong>
@@ -42,4 +47,15 @@
   <button type="submit">Importa selezionati</button>
   <a href="{{ '/corsi/' ~ corso.tag ~ '/appelli/' ~ appello.id ~ '#creazione' if appello else '/corsi/' ~ corso.tag ~ '/esercizi' }}" style="margin-left:1rem">Annulla</a>
 </form>
+<script>
+(function () {
+  var campi = document.querySelectorAll(".campo-esercizio-incluso");
+  document.getElementById("btn-seleziona-tutti-esercizi").addEventListener("click", function () {
+    campi.forEach(function (c) { c.checked = true; });
+  });
+  document.getElementById("btn-deseleziona-tutti-esercizi").addEventListener("click", function () {
+    campi.forEach(function (c) { c.checked = false; });
+  });
+})();
+</script>
 {% endblock %}

@@ -18,28 +18,28 @@
     <h2>Abbinamento colonne</h2>
     <div class="form-grid">
       <div>
-        <label>Matricola</label>
+        <label class="campo-obbligatorio">Matricola</label>
         <select name="matricola_idx" required>
           <option value="">-- scegli --</option>
           {% for c in anteprima.colonne %}<option value="{{ loop.index0 }}" {% if anteprima.matricola_idx == loop.index0 %}selected{% endif %}>{{ c }}</option>{% endfor %}
         </select>
       </div>
       <div>
-        <label>Cognome</label>
+        <label class="campo-obbligatorio">Cognome</label>
         <select name="cognome_idx" required>
           <option value="">-- scegli --</option>
           {% for c in anteprima.colonne %}<option value="{{ loop.index0 }}" {% if anteprima.cognome_idx == loop.index0 %}selected{% endif %}>{{ c }}</option>{% endfor %}
         </select>
       </div>
       <div>
-        <label>Nome</label>
+        <label class="campo-obbligatorio">Nome</label>
         <select name="nome_idx" required>
           <option value="">-- scegli --</option>
           {% for c in anteprima.colonne %}<option value="{{ loop.index0 }}" {% if anteprima.nome_idx == loop.index0 %}selected{% endif %}>{{ c }}</option>{% endfor %}
         </select>
       </div>
       <div>
-        <label>Corso di laurea (facoltativo)</label>
+        <label>Corso di laurea</label>
         <select name="laurea_idx">
           <option value="">-- nessuna --</option>
           {% for c in anteprima.colonne %}<option value="{{ loop.index0 }}" {% if anteprima.laurea_idx == loop.index0 %}selected{% endif %}>{{ c }}</option>{% endfor %}

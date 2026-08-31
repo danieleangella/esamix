@@ -2,17 +2,17 @@
   {% if redirect_to is defined and redirect_to %}<input type="hidden" name="redirect_to" value="{{ redirect_to }}">{% endif %}
   {% if redirect_anchor is defined and redirect_anchor %}<input type="hidden" name="redirect_anchor" value="{{ redirect_anchor }}">{% endif %}
   <div class="form-grid">
-    <div><label>Nome (etichetta breve, opzionale)</label><input name="nome" value="{{ esercizio.nome or '' if esercizio is defined else '' }}" placeholder="es. Area triangolo"></div>
+    <div><label>Nome (etichetta breve)</label><input name="nome" value="{{ esercizio.nome or '' if esercizio is defined else '' }}" placeholder="es. Area triangolo"></div>
     <div>
-      <label>Argomento (opzionale)</label>
+      <label>Argomento</label>
       <input name="argomento" value="{{ esercizio.argomento or '' if esercizio is defined else '' }}" list="lista-argomenti" autocomplete="off" placeholder="es. Geometria analitica">
       <datalist id="lista-argomenti">
         {% for a in (argomenti or []) %}<option value="{{ a }}">{% endfor %}
       </datalist>
     </div>
-    <div><label>Note (opzionali)</label><input name="note" value="{{ esercizio.note or '' if esercizio is defined else '' }}"></div>
+    <div><label>Note</label><input name="note" value="{{ esercizio.note or '' if esercizio is defined else '' }}"></div>
     <div>
-      <label>Difficoltà (opzionale)</label>
+      <label>Difficoltà</label>
       <select name="difficolta">
         <option value="" {% if not (esercizio is defined and esercizio.difficolta) %}selected{% endif %}>-- non indicata --</option>
         <option value="1" {% if esercizio is defined and esercizio.difficolta == 1 %}selected{% endif %}>★☆☆</option>
@@ -25,7 +25,7 @@
     {% endif %}
   </div>
 
-  <label style="margin-top:0.75rem">Soluzione o suggerimento (opzionale)</label>
+  <label style="margin-top:0.75rem">Soluzione o suggerimento</label>
   <textarea name="soluzione" rows="2" placeholder="Se compilata, appare in un riquadro nel foglio di riferimento dell'appello">{{ esercizio.soluzione or '' if esercizio is defined else '' }}</textarea>
 
   <div style="margin-top:0.75rem">
@@ -49,7 +49,7 @@
         <button type="button" class="secondary btn-rimuovi-variante">Rimuovi variante</button>
       </div>
       <input type="hidden" class="campo-vidx" name="variante_idx" value="{{ vidx }}">
-      <label>Testo del quesito</label>
+      <label class="campo-obbligatorio">Testo del quesito</label>
       <textarea class="campo-testo" name="testo_{{ vidx }}" rows="2">{{ v.testo }}</textarea>
       <div class="blocco-risposte-multiple">
         <label>Risposta corretta</label>
@@ -78,7 +78,7 @@
         <button type="button" class="secondary btn-rimuovi-variante">Rimuovi variante</button>
       </div>
       <input type="hidden" class="campo-vidx">
-      <label>Testo del quesito</label>
+      <label class="campo-obbligatorio">Testo del quesito</label>
       <textarea class="campo-testo" rows="2"></textarea>
       <div class="blocco-risposte-multiple">
         <label>Risposta corretta</label>

@@ -5,5 +5,8 @@
 {% endblock %}
 {% block content %}
 <h1>{{ risultato.cognome }} {{ risultato.nome }} <span class="muted">({{ risultato.matricola }})</span></h1>
+<p class="muted" style="margin-top:-0.75rem">
+  {{ corso.nome }} <span class="sep">›</span> A.A. {{ corso.anno }} <span class="sep">›</span> {{ appello.nome }}
+</p>
 {% include "_risultato_dettaglio.html" %}
 {% endblock %}

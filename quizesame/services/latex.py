@@ -189,7 +189,7 @@ def stampa_codici(ctx: LatexContext, studenti) -> str:
     tex = intestazione_breve(ctx)
     tex += (
         "\\begin{center}\n\\begin{longtable}{cc}\n\\toprule\n"
-        "{\\bfseries Codice} & {\\bfseries Griglia} \\\\\n\\toprule\n"
+        "{\\bfseries Codice} & {\\bfseries Griglia} \\\\\n\\toprule\n\\endhead\n"
     )
     for codice, griglia in studenti:
         tex += f"{codice} & {griglia}\\\\\n"
@@ -358,7 +358,7 @@ def crea_tex_risultati(ctx: LatexContext, lista) -> str:
     tex += _intestazione_orale(ctx)
     tex += (
         "\\begin{center}\n\\begin{longtable}{cc}\n\\toprule\n"
-        "{\\bfseries Matricola} & {\\bfseries Voto} \\\\\n\\toprule\n"
+        "{\\bfseries Matricola} & {\\bfseries Voto} \\\\\n\\toprule\n\\endhead\n"
     )
     for matricola, nome, cognome, etichetta in lista:
         tex += f"{celamatr(matricola)}({nome[0]}{cognome[0]}) & {etichetta}\\\\\n"
@@ -369,20 +369,25 @@ def crea_tex_risultati(ctx: LatexContext, lista) -> str:
 
 def _tabella_ammessi(righe: list[dict]) -> str:
     """Righe ben distanziate (spazio a sufficienza per segnare a penna presenza/assenza
-    durante l'appello) con una colonna "Presente" (una casella vuota da spuntare). Chi è
-    ammesso in deroga (aggiunto a mano pur non soddisfacendo i requisiti automatici) è
-    marcato con un asterisco sul cognome, spiegato in una nota sotto la tabella."""
+    durante l'appello), con una riga di separazione tra uno studente e l'altro. La
+    casella "Presente" è la prima colonna (senza intestazione, da spuntare a penna); la
+    colonna "Note" segnala DSA e/o ammissione in deroga (aggiunto a mano pur non
+    soddisfacendo i requisiti automatici)."""
     tex = (
-        "\\begin{center}\n\\begin{longtable}{lllcc}\n\\toprule\n"
-        "{\\bfseries Matricola} & {\\bfseries Cognome} & {\\bfseries Nome} & {\\bfseries DSA} & {\\bfseries Presente} \\\\\n\\toprule\n"
+        "\\begin{center}\n\\begin{longtable}{clllc}\n\\toprule\n"
+        "{} & {\\bfseries Matricola} & {\\bfseries Cognome} & {\\bfseries Nome} & {\\bfseries Note} \\\\\n\\toprule\n\\endhead\n"
     )
-    for r in righe:
-        dsa = "S\\`i" if r.get("dsa") else ""
-        cognome = f"{r['cognome']}*" if r.get("in_deroga") else r["cognome"]
-        tex += f"{r['matricola']} & {cognome} & {r['nome']} & {dsa} & {{\\Large $\\square$}} \\\\[0.9cm]\n"
+    for i, r in enumerate(righe):
+        note_parti = []
+        if r.get("dsa"):
+            note_parti.append("DSA")
+        if r.get("in_deroga"):
+            note_parti.append("deroga")
+        note = ", ".join(note_parti)
+        if i > 0:
+            tex += "\\midrule\n"
+        tex += f"{{\\Large $\\square$}} & {r['matricola']} & {r['cognome']} & {r['nome']} & {note} \\\\[0.9cm]\n"
     tex += "\\bottomrule\n\\end{longtable}\n\\end{center}\n\n"
-    if any(r.get("in_deroga") for r in righe):
-        tex += "{\\small * ammesso in deroga, aggiunto a mano pur non soddisfacendo i requisiti automatici.}\\\\\n\n"
     return tex
 
 
