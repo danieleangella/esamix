@@ -40,6 +40,8 @@
     compiti ne sceglie una a caso per ogni studente); testo in LaTeX.
   </p>
 
+  <div class="flash flash-error errore-form-esercizio" style="display:none; margin-top:0.75rem"></div>
+
   <div class="varianti-container">
     {% for v in (esercizio.varianti if esercizio is defined else []) %}
     {% set vidx = loop.index0 %}
@@ -180,8 +182,53 @@
     form.querySelector(".btn-aggiungi-variante").addEventListener("click", aggiungiVariante);
     if (blocchiEsistenti.length === 0) aggiungiVariante();
 
+    // Stessa regola del server (_valida_varianti): almeno una variante con un testo; per
+    // ognuna di queste (a meno che l'esercizio sia una domanda aperta) serve anche la
+    // risposta corretta e almeno una sbagliata. Validare qui, prima dell'invio, evita che
+    // un campo mancante mandi il form al server (che risponderebbe con un redirect,
+    // perdendo tutto quello già compilato): l'utente resta sulla stessa pagina, con tutti
+    // i campi intatti, e viene guidato dritto al campo da completare.
+    var erroreDiv = form.querySelector(".errore-form-esercizio");
+    function mostraErrore(msg, campoDaFocalizzare) {
+      erroreDiv.textContent = msg;
+      erroreDiv.style.display = "";
+      erroreDiv.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (campoDaFocalizzare) campoDaFocalizzare.focus();
+    }
+    form.addEventListener("submit", function (ev) {
+      erroreDiv.style.display = "none";
+      var blocchi = Array.prototype.slice.call(container.querySelectorAll(".variante-block"));
+      var candidate = blocchi.filter(function (b) { return b.querySelector(".campo-testo").value.trim(); });
+      if (candidate.length === 0) {
+        ev.preventDefault();
+        var primoTesto = blocchi.length ? blocchi[0].querySelector(".campo-testo") : null;
+        mostraErrore("Serve almeno una variante con un testo del quesito compilato.", primoTesto);
+        return;
+      }
+      if (!campoAperta.checked) {
+        for (var i = 0; i < candidate.length; i++) {
+          var blocco = candidate[i];
+          var corretta = blocco.querySelector(".campo-corretta");
+          var sbagliate = Array.prototype.slice.call(blocco.querySelectorAll(".campo-sbagliata"));
+          var haSbagliata = sbagliate.some(function (c) { return c.value.trim(); });
+          if (!corretta.value.trim()) {
+            ev.preventDefault();
+            mostraErrore("Manca la risposta corretta in una variante con il testo già compilato.", corretta);
+            return;
+          }
+          if (!haSbagliata) {
+            ev.preventDefault();
+            var campoSbagliata = sbagliate.length ? sbagliate[0] : null;
+            mostraErrore("Manca almeno una risposta sbagliata in una variante con il testo già compilato.", campoSbagliata);
+            return;
+          }
+        }
+      }
+    });
+
     if (form.dataset.avvisaRigenerazione) {
       form.addEventListener("submit", function (ev) {
+        if (ev.defaultPrevented) return;
         var msg = "Questo esercizio è già usato in almeno un blocco di compiti generato. " +
           "Salvare le modifiche rigenererà quei blocchi con il nuovo testo/varianti, eliminando " +
           "i vecchi codici (non è possibile se hanno già risultati registrati). Procedere comunque?";
