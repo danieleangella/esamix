@@ -1,6 +1,6 @@
 @echo off
 REM Aggiornamento di EsaMiX all'ultima versione disponibile su GitHub: scarica il codice
-REM nuovo con git e reinstalla le eventuali dipendenze cambiate, senza toccare corsi\ né
+REM nuovo con git e reinstalla le eventuali dipendenze cambiate, senza toccare corsi\ ne
 REM altri dati locali (non tracciati da git).
 cd /d "%~dp0"
 
@@ -26,10 +26,22 @@ if defined MODIFICHE (
 
 echo Scarico l'ultima versione...
 git pull
+if errorlevel 1 (
+    echo.
+    echo Aggiornamento non riuscito: git pull ha restituito un errore ^(vedi sopra^).
+    pause
+    exit /b 1
+)
 
 if exist .venv\Scripts\activate.bat (
     call .venv\Scripts\activate.bat
     pip install -e . --upgrade
+    if errorlevel 1 (
+        echo.
+        echo Aggiornamento non riuscito: la reinstallazione delle dipendenze ha dato un errore ^(vedi sopra^).
+        pause
+        exit /b 1
+    )
 ) else (
     echo Ambiente virtuale non trovato: esegui prima installa.bat
     pause

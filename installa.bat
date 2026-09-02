@@ -11,9 +11,21 @@ if errorlevel 1 (
 )
 
 python -m venv .venv
+if errorlevel 1 (
+    echo.
+    echo Creazione dell'ambiente virtuale non riuscita ^(vedi sopra^).
+    pause
+    exit /b 1
+)
 call .venv\Scripts\activate.bat
 pip install --upgrade pip
 pip install -e .
+if errorlevel 1 (
+    echo.
+    echo Installazione non riuscita: pip ha restituito un errore ^(vedi sopra^).
+    pause
+    exit /b 1
+)
 
 echo.
 echo Installazione completata. Per avviare l'app esegui: esamix.bat
