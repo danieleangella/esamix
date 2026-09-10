@@ -355,7 +355,7 @@
       una volta sola: dopo potrai riscaricare il file compilato senza doverlo ricaricare ogni volta.
     </p>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/segreteria-csv" enctype="multipart/form-data">
-      <input type="file" name="file" accept=".csv" required>
+      <input type="file" name="file" accept=".csv,.xls,.xlsx" required>
       <button type="submit">Carica</button>
     </form>
     {% endif %}

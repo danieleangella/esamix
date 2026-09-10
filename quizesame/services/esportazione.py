@@ -7,7 +7,11 @@ corretti, lasciando invariato il resto del file (comprese le altre colonne e gli
 studenti senza un risultato)."""
 import csv
 import io
+from pathlib import Path
 from typing import Optional
+
+import openpyxl
+import xlrd
 
 from quizesame import config, db
 from quizesame.services import correzione as correzione_service
@@ -21,6 +25,45 @@ def _decodifica(contenuto: bytes) -> tuple[str, str]:
         except UnicodeDecodeError:
             continue
     raise ValueError("Non riconosco la codifica del file: attesi UTF-8 o Windows-1252")
+
+
+def _normalizza_cella(valore) -> str:
+    if valore is None:
+        return ""
+    if isinstance(valore, float) and valore.is_integer():
+        return str(int(valore))  # es. una matricola letta come numero (7034532.0 -> "7034532")
+    return str(valore).strip()
+
+
+def _righe_da_xlsx(contenuto: bytes) -> list[list[str]]:
+    cartella = openpyxl.load_workbook(io.BytesIO(contenuto), data_only=True, read_only=True)
+    try:
+        foglio = cartella.worksheets[0]
+        return [[_normalizza_cella(v) for v in riga] for riga in foglio.iter_rows(values_only=True)]
+    finally:
+        cartella.close()
+
+
+def _righe_da_xls(contenuto: bytes) -> list[list[str]]:
+    foglio = xlrd.open_workbook(file_contents=contenuto).sheet_by_index(0)
+    return [
+        [_normalizza_cella(foglio.cell_value(riga, colonna)) for colonna in range(foglio.ncols)]
+        for riga in range(foglio.nrows)
+    ]
+
+
+def _righe_e_codifica(nome_file: str, contenuto: bytes) -> tuple[list[list[str]], str]:
+    """Il file della segreteria può arrivare come CSV oppure come foglio Excel (.xls/.xlsx):
+    in entrambi i casi si ottiene la stessa lista di righe di stringhe, così il resto della
+    logica (ricerca dell'intestazione, colonne 'Matricola'/'Esito') resta identica a valle,
+    indipendentemente dal formato caricato."""
+    estensione = Path(nome_file or "").suffix.lower()
+    if estensione == ".xlsx":
+        return _righe_da_xlsx(contenuto), "utf-8"
+    if estensione == ".xls":
+        return _righe_da_xls(contenuto), "utf-8"
+    testo, codifica = _decodifica(contenuto)
+    return list(csv.reader(io.StringIO(testo))), codifica
 
 
 def _trova_intestazione(righe: list[list[str]]) -> int:
@@ -61,14 +104,21 @@ def _esito_per_export(risultato: Optional[dict], votomin: int) -> Optional[str]:
 
 def carica_csv_segreteria(tag: str, appello_id: int, nome_file: str, contenuto: bytes) -> int:
     """Valida e salva il file (sostituendo un eventuale caricamento precedente per lo
-    stesso appello). Ritorna il numero di studenti iscritti trovati nel file."""
-    testo, codifica = _decodifica(contenuto)
-    righe = list(csv.reader(io.StringIO(testo)))
+    stesso appello). Accetta sia un CSV sia un foglio Excel (.xls/.xlsx, come spesso
+    esportato dal sistema della segreteria): in entrambi i casi viene salvato come CSV,
+    così il resto del programma (elenco iscritti, compilazione per il riesportazione) non
+    deve distinguere il formato originale. Ritorna il numero di studenti iscritti trovati
+    nel file."""
+    righe, codifica = _righe_e_codifica(nome_file, contenuto)
     indice_intestazione = _trova_intestazione(righe)
     idx_matricola = righe[indice_intestazione].index("Matricola")
     n_iscritti = sum(
         1 for r in righe[indice_intestazione + 1:] if len(r) > idx_matricola and r[idx_matricola].strip()
     )
+
+    buffer = io.StringIO()
+    csv.writer(buffer, lineterminator="\r\n").writerows(righe)
+    testo = buffer.getvalue()
 
     conn = db.get_connection(config.corso_db_path(tag))
     try:

@@ -102,7 +102,7 @@
       assente/ritirato uno studente che non vi compare non è consentito.
     </p>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/segreteria-csv" enctype="multipart/form-data">
-      <input type="file" name="file" accept=".csv" required>
+      <input type="file" name="file" accept=".csv,.xls,.xlsx" required>
       <button type="submit">Carica</button>
     </form>
   </details>
