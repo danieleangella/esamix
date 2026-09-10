@@ -35,19 +35,30 @@
     </div>
   </div>
   <p class="muted" style="margin-top:0.75rem">
-    Spunta "Presente" man mano che gli studenti si presentano in aula. Chi ha già un voto o un esito
+    Premi "Presente" man mano che gli studenti si presentano in aula. Chi ha già un voto o un esito
     (assente/ritirato) per questo appello risulta presente automaticamente e non è più modificabile da qui.
   </p>
 
   <table style="margin-top:1rem">
-    <tr><th></th><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Note</th></tr>
+    <tr><th>Presente</th><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Note</th></tr>
     {% for s in riepilogo.iscritti %}
     <tr>
       <td>
+        {% if s.bloccato %}
+        <span class="badge badge-ok">Presente</span>
+        {% elif s.presente %}
+        <span class="badge badge-ok">Presente</span>
+        {% if not appello.presenze_chiuse %}
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/presenze/{{ s.matricola }}/imposta">
-          <input type="checkbox" name="presente" value="1" style="width:auto" onchange="this.form.requestSubmit()"
-                 {% if s.presente %}checked{% endif %} {% if s.bloccato or appello.presenze_chiuse %}disabled{% endif %}>
+          <button type="submit" class="secondary" style="padding:0.1rem 0.5rem; font-size:0.85rem">Annulla</button>
         </form>
+        {% endif %}
+        {% else %}
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/presenze/{{ s.matricola }}/imposta">
+          <input type="hidden" name="presente" value="1">
+          <button type="submit" {% if appello.presenze_chiuse %}disabled{% endif %}>Presente</button>
+        </form>
+        {% endif %}
       </td>
       <td>{{ s.matricola }}</td>
       <td>{{ s.cognome }}</td>
