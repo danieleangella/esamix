@@ -230,13 +230,19 @@ def migra(
             and _clean_matricola(row["matricola"]) not in verbalizzata_per_studente
         ]
         if senza_match:
-            storico = corsi_service.create_appello(tag, slug="verbalizzazione-storica", nome="Verbalizzazioni storiche (da migrazione)", tipo="storico", data=None)
+            # inserito con conn (non corsi_service.create_appello, che aprirebbe una seconda
+            # connessione allo stesso file: con questa transazione ancora aperta finirebbe
+            # in 'database is locked')
+            storico_id = conn.execute(
+                "INSERT INTO appelli (slug, nome, tipo, data) VALUES (?,?,?,?)",
+                ("verbalizzazione-storica", "Verbalizzazioni storiche (da migrazione)", "storico", None),
+            ).lastrowid
             for row in senza_match:
                 matricola = _clean_matricola(row["matricola"])
                 conn.execute(
                     "INSERT INTO risultati (matricola, appello_id, voto, verbalizzato, data_verbalizzazione) "
                     "VALUES (?,?,?,1,?) ON CONFLICT(matricola, appello_id) DO NOTHING",
-                    (matricola, storico.id, row["totale"], row["datav"]),
+                    (matricola, storico_id, row["totale"], row["datav"]),
                 )
                 n_risultati += 1
                 n_verbalizzati += 1
