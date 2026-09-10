@@ -5,6 +5,7 @@ import sqlite3
 import tempfile
 import zipfile
 from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -114,6 +115,51 @@ def list_corsi() -> list[Corso]:
             except Exception:
                 continue
     return sorted(corsi, key=lambda c: c.anno, reverse=True)
+
+
+_ANNO_RE = re.compile(r"^\s*(\d{4})\s*/\s*(\d{4})\s*$")
+
+
+def corso_e_corrente(corso: Corso, oggi: Optional[date] = None) -> bool:
+    """Un corso è "in corso" nell'anno accademico corrente: per convenzione l'anno
+    accademico "AAAA/AAAA+1" copre da inizio settembre AAAA a fine settembre AAAA+1 (le
+    sessioni d'esame, appelli straordinari compresi, si concludono in genere entro
+    settembre dell'anno successivo). Un anno mancante o scritto in un altro formato non è
+    mai considerato corrente (non c'è modo di saperlo)."""
+    m = _ANNO_RE.match(corso.anno or "")
+    if not m:
+        return False
+    anno1, anno2 = int(m.group(1)), int(m.group(2))
+    oggi = oggi or date.today()
+    return date(anno1, 9, 1) <= oggi <= date(anno2, 9, 30)
+
+
+def prossimi_appelli(giorni: int = 14) -> list[dict]:
+    """Appelli (di qualunque corso, non solo quelli "correnti") con una data compresa fra
+    oggi e i prossimi `giorni` giorni inclusi, in ordine cronologico: usato per il
+    riepilogo "in programma" della home page."""
+    oggi = date.today()
+    limite = oggi + timedelta(days=giorni)
+    trovati = []
+    for corso in list_corsi():
+        for appello in list_appelli(corso.tag, includi_raggruppamenti=False):
+            if not appello.data:
+                continue
+            try:
+                data = datetime.strptime(appello.data, "%d/%m/%Y").date()
+            except ValueError:
+                continue
+            if oggi <= data <= limite:
+                trovati.append({
+                    "corso_tag": corso.tag, "corso_nome": corso.nome, "corso_anno": corso.anno,
+                    "appello_id": appello.id, "appello_nome": appello.nome,
+                    "data": appello.data, "giorni_mancanti": (data - oggi).days,
+                    "_ordinamento": data,
+                })
+    trovati.sort(key=lambda r: r["_ordinamento"])
+    for r in trovati:
+        del r["_ordinamento"]
+    return trovati
 
 
 def corsi_simili(corrente: Corso, tutti: list[Corso]) -> list[Corso]:

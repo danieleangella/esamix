@@ -35,6 +35,22 @@
 </div>
 {% endif %}
 
+{% if prossimi_appelli %}
+<div class="card">
+  <h2>Appelli in programma (prossime 2 settimane)</h2>
+  <table style="margin-top:0.5rem">
+    <tr><th>Data</th><th>Appello</th><th>Corso</th></tr>
+    {% for a in prossimi_appelli %}
+    <tr>
+      <td>{{ a.data }} <span class="muted">({{ 'oggi' if a.giorni_mancanti == 0 else 'domani' if a.giorni_mancanti == 1 else 'tra ' + a.giorni_mancanti|string + ' giorni' }})</span></td>
+      <td><a href="/corsi/{{ a.corso_tag }}/appelli/{{ a.appello_id }}">{{ a.appello_nome }}</a></td>
+      <td>{{ a.corso_nome }} <span class="muted">({{ a.corso_anno }})</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
 <div class="card">
   <h2>Cerca uno studente</h2>
   <form method="get" action="/">
@@ -86,9 +102,10 @@
 <div class="card">
   <ul class="list-links">
     {% for c in corsi %}
-    <li>
+    <li{% if c.tag in corsi_correnti %} style="font-weight:600"{% endif %}>
       <a href="/corsi/{{ c.tag }}">{{ c.nome }}</a>
       <span class="muted">{{ c.anno }} · {{ c.tag }}</span>
+      {% if c.tag in corsi_correnti %}<span class="badge badge-ok">In corso</span>{% endif %}
     </li>
     {% endfor %}
   </ul>

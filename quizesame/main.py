@@ -208,11 +208,13 @@ def _parse_esercizio_extra_form(form) -> dict:
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, q: str = ""):
     corsi = corsi_service.list_corsi()
+    corsi_correnti = {c.tag for c in corsi if corsi_service.corso_e_corrente(c)}
     risultati_ricerca = studenti_service.cerca_in_tutti_i_corsi(q.strip()) if q.strip() else None
     app_settings = app_config_service.get_settings()
     riepilogo_globale = statistiche_service.calcola_globale() if app_settings.mostra_riepilogo_home else None
     return templates.TemplateResponse(request, "corsi_list.html", {
-        "corsi": corsi, "q": q, "risultati_ricerca": risultati_ricerca, "riepilogo_globale": riepilogo_globale,
+        "corsi": corsi, "corsi_correnti": corsi_correnti, "prossimi_appelli": corsi_service.prossimi_appelli(),
+        "q": q, "risultati_ricerca": risultati_ricerca, "riepilogo_globale": riepilogo_globale,
         "aggiornamento_disponibile": aggiornamenti_service.aggiornamento_disponibile(),
     })
 
