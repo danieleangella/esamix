@@ -15,6 +15,7 @@ class Studente:
     laurea_ctype: Optional[str]
     laurea_nome: Optional[str] = None
     dsa: bool = False
+    dsa_note: str = ""
 
 
 def _clean(value: Optional[str]) -> str:
@@ -28,6 +29,7 @@ def _row_to_studente(row) -> Studente:
         matricola=row["matricola"], nome=row["nome"], cognome=row["cognome"],
         laurea_ctype=row["laurea_ctype"], laurea_nome=row["laurea_nome"] if "laurea_nome" in row.keys() else None,
         dsa=bool(row["dsa"]) if "dsa" in row.keys() else False,
+        dsa_note=(row["dsa_note"] or "") if "dsa_note" in row.keys() else "",
     )
 
 
@@ -265,6 +267,7 @@ def get_studente(tag: str, matricola: str) -> Optional[Studente]:
 
 def crea_studente(
     tag: str, matricola: str, nome: str, cognome: str, laurea_ctype: Optional[str] = None, dsa: bool = False,
+    dsa_note: str = "",
 ) -> None:
     """A differenza di upsert_studente, rifiuta la matricola se già assegnata a qualcun
     altro: usata dal form "Aggiungi studente", dove un inserimento con matricola sbagliata
@@ -280,8 +283,8 @@ def crea_studente(
                 f"La matricola {matricola} è già assegnata a {esistente['cognome']} {esistente['nome']}"
             )
         conn.execute(
-            "INSERT INTO studenti (matricola, nome, cognome, laurea_ctype, dsa) VALUES (?,?,?,?,?)",
-            (matricola, _clean(nome), _clean(cognome), laurea_ctype or None, dsa),
+            "INSERT INTO studenti (matricola, nome, cognome, laurea_ctype, dsa, dsa_note) VALUES (?,?,?,?,?,?)",
+            (matricola, _clean(nome), _clean(cognome), laurea_ctype or None, dsa, _clean(dsa_note) or None),
         )
         conn.commit()
     finally:
@@ -305,6 +308,7 @@ def upsert_studente(tag: str, matricola: str, nome: str, cognome: str, laurea_ct
 
 def aggiorna_studente(
     tag: str, matricola: str, nome: str, cognome: str, nuova_matricola: Optional[str] = None, dsa: bool = False,
+    dsa_note: str = "",
 ) -> None:
     matricola = _clean(matricola)
     nuova_matricola = _clean(nuova_matricola) if nuova_matricola else matricola
@@ -318,8 +322,8 @@ def aggiorna_studente(
             # può aggiornare prima la tabella genitore e poi le tabelle figlie in sicurezza.
             conn.execute("PRAGMA defer_foreign_keys = ON")
         cur = conn.execute(
-            "UPDATE studenti SET nome=?, cognome=?, matricola=?, dsa=? WHERE matricola=?",
-            (_clean(nome), _clean(cognome), nuova_matricola, dsa, matricola),
+            "UPDATE studenti SET nome=?, cognome=?, matricola=?, dsa=?, dsa_note=? WHERE matricola=?",
+            (_clean(nome), _clean(cognome), nuova_matricola, dsa, _clean(dsa_note) or None, matricola),
         )
         if cur.rowcount == 0:
             raise ValueError(f"Studente con matricola '{matricola}' non trovato")

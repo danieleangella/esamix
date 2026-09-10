@@ -98,6 +98,7 @@ def chiudi(tag: str, appello_id: int) -> dict:
 
     segnati_assenti = 0
     non_registrati = []
+    errori = []
     for s in iscritti:
         matricola = s["matricola"]
         if matricola in presenti or matricola in con_risultato:
@@ -105,11 +106,17 @@ def chiudi(tag: str, appello_id: int) -> dict:
         if matricola not in registrati:
             non_registrati.append(s)
             continue
-        correzione_service.segna_esito_speciale(tag, appello_id, matricola, "assente")
-        segnati_assenti += 1
+        try:
+            correzione_service.segna_esito_speciale(tag, appello_id, matricola, "assente")
+            segnati_assenti += 1
+        except Exception as e:
+            # un imprevisto su un singolo studente (es. una condizione di corsa con una
+            # correzione fatta nel frattempo) non deve impedire di chiudere il registro
+            # e segnare comunque assenti tutti gli altri.
+            errori.append({**s, "errore": str(e)})
 
     corsi_service.update_appello(tag, appello_id, presenze_chiuse=True)
-    return {"segnati_assenti": segnati_assenti, "non_registrati": non_registrati}
+    return {"segnati_assenti": segnati_assenti, "non_registrati": non_registrati, "errori": errori}
 
 
 def riapri(tag: str, appello_id: int) -> None:

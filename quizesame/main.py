@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, Form, Query, Request, UploadFile, File
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -1344,14 +1344,25 @@ def registro_presenze(request: Request, tag: str, appello_id: int):
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/presenze/{matricola}/imposta")
-def imposta_presenza(tag: str, appello_id: int, matricola: str, presente: str = Form("")):
+def imposta_presenza(request: Request, tag: str, appello_id: int, matricola: str, presente: str = Form("")):
+    # risponde in JSON alla chiamata fetch della pagina presenze.html (aggiorna la riga
+    # sul posto, senza ricaricare tutta la pagina), altrimenti con il solito redirect —
+    # usata anche come fallback se il fetch lato client fallisse per qualunque motivo.
+    vuole_json = "application/json" in request.headers.get("accept", "")
     try:
+        appello = corsi_service.get_appello(tag, appello_id)
+        if appello and appello.presenze_chiuse:
+            raise ValueError("Il registro presenze è chiuso: riaprilo prima di modificare le presenze")
         if presente:
             presenze_service.segna_presente(tag, appello_id, matricola)
         else:
             presenze_service.rimuovi_presente(tag, appello_id, matricola)
     except Exception as e:
+        if vuole_json:
+            return JSONResponse({"errore": str(e)}, status_code=400)
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}/presenze", str(e), "error")
+    if vuole_json:
+        return JSONResponse({"presente": bool(presente)})
     return RedirectResponse(f"/corsi/{tag}/appelli/{appello_id}/presenze", status_code=303)
 
 
@@ -1369,6 +1380,9 @@ def chiudi_presenze(tag: str, appello_id: int):
             f" — {len(esito['non_registrati'])} matricole dell'elenco iscritti non sono registrate come "
             "studenti di questo corso e non è stato possibile segnarle: registrale (o correggile) a mano"
         )
+    if esito["errori"]:
+        kind = "warning"
+        msg += f" — {len(esito['errori'])} studenti non segnati per un errore imprevisto: riprova a mano per loro"
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}/presenze", msg, kind)
 
 
@@ -1644,9 +1658,10 @@ def studente_dettaglio_corso(request: Request, tag: str, matricola: str):
 @app.post("/corsi/{tag}/studenti/nuovo")
 def nuovo_studente(
     tag: str, matricola: str = Form(...), nome: str = Form(...), cognome: str = Form(...), dsa: bool = Form(False),
+    dsa_note: str = Form(""),
 ):
     try:
-        studenti_service.crea_studente(tag, matricola, nome, cognome, dsa=dsa)
+        studenti_service.crea_studente(tag, matricola, nome, cognome, dsa=dsa, dsa_note=dsa_note)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/studenti", str(e), "error")
     return flash_redirect(f"/corsi/{tag}/studenti", "Studente salvato")
@@ -1655,10 +1670,12 @@ def nuovo_studente(
 @app.post("/corsi/{tag}/studenti/{matricola}/modifica")
 def modifica_studente(
     tag: str, matricola: str, nome: str = Form(...), cognome: str = Form(...), nuova_matricola: str = Form(""),
-    dsa: bool = Form(False),
+    dsa: bool = Form(False), dsa_note: str = Form(""),
 ):
     try:
-        studenti_service.aggiorna_studente(tag, matricola, nome, cognome, nuova_matricola or None, dsa=dsa)
+        studenti_service.aggiorna_studente(
+            tag, matricola, nome, cognome, nuova_matricola or None, dsa=dsa, dsa_note=dsa_note,
+        )
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/studenti", str(e), "error")
     return flash_redirect(f"/corsi/{tag}/studenti", "Studente aggiornato")

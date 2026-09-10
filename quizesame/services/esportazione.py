@@ -160,13 +160,16 @@ def list_iscritti_manuali(tag: str, appello_id: int) -> list[dict]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         rows = conn.execute(
-            "SELECT s.matricola, s.nome, s.cognome, s.dsa FROM appello_iscritti_manuali im "
+            "SELECT s.matricola, s.nome, s.cognome, s.dsa, s.dsa_note FROM appello_iscritti_manuali im "
             "JOIN studenti s ON s.matricola = im.matricola "
             "WHERE im.appello_id=? ORDER BY s.cognome, s.nome",
             (appello_id,),
         ).fetchall()
         return [
-            {"matricola": r["matricola"], "cognome": r["cognome"], "nome": r["nome"], "dsa": bool(r["dsa"])}
+            {
+                "matricola": r["matricola"], "cognome": r["cognome"], "nome": r["nome"],
+                "dsa": bool(r["dsa"]), "dsa_note": r["dsa_note"] or "", "registrato": True,
+            }
             for r in rows
         ]
     finally:
@@ -203,10 +206,13 @@ def rimuovi_iscritto_manuale(tag: str, appello_id: int, matricola: str) -> None:
 def list_iscritti(tag: str, appello_id: int) -> Optional[list[dict]]:
     """None se non è stato caricato nessun file per questo appello e non è stato aggiunto
     a mano nessuno studente. Il file della segreteria, quando presente, ha sempre la
-    precedenza sull'elenco aggiunto a mano. L'elenco (matricola/cognome/nome/dsa) è
-    ordinato per cognome poi nome: i dati anagrafici vengono dall'anagrafica del corso
-    quando lo studente è già censito, altrimenti (solo per il CSV) dalle colonne
-    Cognome/Nome del file stesso, se presenti."""
+    precedenza sull'elenco aggiunto a mano. L'elenco (matricola/cognome/nome/dsa/dsa_note/
+    registrato) è ordinato per cognome poi nome: i dati anagrafici vengono dall'anagrafica
+    del corso quando lo studente è già censito ('registrato': True), altrimenti (solo per
+    il CSV, per uno studente mai importato in questo corso) dalle colonne Cognome/Nome del
+    file stesso, se presenti ('registrato': False — non può ricevere un risultato, la cui
+    matricola è vincolata a esistere già in 'studenti'). Una matricola ripetuta più volte
+    nel file conta una sola volta (prima occorrenza)."""
     riga_csv = get_segreteria_csv(tag, appello_id)
     if riga_csv is None:
         manuali = list_iscritti_manuali(tag, appello_id)
@@ -221,28 +227,32 @@ def list_iscritti(tag: str, appello_id: int) -> Optional[list[dict]]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         anagrafica = {
-            r["matricola"]: r for r in conn.execute("SELECT matricola, nome, cognome, dsa FROM studenti")
+            r["matricola"]: r for r in conn.execute("SELECT matricola, nome, cognome, dsa, dsa_note FROM studenti")
         }
     finally:
         conn.close()
 
     iscritti = []
+    matricole_viste = set()
     for r in righe[indice_intestazione + 1:]:
         if len(r) <= idx_matricola or not r[idx_matricola].strip():
             continue
         matricola = r[idx_matricola].strip()
+        if matricola in matricole_viste:
+            continue
+        matricole_viste.add(matricola)
         studente = anagrafica.get(matricola)
         if studente:
             iscritti.append({
                 "matricola": matricola, "cognome": studente["cognome"], "nome": studente["nome"],
-                "dsa": bool(studente["dsa"]),
+                "dsa": bool(studente["dsa"]), "dsa_note": studente["dsa_note"] or "", "registrato": True,
             })
         else:
             iscritti.append({
                 "matricola": matricola,
                 "cognome": r[idx_cognome].strip() if idx_cognome is not None and len(r) > idx_cognome else "",
                 "nome": r[idx_nome].strip() if idx_nome is not None and len(r) > idx_nome else "",
-                "dsa": False,
+                "dsa": False, "dsa_note": "", "registrato": False,
             })
     iscritti.sort(key=lambda s: (s["cognome"], s["nome"]))
     return iscritti

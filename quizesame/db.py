@@ -211,6 +211,7 @@ CREATE TABLE IF NOT EXISTS risultati (
 ADDITIVE_COLUMNS = {
     "studenti": [
         ("dsa", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("dsa_note", "TEXT"),
     ],
     "raggruppamenti": [
         ("matricola_minima_prima_prova", "TEXT"),

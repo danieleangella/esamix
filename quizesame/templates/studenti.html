@@ -62,7 +62,7 @@
       <td>{{ s.matricola }}</td>
       <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
       <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
-      <td>{% if s.dsa %}<span class="badge badge-info">DSA</span>{% endif %}</td>
+      <td>{% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>DSA</span>{% endif %}</td>
       <td>
         {% if not st %}<span class="muted">mai sostenuto</span>
         {% elif st.stato == 'verbalizzato' %}<span class="badge badge-ok">{{ st.voto }}</span>
@@ -79,6 +79,7 @@
           <div><label class="campo-obbligatorio">Cognome</label><input name="cognome" value="{{ s.cognome }}" required></div>
           <div><label class="campo-obbligatorio">Nome</label><input name="nome" value="{{ s.nome }}" required></div>
           <div><label style="display:inline"><input type="checkbox" name="dsa" style="width:auto" {% if s.dsa %}checked{% endif %}> DSA</label></div>
+          <div><label>Nota DSA (facoltativa)</label><input name="dsa_note" value="{{ s.dsa_note }}" placeholder="es. tempo aggiuntivo 30%"></div>
           <button type="submit">Salva</button>
         </form>
         <form method="post" action="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/elimina" class="inline"
@@ -99,8 +100,11 @@
       <div><label class="campo-obbligatorio">Nome</label><input name="nome" required></div>
       <div><label class="campo-obbligatorio">Cognome</label><input name="cognome" required></div>
     </div>
-    <div style="margin-top:0.5rem"><label style="display:inline"><input type="checkbox" name="dsa" style="width:auto"> DSA</label></div>
-    <button type="submit">Salva</button>
+    <div class="form-grid" style="margin-top:0.5rem">
+      <div><label style="display:inline"><input type="checkbox" name="dsa" style="width:auto"> DSA</label></div>
+      <div><label>Nota DSA (facoltativa)</label><input name="dsa_note" placeholder="es. tempo aggiuntivo 30%"></div>
+    </div>
+    <button type="submit" style="margin-top:0.5rem">Salva</button>
   </form>
 </details>
 

@@ -4,14 +4,13 @@
     <p class="muted">Appello chiuso: per correggere compiti o segnare assenze, riaprilo prima dalla scheda Impostazioni.</p>
   </div>
   {% else %}
-  {% if md.iscritti %}
   <div class="card">
     <p class="muted" style="margin-top:0">
-      <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze">Registra le presenze in aula</a>
-      (spunta chi si presenta, poi chiudi il registro per segnare assenti gli altri).
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze">Presenze</a>
+      {% if md.iscritti %}(spunta chi si presenta, poi chiudi il registro per segnare assenti gli altri){% endif %}
+      — da lì si segna anche assente o ritirato uno studente.
     </p>
   </div>
-  {% endif %}
   {% if not md.blocchi %}
   <div class="card">
     <p class="muted">Non sono ancora stati generati blocchi di compiti per questa prova: genera almeno un
@@ -60,37 +59,6 @@
         function (p) { return "/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/api/compiti/cerca?prefix=" + encodeURIComponent(p); },
         function (c) { return c; },
         function (c) { return c; }
-      );
-    })();
-    </script>
-
-
-    <h2 style="margin-top:1.5rem">Segna assente o ritirato</h2>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/assenze/segna">
-      <div class="form-grid">
-        <div style="position:relative">
-          <label class="campo-obbligatorio">Matricola o nome</label>
-          <input name="matricola" class="campo-input-matricola-assenza" autocomplete="off" required>
-          <div class="campo-suggerimenti-studenti-assenza sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-        </div>
-        <div>
-          <label>Esito</label>
-          <select name="esito">
-            <option value="assente">Assente</option>
-            <option value="ritirato">Ritirato</option>
-          </select>
-        </div>
-      </div>
-      <button type="submit">Segna</button>
-    </form>
-    <script>
-    (function () {
-      var root = document.currentScript.closest(".tab-pane");
-      creaAutocomplete(
-        root.querySelector(".campo-input-matricola-assenza"), root.querySelector(".campo-suggerimenti-studenti-assenza"),
-        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
-        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
-        function (s) { return s.matricola; }
       );
     })();
     </script>
