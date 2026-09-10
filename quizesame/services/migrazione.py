@@ -145,6 +145,11 @@ def migra(
                 voto = row[col]
                 if voto is None:
                     continue
+                if not isinstance(voto, int):
+                    report.warnings.append(
+                        f"Studente {matricola}, colonna '{col}': voto non numerico ({voto!r}), scartato"
+                    )
+                    continue
                 risultati_map[(matricola, col)] = {
                     "voto": voto, "totale": totale, "datav": datav, "risposte": None, "codice": None,
                 }
