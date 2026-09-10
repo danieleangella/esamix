@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Conferma importazione · {{ corso.nome }}{% endblock %}
 {% block breadcrumb %}
-<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a> <span class="sep">›</span> <span class="current">Conferma importazione</span>
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a> <span class="sep">›</span> <span class="current">Conferma importazione</span>
 {% endblock %}
 {% block content %}
 <h1>Conferma importazione</h1>

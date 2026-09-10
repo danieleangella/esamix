@@ -233,7 +233,12 @@
       overlay.style.display = "none";
     });
     document.getElementById("sfoglia-seleziona").addEventListener("click", function () {
-      if (targetInput) targetInput.value = currentPath;
+      if (targetInput) {
+        targetInput.value = currentPath;
+        // impostare .value via JS non genera da solo un evento "input": altre pagine
+        // (es. la migrazione, che ne precompila il tag) devono poter reagire comunque.
+        targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
       overlay.style.display = "none";
     });
     overlay.addEventListener("click", function (ev) {
