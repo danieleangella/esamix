@@ -117,7 +117,7 @@
   <summary>Importa studenti da un altro corso</summary>
   <div style="margin-top:1rem">
     {% if corsi_suggeriti %}
-    <p>Corsi con stesso nome e facoltà:
+    <p>Corsi con stesso nome e corso di studi:
       {% for c in corsi_suggeriti %}
       <a href="/corsi/{{ corso.tag }}/studenti?da={{ c.tag }}">{{ c.nome }} ({{ c.anno }})</a>{% if not loop.last %}, {% endif %}
       {% endfor %}
