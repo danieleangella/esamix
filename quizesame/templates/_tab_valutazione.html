@@ -4,6 +4,14 @@
     <p class="muted">Appello chiuso: per correggere compiti o segnare assenze, riaprilo prima dalla scheda Impostazioni.</p>
   </div>
   {% else %}
+  {% if md.iscritti %}
+  <div class="card">
+    <p class="muted" style="margin-top:0">
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze">Registra le presenze in aula</a>
+      (spunta chi si presenta, poi chiudi il registro per segnare assenti gli altri).
+    </p>
+  </div>
+  {% endif %}
   {% if not md.blocchi %}
   <div class="card">
     <p class="muted">Non sono ancora stati generati blocchi di compiti per questa prova: genera almeno un
