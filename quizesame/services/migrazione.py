@@ -123,11 +123,13 @@ def migra(
 
     conn = db.get_connection(config.corso_db_path(tag))
     try:
+        matricole_valide: set[str] = set()
         for row in studenti_rows:
             matricola = _clean_matricola(row["matricola"])
             if not matricola:
                 report.warnings.append(f"Riga studenti scartata: matricola vuota ({dict(row)})")
                 continue
+            matricole_valide.add(matricola)
             laurea = row["laurea"] if "laurea" in row.keys() else None
             laurea_ctype = laurea if laurea in ctype_validi else None
             if laurea and laurea not in ctype_validi:
@@ -171,6 +173,12 @@ def migra(
                 col = row["appello"]
                 if col not in appello_id_by_col:
                     report.warnings.append(f"Riga esami per matricola {matricola}: appello '{col}' sconosciuto, saltata")
+                    continue
+                if matricola not in matricole_valide:
+                    report.warnings.append(
+                        f"Riga esami per matricola {matricola} (appello '{col}'): nessuno studente con questa "
+                        "matricola in 'studenti' (probabile prova/collaudo), saltata"
+                    )
                     continue
                 key = (matricola, col)
                 entry = risultati_map.setdefault(key, {"voto": None, "totale": None, "datav": None, "risposte": None, "codice": None})
