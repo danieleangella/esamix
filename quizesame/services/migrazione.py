@@ -202,7 +202,11 @@ def migra(
 
         for (matricola, col), entry in risultati_map.items():
             appello_id = appello_id_by_col[col]
-            verbalizzato = verbalizzata_per_studente.get(matricola) == col
+            # un corso migrato da legacy è per definizione concluso: ogni risultato importato
+            # va considerato già verbalizzato (non deve comparire tra gli "idonei da
+            # verbalizzare" né essere più modificabile). 'ufficiale' resta solo per capire a
+            # quale riga associare la data di verbalizzazione storica (le altre non ne hanno una).
+            ufficiale = verbalizzata_per_studente.get(matricola) == col
             compito_id = None
             if entry["codice"] is not None:
                 crow = conn.execute(
@@ -211,16 +215,15 @@ def migra(
                 compito_id = crow["id"] if crow else None
             conn.execute(
                 "INSERT INTO risultati (matricola, appello_id, compito_id, risposte, voto, verbalizzato, data_verbalizzazione) "
-                "VALUES (?,?,?,?,?,?,?) "
+                "VALUES (?,?,?,?,?,1,?) "
                 "ON CONFLICT(matricola, appello_id) DO NOTHING",
                 (
                     matricola, appello_id, compito_id, entry["risposte"], entry["voto"],
-                    verbalizzato, entry["datav"] if verbalizzato else None,
+                    entry["datav"] if ufficiale else None,
                 ),
             )
             n_risultati += 1
-            if verbalizzato:
-                n_verbalizzati += 1
+            n_verbalizzati += 1
 
         # studenti con 'totale' impostato ma nessuna colonna corrispondente trovata:
         # non si perde il voto verbalizzato, si registra in un appello 'storico' dedicato
