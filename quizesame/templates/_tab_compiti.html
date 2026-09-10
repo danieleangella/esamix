@@ -19,6 +19,36 @@
     <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti.csv">.csv</a> ·
     <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti.pdf">.pdf</a>
   </p>
+  {% set non_registrati = md.iscritti | rejectattr('registrato') | list %}
+  {% if non_registrati %}
+  <div class="card" style="margin-top:0.75rem">
+    <p class="muted" style="margin-top:0">
+      <strong>{{ non_registrati|length }}</strong> student{{ 'e' if non_registrati|length == 1 else 'i' }}
+      nell'elenco della segreteria non risult{{ 'a' if non_registrati|length == 1 else 'ano' }} ancora
+      registrat{{ 'o' if non_registrati|length == 1 else 'i' }} in questo corso: non potr{{ 'à' if non_registrati|length == 1 else 'anno' }}
+      ricevere un voto o un esito finché non l{{ 'o/la' if non_registrati|length == 1 else 'i' }} registri.
+    </p>
+    <table style="margin-top:0.5rem">
+      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
+      {% for s in non_registrati %}
+      <tr>
+        <td>{{ s.matricola }}</td>
+        <td>{{ s.cognome }}</td>
+        <td>{{ s.nome }}</td>
+        <td>
+          <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" class="inline">
+            <input type="hidden" name="matricola" value="{{ s.matricola }}">
+            <input type="hidden" name="cognome" value="{{ s.cognome }}">
+            <input type="hidden" name="nome" value="{{ s.nome }}">
+            <input type="hidden" name="next" value="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}#compiti">
+            <button type="submit" class="secondary">Registra come studente</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
   {% if not md.appello.chiuso %}
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/segreteria-csv/elimina"
         onsubmit="return confirm('Rimuovere il file caricato? Il numero di iscritti tornerà a quello eventualmente inserito a mano, e non sarà più possibile compilare il file per la segreteria finché non ne carichi uno nuovo.');">

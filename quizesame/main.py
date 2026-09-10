@@ -94,6 +94,7 @@ def _anchor_membro(appello, base: str) -> str:
 
 def flash_redirect(
     url: str, message: str, kind: str = "success", anchor: str = "", dettaglio: str = "",
+    extra: Optional[dict] = None,
 ) -> RedirectResponse:
     from urllib.parse import quote
     sep = "&" if "?" in url else "?"
@@ -108,6 +109,8 @@ def flash_redirect(
         # usato per errori con un dettaglio lungo (es. log di compilazione LaTeX): il
         # template mostra questo testo in un riquadro copiabile che non sparisce da solo.
         params += f"&dettaglio={quote(dettaglio)}"
+    for chiave, valore in (extra or {}).items():
+        params += f"&{chiave}={quote(str(valore))}"
     suffisso = f"#{anchor}" if anchor else ""
     return RedirectResponse(f"{url}{sep}{params}{suffisso}", status_code=303)
 
@@ -358,7 +361,7 @@ def corso_detail(request: Request, tag: str):
     raggruppamenti_appelli = {r.appello_id: corsi_service.get_appello(tag, r.appello_id) for r in raggruppamenti}
     return templates.TemplateResponse(request, "corso_detail.html", {
         "corso": corso, "appelli": appelli, "raggruppamenti": raggruppamenti, "statistiche": statistiche,
-        "raggruppamenti_appelli": raggruppamenti_appelli,
+        "raggruppamenti_appelli": raggruppamenti_appelli, "oggi": date.today().strftime("%d/%m/%Y"),
     })
 
 
@@ -1044,6 +1047,11 @@ def correggi(
     risposte = risposte.strip().replace(" ", "").upper()
     try:
         valutazione = correzione_service.valuta_preliminare(tag, appello_id, matricola, codice, risposte)
+    except correzione_service.StudenteNonTrovato as e:
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor,
+            extra={"matricola_da_registrare": matricola},
+        )
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     return _render_correggi_revisione(request, tag, appello_id, valutazione, modifica=bool(modifica))
@@ -1069,6 +1077,11 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
 
     try:
         valutazione = correzione_service.valuta_preliminare(tag, appello_id, matricola, codice, risposte)
+    except correzione_service.StudenteNonTrovato as e:
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor,
+            extra={"matricola_da_registrare": matricola},
+        )
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
 
@@ -1140,16 +1153,26 @@ def completa_orale(tag: str, appello_id: int, matricola: str, esito_orale: str =
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/assenze/segna")
-def segna_assenza(tag: str, appello_id: int, matricola: str = Form(...), esito: str = Form(...)):
+def segna_assenza(request: Request, tag: str, appello_id: int, matricola: str = Form(...), esito: str = Form(...)):
+    # risponde in JSON alla chiamata fetch dalla pagina presenze.html (bottone "Assente"
+    # per riga, aggiornato sul posto), con il solito redirect per il form della scheda
+    # Valutazione (segna ritirato) e come fallback se il fetch lato client fallisse.
+    vuole_json = "application/json" in request.headers.get("accept", "")
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "valutazione")
     errore_iscritto = _errore_non_iscritto(tag, appello_id, matricola)
     if errore_iscritto:
+        if vuole_json:
+            return JSONResponse({"errore": errore_iscritto}, status_code=400)
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", errore_iscritto, "error", anchor=anchor)
     try:
         correzione_service.segna_esito_speciale(tag, appello_id, matricola, esito)
     except Exception as e:
+        if vuole_json:
+            return JSONResponse({"errore": str(e)}, status_code=400)
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    if vuole_json:
+        return JSONResponse({"esito": esito})
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Studente segnato come {esito}", anchor=anchor)
 
 
@@ -1658,13 +1681,23 @@ def studente_dettaglio_corso(request: Request, tag: str, matricola: str):
 @app.post("/corsi/{tag}/studenti/nuovo")
 def nuovo_studente(
     tag: str, matricola: str = Form(...), nome: str = Form(...), cognome: str = Form(...), dsa: bool = Form(False),
-    dsa_note: str = Form(""),
+    dsa_note: str = Form(""), next: str = Form(""),
 ):
+    # "next" (usato dai form di registrazione rapida su Compiti d'esame/Presenze/
+    # Valutazione, per uno studente scoperto non registrato) riporta a quella pagina
+    # invece che alla scheda Studenti: solo un percorso locale del corso, mai un URL
+    # esterno o protocol-relative ("//..."). L'eventuale "#scheda" va passato come anchor
+    # a flash_redirect, non lasciato dentro il path: altrimenti finirebbe prima della
+    # query string ("...#scheda?msg=...", un URL non valido, con relativo fragment che il
+    # browser non manda più al server).
+    destinazione, _, ancora = next.partition("#")
+    if not (destinazione.startswith("/corsi/") and not destinazione.startswith("//")):
+        destinazione, ancora = f"/corsi/{tag}/studenti", ""
     try:
         studenti_service.crea_studente(tag, matricola, nome, cognome, dsa=dsa, dsa_note=dsa_note)
     except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/studenti", str(e), "error")
-    return flash_redirect(f"/corsi/{tag}/studenti", "Studente salvato")
+        return flash_redirect(destinazione, str(e), "error", anchor=ancora)
+    return flash_redirect(destinazione, "Studente salvato", anchor=ancora)
 
 
 @app.post("/corsi/{tag}/studenti/{matricola}/modifica")

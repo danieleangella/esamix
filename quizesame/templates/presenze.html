@@ -40,17 +40,20 @@
 <details class="card" {% if not appello.presenze_chiuse %}open{% endif %}>
   <summary><strong>Registro presenze</strong> — elenco iscritti, presenti e assenti</summary>
   <p class="muted" style="margin-top:0.75rem">
-    Premi "Presente" man mano che gli studenti si presentano in aula. Chi ha già un voto o un esito
-    (assente/ritirato) per questo appello risulta presente automaticamente e non è più modificabile da qui.
+    Premi "Presente" man mano che gli studenti si presentano in aula, o "Assente" per chi risulta assente
+    prima ancora di chiudere il registro. Chi ha già un voto o un esito per questo appello risulta presente
+    (o assente/ritirato) automaticamente e non è più modificabile da qui.
   </p>
 
   <table style="margin-top:1rem" id="tabella-presenze">
     <tr><th>Presente</th><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Note</th></tr>
     {% for s in riepilogo.iscritti %}
-    <tr>
+    <tr data-matricola="{{ s.matricola }}">
       <td>
         {% if s.bloccato %}
-        <span class="badge badge-ok">Presente</span>
+        {% if s.esito == 'assente' %}<span class="badge badge-err">Assente</span>
+        {% elif s.esito == 'ritirato' %}<span class="badge badge-warn">Ritirato</span>
+        {% else %}<span class="badge badge-ok">Presente</span>{% endif %}
         {% elif s.presente %}
         <span class="badge badge-ok">Presente</span>
         {% if not appello.presenze_chiuse %}
@@ -63,11 +66,11 @@
           <input type="hidden" name="presente" value="1">
           <button type="submit" {% if appello.presenze_chiuse %}disabled{% endif %}>Presente</button>
         </form>
-        {% if not s.registrato and appello.presenze_chiuse %}
-        <div class="muted" style="font-size:0.8rem; margin-top:0.25rem">
-          Non registrato: <a href="/corsi/{{ corso.tag }}/studenti">registralo</a> per poter segnare l'esito a mano.
-        </div>
-        {% endif %}
+        <form class="inline form-assenza" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/assenze/segna">
+          <input type="hidden" name="matricola" value="{{ s.matricola }}">
+          <input type="hidden" name="esito" value="assente">
+          <button type="submit" class="secondary" {% if appello.presenze_chiuse or not s.registrato %}disabled{% endif %}>Assente</button>
+        </form>
         {% endif %}
       </td>
       <td>{{ s.matricola }}</td>
@@ -75,8 +78,15 @@
       <td>{{ s.nome }}</td>
       <td>
         {% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>DSA</span>{% endif %}
-        {% if not s.registrato %}<span class="badge badge-warn" title="Non è ancora uno studente registrato in questo corso">non registrato</span>{% endif %}
-        {% if s.bloccato %}<span class="muted">già valutato</span>{% endif %}
+        {% if not s.registrato %}
+        <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" class="inline">
+          <input type="hidden" name="matricola" value="{{ s.matricola }}">
+          <input type="hidden" name="cognome" value="{{ s.cognome }}">
+          <input type="hidden" name="nome" value="{{ s.nome }}">
+          <input type="hidden" name="next" value="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/presenze">
+          <button type="submit" class="secondary" style="padding:0.1rem 0.5rem; font-size:0.85rem" title="Non è ancora uno studente registrato in questo corso">Registra come studente</button>
+        </form>
+        {% endif %}
       </td>
     </tr>
     {% endfor %}
@@ -88,29 +98,37 @@
   var tabella = document.getElementById("tabella-presenze");
   var contatore = document.getElementById("contatore-presenti");
   if (!tabella) return;
+  var urlAssenza = "/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/assenze/segna";
 
-  function cellaPresente(azioneUrl) {
+  function urlPresenza(matricola) {
+    return "/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/presenze/" + matricola + "/imposta";
+  }
+  function cellaPresente(matricola) {
     return '<span class="badge badge-ok">Presente</span> ' +
-      '<form class="inline form-presenza" method="post" action="' + azioneUrl + '">' +
+      '<form class="inline form-presenza" method="post" action="' + urlPresenza(matricola) + '">' +
       '<button type="submit" class="secondary" style="padding:0.1rem 0.5rem; font-size:0.85rem">Annulla</button>' +
       '</form>';
   }
-  function cellaAssente(azioneUrl) {
-    return '<form class="inline form-presenza" method="post" action="' + azioneUrl + '">' +
-      '<input type="hidden" name="presente" value="1">' +
-      '<button type="submit">Presente</button>' +
-      '</form>';
+  function cellaNonSegnato(matricola) {
+    return '<form class="inline form-presenza" method="post" action="' + urlPresenza(matricola) + '">' +
+      '<input type="hidden" name="presente" value="1"><button type="submit">Presente</button></form>' +
+      '<form class="inline form-assenza" method="post" action="' + urlAssenza + '">' +
+      '<input type="hidden" name="matricola" value="' + matricola + '">' +
+      '<input type="hidden" name="esito" value="assente">' +
+      '<button type="submit" class="secondary">Assente</button></form>';
   }
 
   tabella.addEventListener("submit", function (ev) {
-    var form = ev.target.closest(".form-presenza");
+    var formPresenza = ev.target.closest(".form-presenza");
+    var formAssenza = ev.target.closest(".form-assenza");
+    var form = formPresenza || formAssenza;
     if (!form) return;
     ev.preventDefault();
-    var diventaPresente = form.querySelector('input[name="presente"]') !== null;
+    var riga = form.closest("tr");
+    var matricola = riga.dataset.matricola;
     var pulsante = form.querySelector("button");
-    var azioneUrl = form.action;
     pulsante.disabled = true;
-    fetch(azioneUrl, {
+    fetch(form.action, {
       method: "POST", body: new FormData(form), headers: { "Accept": "application/json" },
     })
       .then(function (resp) {
@@ -119,14 +137,22 @@
       })
       .then(function () {
         var cella = form.closest("td");
-        cella.innerHTML = diventaPresente ? cellaPresente(azioneUrl) : cellaAssente(azioneUrl);
-        if (contatore) {
-          contatore.textContent = (parseInt(contatore.textContent, 10) + (diventaPresente ? 1 : -1)).toString();
+        if (formPresenza) {
+          var diventaPresente = form.querySelector('input[name="presente"]') !== null;
+          cella.innerHTML = diventaPresente ? cellaPresente(matricola) : cellaNonSegnato(matricola);
+          if (contatore) {
+            contatore.textContent = (parseInt(contatore.textContent, 10) + (diventaPresente ? 1 : -1)).toString();
+          }
+        } else {
+          cella.innerHTML = '<span class="badge badge-err">Assente</span>';
+          if (contatore) {
+            contatore.textContent = (parseInt(contatore.textContent, 10) + 1).toString();
+          }
         }
       })
       .catch(function (err) {
         pulsante.disabled = false;
-        alert("Non sono riuscito a salvare la presenza: " + err.message);
+        alert("Non sono riuscito a salvare: " + err.message);
       });
   });
 })();
@@ -134,36 +160,19 @@
 
 {% endif %}
 
-<details class="card" open>
-  <summary><strong>Segna assente o ritirato</strong></summary>
+<details class="card" id="dettaglio-registra-studente-presenze">
+  <summary><strong>Registra un nuovo studente</strong></summary>
   <p class="muted" style="margin-top:0.75rem">
-    Per uno studente che arriva ma non svolge (o non completa) il compito scritto, indipendentemente dal
-    registro presenze qui sopra.
+    Per uno studente non ancora registrato in questo corso.
   </p>
-  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/assenze/segna" style="margin-top:0.75rem">
+  <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" style="margin-top:0.75rem">
+    <input type="hidden" name="next" value="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/presenze">
     <div class="form-grid">
-      <div style="position:relative">
-        <label class="campo-obbligatorio">Matricola o nome</label>
-        <input name="matricola" id="campo-input-matricola-assenza" autocomplete="off" required>
-        <div id="campo-suggerimenti-studenti-assenza" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-      </div>
-      <div>
-        <label>Esito</label>
-        <select name="esito">
-          <option value="assente">Assente</option>
-          <option value="ritirato">Ritirato</option>
-        </select>
-      </div>
+      <div><label class="campo-obbligatorio">Matricola</label><input name="matricola" required></div>
+      <div><label class="campo-obbligatorio">Cognome</label><input name="cognome" required></div>
+      <div><label class="campo-obbligatorio">Nome</label><input name="nome" required></div>
     </div>
-    <button type="submit">Segna</button>
+    <button type="submit" style="margin-top:0.5rem">Registra</button>
   </form>
-  <script>
-  creaAutocomplete(
-    document.getElementById("campo-input-matricola-assenza"), document.getElementById("campo-suggerimenti-studenti-assenza"),
-    function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
-    function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
-    function (s) { return s.matricola; }
-  );
-  </script>
 </details>
 {% endblock %}

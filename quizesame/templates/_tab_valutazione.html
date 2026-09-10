@@ -5,12 +5,64 @@
   </div>
   {% else %}
   <div class="card">
+    <h2>Presenze</h2>
     <p class="muted" style="margin-top:0">
-      <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze">Presenze</a>
-      {% if md.iscritti %}(spunta chi si presenta, poi chiudi il registro per segnare assenti gli altri){% endif %}
-      — da lì si segna anche assente o ritirato uno studente.
+      {% if md.iscritti %}Spunta chi si presenta, poi chiudi il registro per segnare assenti gli altri.
+      {% else %}Da lì si può anche segnare assente uno studente.{% endif %}
     </p>
+    <a class="button" href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze">Vai al registro presenze</a>
   </div>
+
+  {% set matricola_da_registrare = request.query_params.get('matricola_da_registrare', '') %}
+  <details class="card" {% if matricola_da_registrare %}open{% endif %}>
+    <summary><strong>Registra un nuovo studente</strong></summary>
+    <p class="muted" style="margin-top:0.75rem">
+      {% if matricola_da_registrare %}
+      La matricola <strong>{{ matricola_da_registrare }}</strong> non risulta ancora tra gli studenti di questo
+      corso: registrala qui per poterla correggere o segnarle un esito.
+      {% else %}
+      Per uno studente non ancora registrato in questo corso (es. scoperto durante la correzione).
+      {% endif %}
+    </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" style="margin-top:0.75rem">
+      <input type="hidden" name="next" value="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}#valutazione">
+      <div class="form-grid">
+        <div><label class="campo-obbligatorio">Matricola</label><input name="matricola" value="{{ matricola_da_registrare }}" required></div>
+        <div><label class="campo-obbligatorio">Cognome</label><input name="cognome" required></div>
+        <div><label class="campo-obbligatorio">Nome</label><input name="nome" required></div>
+      </div>
+      <button type="submit" style="margin-top:0.5rem">Registra</button>
+    </form>
+  </details>
+
+  <details class="card">
+    <summary><strong>Segna ritirato</strong></summary>
+    <p class="muted" style="margin-top:0.75rem">
+      Per uno studente che ha iniziato ma non ha completato (o consegnato in bianco) il compito scritto.
+    </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/assenze/segna" style="margin-top:0.75rem">
+      <input type="hidden" name="esito" value="ritirato">
+      <div class="form-grid">
+        <div style="position:relative">
+          <label class="campo-obbligatorio">Matricola o nome</label>
+          <input name="matricola" class="campo-input-matricola-ritirato" autocomplete="off" required>
+          <div class="campo-suggerimenti-studenti-ritirato sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+        </div>
+      </div>
+      <button type="submit">Segna ritirato</button>
+    </form>
+    <script>
+    (function () {
+      var root = document.currentScript.closest(".tab-pane");
+      creaAutocomplete(
+        root.querySelector(".campo-input-matricola-ritirato"), root.querySelector(".campo-suggerimenti-studenti-ritirato"),
+        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+        function (s) { return s.matricola; }
+      );
+    })();
+    </script>
+  </details>
   {% if not md.blocchi %}
   <div class="card">
     <p class="muted">Non sono ancora stati generati blocchi di compiti per questa prova: genera almeno un

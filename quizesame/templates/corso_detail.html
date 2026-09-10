@@ -31,7 +31,10 @@
         {% endif %}
       </td>
       <td>{{ s.media if s.media is not none else '-' }}</td>
-      <td>{% if not a.attivo %}<span class="badge badge-warn">disattivato</span>{% endif %}</td>
+      <td>
+        {% if a.data == oggi %}<span class="badge badge-ok">In corso</span>{% endif %}
+        {% if not a.attivo %}<span class="badge badge-warn">disattivato</span>{% endif %}
+      </td>
     </tr>
     {% endfor %}
   </table>

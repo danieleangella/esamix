@@ -43,10 +43,11 @@ def rimuovi_presente(tag: str, appello_id: int, matricola: str) -> None:
         conn.close()
 
 
-def _con_risultato(conn, appello_id: int) -> set[str]:
+def _con_risultato(conn, appello_id: int) -> dict[str, str]:
+    """matricola -> valore di risultati.esito ('voto'/'assente'/'ritirato'/'rifiutato')."""
     return {
-        r["matricola"] for r in
-        conn.execute("SELECT matricola FROM risultati WHERE appello_id=?", (appello_id,))
+        r["matricola"]: r["esito"] for r in
+        conn.execute("SELECT matricola, esito FROM risultati WHERE appello_id=?", (appello_id,))
     }
 
 
@@ -55,7 +56,8 @@ def riepilogo(tag: str, appello_id: int) -> Optional[dict]:
     né iscritti aggiunti a mano): il registro presenze si basa su quell'elenco. Uno
     studente già valutato (o già segnato assente/ritirato) conta come presente a
     prescindere dalla spunta, e non è più possibile togliergliela: ha comunque già un
-    esito per questo appello."""
+    esito per questo appello ('esito', usato per distinguere chi risulta "assente" o
+    "ritirato" da chi ha davvero un voto)."""
     iscritti = esportazione_service.list_iscritti(tag, appello_id)
     if iscritti is None:
         return None
@@ -70,6 +72,7 @@ def riepilogo(tag: str, appello_id: int) -> Optional[dict]:
             **s,
             "presente": s["matricola"] in presenti or s["matricola"] in con_risultato,
             "bloccato": s["matricola"] in con_risultato,
+            "esito": con_risultato.get(s["matricola"]),
         }
         for s in iscritti
     ]
