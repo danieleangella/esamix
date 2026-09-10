@@ -170,6 +170,17 @@ CREATE TABLE IF NOT EXISTS appello_iscritti_manuali (
     PRIMARY KEY (matricola, appello_id)
 );
 
+-- Registro presenze di un appello: una spunta "presente" da usare per fare l'appello in
+-- aula, prima ancora della correzione. Senza FK verso studenti perché l'elenco iscritti
+-- può contenere matricole non ancora registrate in questo corso (righe del file della
+-- segreteria per studenti mai importati): la sola presenza qui basta a farle contare come
+-- "presente" nel registro, indipendentemente dal fatto che siano già uno 'studente'.
+CREATE TABLE IF NOT EXISTS appello_presenze (
+    matricola TEXT NOT NULL,
+    appello_id INTEGER NOT NULL REFERENCES appelli(id),
+    PRIMARY KEY (matricola, appello_id)
+);
+
 CREATE TABLE IF NOT EXISTS risultati (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     matricola TEXT NOT NULL REFERENCES studenti(matricola),
@@ -240,6 +251,7 @@ ADDITIVE_COLUMNS = {
         ("orale_aula", "TEXT"),
         ("chiuso", "BOOLEAN NOT NULL DEFAULT 0"),
         ("iscritti_manuale", "INTEGER"),
+        ("presenze_chiuse", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
 }
 

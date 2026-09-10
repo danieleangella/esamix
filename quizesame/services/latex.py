@@ -372,7 +372,10 @@ def _tabella_ammessi(righe: list[dict]) -> str:
     durante l'appello), con una riga di separazione tra uno studente e l'altro. La
     casella "Presente" è la prima colonna (senza intestazione, da spuntare a penna); la
     colonna "Note" segnala DSA e/o ammissione in deroga (aggiunto a mano pur non
-    soddisfacendo i requisiti automatici)."""
+    soddisfacendo i requisiti automatici). Lo spazio verticale è dato da uno strut
+    invisibile dentro ogni riga (non da un salto riga finale tipo '\\\\[0.9cm]'): messo
+    dopo l'ultima riga, quest'ultimo lascerebbe la prima riga incollata all'intestazione,
+    con uno spazio diverso (più stretto) da quello, uniforme, fra tutte le altre righe."""
     tex = (
         "\\begin{center}\n\\begin{longtable}{clllc}\n\\toprule\n"
         "{} & {\\bfseries Matricola} & {\\bfseries Cognome} & {\\bfseries Nome} & {\\bfseries Note} \\\\\n\\toprule\n\\endhead\n"
@@ -386,7 +389,7 @@ def _tabella_ammessi(righe: list[dict]) -> str:
         note = ", ".join(note_parti)
         if i > 0:
             tex += "\\midrule\n"
-        tex += f"{{\\Large $\\square$}} & {r['matricola']} & {r['cognome']} & {r['nome']} & {note} \\\\[0.9cm]\n"
+        tex += f"\\rule{{0pt}}{{0.9cm}}{{\\Large $\\square$}} & {r['matricola']} & {r['cognome']} & {r['nome']} & {note} \\\\\n"
     tex += "\\bottomrule\n\\end{longtable}\n\\end{center}\n\n"
     return tex
 

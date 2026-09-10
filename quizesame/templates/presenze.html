@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Presenze · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#compiti">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Presenze</span>
+{% endblock %}
+{% block content %}
+<h1>Presenze: {{ appello.nome }}</h1>
+
+{% if riepilogo is none %}
+<div class="card">
+  <p class="muted">
+    Nessun elenco iscritti caricato per questo appello: carica il file della segreteria, oppure aggiungi gli
+    iscritti a mano, dalla scheda
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#compiti">Compiti d'esame</a>.
+  </p>
+</div>
+{% else %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem">
+    <div>
+      <strong>{{ riepilogo.n_presenti }}</strong> presenti su <strong>{{ riepilogo.n_iscritti }}</strong> iscritti
+      {% if appello.presenze_chiuse %}<span class="badge badge-warn">Registro chiuso</span>{% endif %}
+    </div>
+    <div style="display:flex; gap:0.5rem">
+      {% if appello.presenze_chiuse %}
+      <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/presenze/riapri">
+        <button type="submit" class="secondary">Riapri registro</button>
+      </form>
+      {% else %}
+      <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/presenze/chiudi"
+            onsubmit="return confirm('Chiudere il registro presenze? Tutti gli iscritti non spuntati (e senza già un esito registrato) verranno segnati automaticamente come assenti. L\'operazione non si annulla da sola: per rimettere mano ai singoli esiti andrà fatto dalla scheda Valutazione scritti.');">
+        <button type="submit">Chiudi registro (segna assenti gli altri)</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <p class="muted" style="margin-top:0.75rem">
+    Spunta "Presente" man mano che gli studenti si presentano in aula. Chi ha già un voto o un esito
+    (assente/ritirato) per questo appello risulta presente automaticamente e non è più modificabile da qui.
+  </p>
+
+  <table style="margin-top:1rem">
+    <tr><th></th><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Note</th></tr>
+    {% for s in riepilogo.iscritti %}
+    <tr>
+      <td>
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/presenze/{{ s.matricola }}/imposta">
+          <input type="checkbox" name="presente" value="1" style="width:auto" onchange="this.form.requestSubmit()"
+                 {% if s.presente %}checked{% endif %} {% if s.bloccato or appello.presenze_chiuse %}disabled{% endif %}>
+        </form>
+      </td>
+      <td>{{ s.matricola }}</td>
+      <td>{{ s.cognome }}</td>
+      <td>{{ s.nome }}</td>
+      <td>
+        {% if s.dsa %}<span class="badge badge-info">DSA</span>{% endif %}
+        {% if s.bloccato %}<span class="muted">già valutato</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

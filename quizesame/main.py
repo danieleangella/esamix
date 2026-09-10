@@ -30,6 +30,7 @@ from quizesame.services import esportazione as esportazione_service
 from quizesame.services import aggiornamenti as aggiornamenti_service
 from quizesame.services import aule as aule_service
 from quizesame.services import latex as latex_service
+from quizesame.services import presenze as presenze_service
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
@@ -1328,6 +1329,54 @@ def scarica_iscritti_pdf(tag: str, appello_id: int):
             anchor=anchor, dettaglio=compilazione.errore_dettagliato or "",
         )
     return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/presenze", response_class=HTMLResponse)
+def registro_presenze(request: Request, tag: str, appello_id: int):
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    riepilogo = presenze_service.riepilogo(tag, appello_id)
+    return templates.TemplateResponse(request, "presenze.html", {
+        "corso": corso, "appello": appello, "riepilogo": riepilogo,
+    })
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/presenze/{matricola}/imposta")
+def imposta_presenza(tag: str, appello_id: int, matricola: str, presente: str = Form("")):
+    try:
+        if presente:
+            presenze_service.segna_presente(tag, appello_id, matricola)
+        else:
+            presenze_service.rimuovi_presente(tag, appello_id, matricola)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}/presenze", str(e), "error")
+    return RedirectResponse(f"/corsi/{tag}/appelli/{appello_id}/presenze", status_code=303)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/presenze/chiudi")
+def chiudi_presenze(tag: str, appello_id: int):
+    try:
+        esito = presenze_service.chiudi(tag, appello_id)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}/presenze", str(e), "error")
+    msg = f"Registro chiuso: {esito['segnati_assenti']} studenti non presenti segnati come assenti"
+    kind = "success"
+    if esito["non_registrati"]:
+        kind = "warning"
+        msg += (
+            f" — {len(esito['non_registrati'])} matricole dell'elenco iscritti non sono registrate come "
+            "studenti di questo corso e non è stato possibile segnarle: registrale (o correggile) a mano"
+        )
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}/presenze", msg, kind)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/presenze/riapri")
+def riapri_presenze(tag: str, appello_id: int):
+    presenze_service.riapri(tag, appello_id)
+    return flash_redirect(
+        f"/corsi/{tag}/appelli/{appello_id}/presenze",
+        "Registro riaperto: puoi tornare a spuntare le presenze (gli studenti già segnati assenti non cambiano)",
+    )
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/esporta-voti")

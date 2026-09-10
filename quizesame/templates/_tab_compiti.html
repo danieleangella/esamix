@@ -8,6 +8,12 @@
 
 <div class="card">
   <h2>Iscritti{% if md.numero_iscritti is not none %} ({{ md.numero_iscritti }}){% endif %}</h2>
+  {% if md.iscritti %}
+  <p class="muted" style="margin-top:0">
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze">Registra le presenze in aula</a>
+    (spunta chi si presenta, poi chiudi il registro per segnare assenti gli altri).
+  </p>
+  {% endif %}
   {% if md.segreteria_csv %}
   <p class="muted" style="margin-top:0">
     File caricato: <strong>{{ md.segreteria_csv.nome_file }}</strong> (il {{ md.segreteria_csv.caricato_il }}) —
@@ -15,7 +21,7 @@
     eventuale numero inserito a mano.
   </p>
   <p class="muted">
-    Elenco per fare l'appello (per segnare le presenze):
+    Elenco stampabile per fare l'appello:
     <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti.csv">.csv</a> ·
     <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti.pdf">.pdf</a>
   </p>
