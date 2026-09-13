@@ -14,7 +14,14 @@
     <strong>{{ risultato.voto }}</strong>
     {% endif %}
     {% if risultato.esito == 'rifiutato' %} · <span class="badge badge-warn">rifiutato dallo studente</span>{% endif %}
-    {% if risultato.verbalizzato %} · <span class="badge badge-ok">verbalizzato {{ risultato.data_verbalizzazione }}</span>{% endif %}
+    {% if risultato.verbalizzato %}
+    ·
+    {% if risultato.superato is not none %}
+    <span class="badge {{ 'badge-ok' if risultato.superato else 'badge-err' }}">{{ 'superato' if risultato.superato else 'insufficiente' }} verbalizzato {{ risultato.data_verbalizzazione }}</span>
+    {% else %}
+    <span class="badge badge-ok">verbalizzato {{ risultato.data_verbalizzazione }}</span>
+    {% endif %}
+    {% endif %}
     {% if risultato.insufficiente_per_obbligatorio %} · <span class="badge badge-warn">insufficiente per obbligatorio non svolto</span>{% endif %}
   </p>
   {% else %}
@@ -56,7 +63,13 @@
       <td>
         {% if s.esito != 'voto' %}{{ s.esito }}
         {% else %}{{ s.voto }}{% endif %}
-        {% if s.verbalizzato %} <span class="badge badge-ok">verbalizzato</span>{% endif %}
+        {% if s.verbalizzato %}
+        {% if s.superato is not none %}
+        <span class="badge {{ 'badge-ok' if s.superato else 'badge-err' }}">{{ 'superato' if s.superato else 'insufficiente' }} verbalizzato</span>
+        {% else %}
+        <span class="badge badge-ok">verbalizzato</span>
+        {% endif %}
+        {% endif %}
       </td>
       <td>
         {% if s.richiede_orale and not s.orale_svolto %}<span class="badge badge-warn">in attesa</span>

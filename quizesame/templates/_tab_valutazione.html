@@ -133,7 +133,13 @@
           {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
           {% else %}{{ r.voto }}{% if r.richiede_orale and r.orale_svolto %} <span class="badge badge-ok">orale svolto</span>{% endif %}{% endif %}
-          {% if r.verbalizzato %} <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>{% endif %}
+          {% if r.verbalizzato %}
+          {% if r.esito == 'voto' and r.voto is not none %}
+          <span class="badge {{ 'badge-ok' if r.voto >= md.votomin_effettivo else 'badge-err' }}">{{ 'superato' if r.voto >= md.votomin_effettivo else 'insufficiente' }} verbalizzato {{ r.data_verbalizzazione }}</span>
+          {% else %}
+          <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>
+          {% endif %}
+          {% endif %}
         </td>
         <td style="white-space:nowrap; text-align:right">
           {% if md.appello.chiuso %}

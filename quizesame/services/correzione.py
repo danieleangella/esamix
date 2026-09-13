@@ -541,6 +541,9 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
         storico = studenti_service.risultati_studente(tag, matricola)
         for s in storico:
             s["corrente"] = s["appello_id"] == appello_id
+        # riusa il calcolo già fatto in risultati_studente (soglia effettiva compresa)
+        # invece di rifarlo qui: distingue un verbalizzato "superato" da uno "insufficiente".
+        risultato["superato"] = next((s["superato"] for s in storico if s["corrente"]), None)
         return {"risultato": risultato, "righe": righe, "storico": storico}
     finally:
         conn.close()

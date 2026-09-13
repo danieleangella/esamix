@@ -28,7 +28,15 @@
           {% else %}<span class="badge badge-warn">orale richiesto</span>{% endif %}
         {% else %}-{% endif %}
       </td>
-      <td>{% if r.verbalizzato %}<span class="badge badge-ok">{{ r.data_verbalizzazione }}</span>{% else %}-{% endif %}</td>
+      <td>
+        {% if r.verbalizzato %}
+        {% if r.superato is not none %}
+        <span class="badge {{ 'badge-ok' if r.superato else 'badge-err' }}">{{ 'superato' if r.superato else 'insufficiente' }} {{ r.data_verbalizzazione }}</span>
+        {% else %}
+        <span class="badge badge-ok">{{ r.data_verbalizzazione }}</span>
+        {% endif %}
+        {% else %}-{% endif %}
+      </td>
       <td><a href="/corsi/{{ c.corso_tag }}/appelli/{{ r.appello_id }}/risultati/{{ matricola }}">Dettaglio</a></td>
     </tr>
     {% endfor %}

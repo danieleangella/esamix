@@ -83,7 +83,15 @@
         <td>
           {% if s.risultati %}
           {% for r in s.risultati %}
-          <div>{{ r.appello_nome }}: <strong>{{ r.voto }}</strong>{% if r.verbalizzato %} <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>{% endif %}</div>
+          <div>{{ r.appello_nome }}: <strong>{{ r.voto }}</strong>
+            {% if r.verbalizzato %}
+            {% if r.superato is not none %}
+            <span class="badge {{ 'badge-ok' if r.superato else 'badge-err' }}">{{ 'superato' if r.superato else 'insufficiente' }} verbalizzato {{ r.data_verbalizzazione }}</span>
+            {% else %}
+            <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>
+            {% endif %}
+            {% endif %}
+          </div>
           {% endfor %}
           {% else %}
           <span class="muted">Nessun risultato registrato</span>
