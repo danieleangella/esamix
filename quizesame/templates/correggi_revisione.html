@@ -141,14 +141,14 @@
     {% endif %}
 
     <hr style="margin:1.5rem 0; border:none; border-top:1px solid var(--border)">
-    <div>
-      <label style="font-size:1rem">Voto finale</label>
+    <div style="text-align:center">
+      <label style="font-size:1rem">Voto finale</label><br>
       <input type="number" name="voto_finale" id="voto-finale" value="{{ voto_proposto }}"
              style="font-size:1.8rem; font-weight:bold; width:6rem; padding:0.4rem 0.6rem; text-align:center">
     </div>
 
     {% set orale_possibile = not v.non_svolte_obbligatorie and voto_proposto >= votomin_effettivo %}
-    <div style="margin-top:1rem">
+    <div style="margin-top:1rem; text-align:center">
       <label style="display:inline-flex; align-items:center; gap:0.4rem">
         <input type="checkbox" id="checkbox-richiedi-orale" style="width:auto"
                {% if richiedi_orale_checked and orale_possibile %}checked{% endif %}
@@ -169,12 +169,17 @@
     <input type="hidden" name="azione" id="azione-hidden" value="{{ 'richiedi_orale' if (richiedi_orale_checked and orale_possibile) else 'salva' }}">
     <input type="hidden" name="conferma_orale_obbligatorio" id="conferma-obbligatorio-hidden" value="">
 
-    <div style="margin-top:1.25rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap">
+    <div style="margin-top:1.25rem; display:flex; justify-content:center; align-items:center; gap:1rem; flex-wrap:wrap">
       <button type="submit" style="font-size:1.2rem; padding:0.7rem 1.6rem">Conferma</button>
       {% if v.da_valutare or v.domande_aperte %}
       <button type="submit" name="sospendi_valutazione" value="1" formnovalidate class="secondary">Completa successivamente</button>
       {% endif %}
+      <button type="submit" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/bozza" formnovalidate class="secondary">Salva come bozza</button>
     </div>
+    <p class="muted" style="margin-top:0.4rem; text-align:center">
+      "Salva come bozza" tiene da parte matricola, codice e risposte senza registrare
+      nessun esito, per riprendere la correzione più tardi dalla sezione "Bozze salvate".
+    </p>
     {% if v.da_valutare or v.domande_aperte %}
     <p class="muted" style="margin-top:0.4rem">
       "Completa successivamente" salva un voto provvisorio (ottimistico) e lascia i punteggi non ancora
@@ -182,7 +187,7 @@
     </p>
     {% endif %}
     {% endif %}
-    <p style="margin-top:0.75rem">
+    <p style="margin-top:0.75rem; text-align:center">
       <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione" class="muted">Annulla, non salvare</a>
     </p>
   </form>

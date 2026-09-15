@@ -35,6 +35,39 @@
     {% endif %}
   </details>
 
+  {% if md.bozze_correzione %}
+  <details class="card" open>
+    <summary><strong>Bozze salvate ({{ md.bozze_correzione|length }})</strong></summary>
+    <p class="muted" style="margin-top:0.75rem">
+      Correzioni iniziate e messe da parte, senza nessun esito registrato: riprendile da
+      dove le avevi lasciate, o eliminale se non servono più.
+    </p>
+    <table style="margin-top:0.75rem">
+      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Codice</th><th></th></tr>
+      {% for b in md.bozze_correzione %}
+      <tr>
+        <td>{{ b.matricola }}</td>
+        <td>{{ b.cognome }}</td>
+        <td>{{ b.nome }}</td>
+        <td style="font-family:monospace">{{ b.codice }}</td>
+        <td style="text-align:right; white-space:nowrap">
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi">
+            <input type="hidden" name="matricola" value="{{ b.matricola }}">
+            <input type="hidden" name="codice" value="{{ b.codice }}">
+            <input type="hidden" name="risposte" value="{{ b.risposte }}">
+            <button type="submit" class="secondary" style="margin-top:0">Riprendi</button>
+          </form>
+          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi/bozza/{{ b.matricola }}/elimina"
+                onsubmit="return confirm({{ ('Eliminare la bozza di ' ~ b.cognome ~ ' ' ~ b.nome ~ '?')|js }});">
+            <button type="submit" class="danger" style="margin-top:0">Elimina</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </details>
+  {% endif %}
+
   <details class="card" open>
     <summary><strong>Correzione</strong></summary>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi" autocomplete="off" style="margin-top:0.75rem">
@@ -79,10 +112,16 @@
         function (c) { return c; },
         function (c) { return c; }
       );
+      var inputRisposte = root.querySelector(".campo-input-risposte");
       root.querySelectorAll(".btn-correggi-presente").forEach(function (btn) {
         btn.addEventListener("click", function () {
           inputMatricola.value = btn.dataset.matricola;
           nomeRisolto.textContent = btn.dataset.nome;
+          // il codice (e le risposte) di un eventuale studente corretto prima restano
+          // altrimenti nel campo: puliti, altrimenti sembrerebbe che il codice giusto
+          // per il nuovo studente sia già caricato.
+          inputCodice.value = "";
+          inputRisposte.value = "";
           inputCodice.focus();
           inputCodice.scrollIntoView({ block: "center" });
         });

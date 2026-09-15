@@ -314,6 +314,46 @@ def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, r
         conn.close()
 
 
+def salva_bozza(tag: str, appello_id: int, matricola: str, codice: str, risposte: str) -> None:
+    """Salva (o sovrascrive) una bozza di correzione per riprenderla più tardi: non tocca
+    'risultati', quindi non conta come esito né blocca il codice come duplicato."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute(
+            "INSERT INTO bozze_correzione (appello_id, matricola, codice, risposte, salvata_il) "
+            "VALUES (?,?,?,?,CURRENT_TIMESTAMP) "
+            "ON CONFLICT(appello_id, matricola) DO UPDATE SET "
+            "codice=excluded.codice, risposte=excluded.risposte, salvata_il=excluded.salvata_il",
+            (appello_id, matricola, codice, risposte),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def list_bozze(tag: str, appello_id: int) -> list[dict]:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        rows = conn.execute(
+            "SELECT b.matricola, b.codice, b.risposte, b.salvata_il, s.nome, s.cognome "
+            "FROM bozze_correzione b JOIN studenti s ON s.matricola = b.matricola "
+            "WHERE b.appello_id=? ORDER BY b.salvata_il",
+            (appello_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def elimina_bozza(tag: str, appello_id: int, matricola: str) -> None:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute("DELETE FROM bozze_correzione WHERE appello_id=? AND matricola=?", (appello_id, matricola))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 @dataclass
 class CorrezioneResult:
     voto: int
@@ -456,6 +496,9 @@ def conferma_risultato(
                 (matricola, orale_motivazione or "", appello.nome),
             )
         _applica_soglia_orale_automatica(conn, corso, matricola)
+        # una correzione confermata rende superflua un'eventuale bozza in sospeso per lo
+        # stesso studente su questo appello.
+        conn.execute("DELETE FROM bozze_correzione WHERE appello_id=? AND matricola=?", (appello_id, matricola))
         conn.commit()
         return CorrezioneResult(
             voto=voto, matricola=studente["matricola"], nome=studente["nome"], cognome=studente["cognome"],
@@ -525,6 +568,7 @@ def segna_esito_speciale(tag: str, appello_id: int, matricola: str, esito: str) 
         if esito == "ritirato":
             corso = corsi_service.get_corso(tag)
             _applica_soglia_orale_automatica(conn, corso, matricola)
+        conn.execute("DELETE FROM bozze_correzione WHERE appello_id=? AND matricola=?", (appello_id, matricola))
         conn.commit()
     finally:
         conn.close()

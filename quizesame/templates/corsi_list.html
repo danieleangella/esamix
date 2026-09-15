@@ -109,12 +109,29 @@
 {% if corsi %}
 <div class="card">
   <ul class="list-links">
-    {% for c in corsi %}
+    {% for gruppo in gruppi_corsi %}
+    {% if gruppo|length > 1 %}
+    <li>
+      <a href="/statistiche-generali?corsi={{ gruppo | map(attribute='tag') | map('urlencode') | join('&corsi=') }}" style="font-weight:600">{{ gruppo[0].nome }}</a>
+      <span class="muted">{{ gruppo[0].facolta }} · {{ gruppo|length }} anni</span>
+      <ul class="list-links" style="margin-top:0.25rem; margin-left:1.25rem">
+        {% for c in gruppo %}
+        <li{% if c.tag in corsi_correnti %} style="font-weight:600"{% endif %}>
+          <a href="/corsi/{{ c.tag }}">{{ c.anno }}</a>
+          <span class="muted">{{ c.tag }}</span>
+          {% if c.tag in corsi_correnti %}<span class="badge badge-ok">In corso</span>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </li>
+    {% else %}
+    {% set c = gruppo[0] %}
     <li{% if c.tag in corsi_correnti %} style="font-weight:600"{% endif %}>
       <a href="/corsi/{{ c.tag }}">{{ c.nome }}</a>
       <span class="muted">{{ c.anno }} · {{ c.tag }}</span>
       {% if c.tag in corsi_correnti %}<span class="badge badge-ok">In corso</span>{% endif %}
     </li>
+    {% endif %}
     {% endfor %}
   </ul>
 </div>

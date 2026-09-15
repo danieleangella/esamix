@@ -212,11 +212,13 @@ def _parse_esercizio_extra_form(form) -> dict:
 def home(request: Request, q: str = ""):
     corsi = corsi_service.list_corsi()
     corsi_correnti = {c.tag for c in corsi if corsi_service.corso_e_corrente(c)}
+    gruppi_corsi = corsi_service.raggruppa_per_nome(corsi)
     risultati_ricerca = studenti_service.cerca_in_tutti_i_corsi(q.strip()) if q.strip() else None
     app_settings = app_config_service.get_settings()
     riepilogo_globale = statistiche_service.calcola_globale() if app_settings.mostra_riepilogo_home else None
     return templates.TemplateResponse(request, "corsi_list.html", {
-        "corsi": corsi, "corsi_correnti": corsi_correnti, "prossimi_appelli": corsi_service.prossimi_appelli(),
+        "corsi": corsi, "gruppi_corsi": gruppi_corsi, "corsi_correnti": corsi_correnti,
+        "prossimi_appelli": corsi_service.prossimi_appelli(),
         "q": q, "risultati_ricerca": risultati_ricerca, "riepilogo_globale": riepilogo_globale,
         "aggiornamento_disponibile": aggiornamenti_service.aggiornamento_disponibile(),
     })
@@ -568,6 +570,7 @@ def _dati_appello(tag: str, corso, appello) -> dict:
         "numero_studenti_suggerito": _numero_studenti_suggerito(numero_iscritti, len(compiti)),
         "avviso_pochi_compiti": numero_iscritti is not None and len(compiti) < numero_iscritti,
         "riepilogo_presenze": presenze_service.riepilogo(tag, appello.id),
+        "bozze_correzione": correzione_service.list_bozze(tag, appello.id),
     }
     dati["riepilogo_home"] = _calcola_riepilogo_home(corso, appello, dati)
     return dati
@@ -1168,6 +1171,24 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
         if result.insufficiente_per_obbligatorio:
             msg += " (insufficiente: esercizio obbligatorio non svolto)"
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/correggi/bozza")
+def correggi_salva_bozza(
+    tag: str, appello_id: int, matricola: str = Form(...), codice: str = Form(...), risposte: str = Form(...),
+):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "valutazione")
+    correzione_service.salva_bozza(tag, appello_id, matricola, codice, risposte.strip().replace(" ", "").upper())
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Bozza salvata: puoi riprenderla più tardi", anchor=anchor)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/correggi/bozza/{matricola}/elimina")
+def correggi_elimina_bozza(tag: str, appello_id: int, matricola: str):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "valutazione")
+    correzione_service.elimina_bozza(tag, appello_id, matricola)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Bozza eliminata", anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/orale/{matricola}/completa")

@@ -179,6 +179,25 @@ def corsi_simili(corrente: Corso, tutti: list[Corso]) -> list[Corso]:
     ]
 
 
+def raggruppa_per_nome(corsi: list[Corso]) -> list[list[Corso]]:
+    """Raggruppa i corsi con stesso nome e stessa facoltà (stesso criterio di
+    corsi_simili): ogni gruppo rappresenta lo stesso insegnamento ripetuto in anni
+    accademici diversi. Un corso senza omonimi resta comunque un gruppo da un solo
+    elemento, per non far gestire due casi diversi al chiamante. `corsi` va già passato
+    ordinato per anno (vedi list_corsi()): l'ordine viene preservato sia tra i gruppi sia
+    al loro interno."""
+    indice_gruppo: dict[tuple[str, str], int] = {}
+    gruppi: list[list[Corso]] = []
+    for c in corsi:
+        chiave = (c.nome.strip().lower(), c.facolta.strip().lower())
+        if chiave in indice_gruppo:
+            gruppi[indice_gruppo[chiave]].append(c)
+        else:
+            indice_gruppo[chiave] = len(gruppi)
+            gruppi.append([c])
+    return gruppi
+
+
 def create_corso(
     tag: str, nome: str, facolta: str, universita: str, anno: str, docente: str,
     votomin: int = DEFAULT_VOTOMIN, consegna: int = DEFAULT_CONSEGNA,

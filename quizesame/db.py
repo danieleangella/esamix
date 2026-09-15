@@ -202,6 +202,19 @@ CREATE TABLE IF NOT EXISTS risultati (
     data_inserimento TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(matricola, appello_id)
 );
+
+-- Una correzione iniziata (matricola/codice/risposte letti dal compito) ma non ancora
+-- confermata: permette di interrompere e riprendere più tardi senza dover ridigitare
+-- tutto. Non è un risultato: non conta nelle statistiche, non blocca il codice come
+-- duplicato, e va rimossa non appena la correzione viene confermata per davvero.
+CREATE TABLE IF NOT EXISTS bozze_correzione (
+    appello_id INTEGER NOT NULL REFERENCES appelli(id),
+    matricola TEXT NOT NULL REFERENCES studenti(matricola),
+    codice TEXT NOT NULL,
+    risposte TEXT NOT NULL,
+    salvata_il TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (appello_id, matricola)
+);
 """
 
 
