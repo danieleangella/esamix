@@ -13,8 +13,8 @@
   <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
 </div>
 
-<div class="card">
-  <h2>Appelli</h2>
+<details class="card" open>
+  <summary><strong>Appelli</strong></summary>
   {% if appelli %}
   <table>
     <tr><th>Nome</th><th>Data</th><th>Risultati</th><th>Voto medio</th><th></th></tr>
@@ -41,9 +41,9 @@
   {% else %}
   <p class="muted">Nessun appello ancora creato per questo corso.</p>
   {% endif %}
-</div>
+</details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Nuovo appello</summary>
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/nuovo" style="margin-top:1rem">
     <div class="form-grid">
@@ -60,8 +60,8 @@
   </p>
 </details>
 
-<div class="card">
-  <h2>Raggruppamenti (es. media di prove parziali)</h2>
+<details class="card" open>
+  <summary><strong>Raggruppamenti (es. media di prove parziali)</strong></summary>
   <p class="muted">
     Un raggruppamento calcola la media dei voti di più appelli come voto finale unico,
     solo per chi ha superato la soglia di <em>ciascuno</em> di essi (il voto minimo per
@@ -91,10 +91,10 @@
     {% endfor %}
   </table>
   {% endif %}
-</div>
+</details>
 
 {% if appelli|length >= 2 %}
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Nuovo raggruppamento</summary>
   <form method="post" action="/corsi/{{ corso.tag }}/raggruppamenti/nuovo" style="margin-top:1rem">
     <div class="form-grid">

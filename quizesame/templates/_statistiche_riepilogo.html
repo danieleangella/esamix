@@ -1,6 +1,6 @@
-<div class="card">
-  <h2>Riepilogo{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</h2>
-  <p class="muted" style="margin-top:0">Esiti su {{ stat.totale }} compiti corretti (voto minimo {{ stat.votomin }}).</p>
+<details class="card" open>
+  <summary><strong>Riepilogo{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">Esiti su {{ stat.totale }} compiti corretti (voto minimo {{ stat.votomin }}).</p>
   <div class="stats-grid">
     <div class="stat-tile stat-ok">
       <div class="stat-value">{{ stat.promossi }} {% if stat.promossi_pct is not none %}<span class="stat-pct">({{ stat.promossi_pct }}%)</span>{% endif %}</div>
@@ -39,12 +39,12 @@
     </div>
     {% endif %}
   </div>
-</div>
+</details>
 
-<div class="card">
-  <h2>Distribuzione dei voti{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</h2>
+<details class="card" open>
+  <summary><strong>Distribuzione dei voti{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</strong></summary>
   {% if stat.distribuzione.bins %}
-  <p class="muted">
+  <p class="muted" style="margin-top:0.75rem">
     Media {{ stat.distribuzione.media }}, deviazione standard {{ stat.distribuzione.dev_std }}.
     La linea rossa è la curva gaussiana teorica con la stessa media e deviazione standard.
   </p>
@@ -86,12 +86,12 @@
   {% else %}
   <p class="muted">Non ci sono ancora abbastanza voti finali registrati per calcolare una distribuzione.</p>
   {% endif %}
-</div>
+</details>
 
 {% if stat.esercizi %}
-<div class="card">
-  <h2>Esercizi più sbagliati{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</h2>
-  <table>
+<details class="card" open>
+  <summary><strong>Esercizi più sbagliati{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</strong></summary>
+  <table style="margin-top:0.75rem">
     <tr><th>Esercizio</th><th>Corrette</th><th>Sbagliate</th><th>% sbagliate</th><th>Risposte sbagliate scelte</th></tr>
     {% for e in stat.esercizi %}
     <tr>
@@ -117,5 +117,5 @@
     </tr>
     {% endfor %}
   </table>
-</div>
+</details>
 {% endif %}

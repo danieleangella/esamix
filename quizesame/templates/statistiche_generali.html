@@ -6,9 +6,9 @@
 {% block content %}
 <h1>Statistiche generali</h1>
 
-<div class="card">
-  <h2>Corsi inclusi</h2>
-  <form method="get" action="/statistiche-generali">
+<details class="card" open>
+  <summary><strong>Corsi inclusi</strong></summary>
+  <form method="get" action="/statistiche-generali" style="margin-top:0.75rem">
     <p style="margin-top:0">
       <input type="text" id="filtro-nome-corso" placeholder="Filtra per nome del corso..." style="max-width:20rem; display:inline-block">
     </p>
@@ -46,11 +46,11 @@
     });
   })();
   </script>
-</div>
+</details>
 
-<div class="card">
-  <h2>Riepilogo</h2>
-  <p class="muted" style="margin-top:0">Esiti su {{ statistiche.totale }} compiti corretti, nei corsi selezionati.</p>
+<details class="card" open>
+  <summary><strong>Riepilogo</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">Esiti su {{ statistiche.totale }} compiti corretti, nei corsi selezionati.</p>
   <div class="stats-grid">
     <div class="stat-tile stat-ok">
       <div class="stat-value">{{ statistiche.promossi }} {% if statistiche.promossi_pct is not none %}<span class="stat-pct">({{ statistiche.promossi_pct }}%)</span>{% endif %}</div>
@@ -83,12 +83,12 @@
       <div class="stat-label"><span class="stat-label-info" title="Media dei voti definitivi, tra i soli esiti con voto.">Media finale</span></div>
     </div>
   </div>
-</div>
+</details>
 
 {% if statistiche.per_corso %}
-<div class="card">
-  <h2>Per corso</h2>
-  <table>
+<details class="card" open>
+  <summary><strong>Per corso</strong></summary>
+  <table style="margin-top:0.75rem">
     <tr><th>Corso</th><th>Corretti</th><th>Promossi</th><th>Insufficienti</th><th>Media finale</th></tr>
     {% for c in statistiche.per_corso %}
     <tr>
@@ -100,13 +100,13 @@
     </tr>
     {% endfor %}
   </table>
-</div>
+</details>
 {% endif %}
 
 {% if statistiche.per_anno|length > 1 %}
-<div class="card">
-  <h2>Variazione per anno accademico</h2>
-  <p class="muted" style="margin-top:0">Numero di studenti e percentuale di promossi, per anno (corsi collegati nello stesso anno sono sommati insieme).</p>
+<details class="card" open>
+  <summary><strong>Variazione per anno accademico</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">Numero di studenti e percentuale di promossi, per anno (corsi collegati nello stesso anno sono sommati insieme).</p>
   <table>
     <tr><th>Anno</th><th>Studenti</th><th>Promossi</th><th>% promossi</th><th>Media finale</th></tr>
     {% for a in statistiche.per_anno %}
@@ -163,13 +163,13 @@
       {% endfor %}
     </svg>
   </div>
-</div>
+</details>
 {% endif %}
 
-<div class="card">
-  <h2>Distribuzione dei voti</h2>
+<details class="card" open>
+  <summary><strong>Distribuzione dei voti</strong></summary>
   {% if statistiche.distribuzione.bins %}
-  <p class="muted">
+  <p class="muted" style="margin-top:0.75rem">
     Media {{ statistiche.distribuzione.media }}, deviazione standard {{ statistiche.distribuzione.dev_std }}.
     La linea rossa è la curva gaussiana teorica con la stessa media e deviazione standard.
   </p>
@@ -204,5 +204,5 @@
   {% else %}
   <p class="muted">Non ci sono ancora abbastanza voti finali registrati per calcolare una distribuzione.</p>
   {% endif %}
-</div>
+</details>
 {% endblock %}

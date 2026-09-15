@@ -14,32 +14,48 @@
 </div>
 
 {% if duplicati %}
-<div class="card">
-  <h2>Possibili doppioni ({{ duplicati|length }} gruppi)</h2>
-  <p class="muted" style="margin-top:0">Esercizi con lo stesso testo e le stesse risposte in ogni variante. Tienine uno per gruppo ed elimina gli altri (non è possibile eliminare un esercizio già assegnato a un appello).</p>
+<details class="card" open>
+  <summary><strong>Possibili doppioni ({{ duplicati|length }} gruppi)</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">Esercizi con lo stesso testo e le stesse risposte in ogni variante. Tienine uno per gruppo ed elimina gli altri (non è possibile eliminare un esercizio già assegnato a un appello).</p>
   {% for gruppo in duplicati %}
   <div style="padding:0.6rem 0; {% if not loop.first %}border-top:1px solid var(--border);{% endif %}">
     {% for e in gruppo %}
     <div style="display:flex; justify-content:space-between; align-items:center; padding:0.15rem 0">
-      <span>{{ e.nome or ('#' ~ e.id) }} <span class="muted">({{ e.varianti|length }} variante/i)</span></span>
+      <span>
+        <button type="button" class="link-simile btn-anteprima-esercizio" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button>
+        <span class="muted">({{ e.varianti|length }} variante/i)</span>
+      </span>
       <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/elimina"
             onsubmit="return confirm({{ ('Eliminare l\'esercizio ' ~ (e.nome or ('#' ~ e.id)) ~ '?')|js }});">
         <button type="submit" class="danger">Elimina</button>
       </form>
     </div>
+    <div class="riga-anteprima-esercizio" data-esercizio="{{ e.id }}" style="display:none; padding:0.25rem 0 0.5rem">
+      <p class="muted" style="margin-top:0.5rem">Anteprima di tutte le varianti:</p>
+    </div>
     {% endfor %}
   </div>
   {% endfor %}
-</div>
+</details>
 {% endif %}
 
-<div class="card">
-  <h2>Banca esercizi del corso ({{ esercizi|length }})</h2>
+<details class="card" open>
+  <summary><strong>Banca esercizi del corso ({{ esercizi|length }})</strong></summary>
   {% if esercizi %}
-  <table>
+  <div class="form-grid" style="margin-top:0.75rem">
+    <div><label>Cerca</label><input type="text" class="filtro-ricerca-banca" placeholder="cerca per nome o testo"></div>
+    <div>
+      <label>Argomento</label>
+      <select class="filtro-argomento-banca">
+        <option value="">Tutti</option>
+        {% for a in esercizi | map(attribute='argomento') | select | unique | sort %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+  <table class="tabella-banca-esercizi" style="margin-top:0.75rem">
     <tr><th>Nome</th><th>Argomento</th><th>Varianti</th><th>Anteprima</th><th></th></tr>
     {% for e in esercizi %}
-    <tr>
+    <tr data-nome="{{ (e.nome or '') | lower }}" data-testo="{{ (e.varianti | map(attribute='testo') | join(' ')) | lower }}" data-argomento="{{ e.argomento or '' }}">
       <td>
         <button type="button" class="link-simile btn-anteprima-esercizio" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button>
         {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
@@ -73,9 +89,9 @@
   <p class="muted">Nessun esercizio ancora creato. Puoi crearne uno qui sotto, oppure dalla pagina di un
     appello (verrà comunque salvato in questa banca condivisa del corso e potrà essere riusato altrove).</p>
   {% endif %}
-</div>
+</details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Collega banca esercizi di un altro corso</summary>
   <div style="margin-top:1rem">
     {% if corsi_suggeriti %}
@@ -128,7 +144,7 @@
   </div>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Nuovo esercizio</summary>
   <div style="margin-top:1rem">
     {% set action = "/corsi/" ~ corso.tag ~ "/esercizi/nuovo" %}
@@ -136,7 +152,7 @@
   </div>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Importa esercizi da un file</summary>
   <form method="post" action="/corsi/{{ corso.tag }}/esercizi/importa-json" enctype="multipart/form-data" style="margin-top:1rem">
     <label>File esercizi.json</label>
@@ -173,12 +189,29 @@
     fetch("/corsi/{{ corso.tag }}/esercizi/" + btn.dataset.esercizio + "/anteprima")
       .then(function (r) { return r.text(); })
       .then(function (html) {
-        riga.querySelector("td").insertAdjacentHTML("beforeend", html);
+        (riga.querySelector("td") || riga).insertAdjacentHTML("beforeend", html);
         riga.dataset.caricata = "1";
         renderizzaLatex(riga);
       });
   });
   collega(".btn-modifica-esercizio", ".riga-modifica-esercizio");
+
+  var ricercaBanca = document.querySelector(".filtro-ricerca-banca");
+  if (ricercaBanca) {
+    var argomentoBanca = document.querySelector(".filtro-argomento-banca");
+    var righeBanca = document.querySelectorAll(".tabella-banca-esercizi tr[data-nome]");
+    function applicaBanca() {
+      var testo = ricercaBanca.value.trim().toLowerCase();
+      var arg = argomentoBanca.value;
+      righeBanca.forEach(function (riga) {
+        var okTesto = !testo || riga.dataset.nome.includes(testo) || riga.dataset.testo.includes(testo);
+        var okArgomento = !arg || riga.dataset.argomento === arg;
+        riga.style.display = (okTesto && okArgomento) ? "" : "none";
+      });
+    }
+    ricercaBanca.addEventListener("input", applicaBanca);
+    argomentoBanca.addEventListener("change", applicaBanca);
+  }
 })();
 </script>
 {% endblock %}

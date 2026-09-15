@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Anteprima riferimento · {{ appello.nome }}{% endblock %}
+{% block content %}
+<p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#compiti">&larr; {{ appello.nome }}</a></p>
+<h1>Anteprima foglio di riferimento</h1>
+<p class="muted">
+  Compito di esempio con la prima variante di ciascun esercizio assegnato: nel foglio
+  pubblicato la risposta corretta è sempre l'opzione A, qui è segnata con l'etichetta
+  "Corretta" per chiarezza.
+</p>
+
+{% for r in righe %}
+<div class="card">
+  <p style="white-space:pre-wrap; margin:0">{{ r.testo }}</p>
+  {% if r.aperta %}
+  <p class="muted" style="margin:0.5rem 0 0">Domanda aperta: nessuna risposta a scelta multipla.</p>
+  {% else %}
+  <p style="margin:0.5rem 0 0"><span class="badge badge-ok">Corretta</span> {{ r.risposte[0] }}</p>
+  {% for s in r.risposte[1:] %}
+  <p style="margin:0.2rem 0"><span class="badge badge-err">x</span> {{ s }}</p>
+  {% endfor %}
+  {% endif %}
+  {% if r.obbligatorio %}<p class="muted" style="margin-top:0.5rem">Obbligatorio.</p>{% endif %}
+</div>
+{% else %}
+<p class="muted">Nessun esercizio assegnato a questo appello.</p>
+{% endfor %}
+<script>renderizzaLatex(document.body);</script>
+{% endblock %}

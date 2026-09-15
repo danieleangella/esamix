@@ -1,0 +1,209 @@
+<div class="tab-pane" data-pane="presenze{{ pane_suffix }}" style="display:none">
+  {% if md.appello.chiuso %}
+  <div class="card">
+    <p class="muted">Appello chiuso: per registrare presenze, ritirati o nuovi studenti, riaprilo prima dalla scheda Impostazioni.</p>
+  </div>
+  {% else %}
+  {% set riepilogo = md.riepilogo_presenze %}
+  <details class="card" open>
+    <summary><strong>Presenze</strong></summary>
+    {% if riepilogo is none %}
+    <p class="muted" style="margin-top:0.75rem">
+      Nessun elenco iscritti caricato per questo appello: carica il file della segreteria, oppure aggiungi gli
+      iscritti a mano, dalla scheda
+      <a href="#compiti{{ pane_suffix }}" onclick="document.querySelector('[data-tab=&quot;compiti{{ pane_suffix }}&quot;]').click(); return false;">Compiti d'esame</a>.
+    </p>
+    {% else %}
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-top:0.75rem">
+      <div style="font-size:1.3rem">
+        <strong class="contatore-presenti">{{ riepilogo.n_presenti }}</strong> / {{ riepilogo.n_iscritti }} presenti
+        {% if md.appello.presenze_chiuse %}<span class="badge badge-warn">Registro chiuso</span>{% endif %}
+      </div>
+      <div style="display:flex; gap:0.5rem">
+        {% if md.appello.presenze_chiuse %}
+        <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze/riapri">
+          <button type="submit" class="secondary">Riapri registro</button>
+        </form>
+        {% else %}
+        <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze/chiudi"
+              onsubmit="return confirm('Chiudere il registro presenze? Tutti gli iscritti non spuntati (e senza già un esito registrato) verranno segnati automaticamente come assenti. L\'operazione non si annulla da sola: per rimettere mano ai singoli esiti andrà fatto dalla scheda Correzione.');">
+          <button type="submit">Chiudi registro (segna assenti gli altri)</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <p class="muted" style="margin-top:1rem">
+      Premi "Presente" man mano che gli studenti si presentano in aula, o "Assente" per chi risulta assente
+      prima ancora di chiudere il registro. Chi ha già un voto o un esito per questo appello risulta presente
+      (o assente/ritirato) automaticamente e non è più modificabile da qui.
+    </p>
+
+    <table style="margin-top:1rem" class="tabella-presenze">
+      <tr><th>Presente</th><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Note</th></tr>
+      {% for s in riepilogo.iscritti %}
+      <tr data-matricola="{{ s.matricola }}">
+        <td>
+          {% if s.bloccato %}
+          {% if s.esito == 'assente' %}<span class="badge badge-err">Assente</span>
+          {% elif s.esito == 'ritirato' %}<span class="badge badge-warn">Ritirato</span>
+          {% else %}<span class="badge badge-ok">Presente</span>{% endif %}
+          {% elif s.presente %}
+          <span class="badge badge-ok">Presente</span>
+          {% if not md.appello.presenze_chiuse %}
+          <form class="inline form-presenza" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze/{{ s.matricola }}/imposta">
+            <button type="submit" class="secondary" style="padding:0.1rem 0.5rem; font-size:0.85rem">Annulla</button>
+          </form>
+          {% endif %}
+          {% else %}
+          <form class="inline form-presenza" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze/{{ s.matricola }}/imposta">
+            <input type="hidden" name="presente" value="1">
+            <button type="submit" {% if md.appello.presenze_chiuse %}disabled{% endif %}>Presente</button>
+          </form>
+          <form class="inline form-assenza" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/assenze/segna">
+            <input type="hidden" name="matricola" value="{{ s.matricola }}">
+            <input type="hidden" name="esito" value="assente">
+            <button type="submit" class="secondary" {% if md.appello.presenze_chiuse or not s.registrato %}disabled{% endif %}>Assente</button>
+          </form>
+          {% endif %}
+        </td>
+        <td>{{ s.matricola }}</td>
+        <td>{{ s.cognome }}</td>
+        <td>{{ s.nome }}</td>
+        <td>
+          {% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>DSA</span>{% endif %}
+          {% if not s.registrato %}
+          <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" class="inline">
+            <input type="hidden" name="matricola" value="{{ s.matricola }}">
+            <input type="hidden" name="cognome" value="{{ s.cognome }}">
+            <input type="hidden" name="nome" value="{{ s.nome }}">
+            <input type="hidden" name="next" value="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}#presenze{{ pane_suffix }}">
+            <button type="submit" class="secondary" style="padding:0.1rem 0.5rem; font-size:0.85rem" title="Non è ancora uno studente registrato in questo corso">Registra come studente</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <script>
+    (function () {
+      var root = document.currentScript.closest(".tab-pane");
+      var tabella = root.querySelector(".tabella-presenze");
+      var contatore = root.querySelector(".contatore-presenti");
+      if (!tabella) return;
+      var urlAssenza = "/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/assenze/segna";
+
+      function urlPresenza(matricola) {
+        return "/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze/" + matricola + "/imposta";
+      }
+      function cellaPresente(matricola) {
+        return '<span class="badge badge-ok">Presente</span> ' +
+          '<form class="inline form-presenza" method="post" action="' + urlPresenza(matricola) + '">' +
+          '<button type="submit" class="secondary" style="padding:0.1rem 0.5rem; font-size:0.85rem">Annulla</button>' +
+          '</form>';
+      }
+      function cellaNonSegnato(matricola) {
+        return '<form class="inline form-presenza" method="post" action="' + urlPresenza(matricola) + '">' +
+          '<input type="hidden" name="presente" value="1"><button type="submit">Presente</button></form>' +
+          '<form class="inline form-assenza" method="post" action="' + urlAssenza + '">' +
+          '<input type="hidden" name="matricola" value="' + matricola + '">' +
+          '<input type="hidden" name="esito" value="assente">' +
+          '<button type="submit" class="secondary">Assente</button></form>';
+      }
+
+      tabella.addEventListener("submit", function (ev) {
+        var formPresenza = ev.target.closest(".form-presenza");
+        var formAssenza = ev.target.closest(".form-assenza");
+        var form = formPresenza || formAssenza;
+        if (!form) return;
+        ev.preventDefault();
+        var riga = form.closest("tr");
+        var matricola = riga.dataset.matricola;
+        var pulsante = form.querySelector("button");
+        pulsante.disabled = true;
+        fetch(form.action, {
+          method: "POST", body: new FormData(form), headers: { "Accept": "application/json" },
+        })
+          .then(function (resp) {
+            if (!resp.ok) return resp.json().then(function (d) { throw new Error(d.errore || "errore"); });
+            return resp.json();
+          })
+          .then(function () {
+            var cella = form.closest("td");
+            if (formPresenza) {
+              var diventaPresente = form.querySelector('input[name="presente"]') !== null;
+              cella.innerHTML = diventaPresente ? cellaPresente(matricola) : cellaNonSegnato(matricola);
+              if (contatore) {
+                contatore.textContent = (parseInt(contatore.textContent, 10) + (diventaPresente ? 1 : -1)).toString();
+              }
+            } else {
+              cella.innerHTML = '<span class="badge badge-err">Assente</span>';
+              if (contatore) {
+                contatore.textContent = (parseInt(contatore.textContent, 10) + 1).toString();
+              }
+            }
+          })
+          .catch(function (err) {
+            pulsante.disabled = false;
+            alert("Non sono riuscito a salvare: " + err.message);
+          });
+      });
+    })();
+    </script>
+    {% endif %}
+  </details>
+
+  {% set matricola_da_registrare = request.query_params.get('matricola_da_registrare', '') %}
+  <details class="card dettaglio-fisarmonica" {% if matricola_da_registrare %}open{% endif %}>
+    <summary><strong>Registra un nuovo studente</strong></summary>
+    <p class="muted" style="margin-top:0.75rem">
+      {% if matricola_da_registrare %}
+      La matricola <strong>{{ matricola_da_registrare }}</strong> non risulta ancora tra gli studenti di questo
+      corso: registrala qui per poterla correggere o segnarle un esito.
+      {% else %}
+      Per uno studente non ancora registrato in questo corso (es. scoperto durante la presa delle presenze).
+      {% endif %}
+    </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" style="margin-top:0.75rem">
+      <input type="hidden" name="next" value="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}#presenze{{ pane_suffix }}">
+      <div class="form-grid">
+        <div><label class="campo-obbligatorio">Matricola</label><input name="matricola" value="{{ matricola_da_registrare }}" required></div>
+        <div><label class="campo-obbligatorio">Cognome</label><input name="cognome" required></div>
+        <div><label class="campo-obbligatorio">Nome</label><input name="nome" required></div>
+      </div>
+      <button type="submit" style="margin-top:0.5rem">Registra</button>
+    </form>
+  </details>
+
+  <details class="card dettaglio-fisarmonica">
+    <summary><strong>Segna ritirato</strong></summary>
+    <p class="muted" style="margin-top:0.75rem">
+      Per uno studente che ha iniziato ma non ha completato (o consegnato in bianco) il compito scritto.
+    </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/assenze/segna" style="margin-top:0.75rem">
+      <input type="hidden" name="esito" value="ritirato">
+      <div class="form-grid">
+        <div style="position:relative">
+          <label class="campo-obbligatorio">Matricola o nome</label>
+          <input name="matricola" class="campo-input-matricola-ritirato" autocomplete="off" required>
+          <div class="campo-suggerimenti-studenti-ritirato sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+        </div>
+      </div>
+      <button type="submit">Segna ritirato</button>
+    </form>
+    <script>
+    (function () {
+      var root = document.currentScript.closest(".tab-pane");
+      creaAutocomplete(
+        root.querySelector(".campo-input-matricola-ritirato"), root.querySelector(".campo-suggerimenti-studenti-ritirato"),
+        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?appello_id={{ md.appello.id }}&q=" + encodeURIComponent(q); },
+        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+        function (s) { return s.matricola; },
+        null,
+        function (s) { return s.stato; }
+      );
+    })();
+    </script>
+  </details>
+  {% endif %}
+</div>

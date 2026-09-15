@@ -107,7 +107,7 @@
       <table class="tabella-disponibili" style="margin-top:0.75rem">
         <tr><th></th><th>Nome</th><th>Argomento</th><th>Varianti</th><th>Anteprima</th></tr>
         {% for e in md.esercizi_disponibili %}
-        <tr data-nome="{{ (e.nome or '') | lower }}" data-testo="{{ (e.varianti[0].testo if e.varianti else '') | lower }}" data-argomento="{{ e.argomento or '' }}">
+        <tr data-nome="{{ (e.nome or '') | lower }}" data-testo="{{ (e.varianti | map(attribute='testo') | join(' ')) | lower }}" data-argomento="{{ e.argomento or '' }}">
           <td><input type="checkbox" name="esercizio_ids" value="{{ e.id }}" style="width:auto"></td>
           <td>
             {{ e.nome or ('#' ~ e.id) }}

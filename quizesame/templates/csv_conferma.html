@@ -6,9 +6,9 @@
 {% block content %}
 <h1>Conferma importazione</h1>
 
-<div class="card">
-  <h2>Riepilogo</h2>
-  <div class="stats-grid">
+<details class="card" open>
+  <summary><strong>Riepilogo</strong></summary>
+  <div class="stats-grid" style="margin-top:0.75rem">
     <div class="stat-tile stat-ok">
       <div class="stat-value">{{ verifica.nuovi }}</div>
       <div class="stat-label">Nuovi studenti</div>
@@ -26,7 +26,7 @@
       <div class="stat-label">Righe con errori (saltate)</div>
     </div>
   </div>
-</div>
+</details>
 
 <form method="post" action="/corsi/{{ corso.tag }}/studenti/importa-csv/conferma">
   <textarea name="csv_testo" style="display:none">{{ csv_testo }}</textarea>
@@ -36,9 +36,9 @@
   <input type="hidden" name="cognome_idx" value="{{ cognome_idx }}">
   <input type="hidden" name="laurea_idx" value="{{ laurea_idx or '' }}">
 
-  <div class="card">
-    <h2>Dettaglio righe</h2>
-    <p class="muted" style="margin-top:0">Deseleziona le righe che non vuoi importare.</p>
+  <details class="card" open>
+    <summary><strong>Dettaglio righe</strong></summary>
+    <p class="muted" style="margin-top:0.75rem">Deseleziona le righe che non vuoi importare.</p>
     <div style="overflow-x:auto">
       <table>
         <tr>
@@ -69,7 +69,7 @@
         {% endfor %}
       </table>
     </div>
-  </div>
+  </details>
 
   {% if verifica.nuovi or verifica.aggiornati %}
   <button type="submit" id="btn-conferma-import">Conferma importazione di {{ verifica.nuovi + verifica.aggiornati }} studenti</button>

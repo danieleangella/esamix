@@ -21,6 +21,8 @@ DEFAULT_RISPOSTA_CORRETTA = 3
 DEFAULT_RISPOSTA_SBAGLIATA = -1
 DEFAULT_RISPOSTA_VUOTA = 0
 DEFAULT_PUNTEGGIO_MAX_APERTA = 3
+DEFAULT_ORALE_SOGLIA_N = 3
+DEFAULT_ORALE_SOGLIA_VOTO = 10
 
 # frasi del testo d'esame, personalizzabili dalla scheda Impostazioni del corso;
 # {consegna}/{corretta}/{sbagliata}/{vuota}/{votomin} vengono sostituiti con i valori
@@ -61,6 +63,7 @@ class Corso:
     orale_soglia_attiva: bool = False
     orale_soglia_n: Optional[int] = None
     orale_soglia_voto: Optional[int] = None
+    orale_soglia_escludi_parziali: bool = True
     ritirato_conta_insufficiente: bool = False
     domande_esame: str = ""
 
@@ -343,8 +346,9 @@ def get_corso(tag: str) -> Corso:
         orale_soglia_attiva=meta.get(
             "orale_soglia_attiva", "1" if meta.get("orale_soglia_n") and meta.get("orale_soglia_voto") else "0"
         ) == "1",
-        orale_soglia_n=int(meta["orale_soglia_n"]) if meta.get("orale_soglia_n") else None,
-        orale_soglia_voto=int(meta["orale_soglia_voto"]) if meta.get("orale_soglia_voto") else None,
+        orale_soglia_n=int(meta.get("orale_soglia_n") or DEFAULT_ORALE_SOGLIA_N),
+        orale_soglia_voto=int(meta.get("orale_soglia_voto") or DEFAULT_ORALE_SOGLIA_VOTO),
+        orale_soglia_escludi_parziali=meta.get("orale_soglia_escludi_parziali", "1") == "1",
         ritirato_conta_insufficiente=meta.get("ritirato_conta_insufficiente", "0") == "1",
         domande_esame=meta.get("domande_esame", ""),
     )

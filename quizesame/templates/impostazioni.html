@@ -15,9 +15,9 @@
 
 <form method="post" action="/corsi/{{ corso.tag }}/impostazioni" id="form-impostazioni-corso">
 
-  <div class="card">
-    <h2>Dati del corso</h2>
-    <div class="form-grid">
+  <details class="card" open>
+    <summary><strong>Dati del corso</strong></summary>
+    <div class="form-grid" style="margin-top:1rem">
       <div><label class="campo-obbligatorio">Nome corso</label><input name="nome" value="{{ corso.nome }}" required></div>
       <div><label>Corso di studi</label><input name="facolta" value="{{ corso.facolta }}"></div>
       <div><label>Università</label><input name="universita" value="{{ corso.universita }}"></div>
@@ -25,10 +25,10 @@
       <div><label>Docente</label><input name="docente" value="{{ corso.docente }}"></div>
     </div>
     <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
-  </div>
+  </details>
 
-  <div class="card">
-    <h2>Voti e punteggi</h2>
+  <details class="card" open>
+    <summary><strong>Voti e punteggi</strong></summary>
     <p class="muted" style="margin-top:0">Valgono per tutti gli appelli del corso.</p>
     <div class="form-grid">
       <div><label class="campo-obbligatorio">Voto minimo (appelli normali) <code class="muted">{votomin}</code></label><input type="number" name="votomin" value="{{ corso.votomin }}" required></div>
@@ -49,10 +49,10 @@
       </div>
     </div>
     <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
-  </div>
+  </details>
 
-  <div class="card">
-    <h2>Orale</h2>
+  <details class="card" open>
+    <summary><strong>Orale</strong></summary>
     <div>
       <label style="display:inline-flex; align-items:center; gap:0.4rem">
         <input type="checkbox" name="orale_dopo_richiesta" style="width:auto" {% if corso.orale_dopo_richiesta %}checked{% endif %}>
@@ -65,30 +65,40 @@
         <input type="checkbox" name="orale_soglia_attiva" id="check-soglia-orale" style="width:auto" {% if corso.orale_soglia_attiva %}checked{% endif %}>
         Rendi l'orale obbligatorio dopo un certo numero di compiti insufficienti
       </label>
-      <div id="blocco-soglia-orale" style="display:flex; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem; margin-left:1.7rem">
-        <span class="muted">dopo</span>
-        <input type="number" name="orale_soglia_n" value="{{ corso.orale_soglia_n or '' }}" min="1" style="width:4.5rem">
-        <span class="muted">compiti con voto inferiore a</span>
-        <input type="number" name="orale_soglia_voto" value="{{ corso.orale_soglia_voto or '' }}" style="width:4.5rem">
-        <label style="display:inline-flex; align-items:center; gap:0.4rem; margin-left:1rem">
-          <input type="checkbox" name="ritirato_conta_insufficiente" style="width:auto" {% if corso.ritirato_conta_insufficiente %}checked{% endif %}>
-          conta anche "ritirato" come insufficiente
-        </label>
+      <div id="blocco-soglia-orale" style="margin-top:0.75rem; margin-left:1.7rem">
+        <div style="display:flex; align-items:center; flex-wrap:wrap; gap:0.5rem">
+          <span class="muted">dopo</span>
+          <input type="number" name="orale_soglia_n" value="{{ corso.orale_soglia_n }}" min="1" style="width:4.5rem">
+          <span class="muted">compiti (non necessariamente consecutivi) con voto inferiore a</span>
+          <input type="number" name="orale_soglia_voto" value="{{ corso.orale_soglia_voto }}" style="width:4.5rem">
+        </div>
+        <div style="margin-top:0.5rem">
+          <label style="display:inline-flex; align-items:center; gap:0.4rem">
+            <input type="checkbox" name="ritirato_conta_insufficiente" style="width:auto" {% if corso.ritirato_conta_insufficiente %}checked{% endif %}>
+            conta anche "ritirato" come insufficiente
+          </label>
+        </div>
+        <div style="margin-top:0.5rem">
+          <label style="display:inline-flex; align-items:center; gap:0.4rem">
+            <input type="checkbox" name="orale_soglia_escludi_parziali" style="width:auto" {% if corso.orale_soglia_escludi_parziali %}checked{% endif %}>
+            escludi le prove parziali dal conteggio
+          </label>
+        </div>
       </div>
     </div>
     <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
-  </div>
+  </details>
 
-  <div class="card">
-    <h2>Domande d'esame</h2>
-    <p class="muted" style="margin-top:0">Testo libero, per uso amministrativo (es. in vista dell'esportazione dei risultati).</p>
+  <details class="card" open>
+    <summary><strong>Domande d'esame</strong></summary>
+    <p class="muted" style="margin-top:1rem">Testo libero, per uso amministrativo (es. in vista dell'esportazione dei risultati).</p>
     <textarea name="domande_esame" rows="3">{{ corso.domande_esame }}</textarea>
     <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
-  </div>
+  </details>
 
-  <div class="card">
-    <h2>Testo del compito</h2>
-    <p class="muted" style="margin-top:0">
+  <details class="card" open>
+    <summary><strong>Testo del compito</strong></summary>
+    <p class="muted" style="margin-top:1rem">
       I placeholder tra parentesi graffe (vedi sopra) vengono sostituiti con i valori
       effettivi di ciascun appello al momento della generazione del testo.
     </p>
@@ -102,19 +112,19 @@
     <button type="button" class="secondary btn-reset-default" data-target="frase-regole" data-default-tpl="tpl-default-frase-regole">Reimposta default</button>
     <template id="tpl-default-frase-regole">{{ default_frase_regole }}</template>
     <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
-  </div>
+  </details>
 </form>
 
-<div class="card" style="margin-top:2rem">
-  <h2>Backup</h2>
-  <p class="muted">Scarica un archivio zip con il database e tutti i file generati (PDF/tex) di questo
+<details class="card" open style="margin-top:2rem">
+  <summary><strong>Backup</strong></summary>
+  <p class="muted" style="margin-top:1rem">Scarica un archivio zip con il database e tutti i file generati (PDF/tex) di questo
     corso: utile prima di modifiche importanti, o semplicemente come copia di sicurezza periodica.</p>
   <a href="/corsi/{{ corso.tag }}/backup.zip" class="button">Scarica backup di questo corso</a>
-</div>
+</details>
 
-<div class="card">
-  <h2>Elimina corso</h2>
-  <p class="muted">Elimina definitivamente il corso "{{ corso.nome }}" ({{ corso.tag }}): studenti,
+<details class="card">
+  <summary><strong>Elimina corso</strong></summary>
+  <p class="muted" style="margin-top:1rem">Elimina definitivamente il corso "{{ corso.nome }}" ({{ corso.tag }}): studenti,
     esercizi, appelli e tutti i risultati registrati. Azione irreversibile, non c'è un backup.</p>
   <form method="post" action="/corsi/{{ corso.tag }}/elimina" id="form-elimina-corso">
     <div>
@@ -123,7 +133,7 @@
     </div>
     <button type="submit" class="danger btn-conferma-testo" disabled style="margin-top:0.75rem">Elimina questo corso</button>
   </form>
-</div>
+</details>
 <script>document.getElementById("form-elimina-corso") && attivaConfermaTestuale(document.getElementById("form-elimina-corso"));</script>
 <script>
 (function () {

@@ -42,6 +42,61 @@ def _esercizi_per_generazione(tag: str, appello_id: int):
     ]
 
 
+def anteprima_riferimento(tag: str, appello_id: int) -> list[dict]:
+    """Righe del "Compito A" del foglio di riferimento (prima variante di ciascun
+    esercizio assegnato, risposte non mischiate: la corretta è sempre la prima), da
+    mostrare in pagina senza generare/scaricare il PDF."""
+    esercizi = esercizi_service.list_esercizi_appello(tag, appello_id)
+    righe = []
+    for e in esercizi:
+        if not e.varianti:
+            continue
+        variante = e.varianti[0]
+        righe.append({
+            "esercizio_nome": e.nome or f"Esercizio #{e.id}", "obbligatorio": e.obbligatorio,
+            "aperta": e.aperta, "testo": variante.testo, "risposte": list(variante.risposte),
+        })
+    return righe
+
+
+def anteprima_blocco(tag: str, appello_id: int, numero: int) -> Optional[dict]:
+    """Il primo compito del blocco indicato, testo e risposte esattamente come stampate
+    su quel foglio (ordine mischiato, nessuna indicata come corretta: è quello che vede
+    lo studente), da mostrare in pagina senza scaricare il PDF."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        blocco = conn.execute(
+            "SELECT id FROM blocchi WHERE appello_id=? AND numero=?", (appello_id, numero)
+        ).fetchone()
+        if blocco is None:
+            return None
+        compito = conn.execute(
+            "SELECT id, codice FROM compiti WHERE blocco_id=? ORDER BY id LIMIT 1", (blocco["id"],)
+        ).fetchone()
+        if compito is None:
+            return None
+        posizioni = conn.execute(
+            "SELECT ce.posizione, ce.obbligatorio, ce.aperta, ce.risposte_mischiate, "
+            "e.nome AS esercizio_nome, ev.testo FROM compito_esercizi ce "
+            "JOIN esercizi e ON e.id = ce.esercizio_id JOIN esercizio_varianti ev ON ev.id = ce.variante_id "
+            "WHERE ce.compito_id=? ORDER BY ce.posizione",
+            (compito["id"],),
+        ).fetchall()
+        return {
+            "codice": compito["codice"],
+            "righe": [
+                {
+                    "esercizio_nome": p["esercizio_nome"], "obbligatorio": bool(p["obbligatorio"]),
+                    "aperta": bool(p["aperta"]), "testo": p["testo"],
+                    "risposte": json.loads(p["risposte_mischiate"]) if p["risposte_mischiate"] else [],
+                }
+                for p in posizioni
+            ],
+        }
+    finally:
+        conn.close()
+
+
 def _out_dir(tag: str) -> Path:
     out_dir = config.corso_dir(tag) / "output"
     out_dir.mkdir(parents=True, exist_ok=True)

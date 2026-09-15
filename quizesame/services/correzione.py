@@ -116,17 +116,23 @@ def _orale_obbligatorio(conn, matricola: str) -> Optional[dict]:
 
 def _applica_soglia_orale_automatica(conn, corso, matricola: str) -> None:
     """Se il corso ha impostato 'orale obbligatorio dopo N compiti con voto sotto M', e lo
-    studente ha appena raggiunto quella soglia (contando tutti gli appelli del corso), lo
-    rende obbligato all'orale da qui in avanti (a meno che non lo sia già)."""
+    studente ha appena raggiunto quella soglia (contando tutti gli appelli del corso, o
+    escludendo le prove parziali se richiesto), lo rende obbligato all'orale da qui in
+    avanti (a meno che non lo sia già)."""
     if not corso.orale_soglia_attiva or not corso.orale_soglia_n or corso.orale_soglia_voto is None:
         return
     if _orale_obbligatorio(conn, matricola):
         return
-    query = "SELECT COUNT(*) c FROM risultati WHERE matricola=? AND (voto < ?"
+    query = "SELECT COUNT(*) c FROM risultati r WHERE r.matricola=? AND (r.voto < ?"
     params = [matricola, corso.orale_soglia_voto]
     if corso.ritirato_conta_insufficiente:
-        query += " OR esito='ritirato'"
+        query += " OR r.esito='ritirato'"
     query += ")"
+    if corso.orale_soglia_escludi_parziali:
+        # "prova parziale" = appello membro di un raggruppamento (es. il raggruppamento
+        # "Prove parziali (media)" creato dalla migrazione legacy, o uno creato a mano):
+        # stesso criterio già usato altrove nel programma per riconoscerle.
+        query += " AND NOT EXISTS (SELECT 1 FROM raggruppamento_membri rm WHERE rm.appello_id = r.appello_id)"
     n_insufficienti = conn.execute(query, params).fetchone()["c"]
     if n_insufficienti >= corso.orale_soglia_n:
         conn.execute(
@@ -143,7 +149,7 @@ def _applica_soglia_orale_automatica(conn, corso, matricola: str) -> None:
 @dataclass
 class RigaRisposta:
     posizione: int
-    esercizio_id: int
+    esercizio_id: Optional[int]
     esercizio_nome: str
     obbligatorio: bool
     aperta: bool
@@ -169,11 +175,36 @@ class ValutazionePreliminare:
     lunghezza_attesa: int = 0
     codice_duplicato: Optional[dict] = None
     risposte_simili: list[dict] = field(default_factory=list)
+    dettaglio_esercizi_disponibile: bool = True
 
 
-def _righe_risposta(tag: str, compito_id: int, soluzioni: str, risposte: str) -> list[RigaRisposta]:
+def _righe_da_soluzioni(soluzioni: str, risposte: str) -> list[RigaRisposta]:
+    """Ripiego per i compiti a cui non è (ancora) collegato quale esercizio occupa
+    ciascuna posizione (es. compiti importati da una migrazione dati legacy): la lettera
+    corretta di ogni posizione è comunque nota da 'soluzioni', quindi si può sempre
+    confrontarla con quella data, solo senza poter mostrare il nome dell'esercizio né
+    sapere se era obbligatorio."""
     righe = []
-    for pos in compiti_service.list_posizioni_compito(tag, compito_id):
+    for i, corretta in enumerate(soluzioni):
+        aperta = corretta == "-"
+        lettera_data = risposte[i].upper() if i < len(risposte) else "X"
+        lettera_corretta = corretta.upper()
+        svolta = (not aperta) and lettera_data != "X"
+        righe.append(RigaRisposta(
+            posizione=i, esercizio_id=None, esercizio_nome=f"Posizione {i + 1}",
+            obbligatorio=False, aperta=aperta,
+            lettera_data=lettera_data, lettera_corretta=lettera_corretta,
+            svolta=svolta, corretta=svolta and lettera_data == lettera_corretta,
+        ))
+    return righe
+
+
+def _righe_risposta(tag: str, compito_id: int, soluzioni: str, risposte: str) -> tuple[list[RigaRisposta], bool]:
+    posizioni = compiti_service.list_posizioni_compito(tag, compito_id)
+    if not posizioni:
+        return _righe_da_soluzioni(soluzioni, risposte), False
+    righe = []
+    for pos in posizioni:
         i = pos["posizione"]
         aperta = bool(pos["aperta"])
         lettera_data = risposte[i].upper() if i < len(risposte) else "X"
@@ -186,7 +217,7 @@ def _righe_risposta(tag: str, compito_id: int, soluzioni: str, risposte: str) ->
             lettera_data=lettera_data, lettera_corretta=lettera_corretta,
             svolta=svolta, corretta=svolta and lettera_data == lettera_corretta,
         ))
-    return righe
+    return righe, True
 
 
 SOGLIA_SIMILARITA = 0.85
@@ -264,7 +295,7 @@ def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, r
         soluzioni = compito["soluzioni"]
         voto_base = valuta(soluzioni, risposte, corso.risposta_corretta, corso.risposta_sbagliata, corso.risposta_vuota)
 
-        righe = _righe_risposta(tag, compito["id"], soluzioni, risposte)
+        righe, dettaglio_disponibile = _righe_risposta(tag, compito["id"], soluzioni, risposte)
         non_svolte = [r for r in righe if r.obbligatorio and not r.aperta and not r.svolta]
         da_valutare = [r for r in righe if r.obbligatorio and not r.aperta and r.svolta and r.corretta]
         domande_aperte = [r for r in righe if r.aperta]
@@ -277,6 +308,7 @@ def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, r
             lunghezza_attesa=len(soluzioni),
             codice_duplicato=_codice_duplicato(conn, appello_id, studente["matricola"], compito["id"]),
             risposte_simili=_risposte_simili(conn, appello_id, studente["matricola"], risposte),
+            dettaglio_esercizi_disponibile=dettaglio_disponibile,
         )
     finally:
         conn.close()
@@ -516,8 +548,18 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
         risposte = r["risposte"] or ""
         punteggi = json.loads(r["punteggi_obbligatori"]) if r["punteggi_obbligatori"] else {}
 
+        posizioni = compiti_service.list_posizioni_compito(tag, r["compito_id"])
+        dettaglio_esercizi_disponibile = bool(posizioni)
+        if not posizioni:
+            # compito senza collegamento esercizio-posizione (es. importato da una
+            # migrazione dati legacy): la lettera corretta di ogni posizione resta nota
+            # da 'soluzioni', quindi si confronta comunque, solo senza nome/obbligatorio.
+            posizioni = [
+                {"posizione": i, "esercizio_id": None, "esercizio_nome": None, "obbligatorio": False, "aperta": c == "-"}
+                for i, c in enumerate(soluzioni)
+            ]
         righe = []
-        for pos in compiti_service.list_posizioni_compito(tag, r["compito_id"]):
+        for pos in posizioni:
             i = pos["posizione"]
             lettera_data = risposte[i].upper() if i < len(risposte) else "X"
             lettera_corretta = soluzioni[i].upper() if i < len(soluzioni) else "?"
@@ -532,7 +574,7 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
                     else (corso.risposta_vuota if lettera_data == "X" else corso.risposta_sbagliata)
                 )
             righe.append({
-                "posizione": i, "esercizio_nome": pos["esercizio_nome"] or f"Esercizio #{pos['esercizio_id']}",
+                "posizione": i, "esercizio_nome": pos["esercizio_nome"] or f"Posizione {i + 1}",
                 "obbligatorio": bool(pos["obbligatorio"]), "lettera_data": lettera_data,
                 "lettera_corretta": lettera_corretta, "corretta": corretta,
                 "punteggio_assegnato": punteggio_assegnato,
@@ -544,7 +586,10 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
         # riusa il calcolo già fatto in risultati_studente (soglia effettiva compresa)
         # invece di rifarlo qui: distingue un verbalizzato "superato" da uno "insufficiente".
         risultato["superato"] = next((s["superato"] for s in storico if s["corrente"]), None)
-        return {"risultato": risultato, "righe": righe, "storico": storico}
+        return {
+            "risultato": risultato, "righe": righe, "storico": storico,
+            "dettaglio_esercizi_disponibile": dettaglio_esercizi_disponibile,
+        }
     finally:
         conn.close()
 

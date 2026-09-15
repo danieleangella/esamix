@@ -13,9 +13,9 @@
   <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
 </div>
 
-<div class="card">
-  <h2>Riepilogo di tutti gli appelli</h2>
-  <p class="muted" style="margin-top:0">Esiti su {{ statistiche.totale }} compiti corretti, in tutti gli appelli del corso.</p>
+<details class="card" open>
+  <summary><strong>Riepilogo di tutti gli appelli</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">Esiti su {{ statistiche.totale }} compiti corretti, in tutti gli appelli del corso.</p>
   <div class="stats-grid">
     <div class="stat-tile stat-ok">
       <div class="stat-value">{{ statistiche.promossi }} {% if statistiche.promossi_pct is not none %}<span class="stat-pct">({{ statistiche.promossi_pct }}%)</span>{% endif %}</div>
@@ -48,12 +48,12 @@
       <div class="stat-label">Media finale</div>
     </div>
   </div>
-</div>
+</details>
 
 {% if statistiche.per_appello %}
-<div class="card">
-  <h2>Per appello</h2>
-  <table>
+<details class="card" open>
+  <summary><strong>Per appello</strong></summary>
+  <table style="margin-top:0.75rem">
     <tr><th>Appello</th><th>Corretti</th><th>Promossi</th><th>Insufficienti</th><th>Media finale</th></tr>
     {% for a in statistiche.per_appello %}
     <tr>
@@ -65,11 +65,11 @@
     </tr>
     {% endfor %}
   </table>
-</div>
+</details>
 
-<div class="card">
-  <h2>Andamento per appello</h2>
-  <p class="muted">
+<details class="card" open>
+  <summary><strong>Andamento per appello</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">
     <span style="display:inline-block; width:0.7rem; height:0.7rem; background:#93c5fd; border-radius:2px"></span> Esami svolti
     &nbsp;&nbsp;
     <span style="display:inline-block; width:0.7rem; height:0.7rem; background:#22c55e; border-radius:2px"></span> Promossi
@@ -85,11 +85,11 @@
       {% endfor %}
     </svg>
   </div>
-</div>
+</details>
 {% endif %}
 
-<div class="card">
-  <h2>Distribuzione dei voti</h2>
+<details class="card" open>
+  <summary><strong>Distribuzione dei voti</strong></summary>
   {% if statistiche.distribuzione.bins %}
   <p class="muted">
     Media {{ statistiche.distribuzione.media }}, deviazione standard {{ statistiche.distribuzione.dev_std }}.
@@ -126,5 +126,5 @@
   {% else %}
   <p class="muted">Non ci sono ancora abbastanza voti finali registrati per calcolare una distribuzione.</p>
   {% endif %}
-</div>
+</details>
 {% endblock %}

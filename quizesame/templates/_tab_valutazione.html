@@ -1,77 +1,43 @@
 <div class="tab-pane" data-pane="valutazione{{ pane_suffix }}" style="display:none">
   {% if md.appello.chiuso %}
   <div class="card">
-    <p class="muted">Appello chiuso: per correggere compiti o segnare assenze, riaprilo prima dalla scheda Impostazioni.</p>
+    <p class="muted">Appello chiuso: per correggere compiti, riaprilo prima dalla scheda Impostazioni.</p>
   </div>
   {% else %}
-  <div class="card">
-    <h2>Presenze</h2>
-    <p class="muted" style="margin-top:0">
-      {% if md.iscritti %}Spunta chi si presenta, poi chiudi il registro per segnare assenti gli altri.
-      {% else %}Da lì si può anche segnare assente uno studente.{% endif %}
-    </p>
-    <a class="button" href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze">Vai al registro presenze</a>
-  </div>
-
-  {% set matricola_da_registrare = request.query_params.get('matricola_da_registrare', '') %}
-  <details class="card" {% if matricola_da_registrare %}open{% endif %}>
-    <summary><strong>Registra un nuovo studente</strong></summary>
-    <p class="muted" style="margin-top:0.75rem">
-      {% if matricola_da_registrare %}
-      La matricola <strong>{{ matricola_da_registrare }}</strong> non risulta ancora tra gli studenti di questo
-      corso: registrala qui per poterla correggere o segnarle un esito.
-      {% else %}
-      Per uno studente non ancora registrato in questo corso (es. scoperto durante la correzione).
-      {% endif %}
-    </p>
-    <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" style="margin-top:0.75rem">
-      <input type="hidden" name="next" value="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}#valutazione">
-      <div class="form-grid">
-        <div><label class="campo-obbligatorio">Matricola</label><input name="matricola" value="{{ matricola_da_registrare }}" required></div>
-        <div><label class="campo-obbligatorio">Cognome</label><input name="cognome" required></div>
-        <div><label class="campo-obbligatorio">Nome</label><input name="nome" required></div>
-      </div>
-      <button type="submit" style="margin-top:0.5rem">Registra</button>
-    </form>
-  </details>
-
-  <details class="card">
-    <summary><strong>Segna ritirato</strong></summary>
-    <p class="muted" style="margin-top:0.75rem">
-      Per uno studente che ha iniziato ma non ha completato (o consegnato in bianco) il compito scritto.
-    </p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/assenze/segna" style="margin-top:0.75rem">
-      <input type="hidden" name="esito" value="ritirato">
-      <div class="form-grid">
-        <div style="position:relative">
-          <label class="campo-obbligatorio">Matricola o nome</label>
-          <input name="matricola" class="campo-input-matricola-ritirato" autocomplete="off" required>
-          <div class="campo-suggerimenti-studenti-ritirato sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-        </div>
-      </div>
-      <button type="submit">Segna ritirato</button>
-    </form>
-    <script>
-    (function () {
-      var root = document.currentScript.closest(".tab-pane");
-      creaAutocomplete(
-        root.querySelector(".campo-input-matricola-ritirato"), root.querySelector(".campo-suggerimenti-studenti-ritirato"),
-        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
-        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
-        function (s) { return s.matricola; }
-      );
-    })();
-    </script>
-  </details>
   {% if not md.blocchi %}
   <div class="card">
     <p class="muted">Non sono ancora stati generati blocchi di compiti per questa prova: genera almeno un
       blocco dalla scheda "Compiti d'esame" prima di poter correggere gli scritti.</p>
   </div>
   {% else %}
-  <div class="card">
-    <h2>Correzione</h2>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi" autocomplete="off">
+  {% set presenti_da_correggere = md.riepilogo_presenze.iscritti | selectattr('presente') | selectattr('registrato') | rejectattr('bloccato') | list if md.riepilogo_presenze else [] %}
+  <details class="card" {% if presenti_da_correggere %}open{% endif %}>
+    <summary><strong>Presenti da correggere ({{ presenti_da_correggere|length }})</strong></summary>
+    {% if presenti_da_correggere %}
+    <table style="margin-top:0.75rem">
+      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
+      {% for s in presenti_da_correggere %}
+      <tr>
+        <td>{{ s.matricola }}</td>
+        <td>{{ s.cognome }}</td>
+        <td>{{ s.nome }}</td>
+        <td style="text-align:right">
+          <button type="button" class="secondary btn-correggi-presente" data-matricola="{{ s.matricola }}" data-nome="{{ s.cognome }} {{ s.nome }}" style="margin-top:0">Correggi</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted" style="margin-top:0.75rem">
+      {% if md.riepilogo_presenze %}Nessuno studente presente ancora da correggere.
+      {% else %}Nessun elenco iscritti caricato: la spunta delle presenze non è disponibile per questa prova.{% endif %}
+    </p>
+    {% endif %}
+  </details>
+
+  <details class="card" open>
+    <summary><strong>Correzione</strong></summary>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi" autocomplete="off" style="margin-top:0.75rem">
       <div class="form-grid">
         <div style="position:relative">
           <label class="campo-obbligatorio">Matricola o nome</label>
@@ -96,13 +62,14 @@
       var nomeRisolto = root.querySelector(".campo-matricola-nome-risolto");
       creaAutocomplete(
         inputMatricola, root.querySelector(".campo-suggerimenti-studenti"),
-        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
+        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?appello_id={{ md.appello.id }}&q=" + encodeURIComponent(q); },
         function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
         function (s) { return s.matricola; },
         function (dati, valoreDigitato) {
           var match = dati.filter(function (s) { return s.matricola === valoreDigitato; })[0];
           nomeRisolto.textContent = match ? (match.cognome + " " + match.nome) : "";
-        }
+        },
+        function (s) { return s.stato; }
       );
       var inputCodice = root.querySelector(".campo-input-codice");
       inputCodice.dataset.minChars = 4;
@@ -112,14 +79,22 @@
         function (c) { return c; },
         function (c) { return c; }
       );
+      root.querySelectorAll(".btn-correggi-presente").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          inputMatricola.value = btn.dataset.matricola;
+          nomeRisolto.textContent = btn.dataset.nome;
+          inputCodice.focus();
+          inputCodice.scrollIntoView({ block: "center" });
+        });
+      });
     })();
     </script>
-  </div>
+  </details>
   {% endif %}
 
-  <div class="card">
-    <h2>Risultati inseriti ({{ md.risultati|length }})</h2>
-    <table>
+  <details class="card" open>
+    <summary><strong>Risultati inseriti ({{ md.risultati|length }})</strong></summary>
+    <table style="margin-top:0.75rem">
       <tr><th>Studente</th><th>Matricola</th><th>Esito</th><th style="text-align:right"></th></tr>
       {% for r in md.risultati %}
       <tr>
@@ -168,10 +143,10 @@
       <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati.tex">.tex</a> ·
       <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati.pdf">.pdf</a>
     </p>
-  </div>
+  </details>
 
   {% if not raggruppamento %}
-  <details class="card">
+  <details class="card dettaglio-fisarmonica">
     <summary>Esporta voti per la segreteria</summary>
     {% if md.segreteria_csv %}
     <p class="muted" style="margin-top:1rem">
@@ -210,9 +185,9 @@
   </script>
 
   {% if md.valutazioni_sospese %}
-  <div class="card">
-    <h2>Valutazioni in sospeso ({{ md.valutazioni_sospese|length }})</h2>
-    <p class="muted" style="margin-top:0">Compiti con esercizi obbligatori o domande aperte la cui
+  <details class="card" open>
+    <summary><strong>Valutazioni in sospeso ({{ md.valutazioni_sospese|length }})</strong></summary>
+    <p class="muted" style="margin-top:0.75rem">Compiti con esercizi obbligatori o domande aperte la cui
       valutazione è stata rimandata: il voto mostrato è provvisorio (calcolato assumendo il punteggio
       massimo per le posizioni ancora da giudicare) e lo studente non compare tra i verbalizzabili
       finché non si completa la valutazione.</p>
@@ -231,7 +206,7 @@
       </tr>
       {% endfor %}
     </table>
-  </div>
+  </details>
   {% endif %}
   {% endif %}
 </div>

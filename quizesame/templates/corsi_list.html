@@ -16,9 +16,9 @@
 {% endif %}
 
 {% if riepilogo_globale %}
-<div class="card">
-  <h2>Riepilogo generale</h2>
-  <p class="muted" style="margin-top:0">
+<details class="card" open>
+  <summary><strong>Riepilogo generale</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">
     In {{ riepilogo_globale.numero_corsi }} corsi{% if riepilogo_globale.anno_iniziale %}, a partire dall'anno accademico {{ riepilogo_globale.anno_iniziale }}{% endif %}.
   </p>
   <div class="stats-grid">
@@ -32,13 +32,13 @@
     </div>
   </div>
   <p style="margin-top:0.75rem"><a href="/statistiche-generali">Statistiche generali (scegli i corsi da includere) &rarr;</a></p>
-</div>
+</details>
 {% endif %}
 
 {% if prossimi_appelli %}
-<div class="card">
-  <h2>Appelli in programma (prossime 2 settimane)</h2>
-  <table style="margin-top:0.5rem">
+<details class="card" open>
+  <summary><strong>Appelli in programma (prossime 2 settimane)</strong></summary>
+  <table style="margin-top:0.75rem">
     <tr><th>Data</th><th>Appello</th><th>Corso</th></tr>
     {% for a in prossimi_appelli %}
     <tr>
@@ -48,12 +48,12 @@
     </tr>
     {% endfor %}
   </table>
-</div>
+</details>
 {% endif %}
 
-<div class="card">
-  <h2>Cerca uno studente</h2>
-  <form method="get" action="/">
+<details class="card" open>
+  <summary><strong>Cerca uno studente</strong></summary>
+  <form method="get" action="/" style="margin-top:0.75rem">
     <div style="position:relative">
       <input type="text" name="q" id="input-cerca-studente" value="{{ q }}" placeholder="Cerca per matricola, nome o cognome (in tutti i corsi)">
       <div id="suggerimenti-cerca-studente" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
@@ -104,7 +104,7 @@
     <p class="muted" style="margin-top:0.75rem">Nessuno studente trovato per "{{ q }}".</p>
     {% endif %}
   {% endif %}
-</div>
+</details>
 
 {% if corsi %}
 <div class="card">
@@ -123,7 +123,7 @@
   <a href="/migrazione">Migrazione dati legacy</a> per importare i dati di un corso già esistente.</p>
 {% endif %}
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Nuovo corso</summary>
   <form method="post" action="/corsi/nuovo" id="nuovo-corso-form" style="margin-top:1rem">
     <div class="form-grid">

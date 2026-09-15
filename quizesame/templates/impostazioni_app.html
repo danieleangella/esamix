@@ -28,9 +28,9 @@
   </form>
 </div>
 
-<div class="card">
-  <h2>Aggiornamenti</h2>
-  <p class="muted">Controlla subito se è disponibile una versione più recente del codice su GitHub
+<details class="card" open>
+  <summary><strong>Aggiornamenti</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">Controlla subito se è disponibile una versione più recente del codice su GitHub
     (l'app lo fa anche automaticamente ogni poche ore, mostrando un avviso in homepage).</p>
   <form method="post" action="/impostazioni/controlla-aggiornamenti">
     <button type="submit" class="secondary">Controlla aggiornamenti</button>
@@ -39,29 +39,29 @@
     <strong>Linux/macOS</strong> esegui <code>./aggiorna.sh</code> dalla cartella del programma; su
     <strong>Windows</strong> fai doppio clic su <code>aggiorna.bat</code>.
     <a href="/help#aggiornamento">Dettagli nella guida</a>.</p>
-</div>
+</details>
 
-<div class="card">
-  <h2>Backup</h2>
-  <p class="muted">Scarica un archivio zip con il database e tutti i file generati (PDF/tex) di
+<details class="card" open>
+  <summary><strong>Backup</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">Scarica un archivio zip con il database e tutti i file generati (PDF/tex) di
     ogni corso: utile prima di modifiche importanti, o come copia di sicurezza periodica.</p>
   <a href="/backup-tutti.zip" class="button">Scarica un backup completo di tutti i corsi</a>
-</div>
+</details>
 
-<div class="card">
-  <h2>Ripristina backup</h2>
-  <p class="muted">Carica uno zip scaricato da qui (di un singolo corso o di tutti insieme): nella
+<details class="card" open>
+  <summary><strong>Ripristina backup</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">Carica uno zip scaricato da qui (di un singolo corso o di tutti insieme): nella
     pagina successiva scegli quali corsi ripristinare, con un avviso per quelli che esistono già e
     verrebbero sovrascritti.</p>
   <form method="post" action="/ripristina-backup" enctype="multipart/form-data">
     <input type="file" name="file" accept=".zip" required>
     <button type="submit" class="secondary">Carica e scegli cosa ripristinare</button>
   </form>
-</div>
+</details>
 
-<div class="card">
-  <h2>Elimina tutti i dati</h2>
-  <p class="muted">Elimina definitivamente <strong>tutti i {{ numero_corsi }} corsi</strong> di questa
+<details class="card">
+  <summary><strong>Elimina tutti i dati</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">Elimina definitivamente <strong>tutti i {{ numero_corsi }} corsi</strong> di questa
     installazione: studenti, esercizi, appelli e tutti i risultati registrati, in ogni corso. Azione
     irreversibile, senza backup automatico: scaricane uno da qui sopra prima di procedere, se non l'hai
     già fatto.</p>
@@ -76,5 +76,5 @@
   {% else %}
   <p class="muted">Non ci sono ancora corsi da eliminare.</p>
   {% endif %}
-</div>
+</details>
 {% endblock %}

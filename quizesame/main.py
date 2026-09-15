@@ -394,6 +394,7 @@ def modifica_corso(
     frase_consegna: str = Form(""), frase_regole: str = Form(""),
     orale_dopo_richiesta: str = Form(""), orale_soglia_attiva: str = Form(""),
     orale_soglia_n: str = Form(""), orale_soglia_voto: str = Form(""),
+    orale_soglia_escludi_parziali: str = Form(""),
     ritirato_conta_insufficiente: str = Form(""), domande_esame: str = Form(""),
 ):
     try:
@@ -407,6 +408,7 @@ def modifica_corso(
             orale_dopo_richiesta="1" if orale_dopo_richiesta else "0",
             orale_soglia_attiva="1" if orale_soglia_attiva else "0",
             orale_soglia_n=orale_soglia_n.strip(), orale_soglia_voto=orale_soglia_voto.strip(),
+            orale_soglia_escludi_parziali="1" if orale_soglia_escludi_parziali else "0",
             ritirato_conta_insufficiente="1" if ritirato_conta_insufficiente else "0",
             domande_esame=domande_esame.strip(),
         )
@@ -540,6 +542,7 @@ def _dati_appello(tag: str, corso, appello) -> dict:
     disponibili = [e for e in banca_esercizi if e.id not in assegnati_ids]
     blocchi = compiti_service.list_blocchi(tag, appello.id)
     for b in blocchi:
+        b["tex_esiste"] = compiti_service.path_blocco(tag, appello.id, b["numero"], "tex", appello=appello).exists()
         b["pdf_esiste"] = compiti_service.path_blocco(tag, appello.id, b["numero"], "pdf", appello=appello).exists()
         b["griglia_pdf_esiste"] = compiti_service.path_griglia(tag, appello.id, b["numero"], "pdf", appello=appello).exists()
     compiti = compiti_service.list_compiti(tag, appello.id)
@@ -564,6 +567,7 @@ def _dati_appello(tag: str, corso, appello) -> dict:
         "numero_iscritti": numero_iscritti,
         "numero_studenti_suggerito": _numero_studenti_suggerito(numero_iscritti, len(compiti)),
         "avviso_pochi_compiti": numero_iscritti is not None and len(compiti) < numero_iscritti,
+        "riepilogo_presenze": presenze_service.riepilogo(tag, appello.id),
     }
     dati["riepilogo_home"] = _calcola_riepilogo_home(corso, appello, dati)
     return dati
@@ -720,6 +724,16 @@ def scarica_riferimento_pdf(tag: str, appello_id: int):
     return FileResponse(path, media_type="application/pdf", filename=path.name)
 
 
+@app.get("/corsi/{tag}/appelli/{appello_id}/riferimento.html", response_class=HTMLResponse)
+def riferimento_anteprima(request: Request, tag: str, appello_id: int):
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    righe = compiti_service.anteprima_riferimento(tag, appello_id)
+    return templates.TemplateResponse(request, "riferimento_anteprima.html", {
+        "corso": corso, "appello": appello, "righe": righe,
+    })
+
+
 @app.get("/corsi/{tag}/appelli/{appello_id}/blocchi/{numero}/testo.tex", response_class=PlainTextResponse)
 def scarica_blocco_tex(tag: str, appello_id: int, numero: int):
     path = compiti_service.path_blocco(tag, appello_id, numero, "tex")
@@ -734,6 +748,18 @@ def scarica_blocco_pdf(tag: str, appello_id: int, numero: int):
     if not path.exists():
         return PlainTextResponse("PDF non ancora compilato", status_code=404)
     return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/blocchi/{numero}/testo.html", response_class=HTMLResponse)
+def blocco_anteprima(request: Request, tag: str, appello_id: int, numero: int):
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    dati = compiti_service.anteprima_blocco(tag, appello_id, numero)
+    if dati is None:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Blocco {numero} non trovato", "error")
+    return templates.TemplateResponse(request, "blocco_anteprima.html", {
+        "corso": corso, "appello": appello, "numero": numero, "codice": dati["codice"], "righe": dati["righe"],
+    })
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/blocchi/{numero}/elimina")
@@ -991,7 +1017,10 @@ def _render_correggi_revisione(
     # Un segno di spunta/croce sotto ogni lettera delle risposte corrette, allineato
     # carattere per carattere (stesso raggruppamento a blocchi di 5): le domande aperte
     # non hanno una lettera "corretta" da confrontare, quindi restano neutre.
-    marcatura_grezza = "".join("·" if r.aperta else ("✓" if r.corretta else "✗") for r in valutazione.righe)
+    marcatura_grezza = "".join(
+        "·" if r.aperta else ("✓" if r.corretta else ("-" if not r.svolta else "✗"))
+        for r in valutazione.righe
+    )
     gruppi_marcatura = [marcatura_grezza[i:i + 5] for i in range(0, len(marcatura_grezza), 5)]
     risposte_marcatura_raggruppata = " ".join(gruppi_marcatura)
 
@@ -1154,9 +1183,9 @@ def completa_orale(tag: str, appello_id: int, matricola: str, esito_orale: str =
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/assenze/segna")
 def segna_assenza(request: Request, tag: str, appello_id: int, matricola: str = Form(...), esito: str = Form(...)):
-    # risponde in JSON alla chiamata fetch dalla pagina presenze.html (bottone "Assente"
-    # per riga, aggiornato sul posto), con il solito redirect per il form della scheda
-    # Valutazione (segna ritirato) e come fallback se il fetch lato client fallisse.
+    # risponde in JSON alla chiamata fetch dalla scheda "Presenze e ritirati" (bottone
+    # "Assente" per riga, aggiornato sul posto), con il solito redirect per il form della
+    # scheda "Segna ritirato" e come fallback se il fetch lato client fallisse.
     vuole_json = "application/json" in request.headers.get("accept", "")
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "valutazione")
@@ -1187,6 +1216,7 @@ def dettaglio_risultato(request: Request, tag: str, appello_id: int, matricola: 
     return templates.TemplateResponse(request, "risultato_dettaglio.html", {
         "corso": corso, "appello": appello, "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
         "storico": dettaglio["storico"], "chiuso": appello.chiuso,
+        "dettaglio_esercizi_disponibile": dettaglio["dettaglio_esercizi_disponibile"],
     })
 
 
@@ -1203,6 +1233,7 @@ def dettaglio_risultato_inline(request: Request, tag: str, appello_id: int, matr
     return templates.TemplateResponse(request, "_risultato_dettaglio.html", {
         "corso_tag": tag, "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
         "storico": dettaglio["storico"], "chiuso": appello.chiuso,
+        "dettaglio_esercizi_disponibile": dettaglio["dettaglio_esercizi_disponibile"],
     })
 
 
@@ -1356,24 +1387,15 @@ def scarica_iscritti_pdf(tag: str, appello_id: int):
     return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
 
 
-@app.get("/corsi/{tag}/appelli/{appello_id}/presenze", response_class=HTMLResponse)
-def registro_presenze(request: Request, tag: str, appello_id: int):
-    corso = corsi_service.get_corso(tag)
-    appello = corsi_service.get_appello(tag, appello_id)
-    riepilogo = presenze_service.riepilogo(tag, appello_id)
-    return templates.TemplateResponse(request, "presenze.html", {
-        "corso": corso, "appello": appello, "riepilogo": riepilogo,
-    })
-
-
 @app.post("/corsi/{tag}/appelli/{appello_id}/presenze/{matricola}/imposta")
 def imposta_presenza(request: Request, tag: str, appello_id: int, matricola: str, presente: str = Form("")):
-    # risponde in JSON alla chiamata fetch della pagina presenze.html (aggiorna la riga
-    # sul posto, senza ricaricare tutta la pagina), altrimenti con il solito redirect —
-    # usata anche come fallback se il fetch lato client fallisse per qualunque motivo.
+    # risponde in JSON alla chiamata fetch dalla scheda "Presenze e ritirati" (aggiorna la
+    # riga sul posto, senza ricaricare tutta la pagina), altrimenti con il solito redirect
+    # — usato anche come fallback se il fetch lato client fallisse per qualunque motivo.
     vuole_json = "application/json" in request.headers.get("accept", "")
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "presenze")
     try:
-        appello = corsi_service.get_appello(tag, appello_id)
         if appello and appello.presenze_chiuse:
             raise ValueError("Il registro presenze è chiuso: riaprilo prima di modificare le presenze")
         if presente:
@@ -1383,18 +1405,20 @@ def imposta_presenza(request: Request, tag: str, appello_id: int, matricola: str
     except Exception as e:
         if vuole_json:
             return JSONResponse({"errore": str(e)}, status_code=400)
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}/presenze", str(e), "error")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     if vuole_json:
         return JSONResponse({"presente": bool(presente)})
-    return RedirectResponse(f"/corsi/{tag}/appelli/{appello_id}/presenze", status_code=303)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Presenza aggiornata", anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/presenze/chiudi")
 def chiudi_presenze(tag: str, appello_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "presenze")
     try:
         esito = presenze_service.chiudi(tag, appello_id)
     except Exception as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}/presenze", str(e), "error")
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     msg = f"Registro chiuso: {esito['segnati_assenti']} studenti non presenti segnati come assenti"
     kind = "success"
     if esito["non_registrati"]:
@@ -1406,15 +1430,17 @@ def chiudi_presenze(tag: str, appello_id: int):
     if esito["errori"]:
         kind = "warning"
         msg += f" — {len(esito['errori'])} studenti non segnati per un errore imprevisto: riprova a mano per loro"
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}/presenze", msg, kind)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, kind, anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/presenze/riapri")
 def riapri_presenze(tag: str, appello_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
     presenze_service.riapri(tag, appello_id)
     return flash_redirect(
-        f"/corsi/{tag}/appelli/{appello_id}/presenze",
+        f"/corsi/{tag}/appelli/{appello_id}",
         "Registro riaperto: puoi tornare a spuntare le presenze (gli studenti già segnati assenti non cambiano)",
+        anchor=_anchor_membro(appello, "presenze"),
     )
 
 
@@ -1893,13 +1919,37 @@ def api_cerca_studenti_globale(q: str = ""):
     return studenti_service.cerca_globale(q)
 
 
+def _stato_iscritto(s: dict) -> Optional[str]:
+    if s["bloccato"]:
+        return {"assente": "assente", "ritirato": "ritirato"}.get(s["esito"], "già valutato")
+    if s["presente"]:
+        return "presente"
+    return None
+
+
 @app.get("/corsi/{tag}/api/studenti/cerca")
-def api_cerca_studenti(tag: str, q: str = ""):
+def api_cerca_studenti(tag: str, q: str = "", appello_id: Optional[int] = None):
     if not q.strip():
         return []
+    risultati = studenti_service.list_studenti(tag, q.strip())
+    stati_per_matricola: dict[str, Optional[str]] = {}
+    if appello_id is not None:
+        # una matricola può corrispondere a più persone (numeri simili, o cercando per
+        # nome/cognome): chi è iscritto a questo appello è quasi sempre chi si sta
+        # cercando davvero, quindi va proposto per primo, senza però nascondere gli altri.
+        # Lo stato (presente/assente/ritirato/già valutato) aiuta a riconoscerlo subito,
+        # e a capire a colpo d'occhio chi resta ancora da correggere.
+        riepilogo = presenze_service.riepilogo(tag, appello_id)
+        iscritti = riepilogo["iscritti"] if riepilogo else []
+        stati_per_matricola = {s["matricola"]: _stato_iscritto(s) for s in iscritti}
+        matricole_iscritte = set(stati_per_matricola)
+        risultati = sorted(risultati, key=lambda s: s.matricola not in matricole_iscritte)
     return [
-        {"matricola": s.matricola, "nome": s.nome, "cognome": s.cognome}
-        for s in studenti_service.list_studenti(tag, q.strip())[:15]
+        {
+            "matricola": s.matricola, "nome": s.nome, "cognome": s.cognome,
+            "stato": stati_per_matricola.get(s.matricola),
+        }
+        for s in risultati[:15]
     ]
 
 

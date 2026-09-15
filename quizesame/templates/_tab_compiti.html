@@ -6,10 +6,10 @@
 </div>
 {% endif %}
 
-<div class="card">
-  <h2>Iscritti{% if md.numero_iscritti is not none %} ({{ md.numero_iscritti }}){% endif %}</h2>
+<details class="card" open>
+  <summary><strong>Iscritti{% if md.numero_iscritti is not none %} ({{ md.numero_iscritti }}){% endif %}</strong></summary>
   {% if md.segreteria_csv %}
-  <p class="muted" style="margin-top:0">
+  <p class="muted" style="margin-top:0.75rem">
     File caricato: <strong>{{ md.segreteria_csv.nome_file }}</strong> (il {{ md.segreteria_csv.caricato_il }}) —
     <strong>{{ md.iscritti|length }}</strong> iscritti trovati. Questo numero ha sempre la precedenza su un
     eventuale numero inserito a mano.
@@ -61,7 +61,7 @@
     uno (usato per l'elenco stampabile e per il numero suggerito di compiti da generare qui sotto).
   </p>
   {% if not md.appello.chiuso %}
-  <details style="margin-top:0.5rem" {% if not md.iscritti_manuali %}open{% endif %}>
+  <details class="dettaglio-fisarmonica" style="margin-top:0.5rem" {% if not md.iscritti_manuali %}open{% endif %}>
     <summary>Aggiungi iscritti manualmente{% if md.iscritti_manuali %} ({{ md.iscritti_manuali|length }}){% endif %}</summary>
     {% if md.iscritti_manuali %}
     <table style="margin-top:0.75rem">
@@ -102,7 +102,7 @@
     })();
     </script>
   </details>
-  <details style="margin-top:0.5rem">
+  <details class="dettaglio-fisarmonica" style="margin-top:0.5rem">
     <summary>In alternativa, indica solo un numero (senza elenco nominale)</summary>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale" style="margin-top:1rem">
       <div class="form-grid">
@@ -123,7 +123,7 @@
   {% endif %}
 
   {% if not md.appello.chiuso %}
-  <details style="margin-top:0.75rem" {% if not md.segreteria_csv %}open{% endif %}>
+  <details class="dettaglio-fisarmonica" style="margin-top:0.75rem" {% if not md.segreteria_csv %}open{% endif %}>
     <summary>{{ 'Aggiorna' if md.segreteria_csv else 'Carica' }} il file della segreteria ("Lista Studenti Esame")</summary>
     <p class="muted" style="margin-top:1rem">
       Caricalo qui una volta sola: da questo file si ricava sia il numero di iscritti (con priorità su quello
@@ -137,10 +137,10 @@
     </form>
   </details>
   {% endif %}
-</div>
+</details>
 
-<div class="card">
-  <h2>Crea compiti</h2>
+<details class="card" open>
+  <summary><strong>Crea compiti</strong></summary>
   {% if md.avviso_pochi_compiti %}
   <div class="flash flash-warning" style="margin-bottom:1rem">
     Attenzione: sono stati generati {{ md.compiti|length }} compiti in totale, ma risultano
@@ -187,10 +187,11 @@
   })();
   </script>
   {% endif %}
-  {% if md.riferimento_tex_esiste %}
+  {% if md.esercizi_assegnati %}
   <p>
     <strong>Foglio di riferimento</strong> (testo e risposte corrette, comune a tutti i blocchi, da pubblicare online):
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.tex">.tex</a>
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.html">.html</a>
+    {% if md.riferimento_tex_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.tex">.tex</a>{% endif %}
     {% if md.riferimento_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.pdf">.pdf</a>{% endif %}
   </p>
   {% endif %}
@@ -206,7 +207,8 @@
       <td>{{ b.numero_studenti }}</td>
       <td class="muted">{{ b.creato_il or 'recuperato (generato prima di questo aggiornamento)' }}</td>
       <td>
-        <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/testo.tex">.tex</a>
+        <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/testo.html">.html</a>
+        {% if b.tex_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/testo.tex">.tex</a>{% endif %}
         {% if b.pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/testo.pdf">.pdf</a>{% endif %}
       </td>
       <td>
@@ -227,12 +229,12 @@
   </table>
   {% endif %}
   <p class="muted">{{ md.compiti|length }} compiti registrati in totale.</p>
-</div>
+</details>
 
 {% if md.ammessi is defined %}
-<div class="card">
-  <h2>Studenti ammessi e aule ({{ md.ammessi|length }})</h2>
-  <p class="muted" style="margin-top:0">
+<details class="card" open>
+  <summary><strong>Studenti ammessi e aule ({{ md.ammessi|length }})</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">
     Scarica elenco ammessi: <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi.pdf">.pdf</a>
   </p>
 
@@ -274,7 +276,7 @@
       {% endfor %}
     </table>
 
-    <details style="margin-top:0.75rem">
+    <details class="dettaglio-fisarmonica" style="margin-top:0.75rem">
       <summary>Aggiungi manualmente uno studente (anche se non soddisfa i requisiti)</summary>
       <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi/aggiungi" style="margin-top:1rem" autocomplete="off">
         <div class="form-grid">
@@ -334,7 +336,7 @@
   </form>
   {% endif %}
   </details>
-</div>
+</details>
 {% endif %}
 
 </div>

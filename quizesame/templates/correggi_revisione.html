@@ -43,7 +43,7 @@
     </div>
     <div class="muted" style="font-size:0.8rem; margin-top:0.5rem">Risposte corrette</div>
     <div style="font-family:monospace; font-size:1.4rem; letter-spacing:0.1em; color:var(--ok-text); font-weight:bold">{{ risposte_corrette_raggruppate }}</div>
-    <div style="font-family:monospace; font-size:1.4rem; letter-spacing:0.1em" title="✓ risposta giusta, ✗ risposta sbagliata o non data, · domanda aperta (valutata a mano)">{{ risposte_marcatura_raggruppata }}</div>
+    <div style="font-family:monospace; font-size:1.4rem; letter-spacing:0.1em" title="✓ risposta giusta, ✗ risposta sbagliata, - risposta non data, · domanda aperta (valutata a mano)">{{ risposte_marcatura_raggruppata }}</div>
     <button type="submit" id="btn-ricalcola" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" formnovalidate class="secondary" disabled style="margin-top:0.6rem">Ricalcola con queste risposte</button>
   </div>
   {% if lunghezza_valida %}
@@ -63,29 +63,40 @@
   {% endif %}
   <p class="muted" style="margin-top:1rem; text-align:center">Voto calcolato dalla griglia di risposte: <strong>{{ v.voto_base }}</strong></p>
 
-  <table>
-    <tr><th>Esercizio</th><th>Obbligatorio</th><th>Risposta data / corretta</th><th>Esito</th></tr>
-    {% for r in v.righe %}
-    <tr>
-      <td>{{ r.posizione + 1 }}. {{ r.esercizio_nome }}</td>
-      <td>{{ 'sì' if r.obbligatorio else '-' }}</td>
-      {% if r.aperta %}
-      <td class="muted">domanda aperta: vedi punteggio da assegnare sotto</td>
-      <td><span class="badge badge-info">domanda aperta</span></td>
-      {% else %}
-      <td style="text-align:center; font-family:monospace; font-size:1.1rem; line-height:1.5">
-        <div>{{ r.lettera_data }}</div>
-        <div style="color:var(--ok-text); font-weight:bold">{{ r.lettera_corretta }}</div>
-      </td>
-      <td>
-        {% if not r.svolta %}<span class="muted">non data</span>
-        {% elif r.corretta %}<span class="badge badge-ok">corretta</span>
-        {% else %}<span class="badge badge-warn">sbagliata</span>{% endif %}
-      </td>
-      {% endif %}
-    </tr>
-    {% endfor %}
-  </table>
+  <details style="margin-top:0.75rem">
+    <summary>Dettaglio esercizio per esercizio ({{ v.righe|length }})</summary>
+    {% if not v.dettaglio_esercizi_disponibile %}
+    <p class="muted" style="margin-top:0.5rem">
+      Per questo compito non è noto quale esercizio corrisponda a ciascuna posizione (dati
+      storici incompleti, tipicamente da una migrazione): sotto trovi comunque, posizione
+      per posizione, la risposta data a confronto con quella corretta.
+    </p>
+    {% endif %}
+
+    <table style="margin-top:0.75rem">
+      <tr><th>Esercizio</th><th>Obbligatorio</th><th>Risposta data / corretta</th><th>Esito</th></tr>
+      {% for r in v.righe %}
+      <tr>
+        <td>{{ r.posizione + 1 }}. {{ r.esercizio_nome }}</td>
+        <td>{{ 'sì' if r.obbligatorio else '-' }}</td>
+        {% if r.aperta %}
+        <td class="muted">domanda aperta: vedi punteggio da assegnare sotto</td>
+        <td><span class="badge badge-info">domanda aperta</span></td>
+        {% else %}
+        <td style="text-align:center; font-family:monospace; font-size:1.1rem; line-height:1.5">
+          <div>{{ r.lettera_data }}</div>
+          <div style="color:var(--ok-text); font-weight:bold">{{ r.lettera_corretta }}</div>
+        </td>
+        <td>
+          {% if not r.svolta %}<span class="muted">non data</span>
+          {% elif r.corretta %}<span class="badge badge-ok">corretta</span>
+          {% else %}<span class="badge badge-warn">sbagliata</span>{% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </table>
+  </details>
 
   {% if v.non_svolte_obbligatorie %}
   <div class="flash flash-error" style="margin-top:1rem">
@@ -130,8 +141,10 @@
     {% endif %}
 
     <hr style="margin:1.5rem 0; border:none; border-top:1px solid var(--border)">
-    <div class="form-grid">
-      <div><label>Voto finale</label><input type="number" name="voto_finale" id="voto-finale" value="{{ voto_proposto }}"></div>
+    <div>
+      <label style="font-size:1rem">Voto finale</label>
+      <input type="number" name="voto_finale" id="voto-finale" value="{{ voto_proposto }}"
+             style="font-size:1.8rem; font-weight:bold; width:6rem; padding:0.4rem 0.6rem; text-align:center">
     </div>
 
     {% set orale_possibile = not v.non_svolte_obbligatorie and voto_proposto >= votomin_effettivo %}
@@ -156,16 +169,22 @@
     <input type="hidden" name="azione" id="azione-hidden" value="{{ 'richiedi_orale' if (richiedi_orale_checked and orale_possibile) else 'salva' }}">
     <input type="hidden" name="conferma_orale_obbligatorio" id="conferma-obbligatorio-hidden" value="">
 
-    <button type="submit">Conferma</button>
+    <div style="margin-top:1.25rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap">
+      <button type="submit" style="font-size:1.2rem; padding:0.7rem 1.6rem">Conferma</button>
+      {% if v.da_valutare or v.domande_aperte %}
+      <button type="submit" name="sospendi_valutazione" value="1" formnovalidate class="secondary">Completa successivamente</button>
+      {% endif %}
+    </div>
     {% if v.da_valutare or v.domande_aperte %}
-    <button type="submit" name="sospendi_valutazione" value="1" formnovalidate class="secondary" style="margin-left:0.5rem">Completa successivamente</button>
     <p class="muted" style="margin-top:0.4rem">
       "Completa successivamente" salva un voto provvisorio (ottimistico) e lascia i punteggi non ancora
       decisi da assegnare più tardi dalla sezione "Valutazioni in sospeso": non serve compilarli tutti ora.
     </p>
     {% endif %}
     {% endif %}
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione" class="muted" style="margin-left:1rem">Annulla, non salvare</a>
+    <p style="margin-top:0.75rem">
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione" class="muted">Annulla, non salvare</a>
+    </p>
   </form>
 </div>
 <script>

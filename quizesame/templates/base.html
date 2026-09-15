@@ -36,7 +36,7 @@
   // fondo a base.html: se fosse definita lì, ogni chiamata fallirebbe silenziosamente
   // con "creaAutocomplete is not defined" (gli script si eseguono nell'ordine in cui
   // compaiono nel documento, non con hoisting tra un <script> e l'altro).
-  function creaAutocomplete(input, suggerimentiEl, urlBuilder, renderEtichetta, campoValore, onRisultati) {
+  function creaAutocomplete(input, suggerimentiEl, urlBuilder, renderEtichetta, campoValore, onRisultati, renderStato) {
     var timer = null;
     var ultimaRichiesta = 0;
     input.addEventListener("input", function () {
@@ -59,7 +59,19 @@
           dati.forEach(function (item) {
             var div = document.createElement("div");
             div.className = "sfoglia-voce";
-            div.textContent = renderEtichetta(item);
+            div.appendChild(document.createTextNode(renderEtichetta(item)));
+            var stato = renderStato ? renderStato(item) : null;
+            if (stato) {
+              var classiBadge = {
+                assente: "badge-err", ritirato: "badge-warn",
+                presente: "badge-ok", "già valutato": "badge-info",
+              };
+              var span = document.createElement("span");
+              span.className = "badge " + (classiBadge[stato] || "badge-info");
+              span.style.marginLeft = "0.4rem";
+              span.textContent = stato;
+              div.appendChild(span);
+            }
             div.addEventListener("click", function () {
               input.value = campoValore(item);
               suggerimentiEl.style.display = "none";
@@ -258,11 +270,14 @@
   });
   </script>
   <script>
-  // Tutti i menu a scomparsa (<details>) di qualunque pagina si comportano come
-  // un'unica fisarmonica: aprirne uno chiude ogni altro rimasto aperto, così le pagine
-  // con più sezioni pieghevoli (es. Esercizi, Appelli) non restano affollate di form aperti.
+  // I pannelli marcati con la classe "dettaglio-fisarmonica" (pannelli-azione come "Nuovo
+  // appello"/"Importa da file", o gruppi di voci come l'accordion della guida) si
+  // comportano come un'unica fisarmonica: aprirne uno chiude ogni altro rimasto aperto,
+  // così le pagine non restano affollate di pannelli aperti. Le sezioni di contenuto
+  // principali (card con solo class="card", senza questa classe) restano invece
+  // indipendenti tra loro e non vengono mai chiuse da un pannello annidato al loro interno.
   (function () {
-    var dettagli = document.querySelectorAll("details");
+    var dettagli = document.querySelectorAll("details.dettaglio-fisarmonica");
     dettagli.forEach(function (d) {
       d.addEventListener("toggle", function () {
         if (d.open) dettagli.forEach(function (altro) { if (altro !== d) altro.open = false; });

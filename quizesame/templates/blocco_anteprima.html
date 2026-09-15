@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Anteprima blocco {{ numero }} · {{ appello.nome }}{% endblock %}
+{% block content %}
+<p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#compiti">&larr; {{ appello.nome }}</a></p>
+<h1>Anteprima testo — blocco {{ numero }}</h1>
+<p class="muted">
+  Il primo compito di questo blocco (codice {{ codice }}), esattamente come stampato:
+  ordine di esercizi e risposte mischiato, nessuna indicata come corretta.
+</p>
+
+{% set lettere = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] %}
+{% for r in righe %}
+<div class="card">
+  <p style="white-space:pre-wrap; margin:0">{{ loop.index }}. {{ r.testo }}</p>
+  {% if r.aperta %}
+  <p class="muted" style="margin:0.5rem 0 0">Domanda aperta: nessuna risposta a scelta multipla.</p>
+  {% else %}
+  {% for s in r.risposte %}
+  <p style="margin:0.2rem 0">{{ lettere[loop.index0] }}. {{ s }}</p>
+  {% endfor %}
+  {% endif %}
+  {% if r.obbligatorio %}<p class="muted" style="margin-top:0.5rem">Obbligatorio.</p>{% endif %}
+</div>
+{% else %}
+<p class="muted">Nessun esercizio in questo compito.</p>
+{% endfor %}
+<script>renderizzaLatex(document.body);</script>
+{% endblock %}

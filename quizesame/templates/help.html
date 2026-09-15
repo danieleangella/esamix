@@ -6,7 +6,7 @@
 {% block content %}
 <h1>Guida</h1>
 
-<details class="card" open>
+<details class="card dettaglio-fisarmonica" open>
   <summary>Corsi</summary>
   <p>
     Ogni corso rappresenta un insegnamento in un anno accademico (es. "Geometria O-Z,
@@ -32,7 +32,7 @@
   </p>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Esercizi</summary>
   <p>
     La banca esercizi di un corso è condivisa tra tutti i suoi appelli: uno stesso
@@ -67,7 +67,7 @@
   </p>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Un appello, scheda per scheda</summary>
   <p>
     La pagina di un appello si apre sulla scheda <strong>Home</strong>: data, compiti
@@ -76,13 +76,13 @@
     99%, verde al 100%) che riassume a che punto si è nel flusso testo → stampa →
     valutazione → eventuali orali → chiusura. Le altre schede sono <strong>Testo</strong>
     (esercizi assegnati), <strong>Compiti d'esame</strong> (iscritti e generazione dei
-    blocchi, vedi sotto), <strong>Valutazione scritti</strong>, <strong>Orali</strong>,
-    <strong>Voti verbalizzati</strong>, <strong>Statistiche</strong> e
-    <strong>Impostazioni</strong>.
+    blocchi, vedi sotto), <strong>Presenze e ritirati</strong>, <strong>Correzione</strong>,
+    <strong>Orali</strong>, <strong>Voti verbalizzati</strong>, <strong>Statistiche</strong>
+    e <strong>Impostazioni</strong>.
   </p>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Iscritti e generazione dei compiti</summary>
   <p>
     Nella scheda <strong>Compiti d'esame</strong> si indicano gli iscritti a un appello,
@@ -105,7 +105,10 @@
     univoco) stampati insieme. Si possono generare più blocchi nel tempo per lo stesso
     appello (es. per chi arriva più tardi, o per aule diverse). Il <strong>foglio di
     riferimento</strong> (testo e risposte corrette) è invece unico per l'appello,
-    comune a tutti i blocchi, e viene creato solo la prima volta.
+    comune a tutti i blocchi, e viene creato solo la prima volta. Per entrambi, oltre ai
+    file <code>.tex</code>/<code>.pdf</code> da scaricare, un link <strong>.html</strong>
+    apre subito in pagina un'anteprima (per il blocco, del primo compito generato) senza
+    dover scaricare né compilare nulla.
   </p>
   <p class="muted">
     Se si modificano gli esercizi assegnati dopo aver già generato un blocco, l'app
@@ -125,15 +128,43 @@
   </p>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
+  <summary>Presenze e ritirati</summary>
+  <p>
+    Il registro presenze si spunta direttamente in questa scheda: "Presente"/"Assente"
+    per riga si salvano subito, senza ricaricare la pagina. Chi ha già un voto o un
+    esito per l'appello risulta presente automaticamente e non è più modificabile da
+    qui. "Chiudi registro" segna assenti tutti gli iscritti non spuntati (e senza già un
+    esito): un'operazione da fare una volta sola, a fine appello.
+  </p>
+  <p>
+    Dalla stessa scheda si <strong>registra al volo uno studente non censito</strong>
+    (scoperto durante l'appello) e si <strong>segna ritirato</strong> chi ha iniziato ma
+    non consegnato il compito scritto — entrambi cercabili per matricola o nome con
+    autocompletamento, che propone per primi gli studenti iscritti a questo appello se
+    la matricola cercata corrisponde a più persone.
+  </p>
+</details>
+
+<details class="card dettaglio-fisarmonica">
   <summary>Correzione</summary>
   <p>
-    Dalla scheda <strong>Valutazione scritti</strong>, si inserisce matricola (o nome,
-    con autocompletamento), codice del compito e la stringa di risposte data. Si arriva
-    sempre a un riepilogo prima di salvare: mostra risposte date e corrette una per una,
-    permette di correggere la stringa e ricalcolare, modificare il voto finale, ed
-    eventualmente <strong>richiedere l'orale</strong> invece di salvare un voto scritto
-    definitivo (solo se il compito è sufficiente).
+    Dalla scheda <strong>Correzione</strong>, si inserisce matricola (o nome, con
+    autocompletamento — anche qui proposti per primi gli iscritti a questo appello),
+    codice del compito e la stringa di risposte data. Un elenco a scomparsa "Presenti da
+    correggere" elenca chi risulta presente e non ancora corretto, con un pulsante che
+    precompila la matricola e sposta il focus sul codice, per scorrere gli studenti più
+    rapidamente. Si arriva sempre a un riepilogo prima di salvare: mostra risposte date e
+    corrette una per una (✓ giusta, ✗ sbagliata, - non data), permette di correggere la
+    stringa e ricalcolare, modificare il voto finale, ed eventualmente
+    <strong>richiedere l'orale</strong> invece di salvare un voto scritto definitivo
+    (solo se il compito è sufficiente).
+  </p>
+  <p class="muted">
+    Per i compiti importati da una migrazione dati legacy, a volte non è noto quale
+    esercizio corrisponda a ciascuna posizione del compito: il riepilogo lo segnala e
+    mostra comunque il confronto risposta data/corretta posizione per posizione, senza
+    però poter indicare il nome dell'esercizio né se fosse obbligatorio.
   </p>
   <p>
     Se un esercizio obbligatorio non è stato svolto, il compito risulta automaticamente
@@ -153,9 +184,10 @@
   <p>
     Un esito già inserito si può modificare in qualsiasi momento (voto e/o risposte, con
     ricalcolo) finché non è verbalizzato. Per chi non si è presentato o si è ritirato
-    durante la prova, si usa "Segna assente o ritirato" invece della correzione normale.
-    Se è stato indicato un elenco iscritti (vedi sopra), correggere o segnare
-    assente/ritirato uno studente che non vi compare è bloccato.
+    durante la prova, si usano i pulsanti "Assente"/"Segna ritirato" della scheda
+    Presenze e ritirati, invece della correzione normale. Se è stato indicato un elenco
+    iscritti (vedi sopra), correggere o segnare assente/ritirato uno studente che non vi
+    compare è bloccato.
   </p>
   <p>
     La pagina di un singolo compito corretto mostra anche, in fondo, un link discreto
@@ -164,7 +196,7 @@
   </p>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Orale</summary>
   <p>
     Nella scheda <strong>Orali</strong> di un appello compaiono gli studenti in attesa:
@@ -179,11 +211,11 @@
   </p>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Verbalizzazione e statistiche</summary>
   <p>
-    Gli studenti idonei non ancora verbalizzati compaiono in fondo alla scheda
-    "Valutazione scritti", con un pulsante "Verbalizza" per ciascuno (oltre a quello per
+    Gli studenti idonei non ancora verbalizzati compaiono in cima alla scheda
+    <strong>Voti verbalizzati</strong>, con un pulsante "Verbalizza" per ciascuno (oltre a quello per
     verbalizzarli tutti insieme) e uno per rifiutare il voto; una volta verbalizzato, un
     esito non è più modificabile o eliminabile. Chi ha sostenuto l'orale è segnalato come
     tale sia tra i risultati inseriti sia tra i voti verbalizzati.
@@ -212,7 +244,7 @@
   </p>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Studenti</summary>
   <p>
     Si aggiungono singolarmente (rifiuta una matricola già assegnata a un altro
@@ -253,7 +285,7 @@
   </p>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Raggruppamenti</summary>
   <p>
     Un raggruppamento combina più appelli (es. prove parziali) in un voto unico: la
@@ -263,7 +295,8 @@
   <p>
     Una prova membro non ha più una pagina propria: tutto vive nella pagina del
     raggruppamento, con una riga di tab per ciascuna prova (nell'ordine, col nome vero
-    della prova seguito dai pulsanti "Testo"/"Compiti d'esame"/"Valutazione") e delle
+    della prova seguito dai pulsanti "Testo"/"Compiti d'esame"/"Presenze e ritirati"/
+    "Correzione") e delle
     schede globali — <strong>Risultati</strong> (elenco combinato, verbalizzazione ed
     esportazione .tex/.pdf/segreteria), <strong>Orali</strong> (l'orale è unico per il
     raggruppamento: se richiesto durante la correzione di una prova, il suo voto
@@ -303,7 +336,7 @@
   </p>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Impostazioni dell'app</summary>
   <p>
     Distinte dalle impostazioni di un singolo corso: dal link <strong>Impostazioni</strong>
@@ -322,7 +355,7 @@
   </p>
 </details>
 
-<details class="card" id="aggiornamento">
+<details class="card dettaglio-fisarmonica" id="aggiornamento">
   <summary>Aggiornamento</summary>
   <p>
     Quando è disponibile una nuova versione, in homepage compare un avviso. Per
@@ -334,7 +367,7 @@
   </p>
 </details>
 
-<details class="card">
+<details class="card dettaglio-fisarmonica">
   <summary>Migrazione da dati legacy</summary>
   <p>
     Dalla pagina "Migrazione dati legacy" si importa un corso gestito con la vecchia CLI

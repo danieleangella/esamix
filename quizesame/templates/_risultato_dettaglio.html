@@ -32,6 +32,13 @@
   {% endif %}
 
   {% if righe %}
+  {% if dettaglio_esercizi_disponibile is defined and not dettaglio_esercizi_disponibile %}
+  <p class="muted">
+    Per questo compito non è noto quale esercizio corrisponda a ciascuna posizione (dati
+    storici incompleti, tipicamente da una migrazione): sotto, posizione per posizione,
+    la risposta data a confronto con quella corretta.
+  </p>
+  {% endif %}
   <table>
     <tr><th>Esercizio</th><th>Obbligatorio</th><th>Risposta data</th><th>Risposta corretta</th><th>Esito</th><th>Punteggio assegnato</th></tr>
     {% for r in righe %}

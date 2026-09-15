@@ -14,9 +14,9 @@
 <form method="post" action="/corsi/{{ corso.tag }}/studenti/importa-csv/verifica">
   <textarea name="csv_testo" style="display:none">{{ anteprima.csv_testo }}</textarea>
 
-  <div class="card">
-    <h2>Abbinamento colonne</h2>
-    <div class="form-grid">
+  <details class="card" open>
+    <summary><strong>Abbinamento colonne</strong></summary>
+    <div class="form-grid" style="margin-top:0.75rem">
       <div>
         <label class="campo-obbligatorio">Matricola</label>
         <select name="matricola_idx" required>
@@ -46,15 +46,15 @@
         </select>
       </div>
     </div>
-  </div>
+  </details>
 
   <div class="card">
     <label>Ignora le prime <input type="number" name="righe_da_ignorare" value="{{ 1 if anteprima.ha_intestazione else 0 }}" min="0" style="width:4rem; display:inline-block"> righe del file (es. intestazione)</label>
   </div>
 
-  <div class="card">
-    <h2>Anteprima del file ({{ anteprima.totale_righe }} righe di dati{% if anteprima.totale_righe > anteprima.righe_anteprima|length %}, prime {{ anteprima.righe_anteprima|length }} mostrate{% endif %})</h2>
-    <div style="overflow-x:auto">
+  <details class="card" open>
+    <summary><strong>Anteprima del file ({{ anteprima.totale_righe }} righe di dati{% if anteprima.totale_righe > anteprima.righe_anteprima|length %}, prime {{ anteprima.righe_anteprima|length }} mostrate{% endif %})</strong></summary>
+    <div style="overflow-x:auto; margin-top:0.75rem">
       <table>
         <tr>{% for c in anteprima.colonne %}<th>{{ c }}</th>{% endfor %}</tr>
         {% for r in anteprima.righe_anteprima %}
@@ -62,7 +62,7 @@
         {% endfor %}
       </table>
     </div>
-  </div>
+  </details>
 
   <button type="submit">Continua</button>
   <a href="/corsi/{{ corso.tag }}/studenti" style="margin-left:1rem">Annulla</a>
