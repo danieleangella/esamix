@@ -66,6 +66,7 @@ class Corso:
     orale_soglia_escludi_parziali: bool = True
     ritirato_conta_insufficiente: bool = False
     domande_esame: str = ""
+    importato_da_legacy: bool = False
 
 
 @dataclass
@@ -83,6 +84,7 @@ class Appello:
     chiuso: bool = False
     iscritti_manuale: Optional[int] = None
     presenze_chiuse: bool = False
+    correzione_scritti_conclusa: bool = False
 
 
 @dataclass
@@ -370,6 +372,7 @@ def get_corso(tag: str) -> Corso:
         orale_soglia_escludi_parziali=meta.get("orale_soglia_escludi_parziali", "1") == "1",
         ritirato_conta_insufficiente=meta.get("ritirato_conta_insufficiente", "0") == "1",
         domande_esame=meta.get("domande_esame", ""),
+        importato_da_legacy=meta.get("importato_da_legacy", "0") == "1",
     )
 
 
@@ -410,6 +413,7 @@ def _row_to_appello(conn, row) -> Appello:
         chiuso=bool(row["chiuso"]) if "chiuso" in chiavi else False,
         iscritti_manuale=row["iscritti_manuale"] if "iscritti_manuale" in chiavi and row["iscritti_manuale"] is not None else None,
         presenze_chiuse=bool(row["presenze_chiuse"]) if "presenze_chiuse" in chiavi else False,
+        correzione_scritti_conclusa=bool(row["correzione_scritti_conclusa"]) if "correzione_scritti_conclusa" in chiavi else False,
     )
 
 
@@ -518,11 +522,11 @@ def chiudi_appello(tag: str, appello_id: int) -> None:
     (nessun idoneo da verbalizzare, nessun orale da svolgere). Se è il raggruppamento
     stesso a essere chiuso, la chiusura si propaga a tutte le sue prove membro, così
     anche correggerle risulta bloccato."""
-    update_appello(tag, appello_id, chiuso=True)
+    update_appello(tag, appello_id, chiuso=True, correzione_scritti_conclusa=True)
     raggruppamento = get_raggruppamento_by_appello(tag, appello_id)
     if raggruppamento:
         for membro in raggruppamento.membri:
-            update_appello(tag, membro.id, chiuso=True)
+            update_appello(tag, membro.id, chiuso=True, correzione_scritti_conclusa=True)
 
 
 def riapri_appello(tag: str, appello_id: int) -> None:
@@ -531,6 +535,31 @@ def riapri_appello(tag: str, appello_id: int) -> None:
     if raggruppamento:
         for membro in raggruppamento.membri:
             update_appello(tag, membro.id, chiuso=False)
+
+
+def concludi_correzione_scritti(tag: str, appello_id: int) -> None:
+    """Segna conclusa la correzione degli scritti per questa specifica prova (o per il
+    voto combinato di un raggruppamento, se appello_id è il suo appello 'virtuale'):
+    blocca nuove correzioni per questa sola prova, senza chiudere l'intero appello (resta
+    possibile completare orali e verbalizzazioni). Indipendente per ogni prova membro di
+    un raggruppamento, dato che le prove parziali si concludono in momenti diversi."""
+    update_appello(tag, appello_id, correzione_scritti_conclusa=True)
+
+
+def riapri_correzione_scritti(tag: str, appello_id: int) -> None:
+    update_appello(tag, appello_id, correzione_scritti_conclusa=False)
+
+
+def chiudi_corso(tag: str) -> int:
+    """Chiude tutti gli appelli non ancora chiusi del corso (comodo a fine anno
+    accademico, invece di chiuderli uno per uno). Ritorna quanti ne ha effettivamente
+    chiusi."""
+    n = 0
+    for appello in list_appelli(tag):
+        if not appello.chiuso:
+            chiudi_appello(tag, appello.id)
+            n += 1
+    return n
 
 
 class AppelloChiuso(ValueError):
@@ -656,7 +685,7 @@ def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) ->
         membro = raggruppamento.membri[indice]
         if indice == 0:
             righe = conn.execute(
-                "SELECT matricola, nome, cognome, dsa FROM studenti ORDER BY cognome, nome"
+                "SELECT matricola, nome, cognome, dsa FROM studenti ORDER BY cognome COLLATE NOCASE, nome COLLATE NOCASE"
             ).fetchall()
             soglia = _matricola_a_intero(raggruppamento.matricola_minima_prima_prova)
             ammessi = [
@@ -670,7 +699,7 @@ def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) ->
                 "SELECT s.matricola, s.nome, s.cognome, s.dsa FROM risultati r "
                 "JOIN studenti s ON s.matricola = r.matricola "
                 "WHERE r.appello_id=? AND r.esito='voto' AND r.voto IS NOT NULL AND r.voto >= ? "
-                "ORDER BY s.cognome, s.nome",
+                "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
                 (membro_precedente.id, corso.votomin_raggruppamento),
             ).fetchall()
             ammessi = [dict(r) for r in righe]

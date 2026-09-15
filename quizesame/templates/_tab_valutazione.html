@@ -1,10 +1,15 @@
 <div class="tab-pane" data-pane="valutazione{{ pane_suffix }}" style="display:none">
   {% if md.appello.chiuso %}
   <div class="card">
-    <p class="muted">Appello chiuso: per correggere compiti, riaprilo prima dalla scheda Impostazioni.</p>
+    <p class="muted">Appello chiuso: per correggere compiti, riaprilo prima dalla scheda Impostazioni. I
+      risultati già registrati restano comunque consultabili e scaricabili qui sotto.</p>
   </div>
-  {% else %}
-  {% if not md.blocchi %}
+  {% elif md.appello.correzione_scritti_conclusa %}
+  <div class="card">
+    <p class="muted">Correzione scritta conclusa: nessuna nuova correzione è possibile finché non la riapri
+      qui sotto. I risultati già registrati restano comunque consultabili e scaricabili.</p>
+  </div>
+  {% elif not md.blocchi %}
   <div class="card">
     <p class="muted">Non sono ancora stati generati blocchi di compiti per questa prova: genera almeno un
       blocco dalla scheda "Compiti d'esame" prima di poter correggere gli scritti.</p>
@@ -133,10 +138,18 @@
 
   <details class="card" open>
     <summary><strong>Risultati inseriti ({{ md.risultati|length }})</strong></summary>
-    <table style="margin-top:0.75rem">
-      <tr><th>Studente</th><th>Matricola</th><th>Esito</th><th style="text-align:right"></th></tr>
-      {% for r in md.risultati %}
+    <div class="form-grid" style="margin-top:0.75rem">
+      <div><label>Cerca per cognome</label><input type="text" class="filtro-cognome-risultati" placeholder="cerca per cognome"></div>
+    </div>
+    <table class="tabella-risultati" style="margin-top:0.75rem">
       <tr>
+        <th class="th-ordina-risultati" data-campo="cognome" style="cursor:pointer" title="Ordina per cognome">Studente <span class="muted">⇅</span></th>
+        <th>Matricola</th>
+        <th class="th-ordina-risultati" data-campo="voto" style="cursor:pointer" title="Ordina per voto">Esito <span class="muted">⇅</span></th>
+        <th style="text-align:right"></th>
+      </tr>
+      {% for r in md.risultati %}
+      <tr class="riga-risultato" data-cognome="{{ r.cognome|lower }}" data-voto="{{ r.voto if r.voto is not none else -9999 }}">
         <td>
           <button type="button" class="link-simile btn-dettaglio-risultato" data-matricola="{{ r.matricola }}">{{ r.cognome }} {{ r.nome }}</button>
         </td>
@@ -177,11 +190,35 @@
       </tr>
       {% endfor %}
     </table>
-    <p>
-      Scarica elenco risultati:
-      <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati.tex">.tex</a> ·
-      <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati.pdf">.pdf</a>
+  </details>
+
+  <details class="card" open>
+    <summary><strong>Concludi correzione scritto</strong></summary>
+    {% if md.appello.correzione_scritti_conclusa %}
+    <p class="muted" style="margin-top:0.75rem">
+      Correzione scritta conclusa: nessuna nuova correzione è possibile per questa prova finché non riapri.
     </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riapri-correzione-scritto" style="margin-top:0.5rem">
+      <button type="submit" class="secondary">Riapri correzione scritto</button>
+    </form>
+    {% else %}
+    <p class="muted" style="margin-top:0.75rem">
+      Quando tutti i compiti scritti sono stati corretti, concludi: genera l'elenco risultati
+      (.html/.tex/.pdf) e blocca nuove correzioni per questa prova (puoi comunque riaprire in
+      qualsiasi momento).
+    </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/concludi-correzione-scritto" style="margin-top:0.5rem">
+      <button type="submit">Concludi correzione scritto</button>
+    </form>
+    {% endif %}
+    {% if md.risultati_tex_esiste or md.risultati_pdf_esiste %}
+    <p style="margin-top:0.75rem">
+      Scarica elenco risultati:
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati.html">.html</a>
+      {% if md.risultati_tex_esiste %} · <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati.tex">.tex</a>{% endif %}
+      {% if md.risultati_pdf_esiste %} · <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati.pdf">.pdf</a>{% endif %}
+    </p>
+    {% endif %}
   </details>
 
   {% if not raggruppamento %}
@@ -220,6 +257,47 @@
           });
       });
     });
+
+    var tabellaRisultati = root.querySelector(".tabella-risultati");
+    if (tabellaRisultati) {
+      var filtroCognome = root.querySelector(".filtro-cognome-risultati");
+      var righeRisultati = Array.prototype.slice.call(tabellaRisultati.querySelectorAll(".riga-risultato"));
+
+      filtroCognome.addEventListener("input", function () {
+        var q = filtroCognome.value.trim().toLowerCase();
+        righeRisultati.forEach(function (riga) {
+          var mostra = !q || riga.dataset.cognome.indexOf(q) !== -1;
+          riga.style.display = mostra ? "" : "none";
+          var dettaglio = riga.nextElementSibling;
+          if (!mostra && dettaglio && dettaglio.classList.contains("riga-dettaglio-risultato")) {
+            dettaglio.style.display = "none";
+          }
+        });
+      });
+
+      var direzioneCorrente = {};
+      tabellaRisultati.querySelectorAll(".th-ordina-risultati").forEach(function (th) {
+        th.addEventListener("click", function () {
+          var campo = th.dataset.campo;
+          var decrescente = direzioneCorrente[campo] !== "desc";
+          direzioneCorrente = {};
+          direzioneCorrente[campo] = decrescente ? "desc" : "asc";
+          righeRisultati.sort(function (a, b) {
+            var va = campo === "voto" ? parseFloat(a.dataset.voto) : a.dataset.cognome;
+            var vb = campo === "voto" ? parseFloat(b.dataset.voto) : b.dataset.cognome;
+            if (va < vb) return decrescente ? 1 : -1;
+            if (va > vb) return decrescente ? -1 : 1;
+            return 0;
+          });
+          righeRisultati.forEach(function (riga) {
+            var dettaglio = riga.nextElementSibling;
+            var eraDettaglio = dettaglio && dettaglio.classList.contains("riga-dettaglio-risultato");
+            tabellaRisultati.appendChild(riga);
+            if (eraDettaglio) tabellaRisultati.appendChild(dettaglio);
+          });
+        });
+      });
+    }
   })();
   </script>
 
@@ -246,6 +324,5 @@
       {% endfor %}
     </table>
   </details>
-  {% endif %}
   {% endif %}
 </div>

@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Anteprima riferimento · {{ appello.nome }}{% endblock %}
+{% block katex %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+{% endblock %}
 {% block content %}
 <p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#compiti">&larr; {{ appello.nome }}</a></p>
 <h1>Anteprima foglio di riferimento</h1>
@@ -25,5 +30,5 @@
 {% else %}
 <p class="muted">Nessun esercizio assegnato a questo appello.</p>
 {% endfor %}
-<script>renderizzaLatex(document.body);</script>
+<script>document.addEventListener("DOMContentLoaded", function () { renderizzaLatex(document.body); });</script>
 {% endblock %}

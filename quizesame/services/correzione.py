@@ -644,7 +644,7 @@ def list_risultati(tag: str, appello_id: int) -> list[dict]:
         rows = conn.execute(
             "SELECT r.*, s.nome, s.cognome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
-            "WHERE r.appello_id=? ORDER BY s.cognome, s.nome",
+            "WHERE r.appello_id=? ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id,),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -659,7 +659,7 @@ def list_orali_da_svolgere(tag: str, appello_id: int) -> list[dict]:
             "SELECT r.*, s.nome, s.cognome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
             "WHERE r.appello_id=? AND r.richiede_orale=1 AND r.orale_svolto=0 "
-            "ORDER BY s.cognome, s.nome",
+            "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id,),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -674,7 +674,7 @@ def list_orali_svolti(tag: str, appello_id: int) -> list[dict]:
             "SELECT r.*, s.nome, s.cognome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
             "WHERE r.appello_id=? AND r.richiede_orale=1 AND r.orale_svolto=1 "
-            "ORDER BY s.cognome, s.nome",
+            "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id,),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -689,7 +689,7 @@ def list_valutazioni_sospese(tag: str, appello_id: int) -> list[dict]:
             "SELECT r.*, s.nome, s.cognome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
             "WHERE r.appello_id=? AND r.valutazione_sospesa=1 "
-            "ORDER BY s.cognome, s.nome",
+            "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id,),
         ).fetchall()
         return [dict(r) for r in rows]

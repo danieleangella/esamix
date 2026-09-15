@@ -4,7 +4,7 @@ from math import ceil
 
 from quizesame import config, db
 from quizesame.services import corsi as corsi_service
-from quizesame.services.latex import LatexContext, crea_tex_risultati, celavoto
+from quizesame.services.latex import LatexContext, crea_tex_risultati, celavoto, celamatr
 
 
 def ctx_for(tag: str, corso, appello) -> LatexContext:
@@ -36,22 +36,43 @@ def _etichetta_esito(r, votomin: int) -> str:
     return celavoto(int(r["voto"]), votomin)
 
 
-def stampa_risultati(tag: str, appello_id: int) -> str:
-    corso = corsi_service.get_corso(tag)
-    appello = corsi_service.get_appello(tag, appello_id)
-    votomin = corsi_service.effective_votomin(corso, appello)
+def _righe_risultati(tag: str, appello_id: int, votomin: int):
     conn = db.get_connection(config.corso_db_path(tag))
     try:
-        rows = conn.execute(
+        return conn.execute(
             "SELECT r.*, s.nome, s.cognome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
-            "WHERE r.appello_id=? ORDER BY r.matricola",
+            "WHERE r.appello_id=? ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id,),
         ).fetchall()
     finally:
         conn.close()
+
+
+def stampa_risultati(tag: str, appello_id: int) -> str:
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    votomin = corsi_service.effective_votomin(corso, appello)
+    rows = _righe_risultati(tag, appello_id, votomin)
+    # celamatr() è applicata da crea_tex_risultati stessa: qui la matricola resta in chiaro.
     lista = [(r["matricola"], r["nome"], r["cognome"], _etichetta_esito(r, votomin)) for r in rows]
     return crea_tex_risultati(ctx_for(tag, corso, appello), lista)
+
+
+def lista_risultati_html(tag: str, appello_id: int) -> list[dict]:
+    """Stessi dati di stampa_risultati (matricola oscurata, stessa etichetta d'esito),
+    come lista di dict per un'anteprima HTML invece del sorgente LaTeX."""
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    votomin = corsi_service.effective_votomin(corso, appello)
+    rows = _righe_risultati(tag, appello_id, votomin)
+    return [
+        {
+            "matricola": celamatr(r["matricola"]), "nome": r["nome"], "cognome": r["cognome"],
+            "etichetta": _etichetta_esito(r, votomin),
+        }
+        for r in rows
+    ]
 
 
 @dataclass

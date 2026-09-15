@@ -4,7 +4,9 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <span class="current">Impostazioni</span>
 {% endblock %}
 {% block content %}
-<h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span></h1>
+<h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span>
+  {% if corso.importato_da_legacy %}<span class="badge badge-warn" title="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
+</h1>
 <div class="tabs">
   <a href="/corsi/{{ corso.tag }}">Appelli</a>
   <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
@@ -89,14 +91,14 @@
     <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </details>
 
-  <details class="card" open>
+  <details class="card">
     <summary><strong>Domande d'esame</strong></summary>
     <p class="muted" style="margin-top:1rem">Testo libero, per uso amministrativo (es. in vista dell'esportazione dei risultati).</p>
     <textarea name="domande_esame" rows="3">{{ corso.domande_esame }}</textarea>
     <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </details>
 
-  <details class="card" open>
+  <details class="card">
     <summary><strong>Testo del compito</strong></summary>
     <p class="muted" style="margin-top:1rem">
       I placeholder tra parentesi graffe (vedi sopra) vengono sostituiti con i valori
@@ -115,11 +117,22 @@
   </details>
 </form>
 
-<details class="card" open style="margin-top:2rem">
+<details class="card" style="margin-top:2rem">
   <summary><strong>Backup</strong></summary>
   <p class="muted" style="margin-top:1rem">Scarica un archivio zip con il database e tutti i file generati (PDF/tex) di questo
     corso: utile prima di modifiche importanti, o semplicemente come copia di sicurezza periodica.</p>
   <a href="/corsi/{{ corso.tag }}/backup.zip" class="button">Scarica backup di questo corso</a>
+</details>
+
+<details class="card">
+  <summary><strong>Chiudi corso</strong></summary>
+  <p class="muted" style="margin-top:1rem">Chiude in un colpo solo tutti gli appelli di questo corso non ancora
+    chiusi (comodo a fine anno accademico): non saranno più possibili correzioni, verbalizzazioni o modifiche,
+    finché non si riapre singolarmente l'appello interessato dalla sua scheda Impostazioni.</p>
+  <form method="post" action="/corsi/{{ corso.tag }}/chiudi"
+        onsubmit="return confirm('Chiudere tutti gli appelli di questo corso non ancora chiusi? Si possono comunque riaprire singolarmente più tardi.');">
+    <button type="submit" class="secondary" style="margin-top:0.5rem">Chiudi tutti gli appelli</button>
+  </form>
 </details>
 
 <details class="card">

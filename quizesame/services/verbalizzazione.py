@@ -18,7 +18,7 @@ def list_idonei(tag: str, appello_id: int) -> list[dict]:
             "WHERE r.appello_id=? AND r.verbalizzato=0 AND r.voto >= ? AND r.esito='voto' "
             "AND NOT (r.richiede_orale=1 AND r.orale_svolto=0) "
             "AND r.valutazione_sospesa=0 "
-            "ORDER BY s.cognome, s.nome",
+            "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id, votomin),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -99,7 +99,7 @@ def list_verbalizzati(tag: str, appello_id: int) -> list[dict]:
             "SELECT r.*, s.nome, s.cognome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
             "WHERE r.appello_id=? AND r.verbalizzato=1 "
-            "ORDER BY s.cognome, s.nome",
+            "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id,),
         ).fetchall()
         return [dict(r) for r in rows]

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Risultati · {{ appello.nome }}{% endblock %}
+{% block content %}
+<p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">&larr; {{ appello.nome }}</a></p>
+<h1>Elenco risultati — {{ appello.nome }}</h1>
+
+<div class="card">
+  {% if righe %}
+  <table>
+    <tr><th>Matricola</th><th>Studente</th><th>Esito</th></tr>
+    {% for r in righe %}
+    <tr>
+      <td style="font-family:monospace">{{ r.matricola }}</td>
+      <td>{{ r.nome[0] }}{{ r.cognome[0] }}</td>
+      <td>{{ r.etichetta }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nessun risultato registrato per questo appello.</p>
+  {% endif %}
+</div>
+{% endblock %}

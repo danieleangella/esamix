@@ -32,7 +32,8 @@
         {% elif r.esito != 'voto' %}{{ r.esito }}
         {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
         {% elif r.esito_orale in ('assente', 'insufficiente') %}{{ r.esito_orale }} (orale)
-        {% else %}{{ r.voto }}{% endif %}
+        {% elif r.superato %}<span class="badge badge-ok">{{ r.voto }}</span>
+        {% else %}<span class="badge badge-err">esame sostenuto insufficiente</span> <span class="muted">({{ r.voto }})</span>{% endif %}
       </td>
       <td>
         {% if r.richiede_orale %}

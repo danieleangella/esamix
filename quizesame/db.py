@@ -266,6 +266,7 @@ ADDITIVE_COLUMNS = {
         ("chiuso", "BOOLEAN NOT NULL DEFAULT 0"),
         ("iscritti_manuale", "INTEGER"),
         ("presenze_chiuse", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("correzione_scritti_conclusa", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
 }
 

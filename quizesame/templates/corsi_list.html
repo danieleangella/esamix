@@ -119,7 +119,9 @@
         <li{% if c.tag in corsi_correnti %} style="font-weight:600"{% endif %}>
           <a href="/corsi/{{ c.tag }}">{{ c.anno }}</a>
           <span class="muted">{{ c.tag }}</span>
-          {% if c.tag in corsi_correnti %}<span class="badge badge-ok">In corso</span>{% endif %}
+          {% if c.tag in corsi_chiusi %}<span class="badge badge-info">Chiuso</span>
+          {% elif c.tag in corsi_correnti %}<span class="badge badge-ok">In corso</span>{% endif %}
+          {% if c.importato_da_legacy %}<span class="badge badge-warn" title="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
         </li>
         {% endfor %}
       </ul>
@@ -129,7 +131,9 @@
     <li{% if c.tag in corsi_correnti %} style="font-weight:600"{% endif %}>
       <a href="/corsi/{{ c.tag }}">{{ c.nome }}</a>
       <span class="muted">{{ c.anno }} · {{ c.tag }}</span>
-      {% if c.tag in corsi_correnti %}<span class="badge badge-ok">In corso</span>{% endif %}
+      {% if c.tag in corsi_chiusi %}<span class="badge badge-info">Chiuso</span>
+      {% elif c.tag in corsi_correnti %}<span class="badge badge-ok">In corso</span>{% endif %}
+      {% if c.importato_da_legacy %}<span class="badge badge-warn" title="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
     </li>
     {% endif %}
     {% endfor %}

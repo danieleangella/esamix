@@ -212,12 +212,17 @@ def _parse_esercizio_extra_form(form) -> dict:
 def home(request: Request, q: str = ""):
     corsi = corsi_service.list_corsi()
     corsi_correnti = {c.tag for c in corsi if corsi_service.corso_e_corrente(c)}
+    corsi_chiusi = {
+        c.tag for c in corsi
+        if (appelli_c := corsi_service.list_appelli(c.tag)) and all(a.chiuso for a in appelli_c)
+    }
     gruppi_corsi = corsi_service.raggruppa_per_nome(corsi)
     risultati_ricerca = studenti_service.cerca_in_tutti_i_corsi(q.strip()) if q.strip() else None
     app_settings = app_config_service.get_settings()
     riepilogo_globale = statistiche_service.calcola_globale() if app_settings.mostra_riepilogo_home else None
     return templates.TemplateResponse(request, "corsi_list.html", {
         "corsi": corsi, "gruppi_corsi": gruppi_corsi, "corsi_correnti": corsi_correnti,
+        "corsi_chiusi": corsi_chiusi,
         "prossimi_appelli": corsi_service.prossimi_appelli(),
         "q": q, "risultati_ricerca": risultati_ricerca, "riepilogo_globale": riepilogo_globale,
         "aggiornamento_disponibile": aggiornamenti_service.aggiornamento_disponibile(),
@@ -441,6 +446,13 @@ def elimina_corso(tag: str):
     return flash_redirect("/", f"Corso '{tag}' eliminato definitivamente")
 
 
+@app.post("/corsi/{tag}/chiudi")
+def chiudi_corso(tag: str):
+    n = corsi_service.chiudi_corso(tag)
+    msg = f"Chiusi {n} appelli" if n else "Nessun appello da chiudere: erano già tutti chiusi"
+    return flash_redirect(f"/corsi/{tag}/impostazioni", msg)
+
+
 @app.post("/corsi/{tag}/appelli/nuovo")
 def crea_appello(tag: str, nome: str = Form(...), data: str = Form("")):
     try:
@@ -571,6 +583,8 @@ def _dati_appello(tag: str, corso, appello) -> dict:
         "avviso_pochi_compiti": numero_iscritti is not None and len(compiti) < numero_iscritti,
         "riepilogo_presenze": presenze_service.riepilogo(tag, appello.id),
         "bozze_correzione": correzione_service.list_bozze(tag, appello.id),
+        "risultati_tex_esiste": compiti_service.path_risultati(tag, appello.id, "tex", appello=appello).exists(),
+        "risultati_pdf_esiste": compiti_service.path_risultati(tag, appello.id, "pdf", appello=appello).exists(),
     }
     dati["riepilogo_home"] = _calcola_riepilogo_home(corso, appello, dati)
     return dati
@@ -624,6 +638,8 @@ def appello_detail(request: Request, tag: str, appello_id: int):
         contesto["statistiche_confronto"] = statistiche_service.confronto_raggruppamento(tag, raggruppamento)
         contesto["risultati"] = correzione_service.list_risultati(tag, appello_id)
         contesto["segreteria_csv"] = esportazione_service.get_segreteria_csv(tag, appello_id)
+        contesto["risultati_tex_esiste"] = compiti_service.path_risultati(tag, appello_id, "tex", appello=appello).exists()
+        contesto["risultati_pdf_esiste"] = compiti_service.path_risultati(tag, appello_id, "pdf", appello=appello).exists()
         percentuali = [md["riepilogo_home"]["percentuale"] for md in contesto["membri_dati"]]
         contesto["riepilogo_home_raggruppamento"] = {
             "percentuale": round(sum(percentuali) / len(percentuali)) if percentuali else 0,
@@ -661,7 +677,38 @@ def elimina_appello(tag: str, appello_id: int):
 @app.post("/corsi/{tag}/appelli/{appello_id}/chiudi")
 def chiudi_appello(tag: str, appello_id: int):
     corsi_service.chiudi_appello(tag, appello_id)
+    _genera_risultati_cache(tag, appello_id)
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Appello chiuso: non sono più possibili modifiche")
+
+
+def _anchor_correzione(appello) -> str:
+    """Come _anchor_membro, ma per azioni disponibili anche sull'appello 'virtuale' di un
+    raggruppamento (che non ha una propria scheda Valutazione: la correzione vive nella
+    scheda Risultati, comune a tutte le prove membro)."""
+    if appello.tipo == "raggruppamento":
+        return "risultati"
+    return _anchor_membro(appello, "valutazione")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/concludi-correzione-scritto")
+def concludi_correzione_scritto(tag: str, appello_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_correzione(appello)
+    corsi_service.concludi_correzione_scritti(tag, appello_id)
+    _genera_risultati_cache(tag, appello_id)
+    return flash_redirect(
+        f"/corsi/{tag}/appelli/{appello_id}",
+        "Correzione scritta conclusa: elenco risultati generato, nessuna nuova correzione è possibile finché non riapri",
+        anchor=anchor,
+    )
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/riapri-correzione-scritto")
+def riapri_correzione_scritto(tag: str, appello_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_correzione(appello)
+    corsi_service.riapri_correzione_scritti(tag, appello_id)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Correzione scritta riaperta", anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/riapri")
@@ -1290,25 +1337,53 @@ def modifica_risultato_form(request: Request, tag: str, appello_id: int, matrico
     )
 
 
+def _genera_risultati_cache(tag: str, appello_id: int) -> None:
+    """Genera e compila l'elenco risultati (.tex/.pdf), una volta sola: chiamata quando
+    l'appello si chiude, invece che a ogni singolo download (la compilazione LaTeX del
+    PDF non è istantanea, e mentre le correzioni sono ancora in corso l'elenco cambia
+    comunque a ogni compito corretto)."""
+    tex = risultati_service.stampa_risultati(tag, appello_id)
+    tex_path = compiti_service.path_risultati(tag, appello_id, "tex")
+    tex_path.write_text(tex, encoding="utf-8")
+    compiti_service.compila_pdf(tex_path)
+
+
 @app.get("/corsi/{tag}/appelli/{appello_id}/risultati.tex", response_class=PlainTextResponse)
 def scarica_risultati(tag: str, appello_id: int):
-    tex = risultati_service.stampa_risultati(tag, appello_id)
-    return PlainTextResponse(tex, media_type="application/x-tex")
+    path = compiti_service.path_risultati(tag, appello_id, "tex")
+    if not path.exists():
+        return PlainTextResponse(
+            "Elenco non ancora generato: si genera automaticamente quando concludi la correzione scritta "
+            "(o chiudi l'appello)", status_code=404,
+        )
+    return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="application/x-tex")
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/risultati.pdf")
 def scarica_risultati_pdf(tag: str, appello_id: int):
-    tex = risultati_service.stampa_risultati(tag, appello_id)
-    tex_path = compiti_service.path_risultati(tag, appello_id, "tex")
-    tex_path.write_text(tex, encoding="utf-8")
-    compilazione = compiti_service.compila_pdf(tex_path)
-    if not compilazione.ok:
-        appello = corsi_service.get_appello(tag, appello_id)
-        return flash_redirect(
-            f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error",
-            anchor=_anchor_membro(appello, "valutazione"), dettaglio=compilazione.errore_dettagliato or "",
+    path = compiti_service.path_risultati(tag, appello_id, "pdf")
+    if not path.exists():
+        return PlainTextResponse(
+            "PDF non ancora generato: si genera automaticamente quando concludi la correzione scritta "
+            "(o chiudi l'appello)", status_code=404,
         )
-    return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
+    return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/risultati.html", response_class=HTMLResponse)
+def risultati_anteprima(request: Request, tag: str, appello_id: int):
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    if not appello.correzione_scritti_conclusa:
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}",
+            "Elenco non ancora generato: concludi prima la correzione scritta (o chiudi l'appello)", "error",
+            anchor=_anchor_correzione(appello),
+        )
+    righe = risultati_service.lista_risultati_html(tag, appello_id)
+    return templates.TemplateResponse(request, "risultati_anteprima.html", {
+        "corso": corso, "appello": appello, "righe": righe,
+    })
 
 
 def _anchor_esporta(tag: str, appello) -> str:

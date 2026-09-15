@@ -29,6 +29,20 @@
     senza dover compilare anche le altre.
   </p>
   <p>
+    "Chiudi corso" chiude in un colpo solo tutti gli appelli non ancora chiusi (comodo a
+    fine anno accademico): si possono comunque riaprire singolarmente più tardi, dalla
+    scheda Impostazioni di ciascun appello.
+  </p>
+  <p>
+    In homepage un corso mostra il tag <strong>"In corso"</strong> se l'anno accademico
+    corrente rientra tra le sue date, oppure <strong>"Chiuso"</strong> (che ha la
+    precedenza) se tutti i suoi appelli sono stati chiusi. Il tag
+    <strong>"importato"</strong> segnala un corso arrivato da una migrazione dati legacy:
+    per questi corsi alcune informazioni di dettaglio (es. il collegamento esercizio-posizione
+    di ogni compito storico) potrebbero essere meno complete di quelle di un corso gestito
+    interamente qui, e quindi rendere le statistiche sugli esercizi meno affidabili.
+  </p>
+  <p>
     Un corso si può <strong>eliminare definitivamente</strong> scrivendo il suo tag in
     una casella di conferma (azione irreversibile, senza backup automatico, quindi
     conviene farne uno prima). Questa stessa richiesta di scrivere una frase per
@@ -203,6 +217,20 @@
     "Modifica" (finché l'appello non è chiuso) e lo storico dello studente in questo
     corso, con il compito corrente evidenziato tra gli altri appelli già sostenuti.
   </p>
+  <p>
+    L'elenco "Risultati inseriti" si può cercare per cognome (ordinato così per default)
+    e ordinare anche per voto, cliccando sulle intestazioni delle colonne.
+  </p>
+  <p>
+    "Concludi correzione scritto" — indipendente dalla chiusura dell'intero appello, che
+    di solito arriva più tardi (dopo orali e verbalizzazioni) — blocca nuove correzioni
+    per questa prova (si può sempre riaprire) e genera l'elenco risultati in
+    <code>.html</code>, <code>.tex</code> e <code>.pdf</code> (matricola oscurata): non a
+    ogni download, per non ricompilare inutilmente il PDF a ogni click mentre le
+    correzioni sono ancora in corso. Restano comunque consultabili anche dopo. Per un
+    raggruppamento, si conclude separatamente per ciascuna prova membro (dalla sua
+    scheda Correzione) o per il voto combinato (dalla scheda Risultati).
+  </p>
 </details>
 
 <details class="card dettaglio-fisarmonica">
@@ -291,6 +319,12 @@
     sull'intestazione "DSA" della tabella, si filtra l'elenco ai soli studenti DSA. La
     stessa indicazione compare anche nell'elenco ammessi di una prova parziale (vedi
     Raggruppamenti).
+  </p>
+  <p>
+    Nello storico di uno studente (dentro un corso, o nel riepilogo che aggrega tutti i
+    corsi/anni), un voto scritto è verde se raggiunge il voto minimo effettivo di
+    quell'appello (quello dedicato alle prove di un raggruppamento, se ne fa parte),
+    altrimenti compare in rosso come "esame sostenuto insufficiente".
   </p>
 </details>
 

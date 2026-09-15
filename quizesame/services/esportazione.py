@@ -162,7 +162,7 @@ def list_iscritti_manuali(tag: str, appello_id: int) -> list[dict]:
         rows = conn.execute(
             "SELECT s.matricola, s.nome, s.cognome, s.dsa, s.dsa_note FROM appello_iscritti_manuali im "
             "JOIN studenti s ON s.matricola = im.matricola "
-            "WHERE im.appello_id=? ORDER BY s.cognome, s.nome",
+            "WHERE im.appello_id=? ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id,),
         ).fetchall()
         return [

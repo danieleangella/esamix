@@ -3,6 +3,11 @@
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <span class="current">{{ appello.nome }}</span>
 {% endblock %}
+{% block katex %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+{% endblock %}
 {% block content %}
 <h1>{{ corso.nome }} - {{ appello.nome }}</h1>
 
@@ -262,6 +267,7 @@
   "numero_studenti_suggerito": numero_studenti_suggerito, "avviso_pochi_compiti": avviso_pochi_compiti,
   "riepilogo_presenze": riepilogo_presenze,
   "bozze_correzione": bozze_correzione,
+  "risultati_tex_esiste": risultati_tex_esiste, "risultati_pdf_esiste": risultati_pdf_esiste,
 } %}
 {% set pane_suffix = "" %}
 {% include "_tab_creazione.html" %}
@@ -320,11 +326,34 @@
       </tr>
       {% endfor %}
     </table>
-    <p>
-      Scarica elenco risultati:
-      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.tex">.tex</a> ·
-      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.pdf">.pdf</a>
+  </details>
+
+  <details class="card" open>
+    <summary><strong>Concludi correzione scritto</strong></summary>
+    {% if appello.correzione_scritti_conclusa %}
+    <p class="muted" style="margin-top:0.75rem">
+      Correzione scritta conclusa: nessuna nuova correzione è possibile per le prove di questo raggruppamento finché non riapri.
     </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riapri-correzione-scritto" style="margin-top:0.5rem">
+      <button type="submit" class="secondary">Riapri correzione scritto</button>
+    </form>
+    {% else %}
+    <p class="muted" style="margin-top:0.75rem">
+      Quando tutte le prove membro sono state corrette, concludi: genera l'elenco risultati
+      combinato (.html/.tex/.pdf) e blocca nuove correzioni (puoi comunque riaprire in qualsiasi momento).
+    </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/concludi-correzione-scritto" style="margin-top:0.5rem">
+      <button type="submit">Concludi correzione scritto</button>
+    </form>
+    {% endif %}
+    {% if risultati_tex_esiste or risultati_pdf_esiste %}
+    <p style="margin-top:0.75rem">
+      Scarica elenco risultati:
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.html">.html</a>
+      {% if risultati_tex_esiste %} · <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.tex">.tex</a>{% endif %}
+      {% if risultati_pdf_esiste %} · <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.pdf">.pdf</a>{% endif %}
+    </p>
+    {% endif %}
   </details>
   <script>
   (function () {
@@ -512,7 +541,7 @@
       <span style="display:inline-block; width:0.7rem; height:0.7rem; background:#22c55e; border-radius:2px"></span> Promossi
     </p>
     <div style="overflow-x:auto">
-      <svg width="{{ statistiche_confronto.andamento.larghezza }}" height="{{ statistiche_confronto.andamento.margine_top + statistiche_confronto.andamento.altezza + 30 }}" style="min-width:100%; color:var(--text)">
+      <svg viewBox="0 0 {{ statistiche_confronto.andamento.larghezza }} {{ statistiche_confronto.andamento.margine_top + statistiche_confronto.andamento.altezza + 30 }}" width="100%" style="color:var(--text)">
         {% for g in statistiche_confronto.andamento.gruppi %}
         <rect x="{{ g.x_totale }}" y="{{ g.y_totale }}" width="22" height="{{ g.h_totale }}" fill="#93c5fd"></rect>
         <text x="{{ g.x_totale + 11 }}" y="{{ g.y_totale - 4 }}" font-size="10" text-anchor="middle" fill="currentColor">{{ g.totale }}</text>

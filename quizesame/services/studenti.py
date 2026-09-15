@@ -45,7 +45,7 @@ def list_studenti(tag: str, search: Optional[str] = None) -> list[Studente]:
             query += "WHERE s.matricola LIKE ? OR s.nome LIKE ? OR s.cognome LIKE ? "
             like = f"%{search}%"
             params = (like, like, like)
-        query += "ORDER BY s.cognome, s.nome"
+        query += "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE"
         rows = conn.execute(query, params).fetchall()
         return [_row_to_studente(r) for r in rows]
     finally:
@@ -159,7 +159,7 @@ def list_non_superati(tag: str) -> list[Studente]:
         rows = conn.execute(
             "SELECT s.* FROM studenti s WHERE NOT EXISTS ("
             "  SELECT 1 FROM risultati r WHERE r.matricola = s.matricola AND r.verbalizzato = 1"
-            ") ORDER BY s.cognome, s.nome"
+            ") ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE"
         ).fetchall()
         return [_row_to_studente(r) for r in rows]
     finally:
@@ -176,7 +176,7 @@ def list_mai_sostenuto(tag: str) -> list[Studente]:
         rows = conn.execute(
             "SELECT s.* FROM studenti s WHERE NOT EXISTS ("
             "  SELECT 1 FROM risultati r WHERE r.matricola = s.matricola"
-            ") ORDER BY s.cognome, s.nome"
+            ") ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE"
         ).fetchall()
         return [_row_to_studente(r) for r in rows]
     finally:
