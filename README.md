@@ -100,7 +100,10 @@ come procedere.
 
 **Windows** — doppio clic su `esamix.bat`.
 
-Si apre automaticamente il browser su `http://127.0.0.1:8000`. Per chiudere l'app,
+Si apre automaticamente il browser su `http://127.0.0.1:8000`. Se la porta 8000 è già
+occupata da un altro programma, l'app usa automaticamente la prima porta libera successiva
+(8001, 8002, …) e lo segnala nel terminale. Per partire da una porta diversa, impostare la
+variabile d'ambiente `QUIZESAME_PORT` (es. `QUIZESAME_PORT=8010 ./esamix.sh`). Per chiudere l'app,
 tornare al terminale e premere `Ctrl+C` (su Windows, premere un tasto quando richiesto
 per chiudere la finestra).
 

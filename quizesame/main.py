@@ -2127,9 +2127,27 @@ def migrazione_esegui(
     return flash_redirect(f"/corsi/{tag}", msg)
 
 
+def _porta_libera(host: str, porta: int, tentativi: int = 50) -> int:
+    """Restituisce la prima porta libera a partire da `porta`."""
+    import socket
+    for p in range(porta, porta + tentativi):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind((host, p))
+                return p
+            except OSError:
+                continue
+    raise RuntimeError(f"Nessuna porta libera tra {porta} e {porta + tentativi - 1}")
+
+
 def run():
+    import os
     import uvicorn
-    host, port = "127.0.0.1", 8000
+    host = "127.0.0.1"
+    richiesta = int(os.environ.get("QUIZESAME_PORT", "8000"))
+    port = _porta_libera(host, richiesta)
+    if port != richiesta:
+        print(f"Porta {richiesta} occupata: uso la {port}")
     webbrowser.open(f"http://{host}:{port}")
     uvicorn.run(app, host=host, port=port)
 
