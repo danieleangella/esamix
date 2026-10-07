@@ -75,7 +75,9 @@
     Gli esercizi si possono esportare/importare in JSON (dalla banca del corso, o dalla
     scheda Testo di un appello per assegnarli subito) per condividerli con un collega o
     riusarli in un altro corso: prima di importare viene sempre chiesta conferma su quali
-    esercizi importare, segnalando quelli già identici a uno esistente nella banca.
+    esercizi importare, segnalando quelli già identici a uno esistente nella banca. Per
+    importare un compito scritto altrove, vedi
+    <a href="#importa-compito">Importare un compito da un unico file</a>.
   </p>
   <p>
     Cliccando sul nome di un esercizio (nella banca del corso, o tra gli esercizi
@@ -85,6 +87,124 @@
     anche cercare ed eliminare automaticamente eventuali <strong>doppioni</strong> (stesso
     testo e stesse risposte in ogni variante).
   </p>
+</details>
+
+<details class="card dettaglio-fisarmonica" id="importa-compito">
+  <summary>Importare un compito da un unico file</summary>
+  <p>
+    Invece di inserire gli esercizi uno per uno, si può importare un intero compito da un
+    unico file di testo: dalla scheda <strong>Testo</strong> di un appello ("Importa un
+    compito da un unico file", gli esercizi vengono anche assegnati all'appello) oppure
+    dalla banca <strong>Esercizi</strong> del corso. Si può caricare il file
+    (<code>.txt</code>) o incollarne direttamente il contenuto nella casella di testo.
+    Prima di creare qualcosa compare sempre l'elenco degli esercizi letti, per scegliere
+    quali importare.
+  </p>
+  <p>
+    Il modo più rapido per preparare il file è darlo da fare a un'IA (Claude, ChatGPT…):
+    copia il prompt qui sotto, incollalo nella chat e aggiungi in fondo il compito (testo
+    LaTeX, PDF allegato o anche una foto). Copia poi la risposta nella casella di
+    importazione. Se qualcosa non va, l'app indica la riga con l'errore: puoi correggerla
+    a mano o incollare il messaggio all'IA chiedendole di sistemare il file.
+  </p>
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem">
+    <strong>Prompt da dare all'IA</strong>
+    <button type="button" class="secondary" id="btn-copia-prompt-import" style="margin-top:0">Copia prompt</button>
+  </div>
+  <pre id="prompt-import" style="white-space:pre-wrap; word-break:break-word; overflow-x:auto; font-size:0.85rem; background:#f1f2f4; padding:0.75rem; border-radius:6px">{% raw %}Converti il compito d'esame che trovi in fondo a questo messaggio in un file di testo per l'importazione in EsaMiX. Rispondi SOLO con il contenuto del file, dentro un unico blocco di codice, senza commenti prima o dopo.
+
+FORMATO DEL FILE
+
+Ogni esercizio inizia con una riga "### ESERCIZIO", seguita da alcune righe "campo: valore" (tutte facoltative):
+  nome: etichetta breve dell'esercizio (es. "Limite notevole", "Rango di una matrice")
+  argomento: argomento del corso (es. "Limiti", "Algebra lineare"); usa lo stesso nome per esercizi dello stesso argomento
+  difficolta: 1, 2 o 3 (1 = facile, 3 = difficile); omettila se non è chiara
+  aperta: sì se è una domanda aperta senza risposte a scelta multipla, altrimenti no
+  obbligatorio: sì solo se il compito indica che l'esercizio va obbligatoriamente svolto per esteso, altrimenti no
+  note: nota interna per il docente (non compare nel compito)
+
+Poi una o più sezioni "### VARIANTE". Ogni variante contiene:
+  - il testo dell'esercizio, anche su più righe;
+  - subito dopo, le risposte a scelta multipla, una per riga: la riga della risposta corretta inizia con "+ " e quelle sbagliate con "- " (segno, spazio, risposta). Esattamente UNA risposta corretta e almeno una sbagliata; la corretta può essere scritta in qualunque posizione, perché l'ordine viene comunque rimescolato per ogni studente.
+  Una domanda aperta non ha righe "+" né "-".
+Se nel compito ci sono più versioni dello stesso esercizio (es. stessi esercizi con numeri diversi in compiti A/B/C), mettile come varianti dello stesso esercizio; altrimenti ogni esercizio ha una sola variante.
+
+Infine, facoltativa, una sezione "### SOLUZIONE" con la soluzione o un suggerimento (anche su più righe), che compare solo nel foglio di riferimento del docente.
+
+REGOLE
+- Scrivi formule e simboli in LaTeX, così come andrebbero in un documento LaTeX: $...$ per le formule in linea, \[ ... \] per quelle in display, \frac, \sqrt, \begin{pmatrix} ecc. Le barre rovesciate vanno scritte una sola volta (non raddoppiarle).
+- Non usare markdown nel testo (niente **grassetto**, niente elenchi con "- " o "* "): per gli elenchi usa \begin{enumerate} \item ... \end{enumerate}, per il grassetto \textbf{...}.
+- Ogni risposta deve stare su una sola riga.
+- Dopo le risposte di una variante non scrivere altro testo: la riga successiva non vuota deve essere un nuovo "### VARIANTE", "### SOLUZIONE" o "### ESERCIZIO".
+- Non inserire numerazioni come "Esercizio 1." nel testo: la numerazione la aggiunge EsaMiX.
+- Se il compito non riporta le opzioni di risposta di un esercizio a scelta multipla, proponile tu (una corretta, verificata con cura, e tre sbagliate verosimili, tipicamente errori comuni degli studenti) e scrivi nella riga "note": Risposte proposte dall'IA, da verificare.
+- Se la soluzione non è indicata nel compito, ometti la sezione "### SOLUZIONE".
+
+ESEMPIO
+
+### ESERCIZIO
+nome: Limite notevole
+argomento: Limiti
+difficolta: 1
+
+### VARIANTE
+Calcolare $\displaystyle\lim_{x \to 0} \frac{\sin(3x)}{x}$.
++ $3$
+- $1$
+- $0$
+- $\frac{1}{3}$
+
+### VARIANTE
+Calcolare $\displaystyle\lim_{x \to 0} \frac{\sin(5x)}{x}$.
++ $5$
+- $1$
+- $0$
+- $\frac{1}{5}$
+
+### SOLUZIONE
+Si scrive $\frac{\sin(kx)}{x} = k\,\frac{\sin(kx)}{kx}$ e si usa il limite notevole.
+
+### ESERCIZIO
+nome: Teorema di Rolle
+argomento: Derivate
+aperta: sì
+obbligatorio: sì
+
+### VARIANTE
+Enunciare e dimostrare il teorema di Rolle.
+
+COMPITO DA CONVERTIRE
+{% endraw %}</pre>
+  <p class="muted">
+    Il formato si può anche scrivere a mano: è lo stesso descritto nel prompt. Il testo
+    prima del primo <code>### ESERCIZIO</code> e le righe <code>```</code> che l'IA mette
+    intorno al blocco di codice vengono ignorati. Resta possibile importare anche un file
+    <code>.json</code> esportato da EsaMiX.
+  </p>
+  <script>
+  (function () {
+    var btn = document.getElementById("btn-copia-prompt-import");
+    btn.addEventListener("click", function () {
+      var testo = document.getElementById("prompt-import").textContent;
+      function fatto() {
+        btn.textContent = "Copiato!";
+        setTimeout(function () { btn.textContent = "Copia prompt"; }, 1500);
+      }
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(testo).then(fatto);
+      } else {
+        // fallback per quando l'app è aperta da un indirizzo non sicuro (es. IP di rete)
+        var ta = document.createElement("textarea");
+        ta.value = testo;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+        fatto();
+      }
+    });
+  })();
+  </script>
 </details>
 
 <details class="card dettaglio-fisarmonica">

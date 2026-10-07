@@ -120,14 +120,16 @@
 
   // Se l'URL punta a un'ancora dentro una tendina compattabile (<details>), la apre
   // subito: altrimenti il contenuto linkato resterebbe nascosto.
-  document.addEventListener("DOMContentLoaded", function () {
+  function apriDettaglioAncora() {
     if (!location.hash) return;
     var bersaglio;
     try { bersaglio = document.querySelector(location.hash); } catch (e) { return; }
     if (!bersaglio) return;
     var dettaglio = bersaglio.closest("details");
     if (dettaglio) dettaglio.open = true;
-  });
+  }
+  document.addEventListener("DOMContentLoaded", apriDettaglioAncora);
+  window.addEventListener("hashchange", apriDettaglioAncora);
   </script>
 </head>
 <body>

@@ -4,6 +4,7 @@ nella banca del corso, riusabili su altri appelli) oppure si importano una tantu
 cartella del vecchio formato a file Python (legacy/esami.py, testi.py + testoN.py)."""
 import importlib.util
 import json
+import re
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -399,6 +400,159 @@ def anteprima_importa_json(tag: str, dati: dict) -> list[dict]:
             "duplicato_di": (duplicato.nome or f"#{duplicato.id}") if duplicato else None,
         })
     return risultato
+
+
+# --- Importazione da file di testo semplice: pensato per essere preparato a mano o da
+# un'IA a partire da un compito esistente (vedi la guida, sezione "Importare un compito
+# da un unico file"). A differenza del JSON non richiede di raddoppiare le barre
+# rovesciate del LaTeX, che è l'errore più frequente nei file JSON scritti da un'IA. ---
+
+_MARCATORE = re.compile(r"^\s*#{2,}\s*(ESERCIZIO|VARIANTE|SOLUZIONE)\b", re.IGNORECASE)
+_RISPOSTA = re.compile(r"^\s*([+-])\s+(.*\S)\s*$")
+_CAMPI_ESERCIZIO = {"nome", "argomento", "note", "difficolta", "aperta", "obbligatorio"}
+_SI = {"si", "sì", "s", "yes", "true", "1", "x"}
+_NO = {"no", "n", "false", "0", ""}
+
+
+def _parse_si_no(valore: str, campo: str, riga: int) -> bool:
+    v = valore.strip().lower()
+    if v in _SI:
+        return True
+    if v in _NO:
+        return False
+    raise ValueError(f"Riga {riga}: '{campo}' deve essere sì o no (trovato '{valore.strip()}')")
+
+
+def parse_testo_esercizi(testo: str) -> dict:
+    """Converte il formato testuale in {"esercizi": [...]}, la stessa struttura del file
+    JSON di esportazione, così da riusare anteprima e conferma dell'import JSON. Gli
+    errori riportano il numero di riga, per poterli correggere (o farli correggere
+    all'IA) senza cercare a tentativi."""
+    esercizi: list[dict] = []
+    corrente: Optional[dict] = None
+    sezione = None  # "intestazione" | "variante" | "soluzione"
+    variante: Optional[dict] = None
+
+    for n, riga in enumerate(testo.replace("\r\n", "\n").replace("\r", "\n").split("\n"), start=1):
+        # recinti di codice markdown (```), che un'IA aggiunge spesso intorno al file
+        if riga.strip().startswith("```"):
+            continue
+        m = _MARCATORE.match(riga)
+        if m:
+            tipo = m.group(1).upper()
+            if tipo == "ESERCIZIO":
+                corrente = {"riga": n, "campi": {}, "varianti": [], "soluzione": []}
+                esercizi.append(corrente)
+                sezione = "intestazione"
+            elif corrente is None:
+                raise ValueError(f"Riga {n}: '### {tipo}' prima di qualunque '### ESERCIZIO'")
+            elif tipo == "VARIANTE":
+                variante = {"riga": n, "testo": [], "risposte": []}
+                corrente["varianti"].append(variante)
+                sezione = "variante"
+            else:
+                sezione = "soluzione"
+            continue
+        if corrente is None:
+            continue  # eventuale preambolo prima del primo esercizio: ignorato
+
+        if sezione == "intestazione":
+            if not riga.strip():
+                continue
+            if ":" not in riga:
+                raise ValueError(
+                    f"Riga {n}: attesa una riga 'campo: valore' (o '### VARIANTE'), trovato '{riga.strip()}'"
+                )
+            campo, valore = riga.split(":", 1)
+            campo = campo.strip().lower().replace("à", "a")
+            if campo not in _CAMPI_ESERCIZIO:
+                raise ValueError(
+                    f"Riga {n}: campo '{campo}' sconosciuto (ammessi: {', '.join(sorted(_CAMPI_ESERCIZIO))})"
+                )
+            corrente["campi"][campo] = (valore.strip(), n)
+        elif sezione == "variante":
+            r = _RISPOSTA.match(riga)
+            if r:
+                variante["risposte"].append((r.group(1), r.group(2)))
+            elif variante["risposte"] and riga.strip():
+                raise ValueError(
+                    f"Riga {n}: dopo le risposte (righe che iniziano con '+' o '-') è atteso un "
+                    f"nuovo '### VARIANTE', '### SOLUZIONE' o '### ESERCIZIO', trovato '{riga.strip()}'"
+                )
+            else:
+                variante["testo"].append(riga)
+        else:
+            corrente["soluzione"].append(riga)
+
+    if not esercizi:
+        raise ValueError("Nessun esercizio trovato: ogni esercizio deve iniziare con una riga '### ESERCIZIO'")
+
+    risultato = []
+    for e in esercizi:
+        campi = e["campi"]
+        valori = {c: v for c, (v, _) in campi.items()}
+        etichetta = f"Esercizio a riga {e['riga']}"
+        if not e["varianti"]:
+            raise ValueError(f"{etichetta}: serve almeno un '### VARIANTE' con il testo")
+
+        if "aperta" in campi:
+            aperta = _parse_si_no(campi["aperta"][0], "aperta", campi["aperta"][1])
+        else:
+            # senza indicazione esplicita, un esercizio senza nessuna risposta è una domanda aperta
+            aperta = all(not v["risposte"] for v in e["varianti"])
+        obbligatorio = _parse_si_no(campi["obbligatorio"][0], "obbligatorio", campi["obbligatorio"][1]) \
+            if "obbligatorio" in campi else False
+
+        difficolta = None
+        if valori.get("difficolta", ""):
+            try:
+                difficolta = int(valori.get("difficolta", ""))
+            except ValueError:
+                difficolta = 0
+            if difficolta not in (1, 2, 3):
+                raise ValueError(f"Riga {campi['difficolta'][1]}: 'difficolta' deve essere 1, 2 o 3")
+
+        varianti = []
+        for v in e["varianti"]:
+            testo_variante = "\n".join(v["testo"]).strip()
+            if not testo_variante:
+                raise ValueError(f"Variante a riga {v['riga']}: manca il testo")
+            corrette = [t for segno, t in v["risposte"] if segno == "+"]
+            sbagliate = [t for segno, t in v["risposte"] if segno == "-"]
+            if aperta:
+                if v["risposte"]:
+                    raise ValueError(
+                        f"Variante a riga {v['riga']}: una domanda aperta non deve avere risposte '+'/'-'"
+                    )
+                risposte = []
+            else:
+                if len(corrette) != 1:
+                    raise ValueError(
+                        f"Variante a riga {v['riga']}: serve esattamente una risposta corretta '+' (trovate {len(corrette)})"
+                    )
+                if not sbagliate:
+                    raise ValueError(f"Variante a riga {v['riga']}: serve almeno una risposta sbagliata '-'")
+                risposte = corrette + sbagliate
+            varianti.append({"testo": testo_variante, "risposte": risposte})
+
+        risultato.append({
+            "nome": valori.get("nome", ""), "argomento": valori.get("argomento", ""), "note": valori.get("note", ""),
+            "obbligatorio": obbligatorio, "difficolta": difficolta, "aperta": aperta,
+            "soluzione": "\n".join(e["soluzione"]).strip(), "varianti": varianti,
+        })
+    return {"esercizi": risultato}
+
+
+def leggi_file_esercizi(contenuto: str, nome_file: str = "") -> dict:
+    """Riconosce se il contenuto caricato/incollato è il JSON di esportazione o il formato
+    testuale, e lo converte nella struttura comune {"esercizi": [...]}."""
+    contenuto = contenuto.lstrip("﻿")
+    if nome_file.lower().endswith(".json") or contenuto.lstrip().startswith("{"):
+        try:
+            return json.loads(contenuto)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"File JSON non valido (riga {e.lineno}): {e.msg}")
+    return parse_testo_esercizi(contenuto)
 
 
 def importa_json(tag: str, appello_id: int, esercizi: list[dict]) -> int:

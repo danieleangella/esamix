@@ -1,0 +1,14 @@
+<form method="post" action="{{ action_importa }}" enctype="multipart/form-data" style="margin-top:1rem">
+  <p class="muted" style="margin-top:0">
+    Un intero compito in un colpo solo: carica un file di testo (<code>.txt</code>) nel formato
+    descritto nella guida — che contiene anche il prompt pronto da dare a un'IA per prepararlo
+    a partire dal tuo compito — oppure incollane direttamente il contenuto qui sotto. Va bene
+    anche un <code>.json</code> esportato da EsaMiX.
+    <a href="/help#importa-compito" target="_blank">Come preparare il file →</a>
+  </p>
+  <label>File (.txt o .json)</label>
+  <input type="file" name="file" accept=".txt,.json,.md,text/plain,application/json">
+  <label>…oppure incolla il testo</label>
+  <textarea name="testo" rows="6" placeholder="### ESERCIZIO&#10;nome: ...&#10;&#10;### VARIANTE&#10;Testo dell'esercizio&#10;+ risposta corretta&#10;- risposta sbagliata" style="font-family:monospace"></textarea>
+  <button type="submit">Importa</button>
+</form>

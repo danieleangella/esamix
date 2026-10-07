@@ -179,12 +179,9 @@
 
   {% if not md.appello.chiuso %}
   <details style="margin-top:0.75rem">
-    <summary>Importa esercizi da un file</summary>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esercizi/importa-json" enctype="multipart/form-data">
-      <label>File esercizi.json</label>
-      <input type="file" name="file" accept=".json" required>
-      <button type="submit">Importa</button>
-    </form>
+    <summary>Importa un compito da un unico file</summary>
+    {% set action_importa = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/esercizi/importa-json" %}
+    {% include "_importa_esercizi_form.html" %}
   </details>
   {% endif %}
 </div>

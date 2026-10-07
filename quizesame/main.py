@@ -968,11 +968,28 @@ def esporta_esercizi(tag: str, appello_id: int):
     )
 
 
-@app.post("/corsi/{tag}/esercizi/importa-json", response_class=HTMLResponse)
-async def importa_esercizi_json_banca(request: Request, tag: str, file: UploadFile = File(...)):
+async def _leggi_esercizi_caricati(file: Optional[UploadFile], testo: str) -> dict:
+    """Gli esercizi da importare arrivano da un file (.json di esportazione o .txt nel
+    formato testuale descritto nella guida) oppure incollati direttamente nella casella
+    di testo: il testo incollato, se presente, ha la precedenza."""
+    if testo.strip():
+        return esercizi_service.leggi_file_esercizi(testo)
+    if file is None or not file.filename:
+        raise ValueError("Scegli un file oppure incolla il testo degli esercizi")
+    contenuto_bytes = await file.read()
     try:
-        contenuto_bytes = await file.read()
-        contenuto = json.loads(contenuto_bytes.decode("utf-8"))
+        contenuto = contenuto_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        contenuto = contenuto_bytes.decode("cp1252")
+    return esercizi_service.leggi_file_esercizi(contenuto, file.filename)
+
+
+@app.post("/corsi/{tag}/esercizi/importa-json", response_class=HTMLResponse)
+async def importa_esercizi_json_banca(
+    request: Request, tag: str, file: Optional[UploadFile] = File(None), testo: str = Form(""),
+):
+    try:
+        contenuto = await _leggi_esercizi_caricati(file, testo)
         candidati = esercizi_service.anteprima_importa_json(tag, contenuto)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/esercizi", str(e), "error")
@@ -1006,13 +1023,15 @@ async def importa_esercizi_json_banca_conferma(tag: str, request: Request):
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-json", response_class=HTMLResponse)
-async def importa_esercizi_json(request: Request, tag: str, appello_id: int, file: UploadFile = File(...)):
+async def importa_esercizi_json(
+    request: Request, tag: str, appello_id: int,
+    file: Optional[UploadFile] = File(None), testo: str = Form(""),
+):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "creazione")
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
-        contenuto_bytes = await file.read()
-        contenuto = json.loads(contenuto_bytes.decode("utf-8"))
+        contenuto = await _leggi_esercizi_caricati(file, testo)
         candidati = esercizi_service.anteprima_importa_json(tag, contenuto)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
