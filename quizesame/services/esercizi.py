@@ -170,6 +170,10 @@ def aggiorna_esercizio(
     esistente. Le vecchie varianti vengono cancellate e ricreate: i loro id cambiano, quindi
     va chiamata solo dopo aver protetto/rigenerato gli appelli che lo usano (vedi
     appelli_che_usano) se hanno già blocchi di compiti generati."""
+    if aperta:
+        # una domanda già aperta resta modificabile anche se il corso le ha disattivate
+        esistente = get_esercizio(tag, esercizio_id)
+        _verifica_aperte_consentite(tag, not (esistente and esistente.aperta))
     varianti = _valida_varianti(varianti, aperta)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
@@ -189,6 +193,14 @@ def aggiorna_esercizio(
     finally:
         conn.close()
     return get_esercizio(tag, esercizio_id)
+
+
+def _verifica_aperte_consentite(tag: str, aperte: bool) -> None:
+    if aperte and not corsi_service.get_corso(tag).domande_aperte_attive:
+        raise ValueError(
+            "Le domande aperte sono disattivate per questo corso: riattivale da Impostazioni"
+            " → Voti e punteggi, oppure aggiungi le risposte a scelta multipla"
+        )
 
 
 def _valida_varianti(varianti: list[dict], aperta: bool = False) -> list[dict]:
@@ -212,6 +224,7 @@ def create_esercizio(
 ) -> Esercizio:
     """varianti: [{"testo": ..., "risposte": [corretta, sbagliata1, ...]}, ...] (risposte
     ignorate se aperta=True: una domanda aperta non ha scelte multiple)."""
+    _verifica_aperte_consentite(tag, aperta)
     varianti = _valida_varianti(varianti, aperta)
 
     conn = db.get_connection(config.corso_db_path(tag))
@@ -564,6 +577,8 @@ def importa_json(tag: str, appello_id: int, esercizi: list[dict]) -> int:
     """Crea nella banca di questo corso e assegna subito all'appello gli esercizi scelti
     dal docente nella pagina di conferma (vedi anteprima_importa_json): a differenza delle
     versioni precedenti non importa più l'intero file alla cieca."""
+    # controllo prima di creare qualcosa, per non lasciare un import a metà
+    _verifica_aperte_consentite(tag, any(e.get("aperta") for e in esercizi))
     n = 0
     for e in esercizi:
         crea_e_assegna(
@@ -580,6 +595,8 @@ def importa_json_banca(tag: str, esercizi: list[dict]) -> int:
     """Come importa_json, ma crea gli esercizi solo nella banca del corso senza
     assegnarli a nessun appello: per l'import dalla scheda Esercizi del corso, non
     legata a un appello specifico."""
+    # controllo prima di creare qualcosa, per non lasciare un import a metà
+    _verifica_aperte_consentite(tag, any(e.get("aperta") for e in esercizi))
     n = 0
     for e in esercizi:
         create_esercizio(
@@ -662,6 +679,10 @@ def importa_in_appello_da_altri_corsi(
     compito gli esercizi scelti da altri corsi/anni. `selezionati`: [(tag_sorgente,
     esercizio_id), ...]. Ritorna (assegnati, di cui già presenti nella banca)."""
     corsi_service.verifica_appello_aperto(tag, appello_id)
+    _verifica_aperte_consentite(tag, any(
+        (e := get_esercizio(tag_sorgente, esercizio_id)) is not None and e.aperta
+        for tag_sorgente, esercizio_id in selezionati if tag_sorgente != tag
+    ))
     assegnati = gia_presenti = 0
     for tag_sorgente, esercizio_id in selezionati:
         if tag_sorgente == tag:

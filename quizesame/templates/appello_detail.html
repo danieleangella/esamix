@@ -15,40 +15,19 @@
 <div class="flash flash-warning">Questo appello è chiuso: non sono più possibili modifiche. Puoi riaprirlo dalla scheda Impostazioni.</div>
 {% endif %}
 
-{% set orali_richiesti = risultati | selectattr('richiede_orale') | list | length > 0 %}
 <div id="tabs-appello">
-  <div class="tabs">
-    <a href="#home" data-tab="home">Home</a>
-  </div>
-  {% if raggruppamento %}
-  {% for m in raggruppamento.membri %}
-  <div class="tabs">
-    <span class="tabs-label">{{ m.nome }}:</span>
-    <a href="#creazione-{{ m.id }}" data-tab="creazione-{{ m.id }}">Testo</a>
-    <a href="#compiti-{{ m.id }}" data-tab="compiti-{{ m.id }}">Compiti d'esame</a>
-    <a href="#presenze-{{ m.id }}" data-tab="presenze-{{ m.id }}">Presenze e ritirati</a>
-    <a href="#valutazione-{{ m.id }}" data-tab="valutazione-{{ m.id }}" class="{{ 'tab-disabilitata' if not membri_dati[loop.index0].blocchi }}">Correzione</a>
-  </div>
-  {% endfor %}
-  <div class="tabs tabs-globali">
+  {# il percorso è la navigazione principale tra le fasi; qui sotto restano solo le
+     schede di consultazione e servizio, che non sono un passo del flusso #}
+  {% include "_percorso.html" %}
+  <div class="tabs tabs-servizio" aria-label="Altre schede">
+    <a href="#home" data-tab="home">Riepilogo</a>
+    {% if raggruppamento %}
     <a href="#risultati" data-tab="risultati">Risultati</a>
-    <a href="#orali" data-tab="orali" class="{{ 'tab-disabilitata' if not orali_richiesti }}">Orali</a>
     <a href="#verbalizzati" data-tab="verbalizzati">Voti verbalizzati</a>
+    {% endif %}
     {% if statistiche %}<a href="#statistiche" data-tab="statistiche">Statistiche</a>{% endif %}
     <a href="#impostazioni" data-tab="impostazioni">Impostazioni</a>
   </div>
-  {% else %}
-  <div class="tabs">
-    <a href="#creazione" data-tab="creazione">Testo</a>
-    <a href="#compiti" data-tab="compiti">Compiti d'esame</a>
-    <a href="#presenze" data-tab="presenze">Presenze e ritirati</a>
-    <a href="#valutazione" data-tab="valutazione" class="{{ 'tab-disabilitata' if not blocchi }}">Correzione</a>
-    <a href="#orali" data-tab="orali" class="{{ 'tab-disabilitata' if not orali_richiesti }}">Orali</a>
-    <a href="#verbalizzati" data-tab="verbalizzati" class="{{ 'tab-disabilitata' if not risultati }}">Voti verbalizzati</a>
-    {% if statistiche %}<a href="#statistiche" data-tab="statistiche">Statistiche</a>{% endif %}
-    <a href="#impostazioni" data-tab="impostazioni">Impostazioni</a>
-  </div>
-  {% endif %}
 </div>
 
 <div class="tab-pane" data-pane="home">
@@ -79,23 +58,6 @@
     <p class="muted" style="margin-top:0.75rem">{{ 'Raggruppamento chiuso.' if riepilogo_home_raggruppamento.chiuso else 'Raggruppamento ancora aperto.' }}</p>
   </details>
 
-  {% for m in raggruppamento.membri %}
-  {% set rh = membri_dati[loop.index0].riepilogo_home %}
-  <details class="card" open>
-    <summary><strong>{{ m.nome }}: cosa resta da fare</strong></summary>
-    <table style="margin-top:0.75rem">
-      <tr><th></th><th>Fase</th><th>Stato</th></tr>
-      {% for f in rh.fasi %}
-      <tr>
-        <td>{% if f.fatta %}<span class="badge badge-ok">fatto</span>{% elif f.in_corso %}<span class="badge badge-warn">in corso</span>{% else %}<span class="badge badge-err">da fare</span>{% endif %}</td>
-        <td>{{ f.nome }}</td>
-        <td class="muted">{{ f.dettaglio }}</td>
-      </tr>
-      {% endfor %}
-    </table>
-  </details>
-  {% endfor %}
-
   {% else %}
   <details class="card" open>
     <summary><strong>Riepilogo</strong></summary>
@@ -124,25 +86,6 @@
     </div>
   </details>
 
-  <details class="card" open>
-    <summary><strong>Avanzamento ({{ riepilogo_home.percentuale }}%)</strong></summary>
-    {% set _pct = riepilogo_home.percentuale %}
-    {% set _barra_colore = '#22c55e' if _pct >= 100 else ('#eab308' if _pct >= 60 else ('#f97316' if _pct >= 30 else '#ef4444')) %}
-    <div style="background:var(--border); border-radius:4px; overflow:hidden; height:0.6rem; margin-top:0.75rem; margin-bottom:1rem">
-      <div style="background:{{ _barra_colore }}; height:100%; width:{{ _pct }}%"></div>
-    </div>
-    <p class="muted" style="margin-top:0">Cosa resta da fare, nell'ordine:</p>
-    <table>
-      <tr><th></th><th>Fase</th><th>Stato</th></tr>
-      {% for f in riepilogo_home.fasi %}
-      <tr>
-        <td>{% if f.fatta %}<span class="badge badge-ok">fatto</span>{% elif f.in_corso %}<span class="badge badge-warn">in corso</span>{% else %}<span class="badge badge-err">da fare</span>{% endif %}</td>
-        <td>{{ f.nome }}</td>
-        <td class="muted">{{ f.dettaglio }}</td>
-      </tr>
-      {% endfor %}
-    </table>
-  </details>
   {% endif %}
 </div>
 
@@ -172,7 +115,7 @@
     </form>
   </details>
 
-  <details class="card" open>
+  <details class="card" {% if prossimo_passo and prossimo_passo.nome == 'Chiusura' %}open{% endif %}>
     <summary><strong>Chiusura appello</strong></summary>
     {% if appello.chiuso %}
     <p class="muted" style="margin-top:0.75rem">Appello chiuso: correzioni, verbalizzazioni ed esercizi assegnati non sono più modificabili.</p>
@@ -210,7 +153,7 @@
   </details>
 
   {% if raggruppamento %}
-  <details class="card" open>
+  <details class="card">
     <summary><strong>Raggruppamento</strong></summary>
     <p class="muted" style="margin-top:0.75rem">Media dei voti di: {{ raggruppamento.membri | map(attribute='nome') | join(', ') }}.
       Conta solo chi ha superato la soglia di ciascuna prova; la media è considerata
@@ -275,7 +218,7 @@
   "segreteria_csv": segreteria_csv, "iscritti": iscritti, "iscritti_manuali": iscritti_manuali, "numero_iscritti": numero_iscritti,
   "numero_studenti_suggerito": numero_studenti_suggerito, "avviso_pochi_compiti": avviso_pochi_compiti,
   "riepilogo_presenze": riepilogo_presenze,
-  "bozze_correzione": bozze_correzione,
+  "bozze_correzione": bozze_correzione, "non_valutati": non_valutati,
   "risultati_tex_esiste": risultati_tex_esiste, "risultati_pdf_esiste": risultati_pdf_esiste,
 } %}
 {% set pane_suffix = "" %}
@@ -337,7 +280,7 @@
     </table>
   </details>
 
-  <details class="card" open>
+  <details class="card">
     <summary><strong>Concludi correzione scritto</strong></summary>
     {% if appello.correzione_scritti_conclusa %}
     <p class="muted" style="margin-top:0.75rem">
@@ -420,7 +363,8 @@
 {% include "_verbalizzazione_idonei.html" %}
   {% endif %}
 
-  <details class="card" open>
+  {# con idonei ancora da verbalizzare il lavoro è nell'elenco sopra: questo è solo consultazione #}
+  <details class="card" {% if not idonei %}open{% endif %}>
     <summary><strong>Voti verbalizzati ({{ verbalizzati|length }})</strong></summary>
     {% if verbalizzati %}
     <table>
@@ -590,10 +534,20 @@ document.querySelectorAll(".btn-mostra-testo").forEach(function (btn) {
 
 <script>
 (function () {
-  var tabs = document.querySelectorAll("#tabs-appello a");
+  var tabs = document.querySelectorAll("#tabs-appello a[data-tab]");
   var panes = document.querySelectorAll(".tab-pane");
+  tabs.forEach(function (t) {
+    if (t.classList.contains("tab-disabilitata")) {
+      t.setAttribute("aria-disabled", "true");
+      t.setAttribute("tabindex", "-1");
+    }
+  });
   function attiva(nome) {
-    tabs.forEach(function (t) { t.classList.toggle("active", t.dataset.tab === nome); });
+    tabs.forEach(function (t) {
+      var selezionata = t.dataset.tab === nome;
+      t.classList.toggle("active", selezionata);
+      if (selezionata) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
+    });
     panes.forEach(function (p) { p.style.display = (p.dataset.pane === nome) ? "" : "none"; });
     // riporta subito il cursore sul campo matricola: con centinaia di studenti da
     // correggere in fila, non dover ricliccare ogni volta sul campo fa risparmiare
@@ -611,9 +565,15 @@ document.querySelectorAll(".btn-mostra-testo").forEach(function (btn) {
       attiva(t.dataset.tab);
     });
   });
-  var iniziale = (location.hash || "#home").slice(1);
-  if (!document.querySelector('.tab-pane[data-pane="' + iniziale + '"]')) iniziale = "home";
-  attiva(iniziale);
+  function daHash() {
+    var nome = (location.hash || "#home").slice(1);
+    if (!document.querySelector('.tab-pane[data-pane="' + nome + '"]')) nome = "home";
+    attiva(nome);
+  }
+  // i link interni alla pagina (es. le fasi di "cosa resta da fare" nella Home) puntano
+  // direttamente a "#scheda": cambiando l'hash si apre la scheda corrispondente
+  window.addEventListener("hashchange", function () { daHash(); window.scrollTo(0, 0); });
+  daHash();
 })();
 </script>
 {% endblock %}

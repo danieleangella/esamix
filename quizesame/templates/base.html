@@ -6,6 +6,7 @@
   <title>EsaMiX - {% block title %}EsaMiX{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/style.css?v={{ static_version() }}">
+  <script src="/static/app.js?v={{ static_version() }}"></script>
   {# KaTeX (CSS+JS da CDN esterno) viene caricato solo dalle pagine che ne hanno davvero
      bisogno (vedi blocco "katex" nei template che mostrano formule), non da ogni pagina:
      prima veniva incluso qui in ogni caso, rendendo ogni pagina (anche quelle senza
@@ -174,6 +175,7 @@
   </script>
 </head>
 <body>
+  <a href="#contenuto" class="salta-al-contenuto">Salta al contenuto</a>
   {% set docente_globale = get_app_settings().docente %}
   <header class="topbar">
     <span>
@@ -181,21 +183,26 @@
       {% if docente_globale %}<span class="brand-docente">({{ docente_globale }})</span>{% endif %}
     </span>
     {% set path = request.url.path %}
-    <nav>
-      <a href="/" class="{{ 'active' if path == '/' or path.startswith('/corsi') or path.startswith('/studenti') else '' }}">Home page</a>
-      <a href="/esercizi" class="{{ 'active' if path == '/esercizi' else '' }}">Tutti gli esercizi</a>
-      <a href="/migrazione" class="{{ 'active' if path.startswith('/migrazione') else '' }}">Migrazione dati legacy</a>
-      <a href="/impostazioni" class="{{ 'active' if path == '/impostazioni' else '' }}">Impostazioni</a>
-      <a href="/help" class="{{ 'active' if path == '/help' else '' }}">Help</a>
-      <a href="/about" class="{{ 'active' if path == '/about' else '' }}">About</a>
+    {# la migrazione dati legacy (operazione una tantum) è raggiungibile da Impostazioni #}
+    {% set voci_menu = [
+      ('/', 'Corsi', path == '/' or path.startswith('/corsi') or path.startswith('/studenti')),
+      ('/esercizi', 'Tutti gli esercizi', path == '/esercizi'),
+      ('/impostazioni', 'Impostazioni', path == '/impostazioni' or path.startswith('/migrazione')),
+      ('/help', 'Guida', path == '/help'),
+      ('/about', 'Informazioni', path == '/about'),
+    ] %}
+    <nav aria-label="Menu principale">
+      {% for url, etichetta, attiva in voci_menu %}
+      <a href="{{ url }}" {% if attiva %}class="active" aria-current="page"{% endif %}>{{ etichetta }}</a>
+      {% endfor %}
     </nav>
   </header>
-  <nav class="breadcrumb-bar">
+  <nav class="breadcrumb-bar" aria-label="Percorso">
     <div class="breadcrumb">
       {% block breadcrumb %}<a href="/">Corsi</a>{% endblock %}
     </div>
   </nav>
-  <main class="container">
+  <main class="container" id="contenuto">
     {% set msg = request.query_params.get('msg') %}
     {% set dettaglio = request.query_params.get('dettaglio') %}
     {% if msg %}

@@ -58,6 +58,9 @@ class Corso:
     risposta_sbagliata: int = DEFAULT_RISPOSTA_SBAGLIATA
     risposta_vuota: int = DEFAULT_RISPOSTA_VUOTA
     punteggio_max_aperta: int = DEFAULT_PUNTEGGIO_MAX_APERTA
+    # se False il corso non usa domande aperte: spariscono dai moduli e non se ne possono
+    # creare/importare di nuove (quelle già esistenti restano valide e correggibili)
+    domande_aperte_attive: bool = True
     frase_consegna: str = DEFAULT_FRASE_CONSEGNA
     frase_regole: str = DEFAULT_FRASE_REGOLE
     orale_dopo_richiesta: bool = True
@@ -213,7 +216,7 @@ def raggruppa_per_nome(corsi: list[Corso]) -> list[list[Corso]]:
 # insegnamento (vedi corso_precedente): tutto tranne i dati identificativi del corso.
 _META_EREDITABILI = (
     "votomin", "votomin_raggruppamento", "consegna", "risposta_corretta", "risposta_sbagliata",
-    "risposta_vuota", "punteggio_max_aperta", "frase_consegna", "frase_regole",
+    "risposta_vuota", "punteggio_max_aperta", "domande_aperte_attive", "frase_consegna", "frase_regole",
     "orale_dopo_richiesta", "orale_soglia_attiva", "orale_soglia_n", "orale_soglia_voto",
     "orale_soglia_escludi_parziali", "ritirato_conta_insufficiente", "domande_esame", "domande_esame_lista",
 )
@@ -404,6 +407,7 @@ def get_corso(tag: str) -> Corso:
         risposta_sbagliata=int(meta.get("risposta_sbagliata", DEFAULT_RISPOSTA_SBAGLIATA)),
         risposta_vuota=int(meta.get("risposta_vuota", DEFAULT_RISPOSTA_VUOTA)),
         punteggio_max_aperta=int(meta.get("punteggio_max_aperta", DEFAULT_PUNTEGGIO_MAX_APERTA)),
+        domande_aperte_attive=meta.get("domande_aperte_attive", "1") == "1",
         frase_consegna=meta.get("frase_consegna") or DEFAULT_FRASE_CONSEGNA,
         frase_regole=meta.get("frase_regole") or DEFAULT_FRASE_REGOLE,
         orale_dopo_richiesta=meta.get("orale_dopo_richiesta", "1") == "1",

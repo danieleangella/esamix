@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Help{% endblock %}
+{% block title %}Guida{% endblock %}
 {% block breadcrumb %}
-<a href="/">Corsi</a> <span class="sep">›</span> <span class="current">Help</span>
+<a href="/">Corsi</a> <span class="sep">›</span> <span class="current">Guida</span>
 {% endblock %}
 {% block content %}
 <h1>Guida</h1>
@@ -20,6 +20,12 @@
     insegnamento ripetuto negli anni) vengono raggruppati automaticamente sotto un'unica
     voce, con gli anni elencati in ordine decrescente: cliccando sul nome si aprono le
     <strong>Statistiche generali</strong> già filtrate su quei soli corsi.
+  </p>
+  <p>
+    In cima alla homepage, il riquadro <strong>Accesso rapido</strong> elenca gli appelli
+    non ancora chiusi dei corsi dell'anno accademico in corso, con i pulsanti per andare
+    direttamente al Testo, ai Compiti d'esame e alla Correzione (e, per un raggruppamento
+    di prove, ai Risultati).
   </p>
   <p>
     Dalla scheda Impostazioni si scarica anche un <strong>backup</strong> (zip con
@@ -78,7 +84,10 @@
     Un esercizio assegnato a un appello può essere marcato <strong>obbligatorio</strong>:
     richiede sia la risposta a scelta multipla sia lo svolgimento scritto. Un esercizio
     può anche essere una <strong>domanda aperta</strong> (nessuna risposta a scelta
-    multipla): in correzione il punteggio va sempre assegnato a mano dal docente.
+    multipla): in correzione il punteggio va sempre assegnato a mano dal docente. Se un
+    corso non usa domande aperte, si possono disattivare dalle Impostazioni del corso
+    (sezione "Voti e punteggi"): l'opzione sparisce dai moduli degli esercizi e non se ne
+    possono creare o importare di nuove, mentre quelle già esistenti restano utilizzabili.
     Facoltativamente si può indicare una <strong>difficoltà</strong> (da una a tre
     stelline) e una <strong>soluzione o suggerimento</strong>, che compare in un riquadro
     nel foglio di riferimento <em>con soluzioni</em> e nell'anteprima di controllo.
@@ -108,7 +117,8 @@
     Dalla scheda Testo, <strong>Anteprima PDF con soluzioni</strong> crea un PDF di controllo
     con tutti gli esercizi del compito, tutte le loro varianti, la risposta corretta segnata e
     la soluzione/suggerimento: si può generare in qualunque momento, anche prima dei blocchi,
-    e non crea codici.
+    e non crea codici. Ha margini ampi (soprattutto a destra) per annotare a mano le
+    correzioni sul foglio stampato.
   </p>
   <p>
     Cliccando sul nome di un esercizio (nella banca del corso, o tra gli esercizi
@@ -241,15 +251,23 @@ COMPITO DA CONVERTIRE
 <details class="card dettaglio-fisarmonica">
   <summary>Un appello, scheda per scheda</summary>
   <p>
-    La pagina di un appello si apre sulla scheda <strong>Home</strong>: data, compiti
-    stampati, iscritti/presenti/ritirati/sufficienti e una barra di avanzamento (colorata
-    in base alla percentuale: rossa sotto il 30%, arancione fino al 60%, gialla fino al
-    99%, verde al 100%) che riassume a che punto si è nel flusso testo → stampa →
-    valutazione → eventuali orali → chiusura. Le altre schede sono <strong>Testo</strong>
-    (esercizi assegnati), <strong>Compiti d'esame</strong> (iscritti e generazione dei
-    blocchi, vedi sotto), <strong>Presenze e ritirati</strong>, <strong>Correzione</strong>,
-    <strong>Orali</strong>, <strong>Voti verbalizzati</strong>, <strong>Statistiche</strong>
-    e <strong>Impostazioni</strong>.
+    In cima alla pagina di un appello c'è il <strong>percorso</strong>: tutte le fasi
+    nell'ordine in cui si svolgono — <strong>Testo</strong> (esercizi assegnati),
+    <strong>Compiti d'esame</strong> (iscritti e generazione dei blocchi, vedi sotto),
+    <strong>Presenze</strong> (facoltativo), <strong>Correzione</strong>, eventuali
+    <strong>Orali</strong>, <strong>Verbalizzazione</strong> e <strong>Chiusura</strong> —
+    ognuna con il suo stato (✓ completata, numero se ancora da fare) e un breve dettaglio.
+    Per un raggruppamento di prove le prime quattro fasi si ripetono per ciascuna prova.
+    Cliccando una fase si apre la scheda in cui completarla.
+  </p>
+  <p>
+    Sotto il percorso, il riquadro <strong>Prossimo passo</strong> dice cosa fare adesso
+    e porta direttamente alla scheda giusta. Le fasi facoltative (come il registro
+    presenze) vengono saltate se nel frattempo si è già andati avanti. La scheda
+    <strong>Riepilogo</strong> mostra i numeri principali (compiti, iscritti, presenti,
+    ritirati, sufficienti); <strong>Statistiche</strong> e <strong>Impostazioni</strong>
+    restano sempre disponibili. Le schede non ancora utilizzabili sono in grigio: passandoci
+    sopra con il mouse si vede perché.
   </p>
 </details>
 
@@ -385,6 +403,14 @@ COMPITO DA CONVERTIRE
   <p>
     L'elenco "Risultati inseriti" si può cercare per cognome (ordinato così per default)
     e ordinare anche per voto, cliccando sulle intestazioni delle colonne.
+  </p>
+  <p>
+    Finito di correggere i compiti consegnati, nella stessa sezione
+    <strong>"Segna come assenti i non valutati"</strong> segna in un colpo solo come assente
+    ogni studente atteso (elenco iscritti o, per le prove di un raggruppamento senza
+    iscritti, gli ammessi) che non ha ancora nessun risultato: prima chiede conferma e
+    permette di vedere chi sono; chi ha una correzione in bozza non viene toccato, e ogni
+    singolo esito si può comunque correggere a mano in seguito.
   </p>
   <p>
     "Concludi correzione scritto" — indipendente dalla chiusura dell'intero appello, che
@@ -549,12 +575,13 @@ COMPITO DA CONVERTIRE
 <details class="card dettaglio-fisarmonica">
   <summary>Impostazioni dell'app</summary>
   <p>
-    Distinte dalle impostazioni di un singolo corso: dal link <strong>Impostazioni</strong>
+    Distinte dalle impostazioni di un singolo corso: dalla voce <strong>Impostazioni</strong>
     nel menu in alto si imposta il nome del docente (mostrato accanto al titolo "EsaMiX")
     e si può disattivare il riquadro di riepilogo generale (esami svolti e sufficienze su
     tutti i corsi) che compare in homepage. Da qui si scaricano e ripristinano anche i
     backup di tutti i corsi insieme, e si può controllare subito se è disponibile un
-    aggiornamento (vedi sotto) senza aspettare il controllo automatico.
+    aggiornamento (vedi sotto) senza aspettare il controllo automatico, e si apre la
+    migrazione da dati legacy (vedi in fondo).
   </p>
   <p>
     In fondo alla pagina, <strong>"Elimina tutti i dati"</strong> cancella
@@ -580,7 +607,7 @@ COMPITO DA CONVERTIRE
 <details class="card dettaglio-fisarmonica">
   <summary>Migrazione da dati legacy</summary>
   <p>
-    Dalla pagina "Migrazione dati legacy" si importa un corso gestito con la vecchia CLI
+    Dalla pagina "Migrazione dati legacy" (in Impostazioni, menu in alto) si importa un corso gestito con la vecchia CLI
     a riga di comando: serve una cartella con <code>db.sqlite</code> nella radice e gli
     esercizi in sottocartelle per appello (<code>&lt;appello&gt;/esercizi/testi.py</code>).
     L'importazione non modifica né cancella i file originali.

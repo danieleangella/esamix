@@ -15,8 +15,38 @@
 </div>
 {% endif %}
 
-{% if riepilogo_globale %}
+{% if in_lavorazione %}
 <details class="card" open>
+  <summary><strong>Accesso rapido: appelli aperti dei corsi in corso</strong></summary>
+  <table style="margin-top:0.75rem">
+    <tr><th>Appello</th><th>Vai a</th></tr>
+    {% for r in in_lavorazione %}
+    {% for nome_prova, suffisso in r.prove %}
+    <tr>
+      <td>
+        {% if loop.first %}
+        <a href="{{ r.url }}"><strong>{{ r.appello.nome }}</strong></a>
+        <span class="muted">{{ r.corso.nome }}{% if r.appello.data %} · {{ r.appello.data }}{% endif %}</span>
+        {% endif %}
+        {% if nome_prova %}<div class="muted">{{ nome_prova }}</div>{% endif %}
+      </td>
+      <td>
+        <div class="azioni-rapide">
+          <a class="button secondary" href="{{ r.url }}#creazione{{ suffisso }}">Testo</a>
+          <a class="button secondary" href="{{ r.url }}#compiti{{ suffisso }}">Compiti</a>
+          <a class="button secondary" href="{{ r.url }}#valutazione{{ suffisso }}">Correzione</a>
+          {% if r.raggruppamento and loop.last %}<a class="button secondary" href="{{ r.url }}#risultati">Risultati</a>{% endif %}
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+    {% endfor %}
+  </table>
+</details>
+{% endif %}
+
+{% if riepilogo_globale %}
+<details class="card">
   <summary><strong>Riepilogo generale</strong></summary>
   <p class="muted" style="margin-top:0.75rem">
     In {{ riepilogo_globale.numero_corsi }} corsi{% if riepilogo_globale.anno_iniziale %}, a partire dall'anno accademico {{ riepilogo_globale.anno_iniziale }}{% endif %}.

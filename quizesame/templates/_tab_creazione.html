@@ -62,15 +62,8 @@
       <td colspan="5"></td>
     </tr>
     <tr class="riga-modifica-assegnato" data-esercizio="{{ e.id }}" style="display:none">
-      <td colspan="5">
-        {% set action = "/corsi/" ~ corso.tag ~ "/esercizi/" ~ e.id ~ "/modifica" %}
-        {% set esercizio = e %}
-        {% set avvisa_rigenerazione = md.blocchi|length > 0 %}
-        {% set redirect_to = "/corsi/" ~ corso.tag ~ "/appelli/" ~ (raggruppamento.appello_id if raggruppamento else md.appello.id) %}
-        {% set redirect_anchor = "creazione" ~ pane_suffix %}
-        {% set argomenti = md.argomenti %}
-        {% include "_esercizio_form.html" %}
-      </td>
+      {% set _redirect = "/corsi/" ~ corso.tag ~ "/appelli/" ~ (raggruppamento.appello_id if raggruppamento else md.appello.id) %}
+      <td colspan="5" data-url="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/form?redirect_to={{ _redirect | urlencode }}&amp;redirect_anchor={{ ('creazione' ~ pane_suffix) | urlencode }}"></td>
     </tr>
     {% endfor %}
   </table>
@@ -291,6 +284,7 @@
       var giaAperta = riga.style.display !== "none";
       chiudiRigheEsercizioAssegnato(giaAperta ? null : riga);
       riga.style.display = giaAperta ? "none" : "";
+      if (!giaAperta) caricaInRiga(riga, riga.querySelector("td").dataset.url, inizializzaFormEsercizi);
     });
   });
 })();

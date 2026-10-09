@@ -19,12 +19,17 @@
   <summary><strong>Appelli</strong></summary>
   {% if appelli or raggruppamenti %}
   <table>
-    <tr><th>Nome</th><th>Data</th><th>Risultati</th><th>Voto medio</th><th></th></tr>
+    <tr><th>Nome</th><th>Data</th><th>Prossimo passo</th><th>Risultati</th><th>Voto medio</th><th></th></tr>
     {% for a in appelli %}
     {% set s = statistiche[a.id] %}
     <tr>
       <td><a href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}" style="text-decoration:none; font-weight:500">{{ a.nome }}</a></td>
       <td>{{ a.data or '-' }}</td>
+      <td>
+        {% set pp = prossimi_passi.get(a.id) %}
+        {% if pp %}<a class="button secondary passo-link" href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}#{{ pp.scheda }}" title="{{ pp.azione }}">{{ pp.nome }}{% if pp.prova %} <span style="opacity:.8">· {{ pp.prova }}</span>{% endif %} &rarr;</a>
+        {% elif a.chiuso %}<span class="muted">completato</span>{% else %}<span class="muted">-</span>{% endif %}
+      </td>
       <td>
         {% if s.totale %}
         {{ s.sufficienti }}/{{ s.totale }} <span class="muted">({{ s.percentuale }}%)</span>
@@ -43,7 +48,7 @@
     {% if raggruppamenti %}
     {# i raggruppamenti (es. prove parziali) compaiono in coda, leggermente staccati: le
        singole prove che li compongono si aprono dalla pagina del raggruppamento #}
-    <tr class="riga-separatore-raggruppamenti"><td colspan="5">Raggruppamenti di prove</td></tr>
+    <tr class="riga-separatore-raggruppamenti"><td colspan="6">Raggruppamenti di prove</td></tr>
     {% for r in raggruppamenti %}
     {% set ra = raggruppamenti_appelli[r.appello_id] %}
     {% set s = statistiche[r.appello_id] %}
@@ -54,6 +59,11 @@
         <div class="muted" style="font-size:0.85em">prove: {{ r.membri | map(attribute='nome') | join(', ') }}</div>
       </td>
       <td>{{ (r.membri | map(attribute='data') | select | join(', ')) or '-' }}</td>
+      <td>
+        {% set pp = prossimi_passi.get(r.appello_id) %}
+        {% if pp %}<a class="button secondary passo-link" href="/corsi/{{ corso.tag }}/appelli/{{ r.appello_id }}#{{ pp.scheda }}" title="{{ pp.azione }}">{{ pp.nome }}{% if pp.prova %} <span style="opacity:.8">· {{ pp.prova }}</span>{% endif %} &rarr;</a>
+        {% elif ra.chiuso %}<span class="muted">completato</span>{% else %}<span class="muted">-</span>{% endif %}
+      </td>
       <td>
         {% if s.totale %}
         {{ s.sufficienti }}/{{ s.totale }} <span class="muted">({{ s.percentuale }}%)</span>
@@ -114,6 +124,6 @@
   </form>
 </details>
 {% else %}
-<p class="muted">Servono almeno due appelli per creare un raggruppamento.</p>
+<p class="muted">Per combinare più prove in un raggruppamento (es. prove parziali) servono almeno due appelli.</p>
 {% endif %}
 {% endblock %}

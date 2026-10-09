@@ -1,0 +1,40 @@
+{# Percorso dell'appello, sempre visibile sopra le schede: tutte le fasi nell'ordine, con
+   il loro stato, e il prossimo passo da fare ben in evidenza. Ogni fase porta alla scheda
+   in cui si completa. #}
+<nav class="percorso" aria-label="Fasi dell'appello">
+  {% set ns = namespace(prova=None, n=0) %}
+  {% for p in percorso %}
+  {% if p.prova != ns.prova %}
+  {% if not loop.first %}</ol>{% endif %}
+  {% set ns.prova = p.prova %}
+  {% if p.prova %}<div class="percorso-gruppo">{{ p.prova }}</div>{% elif not loop.first %}<div class="percorso-gruppo">Conclusione</div>{% endif %}
+  <ol class="percorso-passi">
+  {% endif %}
+  {% set ns.n = ns.n + 1 %}
+    <li class="passo passo-{{ p.stato }}{% if p.prossimo %} passo-prossimo{% endif %}">
+      <a href="#{{ p.scheda }}" data-tab="{{ p.scheda }}" title="{{ p.dettaglio }}"{% if p.prossimo %} aria-current="step"{% endif %}>
+        <span class="passo-icona" aria-hidden="true">{% if p.stato == 'fatta' %}✓{% elif p.stato == 'saltata' %}–{% else %}{{ ns.n }}{% endif %}</span>
+        <span class="passo-testo">
+          <span class="passo-nome">{{ p.nome }}{% if p.facoltativa %} <span class="passo-facoltativo">(facoltativo)</span>{% endif %}</span>
+          <span class="passo-dettaglio">{{ p.dettaglio }}</span>
+        </span>
+        <span class="sr-only">— {{ {'fatta': 'completata', 'saltata': 'non usata', 'in_corso': 'in corso', 'da_fare': 'da fare'}[p.stato] }}{% if p.prossimo %}, prossimo passo{% endif %}</span>
+      </a>
+    </li>
+  {% if loop.last %}</ol>{% endif %}
+  {% endfor %}
+</nav>
+
+{% if prossimo_passo %}
+<div class="prossimo-passo">
+  <div>
+    <div class="prossimo-passo-etichetta">Prossimo passo{% if prossimo_passo.prova %} · {{ prossimo_passo.prova }}{% endif %}</div>
+    <div class="prossimo-passo-azione">{{ prossimo_passo.azione }}</div>
+  </div>
+  <a class="button" href="#{{ prossimo_passo.scheda }}">Vai a {{ prossimo_passo.nome }} &rarr;</a>
+</div>
+{% elif appello.chiuso %}
+<div class="prossimo-passo prossimo-passo-fatto">
+  <div><div class="prossimo-passo-azione">Appello completato e chiuso.</div></div>
+</div>
+{% endif %}

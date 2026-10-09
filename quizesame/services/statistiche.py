@@ -2,6 +2,7 @@
 dei voti confrontata con una gaussiana teorica, ed esercizi più sbagliati con le risposte
 più comuni. Calcolate a partire dai dati già salvati (risultati, compiti, compito_esercizi),
 niente di nuovo da persistere."""
+import copy
 import json
 import math
 import re
@@ -263,7 +264,34 @@ def confronto_raggruppamento(tag: str, raggruppamento) -> dict:
     return {"membri": membri, "combinato": combinato, "andamento": _andamento_appelli(voci_andamento)}
 
 
+# tag -> (firma del file del database, statistiche): calcolare le statistiche di un corso
+# richiede di scorrere tutti i suoi appelli e risultati, e la homepage lo fa per ogni corso
+# a ogni caricamento; finché il database non cambia il risultato resta lo stesso.
+_cache_corso: dict[str, tuple] = {}
+
+
+def _firma_db(tag: str) -> Optional[tuple]:
+    try:
+        st = config.corso_db_path(tag).stat()
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size)
+
+
 def calcola_corso(tag: str, corso=None) -> dict:
+    """Versione con cache di _calcola_corso (vedi _cache_corso): ogni scrittura sul
+    database del corso ne cambia data di modifica/dimensione, e invalida la cache."""
+    firma = _firma_db(tag)
+    in_cache = _cache_corso.get(tag)
+    if firma is not None and in_cache and in_cache[0] == firma:
+        return copy.deepcopy(in_cache[1])
+    risultato = _calcola_corso(tag, corso)
+    if firma is not None:
+        _cache_corso[tag] = (firma, copy.deepcopy(risultato))
+    return risultato
+
+
+def _calcola_corso(tag: str, corso=None) -> dict:
     """Le stesse statistiche di `calcola`, ma aggregate su tutti gli appelli del corso
     (esclusi i raggruppamenti, che non hanno propri risultati ma calcolano una media di
     altri appelli): utile per farsi un'idea d'insieme sull'andamento dell'intero corso,

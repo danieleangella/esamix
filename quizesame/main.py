@@ -37,11 +37,11 @@ templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
 
 
 def _static_version() -> str:
-    """Data di ultima modifica di style.css, usata come parametro ?v= nel link allo
-    stylesheet: così il browser scarica sempre la versione aggiornata invece di tenersi
-    in cache quella vecchia ogni volta che il CSS viene modificato durante lo sviluppo."""
+    """Data di ultima modifica dei file statici (style.css, app.js), usata come parametro
+    ?v= nei link: così il browser scarica sempre la versione aggiornata invece di tenersi
+    in cache quella vecchia ogni volta che CSS o JS vengono modificati."""
     try:
-        return str(int((PACKAGE_DIR / "static" / "style.css").stat().st_mtime))
+        return str(max(int((PACKAGE_DIR / "static" / f).stat().st_mtime) for f in ("style.css", "app.js")))
     except OSError:
         return "0"
 
@@ -220,6 +220,21 @@ def home(request: Request, q: str = ""):
         if (appelli_c := corsi_service.list_appelli(c.tag)) and all(a.chiuso for a in appelli_c)
     }
     gruppi_corsi = corsi_service.raggruppa_per_nome(corsi)
+    # "Accesso rapido": gli appelli non ancora chiusi dei corsi in corso, con i link
+    # diretti alle schede usate più spesso (per un raggruppamento, una riga per prova)
+    in_lavorazione = []
+    for c in corsi:
+        if c.tag not in corsi_correnti:
+            continue
+        for a in corsi_service.list_appelli(c.tag, includi_raggruppamenti=True):
+            if a.chiuso or a.membro_raggruppamento:
+                continue
+            ragg = corsi_service.get_raggruppamento_by_appello(c.tag, a.id)
+            in_lavorazione.append({
+                "corso": c, "appello": a, "url": f"/corsi/{c.tag}/appelli/{a.id}",
+                "prove": [(m.nome, f"-{m.id}") for m in ragg.membri] if ragg else [("", "")],
+                "raggruppamento": bool(ragg),
+            })
     risultati_ricerca = studenti_service.cerca_in_tutti_i_corsi(q.strip()) if q.strip() else None
     app_settings = app_config_service.get_settings()
     riepilogo_globale = statistiche_service.calcola_globale() if app_settings.mostra_riepilogo_home else None
@@ -231,7 +246,7 @@ def home(request: Request, q: str = ""):
             "facolta": c.facolta, "universita": c.universita, "docente": c.docente, "anno": c.anno,
         })
     return templates.TemplateResponse(request, "corsi_list.html", {
-        "edizioni_recenti": edizioni_recenti,
+        "edizioni_recenti": edizioni_recenti, "in_lavorazione": in_lavorazione,
         "corsi": corsi, "gruppi_corsi": gruppi_corsi, "corsi_correnti": corsi_correnti,
         "corsi_chiusi": corsi_chiusi,
         "prossimi_appelli": corsi_service.prossimi_appelli(),
@@ -388,7 +403,15 @@ def corso_detail(request: Request, tag: str):
             "media": media,
         }
     raggruppamenti_appelli = {r.appello_id: corsi_service.get_appello(tag, r.appello_id) for r in raggruppamenti}
+    # prossimo passo di ogni appello ancora aperto (gli stessi calcoli della sua pagina;
+    # per quelli chiusi non c'è più niente da fare e si evita il lavoro)
+    prossimi_passi = {}
+    for a in appelli + [raggruppamenti_appelli[r.appello_id] for r in raggruppamenti]:
+        if a is not None and not a.chiuso:
+            ctx = _contesto_appello(tag, corso, a)
+            prossimi_passi[a.id] = ctx["prossimo_passo"]
     return templates.TemplateResponse(request, "corso_detail.html", {
+        "prossimi_passi": prossimi_passi,
         "corso": corso, "appelli": appelli, "raggruppamenti": raggruppamenti, "statistiche": statistiche,
         "raggruppamenti_appelli": raggruppamenti_appelli, "oggi": date.today().strftime("%d/%m/%Y"),
     })
@@ -420,6 +443,7 @@ def modifica_corso(
     votomin_raggruppamento: int = Form(...),
     risposta_corretta: int = Form(...), risposta_sbagliata: int = Form(...), risposta_vuota: int = Form(...),
     punteggio_max_aperta: int = Form(corsi_service.DEFAULT_PUNTEGGIO_MAX_APERTA),
+    domande_aperte_attive: str = Form(""),
     frase_consegna: str = Form(""), frase_regole: str = Form(""),
     orale_dopo_richiesta: str = Form(""), orale_soglia_attiva: str = Form(""),
     orale_soglia_n: str = Form(""), orale_soglia_voto: str = Form(""),
@@ -432,6 +456,7 @@ def modifica_corso(
             votomin=str(votomin), consegna=str(consegna), votomin_raggruppamento=str(votomin_raggruppamento),
             risposta_corretta=str(risposta_corretta), risposta_sbagliata=str(risposta_sbagliata),
             risposta_vuota=str(risposta_vuota), punteggio_max_aperta=str(punteggio_max_aperta),
+            domande_aperte_attive="1" if domande_aperte_attive else "0",
             frase_consegna=frase_consegna.strip() or corsi_service.DEFAULT_FRASE_CONSEGNA,
             frase_regole=frase_regole.strip() or corsi_service.DEFAULT_FRASE_REGOLE,
             orale_dopo_richiesta="1" if orale_dopo_richiesta else "0",
@@ -443,7 +468,15 @@ def modifica_corso(
         )
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/impostazioni", str(e), "error")
-    return flash_redirect(f"/corsi/{tag}/impostazioni", "Impostazioni corso salvate")
+    msg = "Impostazioni corso salvate"
+    if not domande_aperte_attive:
+        n_aperte = sum(1 for e in esercizi_service.list_esercizi(tag) if e.aperta)
+        if n_aperte:
+            msg += (
+                f". Attenzione: nella banca ci sono ancora {n_aperte} domande aperte, che restano"
+                " utilizzabili e modificabili, ma non se ne possono creare di nuove"
+            )
+    return flash_redirect(f"/corsi/{tag}/impostazioni", msg)
 
 
 @app.get("/corsi/{tag}/backup.zip")
@@ -529,40 +562,56 @@ def _calcola_riepilogo_home(corso, appello, dati: dict) -> dict:
     presenti = (numero_iscritti - assenti) if numero_iscritti is not None else None
     valutati_totale = valutati + assenti + ritirati
 
+    # Le fasi di una singola prova, nell'ordine in cui si svolgono: ognuna sa in quale
+    # scheda si completa e cosa c'è da fare (usato per il percorso e il "prossimo passo"
+    # in cima alla pagina dell'appello). Orali, verbalizzazione e chiusura riguardano
+    # l'appello nel suo insieme e si aggiungono in _fasi_globali.
     fasi = []
+    n_esercizi = len(dati["esercizi_assegnati"])
     fasi.append({
-        "nome": "Preparazione testo", "fatta": bool(dati["esercizi_assegnati"]),
-        "dettaglio": f"{len(dati['esercizi_assegnati'])} esercizi assegnati",
+        "nome": "Testo", "scheda": "creazione", "fatta": bool(n_esercizi),
+        "dettaglio": f"{n_esercizi} esercizi assegnati",
+        "azione": "Scegli gli esercizi del compito (dalla banca, da altri corsi o creandone di nuovi)",
     })
     fase_stampa_fatta = bool(dati["blocchi"]) and (numero_iscritti is None or compiti_totali >= numero_iscritti)
     dettaglio_stampa = f"{compiti_totali} compiti generati"
     if numero_iscritti is not None:
         dettaglio_stampa += f" su {numero_iscritti} iscritti"
-    fasi.append({"nome": "Stampa dei compiti", "fatta": fase_stampa_fatta, "dettaglio": dettaglio_stampa})
+    fasi.append({
+        "nome": "Compiti d'esame", "scheda": "compiti", "fatta": fase_stampa_fatta,
+        "in_corso": bool(dati["blocchi"]) and not fase_stampa_fatta, "dettaglio": dettaglio_stampa,
+        "azione": "Carica gli iscritti, genera i compiti e stampali" if not dati["blocchi"]
+        else "Genera altri compiti: non bastano per tutti gli iscritti",
+    })
 
     atteso = numero_iscritti if numero_iscritti is not None else (compiti_totali or None)
-    fase_valutazione_fatta = bool(atteso) and valutati_totale >= atteso
-    fase_valutazione_in_corso = bool(atteso) and 0 < valutati_totale < atteso
-    dettaglio_valutazione = f"{valutati_totale} valutati" + (f" su {atteso}" if atteso else "")
-    fasi.append({
-        "nome": "Valutazione scritti", "fatta": fase_valutazione_fatta,
-        "in_corso": fase_valutazione_in_corso, "dettaglio": dettaglio_valutazione,
-    })
-
-    orali_richiesti = any(r["richiede_orale"] for r in risultati)
-    if orali_richiesti:
-        orali_rimasti = sum(1 for r in risultati if r["richiede_orale"] and not r["orale_svolto"])
+    concluso = bool(getattr(appello, "correzione_scritti_conclusa", False))
+    # il registro presenze è facoltativo: se la correzione è già partita senza usarlo,
+    # non ha senso continuare a proporlo come passo da fare
+    presenze = dati.get("riepilogo_presenze")
+    if appello.presenze_chiuse:
+        fasi.append({"nome": "Presenze", "scheda": "presenze", "fatta": True, "dettaglio": "registro chiuso"})
+    elif valutati_totale > 0 or concluso:
+        fasi.append({"nome": "Presenze", "scheda": "presenze", "saltata": True, "dettaglio": "registro non usato"})
+    else:
         fasi.append({
-            "nome": "Orali", "fatta": orali_rimasti == 0,
-            "dettaglio": "tutti svolti" if orali_rimasti == 0 else f"{orali_rimasti} da svolgere",
+            "nome": "Presenze", "scheda": "presenze", "fatta": False, "facoltativa": True,
+            "in_corso": bool(presenze and presenze["n_presenti"]),
+            "dettaglio": f"{presenze['n_presenti']} presenti su {presenze['n_iscritti']}" if presenze else "il giorno della prova",
+            "azione": "Il giorno della prova, fai l'appello in aula e segna i ritirati (facoltativo)",
         })
 
+    fase_valutazione_fatta = concluso or (bool(atteso) and valutati_totale >= atteso)
+    dettaglio_valutazione = f"{valutati_totale} valutati" + (f" su {atteso}" if atteso else "")
     fasi.append({
-        "nome": "Chiusura appello", "fatta": appello.chiuso,
-        "dettaglio": "chiuso" if appello.chiuso else "ancora aperto",
+        "nome": "Correzione", "scheda": "valutazione", "fatta": fase_valutazione_fatta,
+        "in_corso": valutati_totale > 0 and not fase_valutazione_fatta,
+        "dettaglio": dettaglio_valutazione + (" · conclusa" if concluso else ""),
+        "azione": "Correggi i compiti, poi segna la correzione come conclusa" if valutati_totale
+        else "Correggi i compiti consegnati",
     })
 
-    punti = sum(1.0 if f.get("fatta") else (0.5 if f.get("in_corso") else 0.0) for f in fasi)
+    punti = sum(1.0 if f.get("fatta") or f.get("saltata") else (0.5 if f.get("in_corso") else 0.0) for f in fasi)
     percentuale = round(100 * punti / len(fasi)) if fasi else 0
 
     return {
@@ -570,6 +619,66 @@ def _calcola_riepilogo_home(corso, appello, dati: dict) -> dict:
         "presenti": presenti, "assenti": assenti, "ritirati": ritirati, "sufficienti": sufficienti,
         "valutati": valutati, "fasi": fasi, "percentuale": percentuale,
     }
+
+
+def _fasi_globali(contesto: dict) -> list[dict]:
+    """Fasi che riguardano l'appello nel suo insieme (per un raggruppamento, dopo tutte
+    le prove): orali (solo se qualcuno li deve sostenere), verbalizzazione e chiusura."""
+    appello = contesto["appello"]
+    risultati = contesto.get("risultati") or []
+    fasi = []
+    da_orale = len(contesto["orali_da_svolgere"])
+    if da_orale or contesto["orali_svolti"]:
+        fasi.append({
+            "nome": "Orali", "scheda": "orali", "fatta": da_orale == 0,
+            "dettaglio": "tutti svolti" if da_orale == 0 else f"{da_orale} da svolgere",
+            "azione": f"Registra l'esito degli orali ({da_orale} studenti da sentire)",
+        })
+    n_idonei, n_verbalizzati = len(contesto["idonei"]), len(contesto["verbalizzati"])
+    fasi.append({
+        "nome": "Verbalizzazione", "scheda": "risultati" if contesto.get("raggruppamento") else "verbalizzati",
+        "fatta": bool(risultati) and n_idonei == 0,
+        "in_corso": n_verbalizzati > 0 and n_idonei > 0,
+        "dettaglio": f"{n_verbalizzati} verbalizzati" + (f", {n_idonei} da verbalizzare" if n_idonei else ""),
+        "azione": "Esporta i voti per la segreteria e segna come verbalizzati quelli registrati",
+    })
+    fasi.append({
+        "nome": "Chiusura", "scheda": "impostazioni", "fatta": appello.chiuso,
+        "dettaglio": "chiuso" if appello.chiuso else "ancora aperto",
+        "azione": "Chiudi l'appello: nessuna modifica sarà più possibile (si può riaprire)",
+    })
+    return fasi
+
+
+def _percorso(contesto: dict) -> tuple[list[dict], Optional[dict]]:
+    """Il percorso completo dell'appello, nell'ordine (per un raggruppamento: le fasi di
+    ciascuna prova, poi quelle globali), con la scheda effettiva di ogni fase, e il
+    prossimo passo da fare: la prima fase non completata, saltando quelle facoltative se
+    nel frattempo si è già andati avanti."""
+    passi = []
+    if contesto.get("raggruppamento"):
+        for m, md in zip(contesto["raggruppamento"].membri, contesto["membri_dati"]):
+            for f in md["riepilogo_home"]["fasi"]:
+                passi.append({**f, "prova": m.nome, "scheda": f"{f['scheda']}-{m.id}"})
+    else:
+        passi.extend(dict(f, prova="") for f in contesto["riepilogo_home"]["fasi"])
+    passi.extend(dict(f, prova="") for f in _fasi_globali(contesto))
+    for p in passi:
+        p["stato"] = (
+            "fatta" if p.get("fatta") else "saltata" if p.get("saltata")
+            else "in_corso" if p.get("in_corso") else "da_fare"
+        )
+    prossimo = None
+    for i, p in enumerate(passi):
+        if p["stato"] in ("fatta", "saltata"):
+            continue
+        if p.get("facoltativa") and any(q["stato"] in ("fatta", "in_corso") for q in passi[i + 1:]):
+            continue
+        prossimo = p
+        break
+    if prossimo:
+        prossimo["prossimo"] = True
+    return passi, prossimo
 
 
 def _dati_appello(tag: str, corso, appello) -> dict:
@@ -611,11 +720,61 @@ def _dati_appello(tag: str, corso, appello) -> dict:
         "avviso_pochi_compiti": numero_iscritti is not None and len(compiti) < numero_iscritti,
         "riepilogo_presenze": presenze_service.riepilogo(tag, appello.id),
         "bozze_correzione": correzione_service.list_bozze(tag, appello.id),
+        "non_valutati": presenze_service.non_valutati(tag, appello.id),
         "risultati_tex_esiste": compiti_service.path_risultati(tag, appello.id, "tex", appello=appello).exists(),
         "risultati_pdf_esiste": compiti_service.path_risultati(tag, appello.id, "pdf", appello=appello).exists(),
     }
     dati["riepilogo_home"] = _calcola_riepilogo_home(corso, appello, dati)
     return dati
+
+
+def _contesto_appello(tag: str, corso, appello) -> dict:
+    """Tutti i dati della pagina di un appello (o di un raggruppamento), compreso il
+    percorso delle fasi e il prossimo passo: usato dalla pagina stessa e, per il solo
+    prossimo passo, dall'elenco appelli del corso."""
+    raggruppamento = corsi_service.get_raggruppamento_by_appello(tag, appello.id)
+    contesto = {
+        "corso": corso, "appello": appello, "raggruppamento": raggruppamento,
+        "orali_da_svolgere": correzione_service.list_orali_da_svolgere(tag, appello.id),
+        "orali_svolti": correzione_service.list_orali_svolti(tag, appello.id),
+        "idonei": verbalizzazione_service.list_idonei(tag, appello.id),
+        "verbalizzati": verbalizzazione_service.list_verbalizzati(tag, appello.id),
+        "statistiche": statistiche_service.calcola(tag, appello.id),
+        "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
+        "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
+    }
+    if raggruppamento:
+        membri_dati = []
+        for i, m in enumerate(raggruppamento.membri):
+            dati_membro = _dati_appello(tag, corso, m)
+            ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, i)
+            # per una prova parziale il numero di studenti attesi si stima dagli ammessi
+            # (chi ha superato la prova precedente / rispetta la soglia di matricola),
+            # non dagli iscritti/CSV segreteria: quello riguarda l'intero raggruppamento,
+            # non la singola prova.
+            dati_membro["numero_studenti_suggerito"] = _numero_studenti_suggerito(len(ammessi), len(dati_membro["compiti"]))
+            # senza elenco iscritti, per una prova del raggruppamento si attendono gli ammessi
+            if dati_membro["non_valutati"] is None:
+                dati_membro["non_valutati"] = presenze_service.non_valutati(tag, m.id, ammessi)
+            membri_dati.append({**dati_membro, "aule": aule_service.list_aule(tag, m.id), "ammessi": ammessi})
+        contesto["membri_dati"] = membri_dati
+        contesto["statistiche_confronto"] = statistiche_service.confronto_raggruppamento(tag, raggruppamento)
+        contesto["risultati"] = correzione_service.list_risultati(tag, appello.id)
+        contesto["segreteria_csv"] = esportazione_service.get_segreteria_csv(tag, appello.id)
+        contesto["risultati_tex_esiste"] = compiti_service.path_risultati(tag, appello.id, "tex", appello=appello).exists()
+        contesto["risultati_pdf_esiste"] = compiti_service.path_risultati(tag, appello.id, "pdf", appello=appello).exists()
+        percentuali = [md["riepilogo_home"]["percentuale"] for md in contesto["membri_dati"]]
+        contesto["riepilogo_home_raggruppamento"] = {
+            "percentuale": round(sum(percentuali) / len(percentuali)) if percentuali else 0,
+            "chiuso": appello.chiuso,
+        }
+    else:
+        contesto.update(_dati_appello(tag, corso, appello))
+    contesto["percorso"], contesto["prossimo_passo"] = _percorso(contesto)
+    fatti = sum(1.0 if p["stato"] in ("fatta", "saltata") else 0.5 if p["stato"] == "in_corso" else 0.0
+                for p in contesto["percorso"])
+    contesto["percentuale_percorso"] = round(100 * fatti / len(contesto["percorso"])) if contesto["percorso"] else 0
+    return contesto
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}", response_class=HTMLResponse)
@@ -640,41 +799,7 @@ def appello_detail(request: Request, tag: str, appello_id: int):
         target += f"#{anchor}"
         return RedirectResponse(target, status_code=303)
 
-    raggruppamento = corsi_service.get_raggruppamento_by_appello(tag, appello_id)
-    contesto = {
-        "corso": corso, "appello": appello, "raggruppamento": raggruppamento,
-        "orali_da_svolgere": correzione_service.list_orali_da_svolgere(tag, appello_id),
-        "orali_svolti": correzione_service.list_orali_svolti(tag, appello_id),
-        "idonei": verbalizzazione_service.list_idonei(tag, appello_id),
-        "verbalizzati": verbalizzazione_service.list_verbalizzati(tag, appello_id),
-        "statistiche": statistiche_service.calcola(tag, appello_id),
-        "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
-        "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
-    }
-    if raggruppamento:
-        membri_dati = []
-        for i, m in enumerate(raggruppamento.membri):
-            dati_membro = _dati_appello(tag, corso, m)
-            ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, i)
-            # per una prova parziale il numero di studenti attesi si stima dagli ammessi
-            # (chi ha superato la prova precedente / rispetta la soglia di matricola),
-            # non dagli iscritti/CSV segreteria: quello riguarda l'intero raggruppamento,
-            # non la singola prova.
-            dati_membro["numero_studenti_suggerito"] = _numero_studenti_suggerito(len(ammessi), len(dati_membro["compiti"]))
-            membri_dati.append({**dati_membro, "aule": aule_service.list_aule(tag, m.id), "ammessi": ammessi})
-        contesto["membri_dati"] = membri_dati
-        contesto["statistiche_confronto"] = statistiche_service.confronto_raggruppamento(tag, raggruppamento)
-        contesto["risultati"] = correzione_service.list_risultati(tag, appello_id)
-        contesto["segreteria_csv"] = esportazione_service.get_segreteria_csv(tag, appello_id)
-        contesto["risultati_tex_esiste"] = compiti_service.path_risultati(tag, appello_id, "tex", appello=appello).exists()
-        contesto["risultati_pdf_esiste"] = compiti_service.path_risultati(tag, appello_id, "pdf", appello=appello).exists()
-        percentuali = [md["riepilogo_home"]["percentuale"] for md in contesto["membri_dati"]]
-        contesto["riepilogo_home_raggruppamento"] = {
-            "percentuale": round(sum(percentuali) / len(percentuali)) if percentuali else 0,
-            "chiuso": appello.chiuso,
-        }
-    else:
-        contesto.update(_dati_appello(tag, corso, appello))
+    contesto = _contesto_appello(tag, corso, appello)
     return templates.TemplateResponse(request, "appello_detail.html", contesto)
 
 
@@ -1668,6 +1793,38 @@ def chiudi_presenze(tag: str, appello_id: int):
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, kind, anchor=anchor)
 
 
+def _ammessi_se_membro(tag: str, appello) -> Optional[list[dict]]:
+    """Per una prova di un raggruppamento, gli studenti ammessi (usati come elenco degli
+    attesi quando manca l'elenco iscritti); None per un appello normale."""
+    if not appello.membro_raggruppamento:
+        return None
+    ragg = corsi_service.get_raggruppamento_by_membro(tag, appello.id)
+    indice = next(i for i, m in enumerate(ragg.membri) if m.id == appello.id)
+    return corsi_service.list_ammessi_prova(tag, ragg, indice)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/segna-assenti-non-valutati")
+def segna_assenti_non_valutati(tag: str, appello_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "valutazione")
+    try:
+        esito = presenze_service.segna_assenti_non_valutati(tag, appello_id, _ammessi_se_membro(tag, appello))
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    msg = f"{esito['segnati_assenti']} studenti non valutati segnati come assenti"
+    kind = "success"
+    if esito["non_registrati"]:
+        kind = "warning"
+        msg += (
+            f" — {len(esito['non_registrati'])} matricole dell'elenco iscritti non sono registrate come "
+            "studenti di questo corso e non è stato possibile segnarle: registrale (o correggile) a mano"
+        )
+    if esito["errori"]:
+        kind = "warning"
+        msg += f" — {len(esito['errori'])} studenti non segnati per un errore imprevisto: riprova a mano per loro"
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, kind, anchor=anchor)
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/presenze/riapri")
 def riapri_presenze(tag: str, appello_id: int):
     appello = corsi_service.get_appello(tag, appello_id)
@@ -2053,6 +2210,27 @@ async def importa_da_corso(tag: str, request: Request):
     return flash_redirect(f"/corsi/{tag}/studenti", msg, "error" if report.errori else "success")
 
 
+@app.get("/corsi/{tag}/esercizi/{esercizio_id}/form", response_class=HTMLResponse)
+def form_modifica_esercizio(
+    request: Request, tag: str, esercizio_id: int, redirect_to: str = "", redirect_anchor: str = "",
+):
+    """Modulo di modifica di un esercizio, caricato via fetch al clic su "Modifica" (come
+    l'anteprima): prima veniva pre-generato, nascosto, per ogni esercizio di ogni elenco,
+    e con banche di centinaia di esercizi le pagine arrivavano a pesare megabyte."""
+    esercizio = esercizi_service.get_esercizio(tag, esercizio_id)
+    if esercizio is None:
+        return HTMLResponse("Esercizio non trovato", status_code=404)
+    avvisa = any(
+        compiti_service.list_blocchi(tag, aid) for aid in esercizi_service.appelli_che_usano(tag, esercizio_id)
+    )
+    return templates.TemplateResponse(request, "_esercizio_form.html", {
+        "corso": corsi_service.get_corso(tag), "esercizio": esercizio,
+        "action": f"/corsi/{tag}/esercizi/{esercizio_id}/modifica",
+        "avvisa_rigenerazione": avvisa, "argomenti": esercizi_service.list_argomenti(tag),
+        "redirect_to": redirect_to, "redirect_anchor": redirect_anchor,
+    })
+
+
 @app.get("/corsi/{tag}/esercizi/{esercizio_id}/anteprima", response_class=HTMLResponse)
 def anteprima_esercizio(request: Request, tag: str, esercizio_id: int):
     """Frammento HTML con testo/risposte/soluzione di tutte le varianti di un esercizio,
@@ -2077,15 +2255,8 @@ def anteprima_esercizio(request: Request, tag: str, esercizio_id: int):
 def esercizi_list(request: Request, tag: str):
     corso = corsi_service.get_corso(tag)
     esercizi = esercizi_service.list_esercizi(tag)
-
-    blocchi_generati = {}
-    for e in esercizi:
-        appelli_coinvolti = esercizi_service.appelli_che_usano(tag, e.id)
-        blocchi_generati[e.id] = any(compiti_service.list_blocchi(tag, aid) for aid in appelli_coinvolti)
-
     return templates.TemplateResponse(request, "esercizi.html", {
-        "corso": corso, "esercizi": esercizi,
-        "argomenti": esercizi_service.list_argomenti(tag), "blocchi_generati": blocchi_generati,
+        "corso": corso, "esercizi": esercizi, "argomenti": esercizi_service.list_argomenti(tag),
         "duplicati": esercizi_service.trova_duplicati(tag),
     })
 

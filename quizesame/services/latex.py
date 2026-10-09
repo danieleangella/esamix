@@ -293,8 +293,12 @@ def crea_file_anteprima(ctx: LatexContext, esercizi_struct: list[dict]) -> str:
     risposta corretta evidenziata e la soluzione/suggerimento. Non è un compito da
     stampare per gli studenti e non crea codici: si può generare in qualunque momento,
     anche prima dei blocchi, per verificare che testo e soluzioni siano corretti.
-    esercizi_struct: come per mischia(), con in più "nome" (facoltativo)."""
-    tex = BEGIN_DOCUMENT
+    esercizi_struct: come per mischia(), con in più "nome" (facoltativo).
+    Margini ampi (soprattutto a destra) per lasciare spazio alle correzioni a mano."""
+    tex = BEGIN_DOCUMENT.replace(
+        "\\usepackage{fullpage}\n",
+        "\\usepackage[a4paper,top=2.5cm,bottom=2.5cm,left=3cm,right=6cm,marginparwidth=4.5cm]{geometry}\n",
+    )
     tex += intestazione_breve(ctx)
     tex += (
         "\\begin{center}\n{\\bfseries ANTEPRIMA DI CONTROLLO -- con soluzioni, non distribuire}\\\\\n"

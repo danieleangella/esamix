@@ -29,7 +29,7 @@ body {
 .topbar .brand-docente { color: var(--muted); font-size: 0.85rem; margin-left: 0.4rem; }
 .topbar nav { display: flex; align-items: center; gap: 0.1rem; line-height: 1; }
 .topbar nav a {
-  color: #9ca3af; text-decoration: none; font-size: 0.8rem; font-weight: 400;
+  color: var(--muted); text-decoration: none; font-size: 0.875rem; font-weight: 500;
   padding: 0.3rem 0.6rem; border-radius: 6px; transition: background 0.15s, color 0.15s;
 }
 .topbar nav a:hover { background: var(--bg); color: var(--text); }
@@ -235,3 +235,77 @@ code { background: #f1f2f4; padding: 0.1rem 0.3rem; border-radius: 4px; }
 .stato-campo.stato-warn { color: #92400e; }
 .stato-campo.stato-err { color: var(--err-text); font-weight: 600; }
 kbd { font-family: monospace; font-size: 0.8em; padding: 0.05rem 0.3rem; border: 1px solid var(--border); border-radius: 3px; }
+
+/* Accessibilità: contorno ben visibile per chi naviga da tastiera (solo con :focus-visible,
+   quindi non compare al clic del mouse), e link "salta al contenuto" per gli screen reader
+   e la tastiera, visibile solo quando riceve il focus. */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, summary:focus-visible {
+  outline: 3px solid var(--accent); outline-offset: 2px;
+}
+.salta-al-contenuto {
+  position: absolute; left: -9999px; top: 0.5rem; z-index: 1000;
+  background: var(--accent); color: #fff; padding: 0.5rem 0.9rem; border-radius: 6px;
+}
+.salta-al-contenuto:focus { left: 0.5rem; }
+
+.azioni-rapide { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.azioni-rapide a.button { margin: 0; padding: 0.3rem 0.7rem; font-size: 0.85rem; }
+
+/* Percorso dell'appello (_percorso.html): fasi nell'ordine, con stato, e prossimo passo */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.percorso { margin: 0 0 0.75rem; }
+.percorso-gruppo {
+  font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.04em; margin: 0.5rem 0 0.25rem;
+}
+.percorso-passi {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 0.4rem;
+}
+.passo a {
+  display: flex; align-items: flex-start; gap: 0.5rem; height: 100%; box-sizing: border-box;
+  padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel); color: var(--text); text-decoration: none;
+}
+.passo a:hover { border-color: var(--accent); }
+.passo-icona {
+  flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 700; border: 2px solid var(--border); color: var(--muted);
+}
+.passo-testo { display: flex; flex-direction: column; min-width: 0; }
+.passo-nome { font-weight: 600; font-size: 0.9rem; }
+.passo-facoltativo { font-weight: 400; color: var(--muted); font-size: 0.75rem; }
+.passo-dettaglio { font-size: 0.75rem; color: var(--muted); }
+.passo-fatta .passo-icona { background: var(--ok-text); border-color: var(--ok-text); color: #fff; }
+.passo-in_corso .passo-icona { border-color: #d97706; color: #92400e; }
+.passo-saltata a { opacity: 0.6; }
+.passo-prossimo a { border: 2px solid var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+.passo-prossimo .passo-icona { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.prossimo-passo {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  margin: 0 0 1rem; padding: 0.8rem 1rem; border-radius: 10px;
+  background: #eff4ff; border: 1px solid #c7d7fe;
+}
+.prossimo-passo-etichetta { font-size: 0.75rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }
+.prossimo-passo-azione { font-size: 1rem; font-weight: 500; color: var(--text); }
+.prossimo-passo a.button { margin: 0; white-space: nowrap; }
+.prossimo-passo-fatto { background: var(--ok-bg); border-color: #bbe5c8; }
+/* fase la cui scheda è aperta in questo momento */
+.passo a.active { background: #eff4ff; border-color: var(--accent); }
+.passo a.active .passo-nome { color: var(--accent); }
+.tabs.tabs-servizio { margin-top: 0.25rem; }
+a.button.passo-link { margin: 0; padding: 0.25rem 0.6rem; font-size: 0.82rem; white-space: nowrap; }
+
+/* schermi stretti: il menu va a capo sotto il nome invece di uscire dalla pagina */
+@media (max-width: 700px) {
+  .topbar { flex-wrap: wrap; gap: 0.5rem; padding: 0.6rem 1rem; }
+  .topbar nav { flex-wrap: wrap; }
+  .container { padding: 1rem; }
+  table { display: block; overflow-x: auto; }
+}

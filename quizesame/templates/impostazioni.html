@@ -17,7 +17,7 @@
 
 <form method="post" action="/corsi/{{ corso.tag }}/impostazioni" id="form-impostazioni-corso">
 
-  <details class="card" open>
+  <details class="card">
     <summary><strong>Dati del corso</strong></summary>
     <div class="form-grid" style="margin-top:1rem">
       <div><label class="campo-obbligatorio">Nome corso</label><input name="nome" value="{{ corso.nome }}" required></div>
@@ -42,7 +42,15 @@
       <div><label class="campo-obbligatorio">Punti risposta sbagliata <code class="muted">{sbagliata}</code></label><input type="number" name="risposta_sbagliata" value="{{ corso.risposta_sbagliata }}" required></div>
       <div><label class="campo-obbligatorio">Punti risposta vuota <code class="muted">{vuota}</code></label><input type="number" name="risposta_vuota" value="{{ corso.risposta_vuota }}" required></div>
     </div>
-    <div class="form-grid" style="margin-top:0.75rem">
+    <div style="margin-top:0.75rem">
+      <label style="display:inline-flex; align-items:center; gap:0.4rem">
+        <input type="checkbox" name="domande_aperte_attive" id="check-domande-aperte" style="width:auto" {% if corso.domande_aperte_attive %}checked{% endif %}>
+        Questo corso usa anche domande aperte (con punteggio assegnato a mano in correzione)
+      </label>
+      <p class="muted" style="margin:0.25rem 0 0 1.7rem">Se disattivato, l'opzione "Domanda aperta" sparisce dai moduli
+        degli esercizi e non se ne possono creare o importare di nuove.</p>
+    </div>
+    <div class="form-grid" style="margin-top:0.75rem" id="blocco-domande-aperte">
       <div>
         <label class="campo-obbligatorio">Punteggio massimo domanda aperta</label>
         <input type="number" name="punteggio_max_aperta" value="{{ corso.punteggio_max_aperta }}" required>
@@ -53,7 +61,7 @@
     <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </details>
 
-  <details class="card" open>
+  <details class="card">
     <summary><strong>Orale</strong></summary>
     <div>
       <label style="display:inline-flex; align-items:center; gap:0.4rem">
@@ -168,6 +176,15 @@
     blocco.querySelectorAll("input").forEach(function (el) { el.disabled = !attivo; });
   }
   checkSoglia.addEventListener("change", aggiorna);
+  aggiorna();
+})();
+
+(function () {
+  // il campo resta inviato anche quando nascosto, così il punteggio salvato non si perde
+  var check = document.getElementById("check-domande-aperte");
+  var blocco = document.getElementById("blocco-domande-aperte");
+  function aggiorna() { blocco.hidden = !check.checked; }
+  check.addEventListener("change", aggiorna);
   aggiorna();
 })();
 

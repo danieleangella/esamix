@@ -289,7 +289,9 @@
     </table>
   </details>
 
-  <details class="card" open>
+  {# aperta solo quando sembra il momento di concludere: risultati presenti e nessun
+     presente o bozza ancora da correggere #}
+  <details class="card" {% if md.risultati and not md.bozze_correzione and not presenti_da_correggere and not md.appello.correzione_scritti_conclusa %}open{% endif %}>
     <summary><strong>Concludi correzione scritto</strong></summary>
     {% if md.appello.correzione_scritti_conclusa %}
     <p class="muted" style="margin-top:0.75rem">
@@ -299,6 +301,23 @@
       <button type="submit" class="secondary">Riapri correzione scritto</button>
     </form>
     {% else %}
+    {% if md.non_valutati %}
+    <div style="margin-top:0.75rem; padding-bottom:0.75rem; border-bottom:1px solid var(--border)">
+      <p class="muted" style="margin:0">
+        <strong>{{ md.non_valutati|length }}</strong> studenti attesi non hanno ancora nessun risultato
+        (né voto, né assente, né ritirato). Se hai corretto tutti i compiti consegnati, segnali come assenti
+        in un colpo solo (chi ha una correzione in bozza non viene toccato).
+      </p>
+      <details style="margin-top:0.4rem">
+        <summary class="muted">Mostra chi sono</summary>
+        <p class="muted" style="margin:0.4rem 0 0">{% for st in md.non_valutati %}{{ st.cognome or '' }} {{ st.nome or '' }} ({{ st.matricola }}){% if not loop.last %}, {% endif %}{% endfor %}</p>
+      </details>
+      <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/segna-assenti-non-valutati" style="margin-top:0.5rem"
+            onsubmit="return confirm({{ ('Segnare come ASSENTI i ' ~ (md.non_valutati|length) ~ ' studenti non ancora valutati? Puoi comunque correggere a mano un singolo esito in seguito.')|js }});">
+        <button type="submit" class="warning">Segna come assenti i {{ md.non_valutati|length }} non valutati</button>
+      </form>
+    </div>
+    {% endif %}
     <p class="muted" style="margin-top:0.75rem">
       Quando tutti i compiti scritti sono stati corretti, concludi: genera l'elenco risultati
       (.html/.tex/.pdf) e blocca nuove correzioni per questa prova (puoi comunque riaprire in

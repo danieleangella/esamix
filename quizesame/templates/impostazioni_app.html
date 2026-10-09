@@ -48,7 +48,7 @@
   <a href="/backup-tutti.zip" class="button">Scarica un backup completo di tutti i corsi</a>
 </details>
 
-<details class="card" open>
+<details class="card">
   <summary><strong>Ripristina backup</strong></summary>
   <p class="muted" style="margin-top:0.75rem">Carica uno zip scaricato da qui (di un singolo corso o di tutti insieme): nella
     pagina successiva scegli quali corsi ripristinare, con un avviso per quelli che esistono già e
@@ -57,6 +57,13 @@
     <input type="file" name="file" accept=".zip" required>
     <button type="submit" class="secondary">Carica e scegli cosa ripristinare</button>
   </form>
+</details>
+
+<details class="card">
+  <summary><strong>Migrazione dati legacy</strong></summary>
+  <p class="muted" style="margin-top:1rem">Importa una tantum i dati di un corso gestito con la vecchia versione
+    (cartelle con file Python e CSV).</p>
+  <a href="/migrazione" class="button secondary">Apri la migrazione dati legacy</a>
 </details>
 
 <details class="card">
