@@ -1,0 +1,14 @@
+{# Pulsante "Compila e scarica" dell'esportazione voti: se il corso ha più testi per la
+   colonna "Domande d'esame", chiede quale usare. Richiede `url_esporta`. #}
+<form method="get" action="{{ url_esporta }}" style="margin-top:0.5rem">
+  {% if corso.domande_esame_lista|length > 1 %}
+  <label>Domande d'esame da scrivere nel file</label>
+  <select name="domanda" style="max-width:40rem">
+    {% for d in corso.domande_esame_lista %}<option value="{{ loop.index0 }}">{{ d|truncate(120) }}</option>{% endfor %}
+  </select>
+  {% elif not corso.domande_esame_lista %}
+  <p class="muted">Nessun testo per la colonna "Domande d'esame": puoi impostarlo nelle
+    <a href="/corsi/{{ corso.tag }}/impostazioni">impostazioni del corso</a> (resterà vuota).</p>
+  {% endif %}
+  <button type="submit" style="margin-top:0.5rem">Compila e scarica</button>
+</form>

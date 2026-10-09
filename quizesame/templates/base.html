@@ -27,6 +27,47 @@
       });
     }
   }
+  // Filtri (testo, nome del corso, corso specifico, argomento) e anteprime a richiesta
+  // dell'elenco _elenco_esercizi_corsi.html; definita qui perché quell'elenco può essere
+  // inserito via fetch, e gli <script> dentro un innerHTML non vengono eseguiti.
+  function attivaElencoEsercizi(radice) {
+    if (!radice) return;
+    var q = function (sel) { return radice.querySelector(sel); };
+    var filtri = [".filtro-testo", ".filtro-nome-corso", ".filtro-corso", ".filtro-argomento"].map(q);
+    if (!filtri[0]) return;
+    var righe = radice.querySelectorAll("tr.riga-esercizio");
+    var conteggio = q(".conteggio-esercizi");
+    function applica() {
+      var testo = filtri[0].value.trim().toLowerCase();
+      var visibili = 0;
+      righe.forEach(function (r) {
+        var ok = (!testo || r.dataset.nome.includes(testo) || r.dataset.testo.includes(testo))
+          && (!filtri[1].value || r.dataset.nomeCorso === filtri[1].value)
+          && (!filtri[2].value || r.dataset.corso === filtri[2].value)
+          && (!filtri[3].value || r.dataset.argomento === filtri[3].value);
+        r.style.display = ok ? "" : "none";
+        if (!ok) r.nextElementSibling.style.display = "none";
+        visibili += ok ? 1 : 0;
+      });
+      if (conteggio) conteggio.textContent = visibili + " esercizi su " + righe.length;
+    }
+    filtri.forEach(function (f) { f.addEventListener(f.tagName === "INPUT" ? "input" : "change", applica); });
+    radice.querySelectorAll(".btn-anteprima-elenco").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var riga = btn.closest("tr").nextElementSibling;
+        var aperta = riga.style.display !== "none";
+        riga.style.display = aperta ? "none" : "";
+        if (aperta) return;
+        if (riga.dataset.caricata) { renderizzaLatex(riga); return; }
+        fetch(btn.dataset.url).then(function (r) { return r.text(); }).then(function (html) {
+          riga.querySelector("td").innerHTML = html;
+          riga.dataset.caricata = "1";
+          renderizzaLatex(riga);
+        });
+      });
+    });
+    applica();
+  }
   </script>
   <script>
   // Autocompletamento generico riusabile da qualunque pagina: digitando nel campo,
@@ -142,6 +183,7 @@
     {% set path = request.url.path %}
     <nav>
       <a href="/" class="{{ 'active' if path == '/' or path.startswith('/corsi') or path.startswith('/studenti') else '' }}">Home page</a>
+      <a href="/esercizi" class="{{ 'active' if path == '/esercizi' else '' }}">Tutti gli esercizi</a>
       <a href="/migrazione" class="{{ 'active' if path.startswith('/migrazione') else '' }}">Migrazione dati legacy</a>
       <a href="/impostazioni" class="{{ 'active' if path == '/impostazioni' else '' }}">Impostazioni</a>
       <a href="/help" class="{{ 'active' if path == '/help' else '' }}">Help</a>

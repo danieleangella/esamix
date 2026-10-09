@@ -228,6 +228,7 @@ ADDITIVE_COLUMNS = {
     ],
     "raggruppamenti": [
         ("matricola_minima_prima_prova", "TEXT"),
+        ("fonte_ammessi", "TEXT NOT NULL DEFAULT 'corso'"),
     ],
     "appello_esercizi": [
         ("obbligatorio", "BOOLEAN NOT NULL DEFAULT 0"),
@@ -267,6 +268,7 @@ ADDITIVE_COLUMNS = {
         ("iscritti_manuale", "INTEGER"),
         ("presenze_chiuse", "BOOLEAN NOT NULL DEFAULT 0"),
         ("correzione_scritti_conclusa", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("matricola_minima_iscritti", "TEXT"),
     ],
 }
 

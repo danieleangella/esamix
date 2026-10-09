@@ -221,13 +221,22 @@
     </form>
 
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/raggruppamento/modifica" style="margin-top:1rem">
-      <div class="form-grid">
+      <label>Chi è ammesso alla prima prova</label>
+      <div><label style="display:inline-flex; align-items:center; gap:0.4rem">
+        <input type="radio" name="fonte_ammessi" value="corso" style="width:auto" {% if raggruppamento.fonte_ammessi != 'iscritti' %}checked{% endif %}>
+        tutti gli studenti registrati nel corso</label></div>
+      <div><label style="display:inline-flex; align-items:center; gap:0.4rem">
+        <input type="radio" name="fonte_ammessi" value="iscritti" style="width:auto" {% if raggruppamento.fonte_ammessi == 'iscritti' %}checked{% endif %}>
+        solo gli iscritti alla prima prova (file della segreteria o aggiunti a mano, scheda "Compiti d'esame" della prova)</label></div>
+      <div class="form-grid" style="margin-top:0.5rem">
         <div>
-          <label>Matricola minima ammessa alla prima prova</label>
-          <input type="number" name="matricola_minima_prima_prova" value="{{ raggruppamento.matricola_minima_prima_prova or '' }}" placeholder="es. 200000 (vuoto = nessun limite)">
+          <label>…e solo con matricola &ge; (facoltativo)</label>
+          <input type="number" name="matricola_minima_prima_prova" value="{{ raggruppamento.matricola_minima_prima_prova or '' }}" placeholder="es. 7100000 (vuoto = nessun limite)">
         </div>
       </div>
-      <button type="submit" class="secondary">Salva soglia</button>
+      <p class="muted" style="margin-top:0.25rem">Alle prove successive è ammesso chi ha superato la prova precedente; singoli
+        studenti si possono comunque aggiungere a mano (in deroga) dall'elenco ammessi di ciascuna prova.</p>
+      <button type="submit" class="secondary">Salva ammissione</button>
     </form>
 
     <table style="margin-top:0.75rem">
@@ -384,7 +393,8 @@
       "{{ segreteria_csv.nome_file }}" caricato il {{ segreteria_csv.caricato_il }}. Prima di scaricare il
       file viene chiesto se verbalizzare subito gli studenti trovati.
     </p>
-    <a class="button" href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/esporta-voti">Compila e scarica</a>
+    {% set url_esporta = "/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/esporta-voti" %}
+    {% include "_esporta_voti_bottone.html" %}
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/segreteria-csv/elimina" style="margin-top:0.5rem"
           onsubmit="return confirm('Rimuovere il file caricato?');">
       <button type="submit" class="secondary">Rimuovi file caricato</button>

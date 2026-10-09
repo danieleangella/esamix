@@ -240,6 +240,11 @@ def elimina_esercizio(tag: str, esercizio_id: int) -> None:
         ).fetchone()[0]
         if in_uso:
             raise ValueError("Questo esercizio è assegnato a un appello: rimuovilo prima dall'appello")
+        in_compiti = conn.execute(
+            "SELECT count(*) FROM compito_esercizi WHERE esercizio_id=?", (esercizio_id,)
+        ).fetchone()[0]
+        if in_compiti:
+            raise ValueError("Questo esercizio compare in compiti già generati: non può essere eliminato")
         conn.execute("DELETE FROM esercizio_varianti WHERE esercizio_id=?", (esercizio_id,))
         conn.execute("DELETE FROM esercizi WHERE id=?", (esercizio_id,))
         conn.commit()
@@ -609,23 +614,66 @@ def carica_esercizi_da_cartella(esercizi_dir: str):
     return module.esercizi
 
 
-def importa_da_altro_corso(tag: str, tag_sorgente: str, esercizio_ids: list[int]) -> int:
-    """Copia esercizi (con le loro varianti) dalla banca di un altro corso in quella del
-    corso corrente. Ogni corso resta un database indipendente e autosufficiente: 'collegare'
-    due banche significa importare una copia degli esercizi scelti, non condividerli dal
-    vivo — le modifiche successive su una copia non si propagano all'altra."""
-    n = 0
-    for esercizio_id in esercizio_ids:
-        esercizio = get_esercizio(tag_sorgente, esercizio_id)
-        if esercizio is None:
+def list_esercizi_tutti_i_corsi(escludi_tag: str = "") -> list[tuple]:
+    """Tutti gli esercizi di tutti i corsi, come coppie (corso, esercizio): le banche
+    restano separate (un database per corso), questo è solo un elenco unico per
+    sfogliarle e filtrarle insieme, ad es. per riusare un esercizio di un anno precedente."""
+    risultato = []
+    for corso in corsi_service.list_corsi():
+        if corso.tag == escludi_tag:
             continue
-        varianti = [{"testo": v.testo, "risposte": list(v.risposte)} for v in esercizio.varianti]
-        create_esercizio(
-            tag, nome=esercizio.nome, note=f"Importato dal corso '{tag_sorgente}'", varianti=varianti,
-            argomento=esercizio.argomento or "",
-        )
-        n += 1
-    return n
+        try:
+            esercizi = list_esercizi(corso.tag)
+        except Exception:
+            continue  # un database illeggibile non deve nascondere tutti gli altri
+        risultato.extend((corso, e) for e in esercizi)
+    return risultato
+
+
+def copia_da_altro_corso(tag: str, tag_sorgente: str, esercizio_id: int) -> tuple[Optional[int], bool]:
+    """Copia un esercizio (varianti, soluzione, difficoltà, tipo compresi) dalla banca di
+    un altro corso in quella del corso `tag`: le banche restano indipendenti, le modifiche
+    successive su una copia non si propagano all'altra. Se nella banca di destinazione
+    c'è già un esercizio identico (stesse varianti e risposte) riusa quello invece di
+    creare un doppione. Ritorna (id nella banca di destinazione, era_già_presente);
+    (None, False) se l'esercizio sorgente non esiste."""
+    esercizio = get_esercizio(tag_sorgente, esercizio_id)
+    if esercizio is None:
+        return None, False
+    varianti = [{"testo": v.testo, "risposte": list(v.risposte)} for v in esercizio.varianti]
+    firma = _firma_varianti(varianti)
+    for esistente in list_esercizi(tag):
+        if _firma_varianti([{"testo": v.testo, "risposte": v.risposte} for v in esistente.varianti]) == firma:
+            return esistente.id, True
+    sorgente = corsi_service.get_corso(tag_sorgente)
+    provenienza = f"Copiato da {sorgente.nome}" + (f" ({sorgente.anno})" if sorgente.anno else f" [{tag_sorgente}]")
+    note = f"{esercizio.note}\n{provenienza}" if esercizio.note else provenienza
+    nuovo = create_esercizio(
+        tag, nome=esercizio.nome or "", note=note, varianti=varianti, argomento=esercizio.argomento or "",
+        difficolta=esercizio.difficolta, soluzione=esercizio.soluzione or "", aperta=esercizio.aperta,
+    )
+    return nuovo.id, False
+
+
+def importa_in_appello_da_altri_corsi(
+    tag: str, appello_id: int, selezionati: list[tuple[str, int]], obbligatorio: bool = False,
+) -> tuple[int, int]:
+    """Copia nella banca del corso (vedi copia_da_altro_corso) e assegna subito al
+    compito gli esercizi scelti da altri corsi/anni. `selezionati`: [(tag_sorgente,
+    esercizio_id), ...]. Ritorna (assegnati, di cui già presenti nella banca)."""
+    corsi_service.verifica_appello_aperto(tag, appello_id)
+    assegnati = gia_presenti = 0
+    for tag_sorgente, esercizio_id in selezionati:
+        if tag_sorgente == tag:
+            nuovo_id, presente = esercizio_id, True
+        else:
+            nuovo_id, presente = copia_da_altro_corso(tag, tag_sorgente, esercizio_id)
+        if nuovo_id is None:
+            continue
+        assegna_a_appello(tag, appello_id, nuovo_id, obbligatorio=obbligatorio)
+        assegnati += 1
+        gia_presenti += presente
+    return assegnati, gia_presenti
 
 
 def importa_da_cartella_legacy(tag: str, esercizi_dir: str, appello_id: Optional[int] = None) -> int:

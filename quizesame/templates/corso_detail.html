@@ -17,7 +17,7 @@
 
 <details class="card" open>
   <summary><strong>Appelli</strong></summary>
-  {% if appelli %}
+  {% if appelli or raggruppamenti %}
   <table>
     <tr><th>Nome</th><th>Data</th><th>Risultati</th><th>Voto medio</th><th></th></tr>
     {% for a in appelli %}
@@ -35,17 +35,47 @@
       <td>{{ s.media if s.media is not none else '-' }}</td>
       <td>
         {% if a.data == oggi %}<span class="badge badge-ok">In corso</span>{% endif %}
+        {% if a.chiuso %}<span class="badge">chiuso</span>{% endif %}
         {% if not a.attivo %}<span class="badge badge-warn">disattivato</span>{% endif %}
       </td>
     </tr>
     {% endfor %}
+    {% if raggruppamenti %}
+    {# i raggruppamenti (es. prove parziali) compaiono in coda, leggermente staccati: le
+       singole prove che li compongono si aprono dalla pagina del raggruppamento #}
+    <tr class="riga-separatore-raggruppamenti"><td colspan="5">Raggruppamenti di prove</td></tr>
+    {% for r in raggruppamenti %}
+    {% set ra = raggruppamenti_appelli[r.appello_id] %}
+    {% set s = statistiche[r.appello_id] %}
+    <tr>
+      <td>
+        <a href="/corsi/{{ corso.tag }}/appelli/{{ r.appello_id }}" style="text-decoration:none; font-weight:500">{{ r.nome }}</a>
+        <span class="badge badge-info">raggruppamento</span>
+        <div class="muted" style="font-size:0.85em">prove: {{ r.membri | map(attribute='nome') | join(', ') }}</div>
+      </td>
+      <td>{{ (r.membri | map(attribute='data') | select | join(', ')) or '-' }}</td>
+      <td>
+        {% if s.totale %}
+        {{ s.sufficienti }}/{{ s.totale }} <span class="muted">({{ s.percentuale }}%)</span>
+        {% else %}
+        <span class="muted">-</span>
+        {% endif %}
+      </td>
+      <td>{{ s.media if s.media is not none else '-' }}</td>
+      <td>
+        {% if ra.chiuso %}<span class="badge">chiuso</span>{% endif %}
+        {% if not ra.attivo %}<span class="badge badge-warn">disattivato</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% endif %}
   </table>
   {% else %}
-  <p class="muted">Nessun appello ancora creato per questo corso.</p>
+  <p class="muted">Nessun appello ancora creato per questo corso: crealo qui sotto.</p>
   {% endif %}
 </details>
 
-<details class="card dettaglio-fisarmonica">
+<details class="card dettaglio-fisarmonica" {% if not appelli and not raggruppamenti %}open{% endif %}>
   <summary>Nuovo appello</summary>
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/nuovo" style="margin-top:1rem">
     <div class="form-grid">
@@ -62,42 +92,16 @@
   </p>
 </details>
 
-<details class="card" open>
-  <summary><strong>Raggruppamenti (es. media di prove parziali)</strong></summary>
-  <p class="muted">
-    Un raggruppamento calcola la media dei voti di più appelli come voto finale unico,
-    solo per chi ha superato la soglia di <em>ciascuno</em> di essi (il voto minimo per
-    le prove di raggruppamento, impostato qui sotto). La media risultante è considerata
-    sufficiente se supera il voto minimo standard del corso.
-  </p>
-  {% if raggruppamenti %}
-  <table>
-    <tr><th>Nome</th><th>Tipo</th><th>Prove membro</th><th>Risultati</th><th>Voto medio</th><th></th></tr>
-    {% for r in raggruppamenti %}
-    {% set ra = raggruppamenti_appelli[r.appello_id] %}
-    {% set s = statistiche[r.appello_id] %}
-    <tr>
-      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ r.appello_id }}" style="text-decoration:none; font-weight:500">{{ r.nome }}</a></td>
-      <td>raggruppamento</td>
-      <td>{{ r.membri | map(attribute='nome') | join(', ') }}</td>
-      <td>
-        {% if s.totale %}
-        {{ s.sufficienti }}/{{ s.totale }} <span class="muted">({{ s.percentuale }}%)</span>
-        {% else %}
-        <span class="muted">-</span>
-        {% endif %}
-      </td>
-      <td>{{ s.media if s.media is not none else '-' }}</td>
-      <td>{% if not ra.attivo %}<span class="badge badge-warn">disattivato</span>{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% endif %}
-</details>
-
 {% if appelli|length >= 2 %}
 <details class="card dettaglio-fisarmonica">
-  <summary>Nuovo raggruppamento</summary>
+  <summary>Nuovo raggruppamento (es. media di prove parziali)</summary>
+  <p class="muted" style="margin-top:1rem">
+    Un raggruppamento calcola la media dei voti di più appelli come voto finale unico,
+    solo per chi ha superato la soglia di <em>ciascuno</em> di essi (il voto minimo per
+    le prove di raggruppamento, nelle impostazioni del corso). La media risultante è considerata
+    sufficiente se supera il voto minimo standard del corso. Le prove scelte compaiono poi
+    dentro la pagina del raggruppamento.
+  </p>
   <form method="post" action="/corsi/{{ corso.tag }}/raggruppamenti/nuovo" style="margin-top:1rem">
     <div class="form-grid">
       <div><label class="campo-obbligatorio">Nome raggruppamento</label><input name="nome" required placeholder="es. Prove parziali"></div>

@@ -148,21 +148,27 @@
   <summary>Nuovo corso</summary>
   <form method="post" action="/corsi/nuovo" id="nuovo-corso-form" style="margin-top:1rem">
     <div class="form-grid">
-      <div style="grid-column: 1 / -1"><label class="campo-obbligatorio">Nome corso</label><input name="nome" id="corso-nome" required placeholder="es. Geometria O-Z"></div>
+      <div style="grid-column: 1 / -1"><label class="campo-obbligatorio">Nome corso</label><input name="nome" id="corso-nome" required placeholder="es. Geometria O-Z" list="suggerimenti-nome-corso" autocomplete="off">
+        <p class="muted" id="avviso-corso-precedente" style="display:none; margin-top:0.25rem"></p></div>
       <div><label>Anno accademico</label><input name="anno" id="corso-anno" placeholder="es. 2026/2027"></div>
       <div><label class="campo-obbligatorio">Tag (cartella, univoco)</label><input name="tag" id="corso-tag" required placeholder="es. GeoOZ-IngMEL-UniFi26"></div>
     </div>
 
     <div class="form-grid" style="margin-top:0.75rem">
-      <div><label>Corso di studi</label><input name="facolta" placeholder="es. Ingegneria Meccanica"></div>
-      <div><label>Università</label><input name="universita" placeholder="es. Universit\`a di Firenze"></div>
-      <div><label>Docente</label><input name="docente"></div>
+      <div><label>Corso di studi</label><input name="facolta" id="corso-facolta" placeholder="es. Ingegneria Meccanica" list="suggerimenti-facolta" autocomplete="off"></div>
+      <div><label>Università</label><input name="universita" id="corso-universita" placeholder="es. Universit\`a di Firenze" list="suggerimenti-universita" autocomplete="off"></div>
+      <div><label>Docente</label><input name="docente" id="corso-docente" list="suggerimenti-docente" autocomplete="off"></div>
     </div>
+    <datalist id="suggerimenti-nome-corso">{% for n in edizioni_recenti %}<option value="{{ n }}">{% endfor %}</datalist>
+    <datalist id="suggerimenti-facolta">{% for v in corsi | map(attribute='facolta') | select | unique | sort %}<option value="{{ v }}">{% endfor %}</datalist>
+    <datalist id="suggerimenti-universita">{% for v in corsi | map(attribute='universita') | select | unique | sort %}<option value="{{ v }}">{% endfor %}</datalist>
+    <datalist id="suggerimenti-docente">{% for v in corsi | map(attribute='docente') | select | unique | sort %}<option value="{{ v }}">{% endfor %}</datalist>
 
     <p class="muted" style="margin-top:1rem">
-      Voto minimo (18), voto minimo per i raggruppamenti (15) ed esercizi obbligatori (0)
-      partono dai valori predefiniti: si possono cambiare in qualsiasi momento dalla
-      scheda Impostazioni del corso.
+      Se esiste già un corso con lo stesso nome (es. l'anno precedente), il nuovo corso ne copia
+      le impostazioni (voti, punteggi, orale, testo del compito, domande d'esame); altrimenti
+      partono dai valori predefiniti. Dopo la creazione si apre la pagina delle impostazioni,
+      per controllarle.
     </p>
     <button type="submit">Crea corso</button>
   </form>
@@ -189,6 +195,22 @@
   }
   nome.addEventListener("input", aggiornaTag);
   anno.addEventListener("input", aggiornaTag);
+
+  // scegliendo il nome di un corso già esistente, precompila i campi vuoti con i dati
+  // della sua edizione più recente e avvisa che ne verranno copiate le impostazioni
+  var edizioni = {{ edizioni_recenti | tojson }};
+  var avviso = document.getElementById("avviso-corso-precedente");
+  nome.addEventListener("input", function () {
+    var e = edizioni[nome.value.trim()];
+    if (!e) { avviso.style.display = "none"; return; }
+    [["corso-facolta", e.facolta], ["corso-universita", e.universita], ["corso-docente", e.docente]].forEach(function (c) {
+      var campo = document.getElementById(c[0]);
+      if (!campo.value && c[1]) campo.value = c[1];
+    });
+    avviso.textContent = "Esiste già questo corso" + (e.anno ? " (" + e.anno + ")" : "") +
+      ": impostazioni e domande d'esame verranno copiate da lì.";
+    avviso.style.display = "";
+  });
 })();
 </script>
 {% endblock %}

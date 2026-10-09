@@ -123,6 +123,34 @@
   {% endif %}
 
   {% if not md.appello.chiuso %}
+  {% if not md.segreteria_csv %}
+  <details class="dettaglio-fisarmonica" style="margin-top:0.75rem">
+    <summary>Ammetti tutti gli studenti del corso</summary>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale/tutti" style="margin-top:1rem">
+      <div class="form-grid">
+        <div><label>Solo con matricola &ge; (facoltativo)</label>
+          <input type="number" name="matricola_minima" placeholder="es. 7100000 (vuoto = tutti)"></div>
+      </div>
+      <p class="muted" style="margin-top:0.5rem">Aggiunge all'elenco iscritti tutti gli studenti registrati nel corso
+        (o solo quelli con matricola maggiore o uguale a quella indicata, ad es. per ammettere solo il primo anno).
+        Poi puoi togliere o aggiungere singoli studenti dall'elenco qui sopra.</p>
+      <button type="submit" class="secondary">Aggiungi tutti</button>
+    </form>
+  </details>
+  {% endif %}
+  <details class="dettaglio-fisarmonica" style="margin-top:0.75rem" {% if md.appello.matricola_minima_iscritti %}open{% endif %}>
+    <summary>Filtra gli iscritti per matricola{% if md.appello.matricola_minima_iscritti %} (attivo: &ge; {{ md.appello.matricola_minima_iscritti }}){% endif %}</summary>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-filtro" style="margin-top:1rem">
+      <div class="form-grid">
+        <div><label>Ammetti solo matricole &ge;</label>
+          <input type="number" name="matricola_minima" value="{{ md.appello.matricola_minima_iscritti or '' }}" placeholder="vuoto = nessun filtro"></div>
+      </div>
+      <p class="muted" style="margin-top:0.5rem">Vale per l'elenco iscritti di questo appello, sia dal file della segreteria
+        sia aggiunti a mano: chi ha una matricola inferiore non compare nell'elenco, nel registro presenze e non può
+        essere corretto (ad es. per una prova riservata al primo anno). Il file restituito alla segreteria resta intero.</p>
+      <button type="submit" class="secondary">Salva filtro</button>
+    </form>
+  </details>
   <details class="dettaglio-fisarmonica" style="margin-top:0.75rem" {% if not md.segreteria_csv %}open{% endif %}>
     <summary>{{ 'Aggiorna' if md.segreteria_csv else 'Carica' }} il file della segreteria ("Lista Studenti Esame")</summary>
     <p class="muted" style="margin-top:1rem">
@@ -189,10 +217,17 @@
   {% endif %}
   {% if md.esercizi_assegnati %}
   <p>
-    <strong>Foglio di riferimento</strong> (testo e risposte corrette, comune a tutti i blocchi, da pubblicare online):
+    <strong>Foglio di riferimento senza soluzioni</strong> (testo e risposte corrette, comune a tutti i blocchi, da pubblicare online):
     <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.html">.html</a>
     {% if md.riferimento_tex_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.tex">.tex</a>{% endif %}
     {% if md.riferimento_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.pdf">.pdf</a>{% endif %}
+  </p>
+  <p>
+    <strong>Foglio di riferimento con soluzioni e suggerimenti</strong>:
+    {% if md.riferimento_sol_tex_esiste %}<a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento-soluzioni.tex">.tex</a>{% endif %}
+    {% if md.riferimento_sol_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento-soluzioni.pdf">.pdf</a>{% endif %}
+    {% if not md.riferimento_sol_tex_esiste %}<span class="muted">viene creato con il prossimo blocco di compiti</span>{% endif %}
+    &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/anteprima.pdf" target="_blank">anteprima di controllo (PDF)</a>
   </p>
   {% endif %}
   {% if md.blocchi %}

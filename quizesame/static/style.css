@@ -216,3 +216,22 @@ code { background: #f1f2f4; padding: 0.1rem 0.3rem; border-radius: 4px; }
   from { transform: translateY(0) rotate(0deg); opacity: 1; }
   to { transform: translateY(105vh) rotate(360deg); opacity: 0.9; }
 }
+
+/* lista appelli del corso: i raggruppamenti seguono gli appelli, leggermente staccati */
+.riga-separatore-raggruppamenti td {
+  padding-top: 1.4rem; font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--muted, #6b7280); border-bottom: 1px solid var(--border);
+}
+
+/* scheda Correzione: avanzamento e controlli in tempo reale sui campi */
+.barra-avanzamento-correzione {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; align-items: center;
+  padding: 0.6rem 1rem; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel, #fff);
+}
+.card-correzione { border-width: 2px; }
+.stato-campo { margin-top: 0.25rem; font-size: 0.85rem; min-height: 1.1em; color: var(--muted); }
+.stato-campo.stato-ok { color: var(--ok-text); }
+.stato-campo.stato-warn { color: #92400e; }
+.stato-campo.stato-err { color: var(--err-text); font-weight: 600; }
+kbd { font-family: monospace; font-size: 0.8em; padding: 0.05rem 0.3rem; border: 1px solid var(--border); border-radius: 3px; }

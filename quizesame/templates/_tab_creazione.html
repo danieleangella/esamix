@@ -50,8 +50,9 @@
       <td style="white-space:nowrap">
         <button type="button" class="secondary btn-modifica-assegnato" data-esercizio="{{ e.id }}">Modifica</button>
         {% if not md.appello.chiuso %}
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esercizi/{{ e.id }}/rimuovi"
-              onsubmit="return confirm({{ ('Rimuovere l\'esercizio ' ~ (e.nome or ('#' ~ e.id)) ~ ' da questo appello?')|js }});">
+        <form class="inline form-rimuovi-esercizio" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esercizi/{{ e.id }}/rimuovi"
+              data-nome="{{ e.nome or ('#' ~ e.id) }}">
+          <input type="hidden" name="elimina_dalla_banca" value="">
           <button type="submit" class="danger">Rimuovi</button>
         </form>
         {% endif %}
@@ -73,6 +74,12 @@
     </tr>
     {% endfor %}
   </table>
+  <p style="margin-top:0.75rem">
+    <a class="button" href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/anteprima.pdf" target="_blank">Anteprima PDF con soluzioni</a>
+    <span class="muted">— tutti gli esercizi con tutte le varianti, la risposta corretta e la soluzione/suggerimento, per
+      controllare che il testo sia corretto (non crea compiti né codici).
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/anteprima.tex">.tex</a></span>
+  </p>
   <p class="muted">Un esercizio obbligatorio richiede consegna e svolgimento scritto: se non
     svolto il compito risulta insufficiente; se svolto, in correzione viene chiesto di
     confermare se lo svolgimento è corretto. L'ordine qui non incide sul compito dello
@@ -92,7 +99,7 @@
 
   {% if md.esercizi_disponibili and not md.appello.chiuso %}
   <details style="margin-top:0.75rem">
-    <summary>Assegna esercizi dalla banca del corso ({{ md.esercizi_disponibili|length }} disponibili)</summary>
+    <summary>Aggiungi esercizi dalla banca di questo corso ({{ md.esercizi_disponibili|length }} disponibili)</summary>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esercizi/assegna" style="margin-top:1rem">
       <div class="form-grid">
         <div><label>Cerca</label><input type="text" class="filtro-ricerca" placeholder="cerca per nome o testo"></div>
@@ -167,6 +174,30 @@
   </script>
   {% endif %}
 
+  {% if not md.appello.chiuso %}
+  <details style="margin-top:0.75rem" class="pannello-altri-corsi">
+    <summary>Importa da altri corsi o anni precedenti</summary>
+    <div class="contenuto-altri-corsi"><p class="muted" style="margin-top:1rem">Caricamento degli esercizi degli altri corsi…</p></div>
+  </details>
+  <script>
+  (function () {
+    // l'elenco (tutte le banche di tutti i corsi) si carica solo alla prima apertura
+    var pannello = document.currentScript.previousElementSibling;
+    pannello.addEventListener("toggle", function () {
+      if (!pannello.open || pannello.dataset.caricato) return;
+      pannello.dataset.caricato = "1";
+      fetch("/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esercizi/altri-corsi")
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var contenuto = pannello.querySelector(".contenuto-altri-corsi");
+          contenuto.innerHTML = html;
+          attivaElencoEsercizi(contenuto.querySelector(".elenco-esercizi-corsi"));
+        });
+    });
+  })();
+  </script>
+  {% endif %}
+
   {% if md.esercizi_assegnati %}
   <details style="margin-top:0.75rem">
     <summary>Esporta gli esercizi di questo appello</summary>
@@ -188,20 +219,44 @@
 
 <script>
 (function () {
+  // Rimuovere un esercizio dal compito chiede anche se eliminarlo dalla banca dati del
+  // corso (ok = elimina anche dalla banca, annulla = resta nella banca, riusabile).
+  var root = document.currentScript.closest(".tab-pane");
+  root.querySelectorAll(".form-rimuovi-esercizio").forEach(function (form) {
+    form.addEventListener("submit", function (ev) {
+      var nome = form.dataset.nome;
+      if (!window.confirm("Rimuovere l'esercizio " + nome + " da questo compito?")) {
+        ev.preventDefault(); ev.stopImmediatePropagation(); return;
+      }
+      var elimina = window.confirm(
+        "Eliminare l'esercizio " + nome + " anche dalla banca dati del corso?\n\n" +
+        "OK = elimina definitivamente anche dalla banca\n" +
+        "Annulla = lo tolgo solo da questo compito (resta nella banca, riusabile)");
+      form.querySelector('[name="elimina_dalla_banca"]').value = elimina ? "1" : "";
+    }, true);
+  });
+})();
+</script>
+<script>
+(function () {
   var root = document.currentScript.closest(".tab-pane");
   var blocchiEsistono = {{ 'true' if md.blocchi else 'false' }};
   if (!blocchiEsistono) return;
-  var azioniSensibili = ["/obbligatorio", "/rimuovi", "/esercizi/assegna", "/esercizi/nuovo", "/importa-json"];
-  root.querySelectorAll("form").forEach(function (form) {
+  var azioniSensibili = ["/obbligatorio", "/rimuovi", "/esercizi/assegna", "/esercizi/nuovo", "/importa-json", "/importa-da-altri-corsi"];
+  // delegato sulla scheda (non sui singoli form): vale anche per i form caricati dopo via
+  // fetch, come quello di "Importa da altri corsi o anni precedenti"
+  root.addEventListener("submit", function (ev) {
+    var form = ev.target;
     var action = form.getAttribute("action") || "";
     if (!azioniSensibili.some(function (suffix) { return action.endsWith(suffix); })) return;
-    form.addEventListener("submit", function (ev) {
+    if (ev.defaultPrevented) return;
+    (function () {
       var msg = "Sono già stati generati {{ md.blocchi|length }} blocco/i di compiti per questo appello. " +
         "Modificare gli esercizi assegnati rigenererà il file di riferimento e tutti i blocchi già " +
         "generati, eliminando i vecchi codici (non è possibile se qualche blocco ha già risultati " +
         "registrati). Procedere comunque?";
       if (!window.confirm(msg)) ev.preventDefault();
-    });
+    })();
   });
 })();
 </script>

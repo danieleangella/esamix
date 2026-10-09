@@ -1,4 +1,5 @@
 import io
+import json
 import re
 import shutil
 import sqlite3
@@ -65,7 +66,8 @@ class Corso:
     orale_soglia_voto: Optional[int] = None
     orale_soglia_escludi_parziali: bool = True
     ritirato_conta_insufficiente: bool = False
-    domande_esame: str = ""
+    domande_esame: str = ""  # la prima di domande_esame_lista: quella proposta di default
+    domande_esame_lista: list[str] = field(default_factory=list)
     importato_da_legacy: bool = False
 
 
@@ -85,6 +87,9 @@ class Appello:
     iscritti_manuale: Optional[int] = None
     presenze_chiuse: bool = False
     correzione_scritti_conclusa: bool = False
+    # filtro sull'elenco iscritti (file della segreteria o aggiunti a mano): solo chi ha
+    # matricola numerica >= questa soglia (es. per ammettere solo il primo anno)
+    matricola_minima_iscritti: Optional[str] = None
 
 
 @dataclass
@@ -94,6 +99,10 @@ class Raggruppamento:
     nome: str
     membri: list = field(default_factory=list)  # list[Appello]
     matricola_minima_prima_prova: Optional[str] = None
+    # chi è ammesso alla prima prova: "corso" = tutti gli studenti del corso, "iscritti" =
+    # l'elenco iscritti della prima prova (file della segreteria o aggiunti a mano);
+    # in entrambi i casi filtrati da matricola_minima_prima_prova
+    fonte_ammessi: str = "corso"
 
 
 def effective_votomin(corso: Corso, appello: Appello) -> int:
@@ -200,21 +209,55 @@ def raggruppa_per_nome(corsi: list[Corso]) -> list[list[Corso]]:
     return gruppi
 
 
+# Impostazioni che un nuovo corso eredita dall'edizione precedente dello stesso
+# insegnamento (vedi corso_precedente): tutto tranne i dati identificativi del corso.
+_META_EREDITABILI = (
+    "votomin", "votomin_raggruppamento", "consegna", "risposta_corretta", "risposta_sbagliata",
+    "risposta_vuota", "punteggio_max_aperta", "frase_consegna", "frase_regole",
+    "orale_dopo_richiesta", "orale_soglia_attiva", "orale_soglia_n", "orale_soglia_voto",
+    "orale_soglia_escludi_parziali", "ritirato_conta_insufficiente", "domande_esame", "domande_esame_lista",
+)
+
+
+def corso_precedente(nome: str, facolta: str = "", escludi_tag: str = "") -> Optional[Corso]:
+    """L'edizione più recente (per anno accademico) di un corso con lo stesso nome: se ce
+    n'è più d'una con quel nome, preferisce quelle con lo stesso corso di studi."""
+    nome = (nome or "").strip().lower()
+    if not nome:
+        return None
+    candidati = [c for c in list_corsi() if c.tag != escludi_tag and c.nome.strip().lower() == nome]
+    stessa_facolta = [c for c in candidati if facolta and c.facolta.strip().lower() == facolta.strip().lower()]
+    candidati = stessa_facolta or candidati
+    return max(candidati, key=lambda c: (c.anno or "", c.tag)) if candidati else None
+
+
 def create_corso(
     tag: str, nome: str, facolta: str, universita: str, anno: str, docente: str,
     votomin: int = DEFAULT_VOTOMIN, consegna: int = DEFAULT_CONSEGNA,
     votomin_raggruppamento: int = DEFAULT_VOTOMIN_RAGGRUPPAMENTO,
-) -> Corso:
+    eredita: bool = True,
+) -> tuple[Corso, Optional[Corso]]:
+    """Ritorna (nuovo corso, corso da cui sono state copiate le impostazioni o None).
+    Con `eredita`, se esiste un'edizione precedente dello stesso insegnamento (vedi
+    corso_precedente), ne copia voti, punteggi, orale, frasi del compito e domande
+    d'esame, e i dati del corso lasciati vuoti (corso di studi, università, docente)."""
     tag = (tag or "").strip()
     if not TAG_RE.match(tag):
         raise ValueError("Il tag può contenere solo lettere, numeri, trattini e underscore")
     if config.corso_exists(tag):
         raise ValueError(f"Esiste già un corso con tag '{tag}'")
+    precedente = corso_precedente(nome, facolta) if eredita else None
+    campi = {
+        "votomin": str(votomin), "consegna": str(consegna), "votomin_raggruppamento": str(votomin_raggruppamento),
+    }
+    if precedente:
+        meta_prec = get_meta(precedente.tag)
+        campi.update({k: meta_prec[k] for k in _META_EREDITABILI if k in meta_prec})
+        facolta = facolta or precedente.facolta
+        universita = universita or precedente.universita
+        docente = docente or precedente.docente
     db.init_db(config.corso_db_path(tag))
-    update_meta(
-        tag, nome=nome, facolta=facolta, universita=universita, anno=anno, docente=docente,
-        votomin=str(votomin), consegna=str(consegna), votomin_raggruppamento=str(votomin_raggruppamento),
-    )
+    update_meta(tag, nome=nome, facolta=facolta, universita=universita, anno=anno, docente=docente, **campi)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         conn.execute(
@@ -223,7 +266,7 @@ def create_corso(
         conn.commit()
     finally:
         conn.close()
-    return get_corso(tag)
+    return get_corso(tag), precedente
 
 
 def _backup_db_bytes(db_path: Path) -> bytes:
@@ -371,9 +414,32 @@ def get_corso(tag: str) -> Corso:
         orale_soglia_voto=int(meta.get("orale_soglia_voto") or DEFAULT_ORALE_SOGLIA_VOTO),
         orale_soglia_escludi_parziali=meta.get("orale_soglia_escludi_parziali", "1") == "1",
         ritirato_conta_insufficiente=meta.get("ritirato_conta_insufficiente", "0") == "1",
-        domande_esame=meta.get("domande_esame", ""),
+        domande_esame=(_domande_esame_da_meta(meta) or [""])[0],
+        domande_esame_lista=_domande_esame_da_meta(meta),
         importato_da_legacy=meta.get("importato_da_legacy", "0") == "1",
     )
+
+
+def _domande_esame_da_meta(meta: dict) -> list[str]:
+    """Più testi alternativi per la colonna "Domande d'esame" dell'esportazione voti, tra
+    cui scegliere al momento di esportare. I corsi creati quando se ne poteva salvare uno
+    solo hanno solo la chiave "domande_esame": diventa una lista di un elemento."""
+    grezzo = meta.get("domande_esame_lista")
+    if grezzo:
+        try:
+            lista = [d for d in json.loads(grezzo) if isinstance(d, str) and d.strip()]
+            return lista
+        except (ValueError, TypeError):
+            pass
+    singola = (meta.get("domande_esame") or "").strip()
+    return [singola] if singola else []
+
+
+def domande_esame_meta(lista: list[str]) -> dict:
+    """Campi meta da salvare per una lista di domande d'esame (vedi
+    _domande_esame_da_meta): la prima resta anche in "domande_esame", per compatibilità."""
+    lista = [d.strip() for d in lista if d and d.strip()]
+    return {"domande_esame_lista": json.dumps(lista, ensure_ascii=False), "domande_esame": lista[0] if lista else ""}
 
 
 def get_meta(tag: str) -> dict:
@@ -414,6 +480,7 @@ def _row_to_appello(conn, row) -> Appello:
         iscritti_manuale=row["iscritti_manuale"] if "iscritti_manuale" in chiavi and row["iscritti_manuale"] is not None else None,
         presenze_chiuse=bool(row["presenze_chiuse"]) if "presenze_chiuse" in chiavi else False,
         correzione_scritti_conclusa=bool(row["correzione_scritti_conclusa"]) if "correzione_scritti_conclusa" in chiavi else False,
+        matricola_minima_iscritti=row["matricola_minima_iscritti"] if "matricola_minima_iscritti" in chiavi else None,
     )
 
 
@@ -609,6 +676,7 @@ def _row_to_raggruppamento(conn, row) -> Raggruppamento:
         id=row["id"], appello_id=row["appello_id"], nome=row["nome"],
         membri=[_row_to_appello(conn, r) for r in membri_rows],
         matricola_minima_prima_prova=row["matricola_minima_prima_prova"] if "matricola_minima_prima_prova" in row.keys() else None,
+        fonte_ammessi=(row["fonte_ammessi"] if "fonte_ammessi" in row.keys() else None) or "corso",
     )
 
 
@@ -653,12 +721,16 @@ def get_raggruppamento_by_membro(tag: str, appello_id: int) -> Optional[Raggrupp
         conn.close()
 
 
-def update_raggruppamento_soglia(tag: str, raggruppamento_id: int, matricola_minima_prima_prova: Optional[str]) -> None:
+def update_raggruppamento_soglia(
+    tag: str, raggruppamento_id: int, matricola_minima_prima_prova: Optional[str], fonte_ammessi: str = "corso",
+) -> None:
+    if fonte_ammessi not in ("corso", "iscritti"):
+        raise ValueError("Fonte degli ammessi non valida")
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         conn.execute(
-            "UPDATE raggruppamenti SET matricola_minima_prima_prova=? WHERE id=?",
-            (matricola_minima_prima_prova or None, raggruppamento_id),
+            "UPDATE raggruppamenti SET matricola_minima_prima_prova=?, fonte_ammessi=? WHERE id=?",
+            (matricola_minima_prima_prova or None, fonte_ammessi, raggruppamento_id),
         )
         conn.commit()
     finally:
@@ -672,9 +744,19 @@ def _matricola_a_intero(matricola: str) -> Optional[int]:
         return None
 
 
+def matricola_ammessa(matricola: str, soglia: Optional[str]) -> bool:
+    """Filtro "matricola >= soglia" (es. per ammettere solo gli studenti del primo anno):
+    una soglia vuota o non numerica, o una matricola non numerica, non escludono nessuno
+    (non si filtrano casi ambigui)."""
+    soglia_int = _matricola_a_intero(soglia)
+    matricola_int = _matricola_a_intero(matricola)
+    return soglia_int is None or matricola_int is None or matricola_int >= soglia_int
+
+
 def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) -> list[dict]:
     """Studenti ammessi a sostenere la prova `raggruppamento.membri[indice]`: per la prima
-    prova (indice 0), tutti gli studenti del corso con matricola >= l'eventuale soglia
+    prova (indice 0), tutti gli studenti del corso — oppure, se fonte_ammessi è
+    "iscritti", quelli dell'elenco iscritti della prima prova — con matricola >= l'eventuale soglia
     impostata sul raggruppamento (chi ha una matricola non numerica, o se la soglia non è
     impostata/non è un numero valido, resta ammesso: non si filtrano casi ambigui); per le
     successive, solo chi ha superato (voto >= voto minimo delle prove parziali) la prova
@@ -684,14 +766,18 @@ def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) ->
     try:
         membro = raggruppamento.membri[indice]
         if indice == 0:
-            righe = conn.execute(
-                "SELECT matricola, nome, cognome, dsa FROM studenti ORDER BY cognome COLLATE NOCASE, nome COLLATE NOCASE"
-            ).fetchall()
-            soglia = _matricola_a_intero(raggruppamento.matricola_minima_prima_prova)
-            ammessi = [
-                dict(r) for r in righe
-                if soglia is None or _matricola_a_intero(r["matricola"]) is None or _matricola_a_intero(r["matricola"]) >= soglia
-            ]
+            if raggruppamento.fonte_ammessi == "iscritti":
+                # import locale: esportazione importa già questo modulo
+                from quizesame.services import esportazione as esportazione_service
+                righe = [
+                    {"matricola": s["matricola"], "nome": s["nome"], "cognome": s["cognome"], "dsa": s["dsa"]}
+                    for s in (esportazione_service.list_iscritti(tag, membro.id) or [])
+                ]
+            else:
+                righe = [dict(r) for r in conn.execute(
+                    "SELECT matricola, nome, cognome, dsa FROM studenti ORDER BY cognome COLLATE NOCASE, nome COLLATE NOCASE"
+                ).fetchall()]
+            ammessi = [r for r in righe if matricola_ammessa(r["matricola"], raggruppamento.matricola_minima_prima_prova)]
         else:
             corso = get_corso(tag)
             membro_precedente = raggruppamento.membri[indice - 1]

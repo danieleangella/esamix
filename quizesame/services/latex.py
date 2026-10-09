@@ -228,19 +228,42 @@ def mischia(esercizi_struct: list[dict]) -> list[dict]:
     return posizioni
 
 
-def crea_file_riferimento(ctx: LatexContext, esercizi_struct: list[dict]) -> str:
+def _box_soluzione(soluzione: str) -> str:
+    return (
+        "\\begin{center}\\fbox{\\parbox{0.9\\linewidth}{\\small "
+        f"{{\\bfseries Soluzione/suggerimento:}} {soluzione}"
+        "}}\\end{center}\n\n"
+    )
+
+
+def _escape_testo_semplice(testo: str) -> str:
+    """Per testi brevi non pensati come LaTeX (es. il nome di un esercizio), che possono
+    contenere caratteri speciali come & _ # %: senza escape farebbero fallire la
+    compilazione dell'intero documento."""
+    sostituzioni = {
+        "\\": "\\textbackslash{}", "&": "\\&", "%": "\\%", "$": "\\$", "#": "\\#",
+        "_": "\\_", "{": "\\{", "}": "\\}", "~": "\\textasciitilde{}", "^": "\\textasciicircum{}",
+    }
+    return "".join(sostituzioni.get(c, c) for c in testo)
+
+
+def crea_file_riferimento(ctx: LatexContext, esercizi_struct: list[dict], con_soluzioni: bool = False) -> str:
     """Foglio di riferimento (risposta corretta sempre "A"): pensato per essere
     pubblicato online, comune a tutti i blocchi di compiti prodotti per questo appello, e
     generato una sola volta. Non elenca le varianti esercizio per esercizio, ma le
     raggruppa in "compiti" completi (Compito A con la prima variante di ognuno, Compito B
     con la seconda, ...): tanti quante il numero massimo di varianti tra gli esercizi
-    assegnati, ripetendo ciclicamente le varianti di chi ne ha di meno."""
+    assegnati, ripetendo ciclicamente le varianti di chi ne ha di meno.
+    Ne esistono due versioni: senza soluzioni/suggerimenti (quella da pubblicare) e, con
+    `con_soluzioni`, con il riquadro della soluzione sotto ogni esercizio che ne ha una."""
     n_varianti_max = max((len(es["varianti"]) for es in esercizi_struct), default=0)
     tex = BEGIN_DOCUMENT
     tex += intestazione_breve(ctx)
     tex += (
         "\\begin{center}\n"
-        "{\\small\\it (foglio di riferimento: un compito completo per ogni combinazione "
+        "{\\small\\it (foglio di riferimento"
+        + (" con soluzioni e suggerimenti" if con_soluzioni else "")
+        + ": un compito completo per ogni combinazione "
         "di varianti degli esercizi, la risposta corretta \\`e sempre \"A\")}\n"
         "\\end{center}\n\\vspace{1cm}\n\n"
     )
@@ -256,14 +279,55 @@ def crea_file_riferimento(ctx: LatexContext, esercizi_struct: list[dict]) -> str
                 tex += tex_esercizio_aperto(ctx, variante["testo"], es.get("obbligatorio", False))
             else:
                 tex += tex_esercizio(ctx, [variante["testo"], variante["risposte"]], es.get("obbligatorio", False))
-            if es.get("soluzione"):
-                tex += (
-                    "\\begin{center}\\fbox{\\parbox{0.9\\linewidth}{\\small "
-                    f"{{\\bfseries Soluzione/suggerimento:}} {es['soluzione']}"
-                    "}}\\end{center}\n\n"
-                )
+            if con_soluzioni and es.get("soluzione"):
+                tex += _box_soluzione(es["soluzione"])
             tex += _separatore_esercizio()
         tex += "\\end{multicols}\n\n"
+    tex += "\n\n\\end{document}"
+    return tex
+
+
+def crea_file_anteprima(ctx: LatexContext, esercizi_struct: list[dict]) -> str:
+    """Anteprima di controllo del testo di un compito, per il docente: ogni esercizio
+    assegnato (nell'ordine della scheda Testo) con nome, tutte le sue varianti, la
+    risposta corretta evidenziata e la soluzione/suggerimento. Non è un compito da
+    stampare per gli studenti e non crea codici: si può generare in qualunque momento,
+    anche prima dei blocchi, per verificare che testo e soluzioni siano corretti.
+    esercizi_struct: come per mischia(), con in più "nome" (facoltativo)."""
+    tex = BEGIN_DOCUMENT
+    tex += intestazione_breve(ctx)
+    tex += (
+        "\\begin{center}\n{\\bfseries ANTEPRIMA DI CONTROLLO -- con soluzioni, non distribuire}\\\\\n"
+        f"{{\\small\\it {len(esercizi_struct)} esercizi; per ciascuno tutte le varianti, "
+        "la risposta corretta \\`e segnata con $\\checkmark$}\n\\end{center}\n\\vspace{0.5cm}\n\n"
+    )
+    for i, es in enumerate(esercizi_struct, start=1):
+        nome = _escape_testo_semplice(es.get("nome") or f"Esercizio #{es['esercizio_id']}")
+        etichette = []
+        if es.get("obbligatorio"):
+            etichette.append("obbligatorio")
+        if es.get("aperta"):
+            etichette.append("domanda aperta")
+        tex += f"\\section*{{{i}. {nome}" + (f" \\normalfont\\small({', '.join(etichette)})" if etichette else "") + "}\n"
+        varianti = es["varianti"]
+        for j, v in enumerate(varianti):
+            if len(varianti) > 1:
+                tex += f"\\noindent{{\\bfseries Variante {j + 1}.}}\\par\n"
+            tex += _prefisso_obbligatorio(ctx, es.get("obbligatorio", False)) + v["testo"] + "\n"
+            if not es.get("aperta") and v["risposte"]:
+                tex += "\\begin{description}\n"
+                for k, r in enumerate(v["risposte"]):
+                    if k == 0:
+                        tex += f"\\item[{LETTERE[k]} $\\checkmark$] \\textbf{{{r}}}\n"
+                    else:
+                        tex += f"\\item[{LETTERE.get(k, k + 1)}] {r}\n"
+                tex += "\\end{description}\n"
+            tex += "\\medskip\n\n"
+        if es.get("soluzione"):
+            tex += _box_soluzione(es["soluzione"])
+        else:
+            tex += "{\\small\\it (nessuna soluzione/suggerimento inserito)}\n\n"
+        tex += _separatore_esercizio()
     tex += "\n\n\\end{document}"
     return tex
 

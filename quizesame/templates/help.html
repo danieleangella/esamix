@@ -29,6 +29,18 @@
     senza dover compilare anche le altre.
   </p>
   <p>
+    Creando un corso con lo stesso nome di uno già esistente (es. l'edizione dell'anno
+    precedente, proposta mentre si scrive), il nuovo corso ne copia le impostazioni — voti,
+    punteggi, orale, testo del compito e domande d'esame — e i dati lasciati vuoti (corso di
+    studi, università, docente). Dopo la creazione si apre subito la scheda Impostazioni, per
+    controllarle; dopo la creazione di un appello si apre direttamente la sua scheda Testo.
+  </p>
+  <p>
+    In Impostazioni si possono salvare più testi per le <strong>domande d'esame</strong>
+    (la colonna omonima del file della segreteria): al momento di esportare i voti si sceglie
+    quale usare.
+  </p>
+  <p>
     "Chiudi corso" chiude in un colpo solo tutti gli appelli non ancora chiusi (comodo a
     fine anno accademico): si possono comunque riaprire singolarmente più tardi, dalla
     scheda Impostazioni di ciascun appello.
@@ -69,7 +81,7 @@
     multipla): in correzione il punteggio va sempre assegnato a mano dal docente.
     Facoltativamente si può indicare una <strong>difficoltà</strong> (da una a tre
     stelline) e una <strong>soluzione o suggerimento</strong>, che compare in un riquadro
-    nel foglio di riferimento dell'appello.
+    nel foglio di riferimento <em>con soluzioni</em> e nell'anteprima di controllo.
   </p>
   <p>
     Gli esercizi si possono esportare/importare in JSON (dalla banca del corso, o dalla
@@ -78,6 +90,25 @@
     esercizi importare, segnalando quelli già identici a uno esistente nella banca. Per
     importare un compito scritto altrove, vedi
     <a href="#importa-compito">Importare un compito da un unico file</a>.
+  </p>
+  <p>
+    Ogni corso ha la sua banca esercizi, separata dalle altre. Per riusare in un compito un
+    esercizio di un anno precedente o di un altro corso: scheda Testo dell'appello, pannello
+    <strong>Importa da altri corsi o anni precedenti</strong> (filtrabile per nome del corso,
+    corso specifico, argomento e testo). L'esercizio scelto viene copiato nella banca del corso
+    (se ce n'è già uno identico si riusa quello) e aggiunto al compito. La pagina
+    <a href="/esercizi">Tutti gli esercizi</a> (menu in alto) mostra invece gli esercizi di tutti i
+    corsi insieme, con gli stessi filtri, solo da consultare.
+  </p>
+  <p>
+    Rimuovendo un esercizio dal compito viene chiesto anche se eliminarlo dalla banca dati del
+    corso, oppure lasciarvelo per riusarlo in futuro.
+  </p>
+  <p>
+    Dalla scheda Testo, <strong>Anteprima PDF con soluzioni</strong> crea un PDF di controllo
+    con tutti gli esercizi del compito, tutte le loro varianti, la risposta corretta segnata e
+    la soluzione/suggerimento: si può generare in qualunque momento, anche prima dei blocchi,
+    e non crea codici.
   </p>
   <p>
     Cliccando sul nome di un esercizio (nella banca del corso, o tra gli esercizi
@@ -234,6 +265,14 @@ COMPITO DA CONVERTIRE
     sempre la precedenza sugli altri due.
   </p>
   <p>
+    Per ammettere l'intero corso senza un file, "Ammetti tutti gli studenti del corso"
+    aggiunge in un colpo solo tutti gli studenti registrati (eventualmente solo quelli con
+    matricola maggiore o uguale a una soglia). Con "Filtra gli iscritti per matricola" si
+    tengono solo le matricole da una certa soglia in su, sia dal file sia dall'elenco a mano
+    (es. per una prova riservata al primo anno): il file restituito alla segreteria resta
+    comunque intero.
+  </p>
+  <p>
     Quando è stato indicato un elenco nominale (file o aggiunta a mano), correggere o
     segnare assente/ritirato uno studente che non vi compare non è consentito: serve
     prima aggiungerlo all'elenco. Il numero di iscritti determina anche il numero
@@ -245,7 +284,8 @@ COMPITO DA CONVERTIRE
     univoco) stampati insieme. Si possono generare più blocchi nel tempo per lo stesso
     appello (es. per chi arriva più tardi, o per aule diverse). Il <strong>foglio di
     riferimento</strong> (testo e risposte corrette) è invece unico per l'appello,
-    comune a tutti i blocchi, e viene creato solo la prima volta. Per entrambi, oltre ai
+    comune a tutti i blocchi, e viene creato solo la prima volta, in due versioni: senza
+    soluzioni né suggerimenti (da pubblicare) e con soluzioni e suggerimenti. Per entrambi, oltre ai
     file <code>.tex</code>/<code>.pdf</code> da scaricare, un link <strong>.html</strong>
     apre subito in pagina un'anteprima (per il blocco, del primo compito generato) senza
     dover scaricare né compilare nulla.
@@ -291,7 +331,12 @@ COMPITO DA CONVERTIRE
   <p>
     Dalla scheda <strong>Correzione</strong>, si inserisce matricola (o nome, con
     autocompletamento — anche qui proposti per primi gli iscritti a questo appello),
-    codice del compito e la stringa di risposte data. Un elenco a scomparsa "Presenti da
+    codice del compito e la stringa di risposte data. Il cursore è già sulla matricola e
+    <kbd>Invio</kbd> passa al campo successivo; sotto ogni campo un controllo immediato
+    segnala uno studente già valutato, un codice inesistente o già usato da un altro
+    studente, e quante risposte mancano o sono di troppo rispetto al compito. Nel riepilogo
+    il cursore è su Conferma (o sul primo punteggio da assegnare a mano), quindi un altro
+    <kbd>Invio</kbd> registra il voto e riporta al modulo per il compito successivo. Un elenco a scomparsa "Presenti da
     correggere" elenca chi risulta presente e non ancora corretto, con un pulsante che
     precompila la matricola e sposta il focus sul codice, per scorrere gli studenti più
     rapidamente. Si arriva sempre a un riepilogo prima di salvare: mostra risposte date e
@@ -469,9 +514,11 @@ COMPITO DA CONVERTIRE
   </p>
   <p>
     Alla seconda prova (e successive) può partecipare solo chi ha superato la prova
-    precedente con il voto minimo delle prove parziali; in Impostazioni si può anche
-    fissare una <strong>matricola minima</strong> per escludere dalla prima prova gli
-    iscritti di anni precedenti. Il numero di compiti suggerito per ciascuna prova si
+    precedente con il voto minimo delle prove parziali. Per la prima prova, in Impostazioni
+    si sceglie se ammettere <strong>tutti gli studenti del corso</strong> oppure solo gli
+    <strong>iscritti</strong> della prova (file della segreteria o aggiunti a mano), e in
+    entrambi i casi si può fissare una <strong>matricola minima</strong> (es. per ammettere
+    solo il primo anno). Il numero di compiti suggerito per ciascuna prova si
     basa proprio su questo elenco di ammessi, non sugli iscritti generali del
     raggruppamento.
   </p>

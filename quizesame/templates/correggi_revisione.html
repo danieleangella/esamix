@@ -4,7 +4,7 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Riepilogo correzione</span>
 {% endblock %}
 {% block content %}
-<h1>Riepilogo: {{ v.nome }} {{ v.cognome }} ({{ v.matricola }})</h1>
+<h1>Riepilogo: {{ v.cognome }} {{ v.nome }} <span class="muted">({{ v.matricola }})</span></h1>
 {% if modifica %}
 <p class="muted">Stai modificando un esito già registrato per questo appello.</p>
 {% endif %}
@@ -170,12 +170,16 @@
     <input type="hidden" name="conferma_orale_obbligatorio" id="conferma-obbligatorio-hidden" value="">
 
     <div style="margin-top:1.25rem; display:flex; justify-content:center; align-items:center; gap:1rem; flex-wrap:wrap">
-      <button type="submit" style="font-size:1.2rem; padding:0.7rem 1.6rem">Conferma</button>
+      <button type="submit" id="btn-conferma-correzione" style="font-size:1.2rem; padding:0.7rem 1.6rem">Conferma</button>
       {% if v.da_valutare or v.domande_aperte %}
       <button type="submit" name="sospendi_valutazione" value="1" formnovalidate class="secondary">Completa successivamente</button>
       {% endif %}
       <button type="submit" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/bozza" formnovalidate class="secondary">Salva come bozza</button>
     </div>
+    <p class="muted" style="margin-top:0.4rem; text-align:center">
+      Controlla nome e codice con il foglio, poi <kbd>Invio</kbd> (o clic su Conferma) per registrare e tornare
+      subito al compito successivo.
+    </p>
     <p class="muted" style="margin-top:0.4rem; text-align:center">
       "Salva come bozza" tiene da parte matricola, codice e risposte senza registrare
       nessun esito, per riprendere la correzione più tardi dalla sezione "Bozze salvate".
@@ -268,6 +272,21 @@
   }
   campiObbligatorio.forEach(function (input) { input.addEventListener("input", ricalcola); });
   campiAperta.forEach(function (input) { input.addEventListener("input", ricalcola); });
+})();
+(function () {
+  // pronto per la tastiera: se ci sono punteggi da assegnare, cursore sul primo (Invio
+  // passa al successivo, poi a Conferma); altrimenti direttamente su Conferma
+  var conferma = document.getElementById("btn-conferma-correzione");
+  if (!conferma) return;
+  var campi = Array.prototype.slice.call(document.querySelectorAll(".campo-punteggio-obbligatorio, .campo-punteggio-aperta"));
+  campi.forEach(function (campo, i) {
+    campo.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Enter") return;
+      ev.preventDefault();
+      (campi[i + 1] || conferma).focus();
+    });
+  });
+  if (campi.length) { campi[0].focus(); campi[0].select(); } else { conferma.focus(); }
 })();
 </script>
 {% endblock %}

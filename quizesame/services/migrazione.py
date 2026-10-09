@@ -72,7 +72,7 @@ def migra(
     cols = [r["name"] for r in src.execute("PRAGMA table_info(studenti)")]
     colonne_appello = [c for c in cols if c not in COLONNE_NON_APPELLO]
 
-    corsi_service.create_corso(tag, nome, facolta, universita, anno, docente)
+    corsi_service.create_corso(tag, nome, facolta, universita, anno, docente, eredita=False)
     corsi_service.update_meta(tag, importato_da_legacy="1")
 
     # corsi di laurea

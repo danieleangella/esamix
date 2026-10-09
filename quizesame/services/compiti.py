@@ -8,7 +8,9 @@ from typing import Optional
 from quizesame import config, db
 from quizesame.services import esercizi as esercizi_service
 from quizesame.services import corsi as corsi_service
-from quizesame.services.latex import LatexContext, crea_file_riferimento, crea_file_blocco, crea_file_griglia, BEGIN_DOCUMENT
+from quizesame.services.latex import (
+    LatexContext, crea_file_riferimento, crea_file_blocco, crea_file_griglia, crea_file_anteprima, BEGIN_DOCUMENT,
+)
 
 
 @dataclass
@@ -35,7 +37,8 @@ def _esercizi_per_generazione(tag: str, appello_id: int):
 
     return [
         {
-            "esercizio_id": e.id, "obbligatorio": e.obbligatorio, "aperta": e.aperta, "soluzione": e.soluzione,
+            "esercizio_id": e.id, "nome": e.nome, "obbligatorio": e.obbligatorio, "aperta": e.aperta,
+            "soluzione": e.soluzione,
             "varianti": [{"variante_id": v.id, "testo": v.testo, "risposte": list(v.risposte)} for v in e.varianti],
         }
         for e in esercizi
@@ -111,6 +114,40 @@ def path_riferimento(tag: str, appello_id: int, ext: str, appello=None) -> Path:
     # file sqlite è più lento che su disco locale.
     appello = appello or corsi_service.get_appello(tag, appello_id)
     return _out_dir(tag) / f"riferimento-{appello.slug}.{ext}"
+
+
+def path_riferimento_soluzioni(tag: str, appello_id: int, ext: str, appello=None) -> Path:
+    """Come il foglio di riferimento, ma con soluzioni/suggerimenti sotto ogni esercizio:
+    per il docente (o da pubblicare dopo la prova), mentre quello senza si può pubblicare."""
+    appello = appello or corsi_service.get_appello(tag, appello_id)
+    return _out_dir(tag) / f"riferimento-soluzioni-{appello.slug}.{ext}"
+
+
+def path_anteprima(tag: str, appello_id: int, ext: str, appello=None) -> Path:
+    appello = appello or corsi_service.get_appello(tag, appello_id)
+    return _out_dir(tag) / f"anteprima-{appello.slug}.{ext}"
+
+
+def _salva_riferimenti(tag: str, appello_id: int, ctx: LatexContext, esercizi_struct: list[dict]) -> None:
+    """Scrive le due versioni del foglio di riferimento: senza e con soluzioni."""
+    _salva_testo(path_riferimento(tag, appello_id, "tex"), crea_file_riferimento(ctx, esercizi_struct))
+    _salva_testo(
+        path_riferimento_soluzioni(tag, appello_id, "tex"),
+        crea_file_riferimento(ctx, esercizi_struct, con_soluzioni=True),
+    )
+
+
+def genera_anteprima(tag: str, appello_id: int) -> Path:
+    """Scrive il .tex dell'anteprima di controllo del compito (tutti gli esercizi
+    assegnati con tutte le varianti, risposte corrette e soluzioni): non tocca blocchi
+    né codici, quindi si può rigenerare quando si vuole. Ritorna il percorso del .tex."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    if appello is None:
+        raise ValueError("Appello non trovato")
+    ctx = _crea_contesto(corsi_service.get_corso(tag), appello)
+    path = path_anteprima(tag, appello_id, "tex", appello=appello)
+    _salva_testo(path, crea_file_anteprima(ctx, _esercizi_per_generazione(tag, appello_id)))
+    return path
 
 
 def path_risultati(tag: str, appello_id: int, ext: str, appello=None) -> Path:
@@ -254,9 +291,9 @@ def genera_blocco(tag: str, appello_id: int, numero_studenti: int) -> BloccoResu
         numero = conn.execute(
             "SELECT COALESCE(MAX(numero), 0) + 1 AS n FROM blocchi WHERE appello_id=?", (appello_id,)
         ).fetchone()["n"]
-        if not path_riferimento(tag, appello_id, "tex").exists():
-            tex_rif = crea_file_riferimento(ctx, esercizi_struct)
-            _salva_testo(path_riferimento(tag, appello_id, "tex"), tex_rif)
+        if not (path_riferimento(tag, appello_id, "tex").exists()
+                and path_riferimento_soluzioni(tag, appello_id, "tex").exists()):
+            _salva_riferimenti(tag, appello_id, ctx, esercizi_struct)
             riferimento_generato = True
 
         codici_esistenti = set()
@@ -361,8 +398,7 @@ def rigenera_tutto(tag: str, appello_id: int) -> RigenerazioneResult | None:
     esercizi_struct = _esercizi_per_generazione(tag, appello_id)
     ctx = _crea_contesto(corso, appello)
 
-    tex_rif = crea_file_riferimento(ctx, esercizi_struct)
-    _salva_testo(path_riferimento(tag, appello_id, "tex"), tex_rif)
+    _salva_riferimenti(tag, appello_id, ctx, esercizi_struct)
 
     conn = db.get_connection(config.corso_db_path(tag))
     try:
@@ -570,6 +606,31 @@ def genera_blocchi_uniti(tag: str, appello_id: int) -> Path:
     path = path_blocchi_uniti(tag, appello_id, "tex")
     _salva_testo(path, tex)
     return path
+
+
+def verifica_codice(tag: str, appello_id: int, codice: str) -> dict:
+    """Controllo immediato, mentre si digita in correzione, di un codice compito: se
+    esiste in questo appello, quante risposte prevede (lunghezza della griglia) e se è
+    già stato usato da un risultato registrato (di chi), per accorgersi subito di un
+    codice letto o trascritto male invece che a riepilogo aperto."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        compito = conn.execute(
+            "SELECT id, soluzioni FROM compiti WHERE appello_id=? AND codice=?", (appello_id, codice.strip()),
+        ).fetchone()
+        if compito is None:
+            return {"esiste": False}
+        usato = conn.execute(
+            "SELECT r.matricola, s.nome, s.cognome FROM risultati r JOIN studenti s ON s.matricola = r.matricola "
+            "WHERE r.appello_id=? AND r.compito_id=?",
+            (appello_id, compito["id"]),
+        ).fetchone()
+        return {
+            "esiste": True, "lunghezza": len(compito["soluzioni"] or ""),
+            "usato_da": dict(usato) if usato else None,
+        }
+    finally:
+        conn.close()
 
 
 def cerca_codici(tag: str, appello_id: int, prefisso: str, limite: int = 10) -> list[str]:

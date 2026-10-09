@@ -96,58 +96,12 @@
   {% endif %}
 </details>
 
-<details class="card dettaglio-fisarmonica">
-  <summary>Collega banca esercizi di un altro corso</summary>
-  <div style="margin-top:1rem">
-    {% if corsi_suggeriti %}
-    <p class="muted">Stesso nome e stesso corso di studi di questo corso — probabilmente lo stesso insegnamento in un altro anno:</p>
-    <ul class="list-links">
-      {% for c in corsi_suggeriti %}
-      <li><a href="/corsi/{{ corso.tag }}/esercizi?da={{ c.tag }}">{{ c.nome }} ({{ c.anno }})</a> <span class="muted">{{ c.tag }}</span></li>
-      {% endfor %}
-    </ul>
-    {% endif %}
-
-    {% if altri_corsi %}
-    <form method="get" action="/corsi/{{ corso.tag }}/esercizi" style="margin-top:0.75rem">
-      <label>Oppure scegli un altro corso</label>
-      <div class="form-grid">
-        <div>
-          <select name="da">
-            {% for c in altri_corsi %}<option value="{{ c.tag }}" {% if corso_sorgente and c.tag == corso_sorgente.tag %}selected{% endif %}>{{ c.nome }} ({{ c.anno }}) — {{ c.tag }}</option>{% endfor %}
-          </select>
-        </div>
-      </div>
-      <button type="submit">Sfoglia</button>
-    </form>
-    {% else %}
-    <p class="muted">Non ci sono altri corsi da cui importare.</p>
-    {% endif %}
-
-    {% if corso_sorgente %}
-    <h2 style="margin-top:1.25rem">Esercizi di "{{ corso_sorgente.nome }}" ({{ corso_sorgente.anno }})</h2>
-    {% if esercizi_sorgente %}
-    <form method="post" action="/corsi/{{ corso.tag }}/esercizi/collega-importa">
-      <input type="hidden" name="tag_sorgente" value="{{ corso_sorgente.tag }}">
-      <table>
-        <tr><th></th><th>Nome</th><th>Varianti</th><th>Anteprima</th></tr>
-        {% for e in esercizi_sorgente %}
-        <tr>
-          <td><input type="checkbox" name="esercizio_ids" value="{{ e.id }}" style="width:auto"></td>
-          <td>{{ e.nome or ('#' ~ e.id) }}</td>
-          <td>{{ e.varianti|length }}</td>
-          <td class="muted">{{ (e.varianti[0].testo if e.varianti else '')[:80] }}&hellip;</td>
-        </tr>
-        {% endfor %}
-      </table>
-      <button type="submit">Importa selezionati</button>
-    </form>
-    {% else %}
-    <p class="muted">Quel corso non ha ancora esercizi nella sua banca.</p>
-    {% endif %}
-    {% endif %}
-  </div>
-</details>
+<div class="card">
+  <p class="muted" style="margin:0">Ogni corso ha la sua banca esercizi, separata dalle altre. Per riusare un esercizio di
+    un anno precedente o di un altro corso: dalla pagina dell'appello, scheda <em>Testo</em>, pannello
+    <em>Importa da altri corsi o anni precedenti</em> (viene copiato in questa banca e aggiunto al compito).
+    Per consultare gli esercizi di tutti i corsi insieme: <a href="/esercizi">Tutti gli esercizi →</a></p>
+</div>
 
 <details class="card dettaglio-fisarmonica">
   <summary>Nuovo esercizio</summary>

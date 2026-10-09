@@ -91,10 +91,20 @@
     <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </details>
 
-  <details class="card">
-    <summary><strong>Domande d'esame</strong></summary>
-    <p class="muted" style="margin-top:1rem">Testo libero, per uso amministrativo (es. in vista dell'esportazione dei risultati).</p>
-    <textarea name="domande_esame" rows="3">{{ corso.domande_esame }}</textarea>
+  <details class="card" {% if not corso.domande_esame_lista %}open{% endif %}>
+    <summary><strong>Domande d'esame ({{ corso.domande_esame_lista|length }})</strong></summary>
+    <p class="muted" style="margin-top:1rem">Testi da scrivere nella colonna "Domande d'esame" del file della
+      segreteria quando esporti i voti. Puoi inserirne più di uno (es. uno per lo scritto, uno per scritto + orale):
+      al momento dell'esportazione scegli quale usare. Il primo è quello proposto di default.</p>
+    <div id="elenco-domande-esame">
+      {% for d in corso.domande_esame_lista or [''] %}
+      <div class="riga-domanda-esame" style="display:flex; gap:0.5rem; align-items:flex-start; margin-top:0.5rem">
+        <textarea name="domande_esame" rows="2" style="flex:1">{{ d }}</textarea>
+        <button type="button" class="secondary btn-rimuovi-domanda" title="Rimuovi">&times;</button>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="secondary" id="btn-aggiungi-domanda" style="margin-top:0.5rem">+ Aggiungi domanda d'esame</button>
     <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </details>
 
@@ -159,6 +169,24 @@
   }
   checkSoglia.addEventListener("change", aggiorna);
   aggiorna();
+})();
+
+(function () {
+  var elenco = document.getElementById("elenco-domande-esame");
+  function collegaRimuovi(riga) {
+    riga.querySelector(".btn-rimuovi-domanda").addEventListener("click", function () {
+      if (elenco.querySelectorAll(".riga-domanda-esame").length > 1) riga.remove();
+      else riga.querySelector("textarea").value = "";
+    });
+  }
+  elenco.querySelectorAll(".riga-domanda-esame").forEach(collegaRimuovi);
+  document.getElementById("btn-aggiungi-domanda").addEventListener("click", function () {
+    var nuova = elenco.querySelector(".riga-domanda-esame").cloneNode(true);
+    nuova.querySelector("textarea").value = "";
+    elenco.appendChild(nuova);
+    collegaRimuovi(nuova);
+    nuova.querySelector("textarea").focus();
+  });
 })();
 
 document.querySelectorAll(".btn-reset-default").forEach(function (btn) {

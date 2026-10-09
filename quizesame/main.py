@@ -164,7 +164,10 @@ def _rigenera_se_necessario(tag: str, appello_id: int, background_tasks: Optiona
     if risultato is None:
         return ""
     blocchi = compiti_service.list_blocchi(tag, appello_id)
-    da_compilare = [compiti_service.path_riferimento(tag, appello_id, "tex")]
+    da_compilare = [
+        compiti_service.path_riferimento(tag, appello_id, "tex"),
+        compiti_service.path_riferimento_soluzioni(tag, appello_id, "tex"),
+    ]
     for b in blocchi:
         da_compilare.append(compiti_service.path_blocco(tag, appello_id, b["numero"], "tex"))
         da_compilare.append(compiti_service.path_griglia(tag, appello_id, b["numero"], "tex"))
@@ -220,7 +223,15 @@ def home(request: Request, q: str = ""):
     risultati_ricerca = studenti_service.cerca_in_tutti_i_corsi(q.strip()) if q.strip() else None
     app_settings = app_config_service.get_settings()
     riepilogo_globale = statistiche_service.calcola_globale() if app_settings.mostra_riepilogo_home else None
+    # per il form "Nuovo corso": nome → dati dell'edizione più recente (corsi è già
+    # ordinato per anno decrescente), per proporli e precompilare i campi
+    edizioni_recenti = {}
+    for c in corsi:
+        edizioni_recenti.setdefault(c.nome.strip(), {
+            "facolta": c.facolta, "universita": c.universita, "docente": c.docente, "anno": c.anno,
+        })
     return templates.TemplateResponse(request, "corsi_list.html", {
+        "edizioni_recenti": edizioni_recenti,
         "corsi": corsi, "gruppi_corsi": gruppi_corsi, "corsi_correnti": corsi_correnti,
         "corsi_chiusi": corsi_chiusi,
         "prossimi_appelli": corsi_service.prossimi_appelli(),
@@ -334,10 +345,21 @@ def crea_corso(
     universita: str = Form(""), anno: str = Form(""), docente: str = Form(""),
 ):
     try:
-        corsi_service.create_corso(tag, nome, facolta, universita, anno, docente)
+        _, precedente = corsi_service.create_corso(
+            tag.strip(), nome.strip(), facolta.strip(), universita.strip(), anno.strip(), docente.strip(),
+        )
     except ValueError as e:
         return flash_redirect("/", str(e), "error")
-    return flash_redirect(f"/corsi/{tag}", "Corso creato")
+    # subito alle impostazioni: voti, punteggi e domande d'esame vanno controllati prima
+    # di creare il primo appello
+    if precedente:
+        msg = (
+            f"Corso creato. Impostazioni e domande d'esame copiate da \"{precedente.nome}\" "
+            f"({precedente.anno or precedente.tag}): controllale qui sotto, poi crea il primo appello."
+        )
+    else:
+        msg = "Corso creato. Controlla le impostazioni principali qui sotto, poi crea il primo appello."
+    return flash_redirect(f"/corsi/{tag.strip()}/impostazioni", msg)
 
 
 @app.get("/corsi/{tag}", response_class=HTMLResponse)
@@ -402,7 +424,7 @@ def modifica_corso(
     orale_dopo_richiesta: str = Form(""), orale_soglia_attiva: str = Form(""),
     orale_soglia_n: str = Form(""), orale_soglia_voto: str = Form(""),
     orale_soglia_escludi_parziali: str = Form(""),
-    ritirato_conta_insufficiente: str = Form(""), domande_esame: str = Form(""),
+    ritirato_conta_insufficiente: str = Form(""), domande_esame: list[str] = Form([]),
 ):
     try:
         corsi_service.update_meta(
@@ -417,7 +439,7 @@ def modifica_corso(
             orale_soglia_n=orale_soglia_n.strip(), orale_soglia_voto=orale_soglia_voto.strip(),
             orale_soglia_escludi_parziali="1" if orale_soglia_escludi_parziali else "0",
             ritirato_conta_insufficiente="1" if ritirato_conta_insufficiente else "0",
-            domande_esame=domande_esame.strip(),
+            **corsi_service.domande_esame_meta(domande_esame),
         )
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/impostazioni", str(e), "error")
@@ -456,10 +478,14 @@ def chiudi_corso(tag: str):
 @app.post("/corsi/{tag}/appelli/nuovo")
 def crea_appello(tag: str, nome: str = Form(...), data: str = Form("")):
     try:
-        corsi_service.create_appello(tag, nome=nome.strip(), data=_data_iso_a_it(data) or None)
+        appello = corsi_service.create_appello(tag, nome=nome.strip(), data=_data_iso_a_it(data) or None)
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}", str(e), "error")
-    return flash_redirect(f"/corsi/{tag}", "Appello creato")
+    # subito dentro l'appello, sulla scheda del testo: il passo successivo è sempre
+    # assegnare gli esercizi
+    return flash_redirect(
+        f"/corsi/{tag}/appelli/{appello.id}", "Appello creato: ora assegna gli esercizi del compito", anchor="creazione",
+    )
 
 
 @app.post("/corsi/{tag}/raggruppamenti/nuovo")
@@ -573,6 +599,8 @@ def _dati_appello(tag: str, corso, appello) -> dict:
         "blocchi": blocchi,
         "riferimento_pdf_esiste": compiti_service.path_riferimento(tag, appello.id, "pdf", appello=appello).exists(),
         "riferimento_tex_esiste": compiti_service.path_riferimento(tag, appello.id, "tex", appello=appello).exists(),
+        "riferimento_sol_pdf_esiste": compiti_service.path_riferimento_soluzioni(tag, appello.id, "pdf", appello=appello).exists(),
+        "riferimento_sol_tex_esiste": compiti_service.path_riferimento_soluzioni(tag, appello.id, "tex", appello=appello).exists(),
         "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
         "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
         "segreteria_csv": esportazione_service.get_segreteria_csv(tag, appello.id),
@@ -739,10 +767,12 @@ def genera_compiti(tag: str, appello_id: int, numero_studenti: int = Form(...)):
     }
     if result.riferimento_generato or not compiti_service.path_riferimento(tag, appello_id, "pdf").exists():
         da_compilare["Riferimento"] = compiti_service.path_riferimento(tag, appello_id, "tex")
+    if result.riferimento_generato or not compiti_service.path_riferimento_soluzioni(tag, appello_id, "pdf").exists():
+        da_compilare["Riferimento con soluzioni"] = compiti_service.path_riferimento_soluzioni(tag, appello_id, "tex")
     with ThreadPoolExecutor(max_workers=len(da_compilare)) as pool:
         risultati_compilazione = dict(zip(da_compilare, pool.map(compiti_service.compila_pdf, da_compilare.values())))
     dettaglio = ""
-    for etichetta in ["Riferimento", "Blocco", "Griglia"]:
+    for etichetta in ["Riferimento", "Riferimento con soluzioni", "Blocco", "Griglia"]:
         if etichetta not in risultati_compilazione:
             continue
         comp = risultati_compilazione[etichetta]
@@ -772,6 +802,53 @@ def scarica_riferimento_pdf(tag: str, appello_id: int):
     if not path.exists():
         return PlainTextResponse("PDF non ancora compilato", status_code=404)
     return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/riferimento-soluzioni.tex", response_class=PlainTextResponse)
+def scarica_riferimento_soluzioni_tex(tag: str, appello_id: int):
+    path = compiti_service.path_riferimento_soluzioni(tag, appello_id, "tex")
+    if not path.exists():
+        return PlainTextResponse("Testo non ancora generato", status_code=404)
+    return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="application/x-tex")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/riferimento-soluzioni.pdf")
+def scarica_riferimento_soluzioni_pdf(tag: str, appello_id: int):
+    path = compiti_service.path_riferimento_soluzioni(tag, appello_id, "pdf")
+    if not path.exists():
+        return PlainTextResponse("PDF non ancora compilato", status_code=404)
+    return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/anteprima.pdf")
+def scarica_anteprima_pdf(tag: str, appello_id: int):
+    """Anteprima di controllo del testo (tutte le varianti, risposte corrette, soluzioni),
+    rigenerata e ricompilata a ogni richiesta: riflette sempre gli esercizi attuali."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
+    try:
+        tex_path = compiti_service.genera_anteprima(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    compilazione = compiti_service.compila_pdf(tex_path)
+    if not compilazione.ok:
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error",
+            anchor=anchor, dettaglio=compilazione.errore_dettagliato or "",
+        )
+    return FileResponse(
+        compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name,
+        content_disposition_type="inline",
+    )
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/anteprima.tex", response_class=PlainTextResponse)
+def scarica_anteprima_tex(tag: str, appello_id: int):
+    try:
+        tex_path = compiti_service.genera_anteprima(tag, appello_id)
+    except ValueError as e:
+        return PlainTextResponse(str(e), status_code=404)
+    return PlainTextResponse(tex_path.read_text(encoding="utf-8"), media_type="application/x-tex")
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/riferimento.html", response_class=HTMLResponse)
@@ -889,16 +966,35 @@ async def assegna_esercizio(tag: str, appello_id: int, request: Request, backgro
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/rimuovi")
-def rimuovi_esercizio(tag: str, appello_id: int, esercizio_id: int, background_tasks: BackgroundTasks):
+def rimuovi_esercizio(
+    tag: str, appello_id: int, esercizio_id: int, background_tasks: BackgroundTasks,
+    elimina_dalla_banca: str = Form(""),
+):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "creazione")
+    kind = "success"
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
         esercizi_service.rimuovi_da_appello(tag, appello_id, esercizio_id)
-        msg = "Esercizio rimosso dall'appello" + _rigenera_se_necessario(tag, appello_id, background_tasks)
+        rigenerazione = _rigenera_se_necessario(tag, appello_id, background_tasks)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
+    msg = "Esercizio rimosso dal compito"
+    if elimina_dalla_banca:
+        # dopo la rigenerazione: i blocchi di questo appello non lo referenziano più
+        try:
+            esercizi_service.elimina_esercizio(tag, esercizio_id)
+            msg += " ed eliminato dalla banca dati del corso."
+        except ValueError:
+            msg += (
+                ", ma non eliminato dalla banca dati: è ancora assegnato ad altri appelli "
+                "o compare in loro compiti già generati."
+            )
+            kind = "warning"
+    else:
+        msg += " (resta nella banca dati del corso)."
+    msg += rigenerazione
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, kind, anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/obbligatorio")
@@ -1459,6 +1555,30 @@ def aggiungi_iscritto_manuale(tag: str, appello_id: int, matricola: str = Form(.
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Iscritto aggiunto", anchor=anchor)
 
 
+@app.post("/corsi/{tag}/appelli/{appello_id}/iscritti-manuale/tutti")
+def iscrivi_tutti(tag: str, appello_id: int, matricola_minima: str = Form("")):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "compiti")
+    n = esportazione_service.iscrivi_tutti_gli_studenti(tag, appello_id, matricola_minima)
+    msg = f"{n} studenti del corso aggiunti agli iscritti"
+    if matricola_minima.strip():
+        msg += f" (matricola ≥ {matricola_minima.strip()})"
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/iscritti-filtro")
+def imposta_filtro_iscritti(tag: str, appello_id: int, matricola_minima: str = Form("")):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "compiti")
+    soglia = matricola_minima.strip() or None
+    corsi_service.update_appello(tag, appello_id, matricola_minima_iscritti=soglia)
+    n = esportazione_service.numero_iscritti(tag, appello_id)
+    msg = (f"Filtro salvato: solo matricole ≥ {soglia}" if soglia else "Filtro sulle matricole rimosso")
+    if n is not None:
+        msg += f" — {n} iscritti nell'elenco"
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/iscritti-manuale/{matricola}/rimuovi")
 def rimuovi_iscritto_manuale(tag: str, appello_id: int, matricola: str):
     appello = corsi_service.get_appello(tag, appello_id)
@@ -1560,12 +1680,16 @@ def riapri_presenze(tag: str, appello_id: int):
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/esporta-voti")
-def esporta_voti(request: Request, tag: str, appello_id: int):
+def esporta_voti(request: Request, tag: str, appello_id: int, domanda: Optional[int] = None):
     raggruppamento = corsi_service.get_raggruppamento_by_appello(tag, appello_id)
     appello_singolo = corsi_service.get_appello(tag, appello_id)
     anchor_errore = _anchor_esporta(tag, appello_singolo)
+    lista_domande = corsi_service.get_corso(tag).domande_esame_lista
+    # `domanda` è l'indice in lista_domande scelto nel menu accanto a "Compila e scarica"
+    # (assente se il corso ne ha al massimo una: si usa quella)
+    domande_esame = lista_domande[domanda] if domanda is not None and 0 <= domanda < len(lista_domande) else None
     try:
-        testo, codifica, compilati, extra = esportazione_service.compila_export_voti(tag, appello_id)
+        testo, codifica, compilati, extra = esportazione_service.compila_export_voti(tag, appello_id, domande_esame)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor_errore)
     filename = esportazione_service.get_segreteria_csv(tag, appello_id)["nome_file"]
@@ -1656,11 +1780,18 @@ def calcola_raggruppamento(tag: str, appello_id: int, raggruppamento_id: int = F
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/raggruppamento/modifica")
-def modifica_raggruppamento(tag: str, appello_id: int, matricola_minima_prima_prova: str = Form("")):
+def modifica_raggruppamento(
+    tag: str, appello_id: int, matricola_minima_prima_prova: str = Form(""), fonte_ammessi: str = Form("corso"),
+):
     raggruppamento = corsi_service.get_raggruppamento_by_appello(tag, appello_id)
     if raggruppamento is None:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Questo appello non è un raggruppamento", "error")
-    corsi_service.update_raggruppamento_soglia(tag, raggruppamento.id, matricola_minima_prima_prova.strip() or None)
+    try:
+        corsi_service.update_raggruppamento_soglia(
+            tag, raggruppamento.id, matricola_minima_prima_prova.strip() or None, fonte_ammessi,
+        )
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="impostazioni")
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Impostazioni raggruppamento salvate", anchor="impostazioni")
 
 
@@ -1943,18 +2074,9 @@ def anteprima_esercizio(request: Request, tag: str, esercizio_id: int):
 
 
 @app.get("/corsi/{tag}/esercizi", response_class=HTMLResponse)
-def esercizi_list(request: Request, tag: str, da: str = ""):
+def esercizi_list(request: Request, tag: str):
     corso = corsi_service.get_corso(tag)
     esercizi = esercizi_service.list_esercizi(tag)
-    tutti_corsi = corsi_service.list_corsi()
-    corsi_suggeriti = corsi_service.corsi_simili(corso, tutti_corsi)
-    altri_corsi = [c for c in tutti_corsi if c.tag != tag]
-
-    corso_sorgente = None
-    esercizi_sorgente = []
-    if da and config.corso_exists(da) and da != tag:
-        corso_sorgente = corsi_service.get_corso(da)
-        esercizi_sorgente = esercizi_service.list_esercizi(da)
 
     blocchi_generati = {}
     for e in esercizi:
@@ -1962,22 +2084,79 @@ def esercizi_list(request: Request, tag: str, da: str = ""):
         blocchi_generati[e.id] = any(compiti_service.list_blocchi(tag, aid) for aid in appelli_coinvolti)
 
     return templates.TemplateResponse(request, "esercizi.html", {
-        "corso": corso, "esercizi": esercizi, "corsi_suggeriti": corsi_suggeriti, "altri_corsi": altri_corsi,
-        "corso_sorgente": corso_sorgente, "esercizi_sorgente": esercizi_sorgente,
+        "corso": corso, "esercizi": esercizi,
         "argomenti": esercizi_service.list_argomenti(tag), "blocchi_generati": blocchi_generati,
         "duplicati": esercizi_service.trova_duplicati(tag),
     })
 
 
-@app.post("/corsi/{tag}/esercizi/collega-importa")
-async def collega_importa_esercizi(tag: str, request: Request):
+def _contesto_elenco_esercizi(escludi_tag: str = "", corso_corrente=None) -> dict:
+    """Dati per _elenco_esercizi_corsi.html: tutti gli esercizi di tutti i corsi (tranne
+    `escludi_tag`) con i valori dei filtri. Se `corso_corrente` è dato, il filtro sul nome
+    del corso parte già da quel nome (le edizioni degli anni precedenti)."""
+    righe = esercizi_service.list_esercizi_tutti_i_corsi(escludi_tag=escludi_tag)
+    corsi_presenti = []
+    for c, _ in righe:
+        if c not in corsi_presenti:
+            corsi_presenti.append(c)
+    nomi_corso = sorted({c.nome for c in corsi_presenti})
+    nome_preselezionato = ""
+    if corso_corrente and corso_corrente.nome in nomi_corso:
+        nome_preselezionato = corso_corrente.nome
+    return {
+        "righe_esercizi": righe, "corsi_presenti": corsi_presenti, "nomi_corso": nomi_corso,
+        "argomenti_tutti": sorted({e.argomento for _, e in righe if e.argomento}),
+        "nome_corso_preselezionato": nome_preselezionato,
+    }
+
+
+@app.get("/esercizi", response_class=HTMLResponse)
+def esercizi_tutti(request: Request):
+    """Tutti gli esercizi di tutti i corsi in un unico elenco filtrabile (per nome del
+    corso, corso specifico, argomento, testo): solo consultazione, le banche restano
+    separate. Per usarne uno in un compito: scheda Testo dell'appello, "Importa da altri
+    corsi o anni precedenti"."""
+    contesto = _contesto_elenco_esercizi()
+    contesto["selezionabile"] = False
+    return templates.TemplateResponse(request, "esercizi_tutti.html", contesto)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/esercizi/altri-corsi", response_class=HTMLResponse)
+def esercizi_altri_corsi(request: Request, tag: str, appello_id: int):
+    """Frammento caricato all'apertura del pannello "Importa da altri corsi o anni
+    precedenti" della scheda Testo (leggere tutte le banche è lento: solo quando serve)."""
+    contesto = _contesto_elenco_esercizi(escludi_tag=tag, corso_corrente=corsi_service.get_corso(tag))
+    contesto.update({
+        "selezionabile": True,
+        "action_importa_altri": f"/corsi/{tag}/appelli/{appello_id}/esercizi/importa-da-altri-corsi",
+    })
+    return templates.TemplateResponse(request, "_elenco_esercizi_corsi.html", contesto)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/importa-da-altri-corsi")
+async def importa_esercizi_altri_corsi(tag: str, appello_id: int, request: Request, background_tasks: BackgroundTasks):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
     form = await request.form()
-    tag_sorgente = form.get("tag_sorgente") or ""
-    esercizio_ids = [int(v) for v in form.getlist("esercizio_ids")]
-    if not esercizio_ids:
-        return flash_redirect(f"/corsi/{tag}/esercizi?da={tag_sorgente}", "Nessun esercizio selezionato", "error")
-    n = esercizi_service.importa_da_altro_corso(tag, tag_sorgente, esercizio_ids)
-    return flash_redirect(f"/corsi/{tag}/esercizi", f"Importati {n} esercizi dal corso '{tag_sorgente}'")
+    selezionati = []
+    for valore in form.getlist("selezionati"):
+        tag_sorgente, _, esercizio_id = valore.rpartition(":")
+        if tag_sorgente and esercizio_id.isdigit() and config.corso_exists(tag_sorgente):
+            selezionati.append((tag_sorgente, int(esercizio_id)))
+    if not selezionati:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessun esercizio selezionato", "error", anchor=anchor)
+    try:
+        _proteggi_modifica_esercizi(tag, appello_id)
+        assegnati, gia_presenti = esercizi_service.importa_in_appello_da_altri_corsi(
+            tag, appello_id, selezionati, obbligatorio=bool(form.get("obbligatorio")),
+        )
+        msg = f"{assegnati} esercizi aggiunti al compito"
+        if gia_presenti:
+            msg += f" ({gia_presenti} erano già nella banca di questo corso e sono stati riusati)"
+        msg += _rigenera_se_necessario(tag, appello_id, background_tasks)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
 @app.post("/corsi/{tag}/esercizi/nuovo")
@@ -2073,6 +2252,13 @@ def api_cerca_compiti(tag: str, appello_id: int, prefix: str = ""):
     if not prefix.strip():
         return []
     return compiti_service.cerca_codici(tag, appello_id, prefix.strip())
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/api/compiti/verifica")
+def api_verifica_codice(tag: str, appello_id: int, codice: str = ""):
+    if not codice.strip():
+        return {"esiste": False}
+    return compiti_service.verifica_codice(tag, appello_id, codice)
 
 
 @app.get("/api/fs/sfoglia")

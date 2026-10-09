@@ -192,6 +192,28 @@ def aggiungi_iscritto_manuale(tag: str, appello_id: int, matricola: str) -> None
         conn.close()
 
 
+def iscrivi_tutti_gli_studenti(tag: str, appello_id: int, matricola_minima: str = "") -> int:
+    """Aggiunge agli iscritti manuali di questo appello tutti gli studenti del corso (con
+    matricola >= `matricola_minima`, se data): per le prove a cui è ammesso l'intero
+    corso, senza un file della segreteria. Ritorna quanti ne sono stati aggiunti."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        matricole = [
+            r["matricola"] for r in conn.execute("SELECT matricola FROM studenti")
+            if corsi_service.matricola_ammessa(r["matricola"], matricola_minima.strip() or None)
+        ]
+        prima = conn.total_changes
+        conn.executemany(
+            "INSERT INTO appello_iscritti_manuali (matricola, appello_id) VALUES (?,?) "
+            "ON CONFLICT(matricola, appello_id) DO NOTHING",
+            [(m, appello_id) for m in matricole],
+        )
+        conn.commit()
+        return conn.total_changes - prima
+    finally:
+        conn.close()
+
+
 def rimuovi_iscritto_manuale(tag: str, appello_id: int, matricola: str) -> None:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
@@ -212,7 +234,18 @@ def list_iscritti(tag: str, appello_id: int) -> Optional[list[dict]]:
     il CSV, per uno studente mai importato in questo corso) dalle colonne Cognome/Nome del
     file stesso, se presenti ('registrato': False — non può ricevere un risultato, la cui
     matricola è vincolata a esistere già in 'studenti'). Una matricola ripetuta più volte
-    nel file conta una sola volta (prima occorrenza)."""
+    nel file conta una sola volta (prima occorrenza). Se l'appello ha una matricola
+    minima per gli iscritti, chi ha una matricola inferiore è escluso dall'elenco (ma resta
+    nel file salvato, che torna intero alla segreteria)."""
+    elenco = _list_iscritti_senza_filtro(tag, appello_id)
+    if elenco is None:
+        return None
+    appello = corsi_service.get_appello(tag, appello_id)
+    soglia = appello.matricola_minima_iscritti if appello else None
+    return [s for s in elenco if corsi_service.matricola_ammessa(s["matricola"], soglia)]
+
+
+def _list_iscritti_senza_filtro(tag: str, appello_id: int) -> Optional[list[dict]]:
     riga_csv = get_segreteria_csv(tag, appello_id)
     if riga_csv is None:
         manuali = list_iscritti_manuali(tag, appello_id)
@@ -269,10 +302,13 @@ def numero_iscritti(tag: str, appello_id: int) -> Optional[int]:
     return appello.iscritti_manuale if appello else None
 
 
-def compila_export_voti(tag: str, appello_id: int) -> tuple[str, str, list[dict], list[dict]]:
+def compila_export_voti(
+    tag: str, appello_id: int, domande_esame: Optional[str] = None,
+) -> tuple[str, str, list[dict], list[dict]]:
     """Compila il file caricato in precedenza per questo appello (vedi
     carica_csv_segreteria) con "Esito" (voto, ASS, RIT o 0 per insufficiente) e "Domande
-    d'esame" (testo salvato nelle impostazioni del corso), per gli studenti già corretti.
+    d'esame" (`domande_esame`, scelto tra quelli salvati nelle impostazioni del corso; se
+    None, il primo), per gli studenti già corretti.
 
     Ritorna (testo compilato, codifica del file caricato, elenco degli studenti
     compilati [{"matricola","nome","cognome","voto_label"}], elenco "extra" con la stessa
@@ -312,7 +348,7 @@ def compila_export_voti(tag: str, appello_id: int) -> tuple[str, str, list[dict]
             continue
         riga[idx_esito] = esito
         if idx_domande is not None:
-            riga[idx_domande] = corso.domande_esame
+            riga[idx_domande] = corso.domande_esame if domande_esame is None else domande_esame
         compilati.append({
             "matricola": matricola, "nome": risultato["nome"], "cognome": risultato["cognome"],
             "voto_label": esito,

@@ -16,6 +16,164 @@
   </div>
   {% else %}
   {% set presenti_da_correggere = md.riepilogo_presenze.iscritti | selectattr('presente') | selectattr('registrato') | rejectattr('bloccato') | list if md.riepilogo_presenze else [] %}
+  {% set n_lunghezza_attesa = md.esercizi_assegnati|length %}
+  <div class="barra-avanzamento-correzione">
+    <span><strong>{{ md.risultati|length }}</strong> corretti</span>
+    {% if md.riepilogo_presenze %}<span><strong>{{ presenti_da_correggere|length }}</strong> presenti ancora da correggere</span>{% endif %}
+    {% if md.bozze_correzione %}<span><strong>{{ md.bozze_correzione|length }}</strong> bozze</span>{% endif %}
+    {% if md.valutazioni_sospese %}<span class="badge badge-warn">{{ md.valutazioni_sospese|length }} valutazioni in sospeso</span>{% endif %}
+  </div>
+  <details class="card card-correzione" open>
+    <summary><strong>Correggi un compito</strong></summary>
+    <p class="muted" style="margin:0.5rem 0 0">Dal foglio dello studente: matricola, codice (in alto a destra) e le
+      lettere della griglia nell'ordine, <code>X</code> per una risposta non data e <code>-</code> per le domande aperte.
+      <kbd>Invio</kbd> passa al campo successivo; nel campo risposte apre il riepilogo.</p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi" autocomplete="off" style="margin-top:0.75rem" class="form-correzione">
+      <div class="form-grid">
+        <div style="position:relative">
+          <label class="campo-obbligatorio">1. Matricola o nome</label>
+          <input name="matricola" class="campo-input-matricola" autocomplete="off" required>
+          <div class="campo-suggerimenti-studenti sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+          <div class="campo-matricola-nome-risolto stato-campo"></div>
+        </div>
+        <div style="position:relative">
+          <label class="campo-obbligatorio">2. Codice compito</label>
+          <input name="codice" class="campo-input-codice" autocomplete="off" required inputmode="numeric">
+          <div class="campo-suggerimenti-codici sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+          <div class="campo-codice-stato stato-campo"></div>
+        </div>
+        <div>
+          <label class="campo-obbligatorio">3. Risposte</label>
+          <input name="risposte" class="campo-input-risposte" autocomplete="off" required placeholder="es. ABCXB ADCEB A" style="font-family:monospace">
+          <div class="campo-risposte-stato stato-campo"></div>
+        </div>
+      </div>
+      <button type="submit">Vai al riepilogo</button>
+      <button type="reset" class="secondary">Svuota</button>
+    </form>
+    <script>
+    (function () {
+      var root = document.currentScript.closest(".tab-pane");
+      var form = root.querySelector(".form-correzione");
+      var inputMatricola = root.querySelector(".campo-input-matricola");
+      var nomeRisolto = root.querySelector(".campo-matricola-nome-risolto");
+      var inputCodice = root.querySelector(".campo-input-codice");
+      var statoCodice = root.querySelector(".campo-codice-stato");
+      var inputRisposte = root.querySelector(".campo-input-risposte");
+      var statoRisposte = root.querySelector(".campo-risposte-stato");
+      // lunghezza attesa della griglia: dal codice appena verificato (esatta per quel
+      // compito), altrimenti dal numero di esercizi assegnati alla prova
+      var lunghezzaAttesa = {{ n_lunghezza_attesa }};
+
+      function imposta(el, testo, tipo) {
+        el.textContent = testo;
+        el.className = el.className.replace(/\bstato-(ok|err|warn)\b/g, "").trim() + (tipo ? " stato-" + tipo : "");
+      }
+
+      formattaRisposte(inputRisposte);
+      function aggiornaRisposte() {
+        var n = inputRisposte.value.replace(/\s+/g, "").length;
+        if (!n) { imposta(statoRisposte, "", ""); return; }
+        if (!lunghezzaAttesa) { imposta(statoRisposte, n + " risposte", ""); return; }
+        if (n === lunghezzaAttesa) imposta(statoRisposte, "✓ " + n + " / " + lunghezzaAttesa + " risposte", "ok");
+        else if (n < lunghezzaAttesa) imposta(statoRisposte, n + " / " + lunghezzaAttesa + " risposte: ne mancano " + (lunghezzaAttesa - n), "warn");
+        else imposta(statoRisposte, n + " / " + lunghezzaAttesa + " risposte: " + (n - lunghezzaAttesa) + " di troppo", "err");
+      }
+      inputRisposte.addEventListener("input", aggiornaRisposte);
+
+      creaAutocomplete(
+        inputMatricola, root.querySelector(".campo-suggerimenti-studenti"),
+        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?appello_id={{ md.appello.id }}&q=" + encodeURIComponent(q); },
+        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+        function (s) { return s.matricola; },
+        function (dati, valoreDigitato) {
+          var match = dati.filter(function (s) { return s.matricola === valoreDigitato; })[0];
+          if (!match) { imposta(nomeRisolto, valoreDigitato && /^\d+$/.test(valoreDigitato) ? "matricola non trovata nel corso" : "", valoreDigitato && /^\d+$/.test(valoreDigitato) ? "warn" : ""); return; }
+          if (match.stato === "già valutato") imposta(nomeRisolto, "⚠ " + match.cognome + " " + match.nome + ": già valutato in questa prova", "err");
+          else if (match.stato === "assente" || match.stato === "ritirato") imposta(nomeRisolto, "⚠ " + match.cognome + " " + match.nome + ": segnato " + match.stato, "warn");
+          else imposta(nomeRisolto, "✓ " + match.cognome + " " + match.nome + (match.stato ? " (" + match.stato + ")" : ""), "ok");
+        },
+        function (s) { return s.stato; }
+      );
+
+      inputCodice.dataset.minChars = 4;
+      creaAutocomplete(
+        inputCodice, root.querySelector(".campo-suggerimenti-codici"),
+        function (p) { return "/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/api/compiti/cerca?prefix=" + encodeURIComponent(p); },
+        function (c) { return c; },
+        function (c) { return c; },
+        function (dati, valore) { if (dati.length === 1 && dati[0] === valore) verificaCodice(); }
+      );
+      var timerCodice = null, ultimaVerifica = 0;
+      function verificaCodice() {
+        var codice = inputCodice.value.trim();
+        if (!codice) { imposta(statoCodice, "", ""); return; }
+        var id = ++ultimaVerifica;
+        fetch("/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/api/compiti/verifica?codice=" + encodeURIComponent(codice))
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (id !== ultimaVerifica) return;
+            if (!d.esiste) { imposta(statoCodice, "✗ codice inesistente in questa prova", "err"); return; }
+            lunghezzaAttesa = d.lunghezza || lunghezzaAttesa;
+            if (d.usato_da && d.usato_da.matricola !== inputMatricola.value.trim()) {
+              imposta(statoCodice, "⚠ codice già usato da " + d.usato_da.cognome + " " + d.usato_da.nome + " (" + d.usato_da.matricola + ")", "err");
+            } else {
+              imposta(statoCodice, "✓ codice valido, " + d.lunghezza + " risposte", "ok");
+            }
+            aggiornaRisposte();
+          });
+      }
+      inputCodice.addEventListener("input", function () { clearTimeout(timerCodice); timerCodice = setTimeout(verificaCodice, 300); });
+      inputCodice.addEventListener("change", verificaCodice);
+
+      // Invio nei primi due campi passa al successivo invece di inviare il modulo
+      [[inputMatricola, inputCodice], [inputCodice, inputRisposte]].forEach(function (coppia) {
+        coppia[0].addEventListener("keydown", function (ev) {
+          if (ev.key !== "Enter") return;
+          ev.preventDefault();
+          root.querySelectorAll(".sfoglia-lista").forEach(function (l) { l.style.display = "none"; });
+          coppia[1].focus();
+        });
+      });
+      form.addEventListener("submit", function (ev) {
+        var n = inputRisposte.value.replace(/\s+/g, "").length;
+        var problemi = [];
+        if (statoCodice.classList.contains("stato-err")) problemi.push(statoCodice.textContent.replace(/^[✗⚠] /, ""));
+        if (nomeRisolto.classList.contains("stato-err")) problemi.push(nomeRisolto.textContent.replace(/^⚠ /, ""));
+        if (lunghezzaAttesa && n !== lunghezzaAttesa) problemi.push(n + " risposte inserite invece di " + lunghezzaAttesa);
+        if (problemi.length && !window.confirm("Attenzione:\n- " + problemi.join("\n- ") + "\n\nProcedere comunque al riepilogo?")) ev.preventDefault();
+      });
+      form.addEventListener("reset", function () {
+        setTimeout(function () {
+          [nomeRisolto, statoCodice, statoRisposte].forEach(function (el) { imposta(el, "", ""); });
+          lunghezzaAttesa = {{ n_lunghezza_attesa }};
+          inputMatricola.focus();
+        }, 0);
+      });
+
+      root.querySelectorAll(".btn-correggi-presente").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          form.reset();
+          setTimeout(function () {
+            inputMatricola.value = btn.dataset.matricola;
+            imposta(nomeRisolto, "✓ " + btn.dataset.nome, "ok");
+            inputCodice.focus();
+            inputCodice.scrollIntoView({ block: "center" });
+          }, 0);
+        });
+      });
+
+      // scheda aperta (anche dopo aver confermato una correzione): cursore già sulla
+      // matricola, per passare subito al compito successivo
+      function focusSeAttiva() {
+        if (location.hash === "#valutazione{{ pane_suffix }}") setTimeout(function () { inputMatricola.focus(); }, 50);
+      }
+      window.addEventListener("hashchange", focusSeAttiva);
+      focusSeAttiva();
+    })();
+    </script>
+  </details>
+
   <details class="card" {% if presenti_da_correggere %}open{% endif %}>
     <summary><strong>Presenti da correggere ({{ presenti_da_correggere|length }})</strong></summary>
     {% if presenti_da_correggere %}
@@ -73,67 +231,6 @@
   </details>
   {% endif %}
 
-  <details class="card" open>
-    <summary><strong>Correzione</strong></summary>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi" autocomplete="off" style="margin-top:0.75rem">
-      <div class="form-grid">
-        <div style="position:relative">
-          <label class="campo-obbligatorio">Matricola o nome</label>
-          <input name="matricola" class="campo-input-matricola" autocomplete="off" required>
-          <div class="campo-suggerimenti-studenti sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-          <div class="campo-matricola-nome-risolto muted" style="margin-top:0.25rem"></div>
-        </div>
-        <div style="position:relative">
-          <label class="campo-obbligatorio">Codice compito</label>
-          <input name="codice" class="campo-input-codice" autocomplete="off" required>
-          <div class="campo-suggerimenti-codici sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-        </div>
-        <div><label class="campo-obbligatorio">Stringa risposte</label><input name="risposte" class="campo-input-risposte" autocomplete="off" required placeholder="es. ABCXB ADCEB A" style="font-family:monospace"></div>
-      </div>
-      <button type="submit">Vai al riepilogo</button>
-    </form>
-    <script>
-    (function () {
-      var root = document.currentScript.closest(".tab-pane");
-      formattaRisposte(root.querySelector(".campo-input-risposte"));
-      var inputMatricola = root.querySelector(".campo-input-matricola");
-      var nomeRisolto = root.querySelector(".campo-matricola-nome-risolto");
-      creaAutocomplete(
-        inputMatricola, root.querySelector(".campo-suggerimenti-studenti"),
-        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?appello_id={{ md.appello.id }}&q=" + encodeURIComponent(q); },
-        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
-        function (s) { return s.matricola; },
-        function (dati, valoreDigitato) {
-          var match = dati.filter(function (s) { return s.matricola === valoreDigitato; })[0];
-          nomeRisolto.textContent = match ? (match.cognome + " " + match.nome) : "";
-        },
-        function (s) { return s.stato; }
-      );
-      var inputCodice = root.querySelector(".campo-input-codice");
-      inputCodice.dataset.minChars = 4;
-      creaAutocomplete(
-        inputCodice, root.querySelector(".campo-suggerimenti-codici"),
-        function (p) { return "/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/api/compiti/cerca?prefix=" + encodeURIComponent(p); },
-        function (c) { return c; },
-        function (c) { return c; }
-      );
-      var inputRisposte = root.querySelector(".campo-input-risposte");
-      root.querySelectorAll(".btn-correggi-presente").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          inputMatricola.value = btn.dataset.matricola;
-          nomeRisolto.textContent = btn.dataset.nome;
-          // il codice (e le risposte) di un eventuale studente corretto prima restano
-          // altrimenti nel campo: puliti, altrimenti sembrerebbe che il codice giusto
-          // per il nuovo studente sia già caricato.
-          inputCodice.value = "";
-          inputRisposte.value = "";
-          inputCodice.focus();
-          inputCodice.scrollIntoView({ block: "center" });
-        });
-      });
-    })();
-    </script>
-  </details>
   {% endif %}
 
   <details class="card" open>
@@ -227,10 +324,11 @@
     {% if md.segreteria_csv %}
     <p class="muted" style="margin-top:1rem">
       Per ogni studente con una valutazione già completata e confermata viene compilata la colonna Esito
-      (voto, ASS, RIT o 0 per insufficiente) e la colonna Domande d'esame (testo salvato nelle impostazioni
-      del corso), nel file "{{ md.segreteria_csv.nome_file }}" caricato dalla scheda "Compiti d'esame".
+      (voto, ASS, RIT o 0 per insufficiente) e la colonna Domande d'esame (uno dei testi salvati nelle
+      impostazioni del corso), nel file "{{ md.segreteria_csv.nome_file }}" caricato dalla scheda "Compiti d'esame".
     </p>
-    <a class="button" href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esporta-voti">Compila e scarica</a>
+    {% set url_esporta = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/esporta-voti" %}
+    {% include "_esporta_voti_bottone.html" %}
     {% else %}
     <p class="muted" style="margin-top:1rem">
       Nessun file della segreteria ancora caricato: caricalo dalla scheda
