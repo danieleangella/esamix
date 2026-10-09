@@ -150,3 +150,50 @@ function caricaInRiga(riga, url, dopo) {
     if (dopo) dopo(riga);
   });
 }
+
+// Copia un testo negli appunti; dove il browser non lo permette (pagina aperta da un
+// indirizzo non sicuro, es. IP di rete) lo mostra in una casella già selezionata.
+function copiaTesto(testo, doveMostrare) {
+  function mostra() {
+    var area = document.createElement("textarea");
+    area.rows = 8;
+    area.value = testo;
+    area.readOnly = true;
+    doveMostrare.appendChild(area);
+    area.focus();
+    area.select();
+    return Promise.resolve(false);
+  }
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(testo).then(function () { return true; }, mostra);
+  }
+  return mostra();
+}
+
+// Pannello "Genera con l'IA" (_genera_ia.html), inserito via fetch nella scheda Testo.
+function attivaPannelloIA(radice) {
+  var form = radice.querySelector(".form-genera-ia");
+  if (!form) return;
+  var stato = form.querySelector(".stato-ia");
+  form.addEventListener("submit", function (ev) {
+    if (ev.defaultPrevented) return;  // es. annullato dall'avviso sui blocchi già generati
+    var btn = form.querySelector(".btn-genera-ia");
+    btn.disabled = true;
+    btn.textContent = "Generazione in corso…";
+    stato.textContent = "Claude sta preparando gli esercizi: di solito 1–3 minuti, non chiudere la pagina.";
+  });
+  form.querySelector(".btn-prompt-ia").addEventListener("click", function () {
+    var parametri = new URLSearchParams({
+      n: form.elements.n.value, varianti: form.elements.varianti.value, istruzioni: form.elements.istruzioni.value,
+    });
+    stato.textContent = "Preparazione del prompt…";
+    fetch(form.getAttribute("action").replace(/\/genera$/, "/prompt") + "?" + parametri)
+      .then(function (r) { return r.text(); })
+      .then(function (testo) { return copiaTesto(testo, form); })
+      .then(function (copiato) {
+        stato.textContent = copiato
+          ? "Prompt copiato: incollalo in claude.ai, poi incolla la risposta in \"Importa un compito da un unico file\"."
+          : "Copia il prompt dalla casella qui sotto.";
+      });
+  });
+}

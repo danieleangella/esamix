@@ -1,0 +1,53 @@
+{# Pannello "Genera con l'IA" della scheda Testo, caricato via fetch all'apertura. #}
+<div class="pannello-ia" style="margin-top:0.75rem">
+  {% if riferimenti.prove %}
+  <p class="muted" style="margin-top:0">
+    Claude prende a modello <strong>{{ riferimenti.prove|length }}</strong> prove precedenti
+    ({{ riferimenti.tipo }}): stessi argomenti, in proporzione, e stessa difficoltà, con esercizi nuovi.
+  </p>
+  <details style="margin-bottom:0.5rem">
+    <summary class="muted">Quali prove</summary>
+    <ul class="muted" style="margin:0.3rem 0 0">
+      {% for p in riferimenti.prove %}
+      <li>{{ p.appello.nome }}{% if p.appello.data %} ({{ p.appello.data }}){% endif %} — {{ p.corso.anno or p.corso.tag }}:
+        {{ p.esercizi|length }} esercizi{% set args = p.esercizi | map(attribute='argomento') | select | unique | list %}{% if args %}, argomenti: {{ args | join(', ') }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% else %}
+  <p class="muted" style="margin-top:0">Non ci sono prove precedenti analoghe con esercizi: Claude si baserà sul
+    nome del corso e sulle indicazioni che scrivi qui sotto.</p>
+  {% endif %}
+
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/ia/genera" class="form-genera-ia">
+    <div class="form-grid">
+      <div><label for="ia-n-{{ appello.id }}">Numero di esercizi</label>
+        <input type="number" id="ia-n-{{ appello.id }}" name="n" min="1" max="30" value="{{ n_suggerito }}"></div>
+      <div><label for="ia-v-{{ appello.id }}">Varianti per esercizio</label>
+        <input type="number" id="ia-v-{{ appello.id }}" name="varianti" min="1" max="5" value="{{ varianti_suggerite }}"></div>
+    </div>
+    <label for="ia-istr-{{ appello.id }}" style="margin-top:0.5rem">Indicazioni aggiuntive (facoltative)</label>
+    <textarea id="ia-istr-{{ appello.id }}" name="istruzioni" rows="2"
+              placeholder="es. niente esercizi sui numeri complessi; almeno due esercizi sugli autovalori; difficoltà un po' più bassa"></textarea>
+    <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-top:0.5rem">
+      {% if fornitore_ia %}
+      <button type="submit" class="btn-genera-ia" style="margin:0">Genera con {{ fornitore_ia.nome }}</button>
+      {% endif %}
+      <button type="button" class="secondary btn-prompt-ia" style="margin:0">{{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</button>
+      <span class="muted stato-ia" role="status"></span>
+    </div>
+    {% if not fornitore_ia %}
+    <p class="muted" style="margin-top:0.5rem">
+      Senza chiave API: copia il prompt, incollalo in <a href="https://claude.ai" target="_blank" rel="noopener">claude.ai</a>,
+      poi incolla la risposta in "Importa un compito da un unico file" qui sotto. Per generare direttamente da qui,
+      configura Anthropic, OpenRouter o un server Ollama in <a href="/impostazioni#ia">Impostazioni</a>.
+    </p>
+    {% else %}
+    <p class="muted" style="margin-top:0.5rem">Modello: <strong>{{ fornitore_ia.modello }}</strong> tramite {{ fornitore_ia.nome }}
+      (<a href="/impostazioni#ia">cambia</a>). La generazione richiede di solito alcuni minuti. Prima di importare
+      vedrai tutti gli esercizi proposti e sceglierai quali tenere.
+      {% if fornitore_ia.id == 'ollama' %}I testi degli esercizi vanno solo al tuo server Ollama.
+      {% else %}Vengono inviati {{ 'ad Anthropic' if fornitore_ia.id == 'anthropic' else 'a OpenRouter (che li inoltra ad Anthropic)' }} solo testi di esercizi, nessun dato degli studenti.{% endif %}</p>
+    {% endif %}
+  </form>
+</div>

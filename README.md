@@ -1,8 +1,9 @@
 # EsaMiX
 
 App locale per la creazione e la correzione di compiti d'esame a risposta multipla.
-Gira come un piccolo server sul proprio computer e si usa dal browser. Nessun dato
-viene inviato altrove: tutto resta sul computer su cui gira l'app.
+Gira come un piccolo server sul proprio computer e si usa dal browser. I dati restano
+sul computer su cui gira l'app; l'unica eccezione, facoltativa, è la generazione di
+esercizi con l'IA (vedi sotto).
 
 ## Requisiti
 
@@ -120,11 +121,32 @@ Ogni corso è una cartella dentro `corsi/`, con il proprio database (`db.sqlite`
 testi generati (`corsi/<corso>/output/`). I dati non vengono mai inviati altrove: tutto
 resta sul computer su cui gira l'app.
 
-Dalla pagina Impostazioni di un corso (o dalle Impostazioni generali dell'app, per tutti
-i corsi insieme) si può scaricare in qualsiasi momento un **backup** in formato zip.
-Sempre dalle Impostazioni generali dell'app è possibile eliminare definitivamente tutti
-i corsi presenti (azione irreversibile, protetta da una frase di conferma da scrivere):
-conviene farne un backup prima.
+## Generazione di esercizi con l'IA (facoltativa)
+
+Nella scheda Testo di un appello, **"Genera con l'IA"** crea nuovi esercizi con Claude
+(Anthropic) sul modello delle prove analoghe degli anni precedenti dello stesso corso:
+per una prova parziale, le prove parziali corrispondenti; per un appello, gli appelli.
+Gli esercizi proposti passano sempre da una pagina di conferma, dove si sceglie quali
+importare.
+
+Si può generare con tre fornitori, da scegliere in Impostazioni → "Generazione esercizi
+con l'IA":
+
+- **Anthropic** (Claude Opus 5): chiave API `sk-ant-…`, oppure la variabile d'ambiente
+  `ANTHROPIC_API_KEY`. A pagamento sul proprio account Anthropic.
+- **OpenRouter** (Claude Opus 5 tramite OpenRouter): chiave `sk-or-…`, oppure la
+  variabile d'ambiente `OPENROUTER_API_KEY`. A pagamento sul credito OpenRouter.
+- **Ollama su un proprio server**: indirizzo del server (es. `http://192.168.1.10:11434`),
+  modello installato e, se il server è dietro un proxy con login, un token. I testi non
+  escono dalla propria rete. Serve un modello abbastanza grande e un contesto ampio: sul
+  server impostare `OLLAMA_CONTEXT_LENGTH` ad almeno 32768.
+
+Le chiavi restano solo in `corsi/app_settings.json` e non vengono mai rimostrate per
+intero nelle pagine. Senza nessun fornitore si può copiare il prompt, incollarlo in
+claude.ai e importare la risposta con "Importa un compito da un unico file".
+
+Vengono inviati solo i testi degli esercizi e le impostazioni del corso (mai dati degli
+studenti), e solo quando si preme il pulsante.
 
 ## Importare i dati di un corso già gestito con la vecchia versione a riga di comando
 

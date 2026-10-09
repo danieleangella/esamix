@@ -5,8 +5,22 @@
 {% if appello %}<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#creazione">{{ appello.nome }}</a>{% else %}<a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>{% endif %}
 <span class="sep">›</span> <span class="current">Importa esercizi</span>
 {% endblock %}
+{% block katex %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+{% endblock %}
 {% block content %}
+{% if generati_ia %}
+<h1>Esercizi generati con l'IA</h1>
+<div class="flash flash-warning">
+  Controlla ogni esercizio prima di importarlo: Claude può sbagliare, soprattutto i calcoli. Apri "Mostra
+  tutto" per vedere testo, risposte (la corretta è segnata con ✓) e soluzione. Dopo l'import puoi comunque
+  modificarli, e l'Anteprima PDF con soluzioni della scheda Testo permette un controllo completo.
+</div>
+{% else %}
 <h1>Importa esercizi da file</h1>
+{% endif %}
 <p class="muted">
   Scegli quali esercizi importare (verranno creati nella banca del corso{% if appello %} e assegnati a questo appello{% endif %}).
   Quelli segnalati come già presenti hanno lo stesso testo e le stesse risposte di un esercizio esistente:
@@ -40,6 +54,23 @@
           <span class="muted" style="white-space:pre-wrap">{{ (c.varianti[0].testo if c.varianti else '')[:150] }}{% if c.varianti and c.varianti[0].testo|length > 150 %}…{% endif %}</span>
         </span>
       </label>
+      <details class="anteprima-import" style="margin:0.4rem 0 0 1.9rem"{% if generati_ia %} open{% endif %}>
+        <summary class="muted">Mostra tutto</summary>
+        {% if c.obbligatorio %}<p style="margin:0.4rem 0 0"><span class="badge badge-warn">obbligatorio</span></p>{% endif %}
+        {% for v in c.varianti %}
+        <div style="margin-top:0.5rem">
+          {% if c.varianti|length > 1 %}<strong>Variante {{ loop.index }}.</strong>{% endif %}
+          <div style="white-space:pre-wrap">{{ v.testo }}</div>
+          {% if v.risposte %}
+          <ol type="A" style="margin:0.3rem 0 0">
+            {% for r in v.risposte %}<li>{% if loop.first %}<strong>{{ r }} ✓</strong>{% else %}{{ r }}{% endif %}</li>{% endfor %}
+          </ol>
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% if c.soluzione %}<div class="card" style="margin:0.5rem 0 0; padding:0.5rem 0.75rem; white-space:pre-wrap"><strong>Soluzione:</strong> {{ c.soluzione }}</div>{% endif %}
+        {% if c.note %}<p class="muted" style="margin:0.3rem 0 0">Note: {{ c.note }}</p>{% endif %}
+      </details>
     </div>
     {% endfor %}
   </div>
@@ -49,6 +80,11 @@
 </form>
 <script>
 (function () {
+  // formule visibili solo quando un'anteprima viene aperta (o subito, se già aperta)
+  document.querySelectorAll(".anteprima-import").forEach(function (d) {
+    if (d.open) window.addEventListener("load", function () { renderizzaLatex(d); });
+    d.addEventListener("toggle", function () { if (d.open) renderizzaLatex(d); });
+  });
   var campi = document.querySelectorAll(".campo-esercizio-incluso");
   document.getElementById("btn-seleziona-tutti-esercizi").addEventListener("click", function () {
     campi.forEach(function (c) { c.checked = true; });

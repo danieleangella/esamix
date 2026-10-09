@@ -28,6 +28,99 @@
   </form>
 </div>
 
+<details class="card" id="ia" {% if not ia_attivo %}open{% endif %}>
+  <summary><strong>Generazione esercizi con l'IA</strong>
+    {% if ia_attivo %}<span class="badge badge-ok">{{ ia_attivo.nome }} · {{ ia_attivo.modello }}</span>{% endif %}</summary>
+  <p class="muted" style="margin-top:1rem">
+    Il pannello <strong>"Genera con l'IA"</strong> nella scheda Testo di un appello crea nuovi esercizi
+    sul modello delle prove analoghe degli anni precedenti. Gli esercizi proposti passano sempre da una
+    pagina di conferma. Vengono inviati solo testi di esercizi e impostazioni del corso, mai dati degli
+    studenti, e solo quando premi il pulsante. Senza nessun fornitore puoi comunque copiare il prompt in claude.ai.
+  </p>
+  <form method="post" action="/impostazioni/ia" id="form-ia" style="margin-top:0.75rem">
+    <label for="ia-fornitore">Fornitore da usare</label>
+    <select name="fornitore" id="ia-fornitore" style="max-width:24rem">
+      <option value="anthropic" {% if ia_scelto == 'anthropic' %}selected{% endif %}>Anthropic (Claude Opus 5, chiave sk-ant-…)</option>
+      <option value="openrouter" {% if ia_scelto == 'openrouter' %}selected{% endif %}>OpenRouter (Claude Opus 5, chiave sk-or-…)</option>
+      <option value="ollama" {% if ia_scelto == 'ollama' %}selected{% endif %}>Ollama su un tuo server</option>
+    </select>
+
+    <fieldset class="ia-sezione" data-fornitore="anthropic">
+      <legend>Anthropic</legend>
+      <p class="muted" style="margin-top:0">A pagamento sul tuo account; la chiave si crea su
+        <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a>.</p>
+      <label for="ia-chiave-anthropic">Chiave API</label>
+      <input type="password" id="ia-chiave-anthropic" name="chiave_anthropic" autocomplete="off"
+             placeholder="{{ ('salvata: …' ~ ia_finali.anthropic ~ ' (lascia vuoto per non cambiarla)') if ia_finali.anthropic else 'sk-ant-…' }}">
+      {% if ia_env.anthropic and not ia_finali.anthropic %}<p class="muted" style="margin-top:0.25rem">In uso la variabile d'ambiente ANTHROPIC_API_KEY.</p>{% endif %}
+      {% if ia_finali.anthropic %}<button type="submit" name="rimuovi" value="anthropic" class="secondary">Rimuovi chiave</button>{% endif %}
+    </fieldset>
+
+    <fieldset class="ia-sezione" data-fornitore="openrouter">
+      <legend>OpenRouter</legend>
+      <p class="muted" style="margin-top:0">Usa Claude Opus 5 tramite il tuo credito su
+        <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai</a>.</p>
+      <label for="ia-chiave-openrouter">Chiave API</label>
+      <input type="password" id="ia-chiave-openrouter" name="chiave_openrouter" autocomplete="off"
+             placeholder="{{ ('salvata: …' ~ ia_finali.openrouter ~ ' (lascia vuoto per non cambiarla)') if ia_finali.openrouter else 'sk-or-…' }}">
+      {% if ia_env.openrouter and not ia_finali.openrouter %}<p class="muted" style="margin-top:0.25rem">In uso la variabile d'ambiente OPENROUTER_API_KEY.</p>{% endif %}
+      {% if ia_finali.openrouter %}<button type="submit" name="rimuovi" value="openrouter" class="secondary">Rimuovi chiave</button>{% endif %}
+    </fieldset>
+
+    <fieldset class="ia-sezione" data-fornitore="ollama">
+      <legend>Ollama</legend>
+      <p class="muted" style="margin-top:0">Un modello che gira su un tuo server: i testi degli esercizi non escono
+        dalla tua rete. Serve un modello abbastanza grande (i modelli piccoli sbagliano spesso i calcoli) e un
+        contesto ampio: sul server imposta <code>OLLAMA_CONTEXT_LENGTH</code> ad almeno 32768, altrimenti le prove
+        di riferimento vengono troncate.</p>
+      <div class="form-grid">
+        <div><label for="ia-ollama-url">Indirizzo del server</label>
+          <input id="ia-ollama-url" name="ollama_url" value="{{ app_settings.ollama_url }}" placeholder="http://192.168.1.10:11434"></div>
+        <div><label for="ia-ollama-modello">Modello</label>
+          <input id="ia-ollama-modello" name="ollama_modello" value="{{ app_settings.ollama_modello }}" list="ia-modelli-ollama" autocomplete="off" placeholder="es. qwen3:32b">
+          <datalist id="ia-modelli-ollama"></datalist></div>
+        <div><label for="ia-ollama-token">Token (facoltativo)</label>
+          <input type="password" id="ia-ollama-token" name="ollama_token" autocomplete="off"
+                 placeholder="{{ 'salvato (lascia vuoto per non cambiarlo)' if app_settings.ollama_token else 'solo se il server è dietro un proxy con login' }}"></div>
+      </div>
+      <button type="button" class="secondary" id="btn-verifica-ollama">Verifica connessione ed elenca i modelli</button>
+      {% if app_settings.ollama_token %}<button type="submit" name="rimuovi" value="ollama" class="secondary">Rimuovi token</button>{% endif %}
+      <p class="muted" id="esito-verifica-ollama" role="status" style="margin-top:0.25rem"></p>
+    </fieldset>
+
+    <button type="submit">Salva</button>
+  </form>
+</details>
+<script>
+(function () {
+  var scelta = document.getElementById("ia-fornitore");
+  function aggiorna() {
+    document.querySelectorAll(".ia-sezione").forEach(function (f) { f.hidden = f.dataset.fornitore !== scelta.value; });
+  }
+  scelta.addEventListener("change", aggiorna);
+  aggiorna();
+  var esito = document.getElementById("esito-verifica-ollama");
+  document.getElementById("btn-verifica-ollama").addEventListener("click", function () {
+    var dati = new FormData();
+    dati.append("ollama_url", document.getElementById("ia-ollama-url").value);
+    dati.append("ollama_token", document.getElementById("ia-ollama-token").value);
+    esito.textContent = "Verifica in corso…";
+    fetch("/impostazioni/ia/modelli-ollama", { method: "POST", body: dati })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.errore) { esito.textContent = d.errore; return; }
+        var lista = document.getElementById("ia-modelli-ollama");
+        lista.innerHTML = "";
+        d.modelli.forEach(function (m) { var o = document.createElement("option"); o.value = m; lista.appendChild(o); });
+        esito.textContent = d.modelli.length
+          ? "Connessione riuscita. Modelli installati: " + d.modelli.join(", ")
+          : "Connessione riuscita, ma sul server non c'è nessun modello installato (ollama pull …).";
+      })
+      .catch(function () { esito.textContent = "Verifica non riuscita"; });
+  });
+})();
+</script>
+
 <details class="card" open>
   <summary><strong>Aggiornamenti</strong></summary>
   <p class="muted" style="margin-top:0.75rem">Controlla subito se è disponibile una versione più recente del codice su GitHub

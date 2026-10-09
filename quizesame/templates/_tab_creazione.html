@@ -82,6 +82,29 @@
   {% endif %}
 
   {% if not md.appello.chiuso %}
+  <details style="margin-top:0.75rem" class="pannello-genera-ia">
+    <summary><strong>Genera con l'IA</strong> <span class="muted">— nuovi esercizi sul modello delle prove analoghe degli anni precedenti</span></summary>
+    <div class="contenuto-genera-ia"><p class="muted" style="margin-top:0.75rem">Caricamento delle prove di riferimento…</p></div>
+  </details>
+  <script>
+  (function () {
+    var pannello = document.currentScript.previousElementSibling;
+    pannello.addEventListener("toggle", function () {
+      if (!pannello.open || pannello.dataset.caricato) return;
+      pannello.dataset.caricato = "1";
+      fetch("/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ia")
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var contenuto = pannello.querySelector(".contenuto-genera-ia");
+          contenuto.innerHTML = html;
+          attivaPannelloIA(contenuto);
+        });
+    });
+  })();
+  </script>
+  {% endif %}
+
+  {% if not md.appello.chiuso %}
   <details style="margin-top:0.75rem">
     <summary>Crea un nuovo esercizio</summary>
     {% set action = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/esercizi/nuovo" %}
@@ -235,7 +258,7 @@
   var root = document.currentScript.closest(".tab-pane");
   var blocchiEsistono = {{ 'true' if md.blocchi else 'false' }};
   if (!blocchiEsistono) return;
-  var azioniSensibili = ["/obbligatorio", "/rimuovi", "/esercizi/assegna", "/esercizi/nuovo", "/importa-json", "/importa-da-altri-corsi"];
+  var azioniSensibili = ["/obbligatorio", "/rimuovi", "/esercizi/assegna", "/esercizi/nuovo", "/importa-json", "/importa-da-altri-corsi", "/ia/genera"];
   // delegato sulla scheda (non sui singoli form): vale anche per i form caricati dopo via
   // fetch, come quello di "Importa da altri corsi o anni precedenti"
   root.addEventListener("submit", function (ev) {

@@ -130,6 +130,37 @@
   </p>
 </details>
 
+<details class="card dettaglio-fisarmonica" id="genera-ia">
+  <summary>Generare esercizi con l'IA</summary>
+  <p>
+    Nella scheda <strong>Testo</strong> di un appello, il pannello <strong>"Genera con l'IA"</strong>
+    crea nuovi esercizi con Claude prendendo a modello le prove analoghe degli anni precedenti
+    dello stesso corso (stesso nome e corso di studi): per una prova di un raggruppamento, ad
+    esempio la seconda prova parziale, le seconde prove parziali degli altri anni; per un appello
+    normale, gli altri appelli. Claude segue gli stessi argomenti, in proporzione, e la stessa
+    difficoltà, con dati ed esercizi nuovi. Si possono scegliere il numero di esercizi, le
+    varianti per esercizio e aggiungere indicazioni (es. "niente numeri complessi").
+  </p>
+  <p>
+    Gli esercizi proposti si vedono per intero (testo, risposte con la corretta segnata,
+    soluzione) in una pagina di conferma, dove si sceglie quali importare: <strong>vanno
+    sempre controllati</strong>, perché l'IA può sbagliare i calcoli. Dopo l'import
+    l'Anteprima PDF con soluzioni permette un controllo completo.
+  </p>
+  <p>
+    Per generare direttamente dall'app si sceglie un fornitore in Impostazioni → "Generazione
+    esercizi con l'IA": <strong>Anthropic</strong> (Claude Opus 5, chiave API a pagamento sul
+    proprio account), <strong>OpenRouter</strong> (Claude Opus 5 con il credito OpenRouter) oppure
+    <strong>Ollama</strong> su un proprio server (indirizzo e modello; "Verifica connessione"
+    elenca i modelli installati). Con Ollama i testi non escono dalla propria rete, ma servono un
+    modello abbastanza grande e un contesto ampio (<code>OLLAMA_CONTEXT_LENGTH</code> almeno
+    32768 sul server); vengono usate come modello solo le 3 prove più recenti. Senza nessun
+    fornitore, "Copia il prompt per claude.ai" copia la richiesta completa: incollala in
+    claude.ai e importa la risposta con "Importa un compito da un unico file". Vengono inviati
+    solo testi di esercizi e impostazioni del corso, mai dati degli studenti.
+  </p>
+</details>
+
 <details class="card dettaglio-fisarmonica" id="importa-compito">
   <summary>Importare un compito da un unico file</summary>
   <p>
@@ -154,65 +185,11 @@
   </div>
   <pre id="prompt-import" style="white-space:pre-wrap; word-break:break-word; overflow-x:auto; font-size:0.85rem; background:#f1f2f4; padding:0.75rem; border-radius:6px">{% raw %}Converti il compito d'esame che trovi in fondo a questo messaggio in un file di testo per l'importazione in EsaMiX. Rispondi SOLO con il contenuto del file, dentro un unico blocco di codice, senza commenti prima o dopo.
 
-FORMATO DEL FILE
+{% endraw %}{{ formato_esercizi }}{% raw %}
 
-Ogni esercizio inizia con una riga "### ESERCIZIO", seguita da alcune righe "campo: valore" (tutte facoltative):
-  nome: etichetta breve dell'esercizio (es. "Limite notevole", "Rango di una matrice")
-  argomento: argomento del corso (es. "Limiti", "Algebra lineare"); usa lo stesso nome per esercizi dello stesso argomento
-  difficolta: 1, 2 o 3 (1 = facile, 3 = difficile); omettila se non è chiara
-  aperta: sì se è una domanda aperta senza risposte a scelta multipla, altrimenti no
-  obbligatorio: sì solo se il compito indica che l'esercizio va obbligatoriamente svolto per esteso, altrimenti no
-  note: nota interna per il docente (non compare nel compito)
-
-Poi una o più sezioni "### VARIANTE". Ogni variante contiene:
-  - il testo dell'esercizio, anche su più righe;
-  - subito dopo, le risposte a scelta multipla, una per riga: la riga della risposta corretta inizia con "+ " e quelle sbagliate con "- " (segno, spazio, risposta). Esattamente UNA risposta corretta e almeno una sbagliata; la corretta può essere scritta in qualunque posizione, perché l'ordine viene comunque rimescolato per ogni studente.
-  Una domanda aperta non ha righe "+" né "-".
-Se nel compito ci sono più versioni dello stesso esercizio (es. stessi esercizi con numeri diversi in compiti A/B/C), mettile come varianti dello stesso esercizio; altrimenti ogni esercizio ha una sola variante.
-
-Infine, facoltativa, una sezione "### SOLUZIONE" con la soluzione o un suggerimento (anche su più righe), che compare solo nel foglio di riferimento del docente.
-
-REGOLE
-- Scrivi formule e simboli in LaTeX, così come andrebbero in un documento LaTeX: $...$ per le formule in linea, \[ ... \] per quelle in display, \frac, \sqrt, \begin{pmatrix} ecc. Le barre rovesciate vanno scritte una sola volta (non raddoppiarle).
-- Non usare markdown nel testo (niente **grassetto**, niente elenchi con "- " o "* "): per gli elenchi usa \begin{enumerate} \item ... \end{enumerate}, per il grassetto \textbf{...}.
-- Ogni risposta deve stare su una sola riga.
-- Dopo le risposte di una variante non scrivere altro testo: la riga successiva non vuota deve essere un nuovo "### VARIANTE", "### SOLUZIONE" o "### ESERCIZIO".
-- Non inserire numerazioni come "Esercizio 1." nel testo: la numerazione la aggiunge EsaMiX.
+REGOLE PER LA CONVERSIONE
 - Se il compito non riporta le opzioni di risposta di un esercizio a scelta multipla, proponile tu (una corretta, verificata con cura, e tre sbagliate verosimili, tipicamente errori comuni degli studenti) e scrivi nella riga "note": Risposte proposte dall'IA, da verificare.
 - Se la soluzione non è indicata nel compito, ometti la sezione "### SOLUZIONE".
-
-ESEMPIO
-
-### ESERCIZIO
-nome: Limite notevole
-argomento: Limiti
-difficolta: 1
-
-### VARIANTE
-Calcolare $\displaystyle\lim_{x \to 0} \frac{\sin(3x)}{x}$.
-+ $3$
-- $1$
-- $0$
-- $\frac{1}{3}$
-
-### VARIANTE
-Calcolare $\displaystyle\lim_{x \to 0} \frac{\sin(5x)}{x}$.
-+ $5$
-- $1$
-- $0$
-- $\frac{1}{5}$
-
-### SOLUZIONE
-Si scrive $\frac{\sin(kx)}{x} = k\,\frac{\sin(kx)}{kx}$ e si usa il limite notevole.
-
-### ESERCIZIO
-nome: Teorema di Rolle
-argomento: Derivate
-aperta: sì
-obbligatorio: sì
-
-### VARIANTE
-Enunciare e dimostrare il teorema di Rolle.
 
 COMPITO DA CONVERTIRE
 {% endraw %}</pre>

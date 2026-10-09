@@ -1,6 +1,7 @@
 import base64
 import json
 import math
+import os
 import re
 import traceback
 import webbrowser
@@ -31,6 +32,7 @@ from quizesame.services import aggiornamenti as aggiornamenti_service
 from quizesame.services import aule as aule_service
 from quizesame.services import latex as latex_service
 from quizesame.services import presenze as presenze_service
+from quizesame.services import ia as ia_service
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
@@ -305,8 +307,18 @@ async def ripristina_backup_conferma(request: Request):
 
 @app.get("/impostazioni", response_class=HTMLResponse)
 def impostazioni_app(request: Request):
+    imp = app_config_service.get_settings()
+    attivo = ia_service.fornitore()
+    # delle chiavi si mostrano solo le ultime cifre, mai la chiave intera
+    finali = {
+        "anthropic": imp.anthropic_api_key[-4:], "openrouter": imp.openrouter_api_key[-4:],
+    }
     return templates.TemplateResponse(request, "impostazioni_app.html", {
-        "app_settings": app_config_service.get_settings(),
+        "ia_attivo": attivo, "ia_scelto": imp.ia_fornitore or (attivo["id"] if attivo else "anthropic"),
+        "ia_finali": finali, "ia_env": {
+            "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY")), "openrouter": bool(os.environ.get("OPENROUTER_API_KEY")),
+        },
+        "app_settings": imp,
         "numero_corsi": len(corsi_service.list_corsi()),
         "frase_conferma_elimina_tutto": FRASE_CONFERMA_ELIMINA_TUTTO,
     })
@@ -321,6 +333,60 @@ def modifica_impostazioni_app(
         docente=docente.strip(), mostra_riepilogo_home=bool(mostra_riepilogo_home),
     )
     return flash_redirect("/impostazioni", "Impostazioni salvate")
+
+
+@app.post("/impostazioni/ia")
+def salva_impostazioni_ia(
+    fornitore: str = Form("anthropic"), chiave_anthropic: str = Form(""), chiave_openrouter: str = Form(""),
+    ollama_url: str = Form(""), ollama_modello: str = Form(""), ollama_token: str = Form(""),
+    rimuovi: str = Form(""),
+):
+    """Le chiavi lasciate vuote non cambiano (i campi non rimostrano mai quelle salvate);
+    "rimuovi" cancella la chiave del fornitore indicato."""
+    if fornitore not in ia_service.FORNITORI:
+        return flash_redirect("/impostazioni", "Fornitore non valido", "error", anchor="ia")
+    if rimuovi in ("anthropic", "openrouter", "ollama"):
+        campo = {"anthropic": "anthropic_api_key", "openrouter": "openrouter_api_key", "ollama": "ollama_token"}[rimuovi]
+        app_config_service.update_settings(**{campo: ""})
+        return flash_redirect("/impostazioni", "Chiave rimossa", anchor="ia")
+    campi = {"ia_fornitore": fornitore}
+    chiave_anthropic, chiave_openrouter = chiave_anthropic.strip(), chiave_openrouter.strip()
+    if chiave_anthropic:
+        if not chiave_anthropic.startswith("sk-ant-"):
+            return flash_redirect("/impostazioni", "Non sembra una chiave API di Anthropic (inizia con sk-ant-)", "error", anchor="ia")
+        campi["anthropic_api_key"] = chiave_anthropic
+    if chiave_openrouter:
+        if not chiave_openrouter.startswith("sk-or-"):
+            return flash_redirect("/impostazioni", "Non sembra una chiave di OpenRouter (inizia con sk-or-)", "error", anchor="ia")
+        campi["openrouter_api_key"] = chiave_openrouter
+    ollama_url = ollama_url.strip().rstrip("/")
+    if ollama_url and not ollama_url.startswith(("http://", "https://")):
+        ollama_url = "http://" + ollama_url
+    campi.update(ollama_url=ollama_url, ollama_modello=ollama_modello.strip())
+    if ollama_token.strip():
+        campi["ollama_token"] = ollama_token.strip()
+    app_config_service.update_settings(**campi)
+    attivo = ia_service.fornitore()
+    if not attivo:
+        return flash_redirect("/impostazioni", "Impostazioni salvate, ma nessun fornitore è ancora configurato", "warning", anchor="ia")
+    msg = f"Impostazioni salvate: la generazione con l'IA userà {attivo['nome']} ({attivo['modello']})"
+    if attivo["id"] != fornitore:
+        msg += f" — {ia_service.NOMI_FORNITORI[fornitore]} non è ancora configurato del tutto"
+    return flash_redirect("/impostazioni", msg, "success" if attivo["id"] == fornitore else "warning", anchor="ia")
+
+
+@app.post("/impostazioni/ia/modelli-ollama")
+def modelli_ollama(ollama_url: str = Form(""), ollama_token: str = Form("")):
+    """Verifica la connessione al server Ollama ed elenca i modelli installati (usato
+    dal pulsante "Verifica connessione" delle impostazioni)."""
+    url = ollama_url.strip().rstrip("/")
+    if url and not url.startswith(("http://", "https://")):
+        url = "http://" + url
+    token = ollama_token.strip() or app_config_service.get_settings().ollama_token
+    try:
+        return JSONResponse({"modelli": ia_service.modelli_ollama(url, token)})
+    except ValueError as e:
+        return JSONResponse({"errore": str(e)}, status_code=400)
 
 
 @app.post("/impostazioni/controlla-aggiornamenti")
@@ -1287,6 +1353,55 @@ async def importa_esercizi_json_conferma(request: Request, tag: str, appello_id:
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Errore import: {e}", "error", anchor=anchor)
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/ia", response_class=HTMLResponse)
+def pannello_ia(request: Request, tag: str, appello_id: int):
+    """Frammento del pannello "Genera con l'IA" della scheda Testo, caricato solo alla
+    sua apertura: cercare le prove di riferimento legge le banche di più corsi."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    rif = ia_service.riferimenti_precedenti(tag, appello)
+    # proposte iniziali: quanti esercizi e quante varianti aveva la prova più recente
+    ultima = rif["prove"][0]["esercizi"] if rif["prove"] else []
+    n_suggerito = len(ultima) or 10
+    varianti_suggerite = round(sum(len(e.varianti) for e in ultima) / len(ultima)) if ultima else 2
+    return templates.TemplateResponse(request, "_genera_ia.html", {
+        "corso": corsi_service.get_corso(tag), "appello": appello, "riferimenti": rif,
+        "n_suggerito": n_suggerito, "varianti_suggerite": min(max(1, varianti_suggerite), 5),
+        "fornitore_ia": ia_service.fornitore(),
+    })
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/ia/prompt", response_class=PlainTextResponse)
+def prompt_ia(tag: str, appello_id: int, n: int = 10, varianti: int = 2, istruzioni: str = ""):
+    """Lo stesso prompt della generazione, come testo da copiare in claude.ai (per chi
+    non ha una chiave API): la risposta va poi in "Importa un compito da un unico file"."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    prompt = ia_service.costruisci_prompt(tag, appello, max(1, n), max(1, varianti), istruzioni)
+    return prompt["sistema"] + "\n\n" + "=" * 40 + "\n\n" + prompt["richiesta"]
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/ia/genera", response_class=HTMLResponse)
+def genera_ia(
+    request: Request, tag: str, appello_id: int,
+    n: int = Form(10), varianti: int = Form(2), istruzioni: str = Form(""),
+):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
+    try:
+        _proteggi_modifica_esercizi(tag, appello_id)
+        n, varianti = min(max(1, n), 30), min(max(1, varianti), 5)
+        contenuto = ia_service.genera(tag, appello, n, varianti, istruzioni)
+        candidati = esercizi_service.anteprima_importa_json(tag, contenuto)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    if not candidati:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Claude non ha prodotto esercizi", "error", anchor=anchor)
+    # stessa conferma dell'import da file: il docente sceglie quali esercizi tenere
+    return templates.TemplateResponse(request, "esercizi_importa_conferma.html", {
+        "corso": corsi_service.get_corso(tag), "appello": appello, "candidati": candidati,
+        "dati_json": json.dumps(contenuto, ensure_ascii=False), "generati_ia": True,
+    })
 
 
 def _render_correggi_revisione(
@@ -2456,7 +2571,7 @@ def fs_sfoglia(path: str = ""):
 
 @app.get("/help", response_class=HTMLResponse)
 def help_page(request: Request):
-    return templates.TemplateResponse(request, "help.html", {})
+    return templates.TemplateResponse(request, "help.html", {"formato_esercizi": ia_service.FORMATO_ESERCIZI})
 
 
 def _versione_app() -> Optional[str]:
