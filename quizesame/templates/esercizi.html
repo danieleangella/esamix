@@ -9,14 +9,8 @@
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 {% endblock %}
 {% block content %}
-<h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span></h1>
-<div class="tabs">
-  <a href="/corsi/{{ corso.tag }}">Appelli</a>
-  <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
-  <a class="active" href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
-  <a href="/corsi/{{ corso.tag }}/statistiche">Statistiche</a>
-  <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
-</div>
+{% set sezione_corso = "esercizi" %}
+{% include "_intestazione_corso.html" %}
 
 {% if duplicati %}
 <details class="card" open>
@@ -98,7 +92,7 @@
     Per consultare gli esercizi di tutti i corsi insieme: <a href="/esercizi">Tutti gli esercizi →</a></p>
 </div>
 
-<details class="card dettaglio-fisarmonica">
+<details class="card dettaglio-fisarmonica pannello-azione">
   <summary>Nuovo esercizio</summary>
   <div style="margin-top:1rem">
     {% set action = "/corsi/" ~ corso.tag ~ "/esercizi/nuovo" %}
@@ -106,7 +100,7 @@
   </div>
 </details>
 
-<details class="card dettaglio-fisarmonica">
+<details class="card dettaglio-fisarmonica pannello-azione">
   <summary>Importa esercizi da un file</summary>
   {% set action_importa = "/corsi/" ~ corso.tag ~ "/esercizi/importa-json" %}
   {% include "_importa_esercizi_form.html" %}

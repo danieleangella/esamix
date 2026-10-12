@@ -4,16 +4,8 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <span class="current">Impostazioni</span>
 {% endblock %}
 {% block content %}
-<h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span>
-  {% if corso.importato_da_legacy %}<span class="badge badge-warn" title="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
-</h1>
-<div class="tabs">
-  <a href="/corsi/{{ corso.tag }}">Appelli</a>
-  <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
-  <a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
-  <a href="/corsi/{{ corso.tag }}/statistiche">Statistiche</a>
-  <a class="active" href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
-</div>
+{% set sezione_corso = "impostazioni" %}
+{% include "_intestazione_corso.html" %}
 
 <form method="post" action="/corsi/{{ corso.tag }}/impostazioni" id="form-impostazioni-corso">
 
@@ -26,7 +18,6 @@
       <div><label>Anno accademico</label><input name="anno" value="{{ corso.anno }}"></div>
       <div><label>Docente</label><input name="docente" value="{{ corso.docente }}"></div>
     </div>
-    <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </details>
 
   <details class="card" open>
@@ -58,7 +49,6 @@
           aperta (senza risposta a scelta multipla): può essere maggiore dei punti di una risposta corretta.</p>
       </div>
     </div>
-    <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </details>
 
   <details class="card">
@@ -96,7 +86,6 @@
         </div>
       </div>
     </div>
-    <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </details>
 
   <details class="card" {% if not corso.domande_esame_lista %}open{% endif %}>
@@ -113,7 +102,6 @@
       {% endfor %}
     </div>
     <button type="button" class="secondary" id="btn-aggiungi-domanda" style="margin-top:0.5rem">+ Aggiungi domanda d'esame</button>
-    <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </details>
 
   <details class="card">
@@ -122,17 +110,26 @@
       I placeholder tra parentesi graffe (vedi sopra) vengono sostituiti con i valori
       effettivi di ciascun appello al momento della generazione del testo.
     </p>
-    <label>Frase sugli esercizi obbligatori</label>
+    <label>Frase sulla consegna (in testa al compito e nelle regole)</label>
     <textarea name="frase_consegna" id="frase-consegna" rows="2">{{ corso.frase_consegna }}</textarea>
     <button type="button" class="secondary btn-reset-default" data-target="frase-consegna" data-default-tpl="tpl-default-frase-consegna">Reimposta default</button>
     <template id="tpl-default-frase-consegna">{{ default_frase_consegna }}</template>
+
+    <label style="margin-top:0.75rem">Frase sugli esercizi obbligatori (in grassetto prima del testo di ciascuno)</label>
+    <textarea name="frase_obbligatorio" id="frase-obbligatorio" rows="2">{{ corso.frase_obbligatorio }}</textarea>
+    <button type="button" class="secondary btn-reset-default" data-target="frase-obbligatorio" data-default-tpl="tpl-default-frase-obbligatorio">Reimposta default</button>
+    <template id="tpl-default-frase-obbligatorio">{{ default_frase_obbligatorio }}</template>
 
     <label style="margin-top:0.75rem">Frase di valutazione (punteggi e voto minimo)</label>
     <textarea name="frase_regole" id="frase-regole" rows="3">{{ corso.frase_regole }}</textarea>
     <button type="button" class="secondary btn-reset-default" data-target="frase-regole" data-default-tpl="tpl-default-frase-regole">Reimposta default</button>
     <template id="tpl-default-frase-regole">{{ default_frase_regole }}</template>
-    <button type="submit" form="form-impostazioni-corso" style="margin-top:1rem">Salva</button>
   </details>
+
+  <div class="barra-salva">
+    <button type="submit" style="margin-top:0">Salva tutte le impostazioni</button>
+    <span class="muted stato-impostazioni">Salva insieme le modifiche di tutte le sezioni qui sopra.</span>
+  </div>
 </form>
 
 <details class="card" style="margin-top:2rem">
@@ -203,6 +200,27 @@
     elenco.appendChild(nuova);
     collegaRimuovi(nuova);
     nuova.querySelector("textarea").focus();
+  });
+})();
+
+(function () {
+  // un solo pulsante salva tutte le sezioni: segnala quando ci sono modifiche non salvate
+  var form = document.getElementById("form-impostazioni-corso");
+  var barra = form.querySelector(".barra-salva");
+  var stato = barra.querySelector(".stato-impostazioni");
+  var inviato = false;
+  function segnaModificato() {
+    barra.classList.add("modificata");
+    stato.textContent = "Ci sono modifiche non salvate.";
+  }
+  form.addEventListener("input", segnaModificato);
+  form.addEventListener("change", segnaModificato);
+  form.addEventListener("click", function (ev) {
+    if (ev.target.closest(".btn-reset-default, .btn-rimuovi-domanda, #btn-aggiungi-domanda")) segnaModificato();
+  });
+  form.addEventListener("submit", function () { inviato = true; });
+  window.addEventListener("beforeunload", function (ev) {
+    if (barra.classList.contains("modificata") && !inviato) { ev.preventDefault(); ev.returnValue = ""; }
   });
 })();
 

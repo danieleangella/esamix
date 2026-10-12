@@ -186,6 +186,7 @@ def _crea_contesto(corso, appello) -> LatexContext:
         consegna=corsi_service.effective_consegna(corso, appello), votomin=corsi_service.effective_votomin(corso, appello),
         risposta_corretta=corso.risposta_corretta, risposta_sbagliata=corso.risposta_sbagliata,
         risposta_vuota=corso.risposta_vuota, frase_consegna=corso.frase_consegna, frase_regole=corso.frase_regole,
+        frase_obbligatorio=corso.frase_obbligatorio,
     )
 
 

@@ -14,6 +14,7 @@ def ctx_for(tag: str, corso, appello) -> LatexContext:
         consegna=corsi_service.effective_consegna(corso, appello), votomin=corsi_service.effective_votomin(corso, appello),
         risposta_corretta=corso.risposta_corretta, risposta_sbagliata=corso.risposta_sbagliata,
         risposta_vuota=corso.risposta_vuota, frase_consegna=corso.frase_consegna, frase_regole=corso.frase_regole,
+        frase_obbligatorio=corso.frase_obbligatorio,
         orale_data=appello.orale_data or "", orale_ora=appello.orale_ora or "", orale_aula=appello.orale_aula or "",
     )
 

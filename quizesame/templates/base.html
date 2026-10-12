@@ -177,11 +177,16 @@
 <body>
   <a href="#contenuto" class="salta-al-contenuto">Salta al contenuto</a>
   {% set docente_globale = get_app_settings().docente %}
-  <header class="topbar">
-    <span>
-      <a class="brand" href="/">EsaMiX</a>
+  <header class="topbar" id="topbar">
+    <span class="topbar-marchio">
+      <a class="brand" href="/"><img src="/static/favicon.svg" alt="" width="22" height="22"> EsaMiX</a>
       {% if docente_globale %}<span class="brand-docente">({{ docente_globale }})</span>{% endif %}
     </span>
+    {# su schermi stretti il menu si apre da questo pulsante (vedi style.css) #}
+    <button type="button" class="menu-toggle" aria-expanded="false" aria-controls="menu-principale"
+            onclick="var h=document.getElementById('topbar'); var a=h.classList.toggle('menu-aperto'); this.setAttribute('aria-expanded', a);">
+      <span aria-hidden="true">☰</span> Menu
+    </button>
     {% set path = request.url.path %}
     {# la migrazione dati legacy (operazione una tantum) è raggiungibile da Impostazioni #}
     {% set voci_menu = [
@@ -191,7 +196,7 @@
       ('/help', 'Guida', path == '/help'),
       ('/about', 'Informazioni', path == '/about'),
     ] %}
-    <nav aria-label="Menu principale">
+    <nav aria-label="Menu principale" id="menu-principale">
       {% for url, etichetta, attiva in voci_menu %}
       <a href="{{ url }}" {% if attiva %}class="active" aria-current="page"{% endif %}>{{ etichetta }}</a>
       {% endfor %}

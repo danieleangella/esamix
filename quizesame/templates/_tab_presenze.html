@@ -5,8 +5,8 @@
   </div>
   {% else %}
   {% set riepilogo = md.riepilogo_presenze %}
-  <details class="card" open>
-    <summary><strong>Presenze</strong></summary>
+  <details class="card sezione-flusso" data-sezione="presenze-{{ md.appello.id }}" data-fatta="{{ 1 if md.appello.presenze_chiuse else 0 }}"{% if not md.appello.presenze_chiuse %} open{% endif %}>
+    <summary><strong>Presenze</strong>{% if md.appello.presenze_chiuse %} <span class="badge badge-ok">✓ completato</span> <span class="muted">— registro chiuso</span>{% endif %}</summary>
     {% if riepilogo is none %}
     <p class="muted" style="margin-top:0.75rem">
       Nessun elenco iscritti caricato per questo appello: carica il file della segreteria, oppure aggiungi gli
@@ -71,7 +71,7 @@
         <td>{{ s.cognome }}</td>
         <td>{{ s.nome }}</td>
         <td>
-          {% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>DSA</span>{% endif %}
+          {% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}
           {% if not s.registrato %}
           <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" class="inline">
             <input type="hidden" name="matricola" value="{{ s.matricola }}">

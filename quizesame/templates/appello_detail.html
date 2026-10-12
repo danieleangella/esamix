@@ -9,7 +9,12 @@
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 {% endblock %}
 {% block content %}
-<h1>{{ corso.nome }} - {{ appello.nome }}</h1>
+<header class="intestazione-pagina">
+  <div class="intestazione-livello">{{ 'Raggruppamento di prove' if raggruppamento else 'Appello' }} ·
+    <a href="/corsi/{{ corso.tag }}">{{ corso.nome }} ({{ corso.anno }})</a></div>
+  <h1>{{ appello.nome }}{% if appello.data %} <span class="muted">· {{ appello.data }}</span>{% endif %}
+    {% if appello.chiuso %}<span class="badge">chiuso</span>{% endif %}</h1>
+</header>
 
 {% if appello.chiuso %}
 <div class="flash flash-warning">Questo appello è chiuso: non sono più possibili modifiche. Puoi riaprirlo dalla scheda Impostazioni.</div>
@@ -220,6 +225,7 @@
   "riepilogo_presenze": riepilogo_presenze,
   "bozze_correzione": bozze_correzione, "non_valutati": non_valutati,
   "risultati_tex_esiste": risultati_tex_esiste, "risultati_pdf_esiste": risultati_pdf_esiste,
+  "riepilogo_home": riepilogo_home, "esclusi_filtro": esclusi_filtro,
 } %}
 {% set pane_suffix = "" %}
 {% include "_tab_creazione.html" %}
@@ -547,8 +553,19 @@ document.querySelectorAll(".btn-mostra-testo").forEach(function (btn) {
       var selezionata = t.dataset.tab === nome;
       t.classList.toggle("active", selezionata);
       if (selezionata) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
+      // su schermi stretti il percorso scorre in orizzontale: porta in vista la fase aperta
+      if (selezionata && t.closest(".percorso")) {
+        var striscia = t.closest(".percorso-passi");
+        if (striscia && striscia.scrollWidth > striscia.clientWidth) {
+          striscia.scrollLeft = t.parentElement.offsetLeft - (striscia.clientWidth - t.parentElement.offsetWidth) / 2;
+        }
+      }
     });
     panes.forEach(function (p) { p.style.display = (p.dataset.pane === nome) ? "" : "none"; });
+    // il riquadro "Prossimo passo" serve a portare alla scheda giusta: se è già aperta, sparisce
+    document.querySelectorAll(".prossimo-passo[data-scheda]").forEach(function (b) {
+      b.hidden = b.dataset.scheda === nome;
+    });
     // riporta subito il cursore sul campo matricola: con centinaia di studenti da
     // correggere in fila, non dover ricliccare ogni volta sul campo fa risparmiare
     // un bel po' di movimenti ripetuti.

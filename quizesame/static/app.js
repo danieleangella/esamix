@@ -197,3 +197,33 @@ function attivaPannelloIA(radice) {
       });
   });
 }
+
+// Sezioni del flusso di lavoro di un appello (<details class="sezione-flusso">): il
+// template le apre se la fase è ancora da fare e le richiude se è completata, così
+// risaltano i passaggi che mancano. Se il docente apre o chiude a mano una sezione, la
+// scelta resta per la sessione (anche dopo i ricaricamenti dovuti alle azioni) finché la
+// fase non cambia stato: la chiave include data-fatta, quindi quando una fase viene
+// completata la sezione torna a richiudersi da sola.
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll("details.sezione-flusso[data-sezione]").forEach(function (d) {
+    var chiave = "sezione-flusso:" + location.pathname + ":" + d.dataset.sezione + ":" + d.dataset.fatta;
+    try {
+      var salvato = sessionStorage.getItem(chiave);
+      if (salvato !== null) d.open = salvato === "1";
+    } catch (e) { /* storage non disponibile: resta lo stato predefinito */ }
+    d.addEventListener("toggle", function () {
+      try { sessionStorage.setItem(chiave, d.open ? "1" : "0"); } catch (e) { /* ignorato */ }
+    });
+  });
+});
+
+// Barre di schede che scorrono in orizzontale (schermi stretti): all'apertura della
+// pagina porta in vista la scheda attiva, che altrimenti potrebbe restare fuori schermo.
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll(".schede-sezione").forEach(function (barra) {
+    var attiva = barra.querySelector("a.active");
+    if (attiva && barra.scrollWidth > barra.clientWidth) {
+      barra.scrollLeft = attiva.offsetLeft - (barra.clientWidth - attiva.offsetWidth) / 2;
+    }
+  });
+});

@@ -30,6 +30,29 @@
 <form method="post" action="{{ '/corsi/' ~ corso.tag ~ '/appelli/' ~ appello.id ~ '/esercizi/importa-json/conferma' if appello else '/corsi/' ~ corso.tag ~ '/esercizi/importa-json/conferma' }}">
   <textarea name="dati_json" style="display:none">{{ dati_json }}</textarea>
 
+  {% if appello and esercizi_compito %}
+  {% set ids_compito = esercizi_compito|map(attribute="id")|list %}
+  <div class="card">
+    <strong>Il compito contiene già {{ esercizi_compito|length }} esercizi.</strong> Cosa ne faccio?
+    <label style="display:flex; gap:0.5rem; align-items:flex-start; font-weight:normal; margin-top:0.5rem; cursor:pointer">
+      <input type="radio" name="modalita" value="aggiungi" checked style="width:auto; margin-top:0.25rem">
+      <span>Li tengo: aggiungo i nuovi esercizi a quelli già presenti</span>
+    </label>
+    <label style="display:flex; gap:0.5rem; align-items:flex-start; font-weight:normal; cursor:pointer">
+      <input type="radio" name="modalita" value="sostituisci" style="width:auto; margin-top:0.25rem">
+      <span>Li sostituisco con i nuovi, ma restano nella banca dati del corso (riusabili in altri appelli)</span>
+    </label>
+    <label style="display:flex; gap:0.5rem; align-items:flex-start; font-weight:normal; cursor:pointer">
+      <input type="radio" name="modalita" value="sostituisci_elimina" style="width:auto; margin-top:0.25rem">
+      <span>Li sostituisco con i nuovi e li elimino anche dalla banca dati del corso
+        <span class="muted">(tranne quelli usati da altri appelli, che restano)</span></span>
+    </label>
+    <p class="muted" style="margin:0.4rem 0 0">
+      Sostituendo, un esercizio del file identico a uno già nel compito non viene duplicato: resta quello esistente.
+    </p>
+  </div>
+  {% endif %}
+
   <p style="margin-top:0">
     <button type="button" id="btn-seleziona-tutti-esercizi" class="secondary" style="margin-top:0">Seleziona tutti (importa tutto)</button>
     <button type="button" id="btn-deseleziona-tutti-esercizi" class="secondary" style="margin-top:0">Deseleziona tutti</button>
@@ -40,6 +63,7 @@
     <div style="padding:0.75rem 0; {% if not loop.first %}border-top:1px solid var(--border);{% endif %}">
       <label style="display:flex; align-items:flex-start; gap:0.6rem; cursor:pointer">
         <input type="checkbox" name="importa_idx" value="{{ loop.index0 }}" class="campo-esercizio-incluso" style="width:auto; margin-top:0.25rem"
+               {% if ids_compito and c.duplicato_id in ids_compito %}data-nel-compito="1"{% endif %}
                {% if not c.duplicato_di %}checked{% endif %}>
         <span>
           <strong>{{ c.nome or ('Esercizio ' ~ loop.index) }}</strong>
@@ -48,7 +72,7 @@
           <br>
           <span class="muted">{{ c.varianti|length }} variante/i</span>
           {% if c.duplicato_di %}
-          <br><span class="badge badge-warn">esiste già nella banca del corso, come "{{ c.duplicato_di }}"</span>
+          <br><span class="badge badge-warn">esiste già {% if ids_compito and c.duplicato_id in ids_compito %}in questo compito{% else %}nella banca del corso{% endif %}, come "{{ c.duplicato_di }}"</span>
           {% endif %}
           <br>
           <span class="muted" style="white-space:pre-wrap">{{ (c.varianti[0].testo if c.varianti else '')[:150] }}{% if c.varianti and c.varianti[0].testo|length > 150 %}…{% endif %}</span>
@@ -91,6 +115,14 @@
   });
   document.getElementById("btn-deseleziona-tutti-esercizi").addEventListener("click", function () {
     campi.forEach(function (c) { c.checked = false; });
+  });
+  // sostituendo il compito, gli esercizi del file già presenti nel compito vanno tenuti:
+  // selezionati, restano (senza doppione); deselezionati, verrebbero tolti
+  document.querySelectorAll('input[name="modalita"]').forEach(function (r) {
+    r.addEventListener("change", function () {
+      if (r.value === "aggiungi") return;
+      document.querySelectorAll('.campo-esercizio-incluso[data-nel-compito]').forEach(function (c) { c.checked = true; });
+    });
   });
 })();
 </script>

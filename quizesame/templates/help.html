@@ -118,7 +118,12 @@
     con tutti gli esercizi del compito, tutte le loro varianti, la risposta corretta segnata e
     la soluzione/suggerimento: si può generare in qualunque momento, anche prima dei blocchi,
     e non crea codici. Ha margini ampi (soprattutto a destra) per annotare a mano le
-    correzioni sul foglio stampato.
+    correzioni sul foglio stampato. Sotto ogni esercizio c'è un riquadro
+    <em>Revisione</em> con le caselle "corretta" / "da correggere" per ogni variante e per la
+    soluzione e uno spazio per le note sulle correzioni; in fondo, una pagina per le note
+    generali. Il PDF è compilabile: caselle e note si riempiono nel lettore PDF (es.
+    Firefox, Okular o Acrobat) e si salvano con il file, oppure a mano sul foglio stampato.
+    Ogni nuova anteprima riparte vuota.
   </p>
   <p>
     Cliccando sul nome di un esercizio (nella banca del corso, o tra gli esercizi
@@ -170,7 +175,9 @@
     dalla banca <strong>Esercizi</strong> del corso. Si può caricare il file
     (<code>.txt</code>) o incollarne direttamente il contenuto nella casella di testo.
     Prima di creare qualcosa compare sempre l'elenco degli esercizi letti, per scegliere
-    quali importare.
+    quali importare. Se il compito contiene già degli esercizi, si sceglie anche se
+    aggiungere i nuovi a quelli presenti oppure sostituirli, e in questo caso se i vecchi
+    restano nella banca dati del corso o vengono eliminati anche da lì.
   </p>
   <p>
     Il modo più rapido per preparare il file è darlo da fare a un'IA (Claude, ChatGPT…):
@@ -252,12 +259,14 @@ COMPITO DA CONVERTIRE
   <summary>Iscritti e generazione dei compiti</summary>
   <p>
     Nella scheda <strong>Compiti d'esame</strong> si indicano gli iscritti a un appello,
-    in uno di tre modi: caricando una volta sola il file "Lista Studenti Esame" scaricato
+    in uno di questi modi: caricando una volta sola il file "Lista Studenti Esame" scaricato
     dalla segreteria (da cui si ricava anche l'elenco per fare l'appello e, più avanti, il
-    file compilato da restituire), aggiungendoli singolarmente a mano per nome o
-    matricola (dietro una tendina apribile), oppure — più rapidamente ma senza un elenco
-    nominale — indicando solo un numero. Il file della segreteria, quando caricato, ha
-    sempre la precedenza sugli altri due.
+    file compilato da restituire), importando le prenotazioni esportate da Moodle
+    (l'<em>ID number</em> è usato come matricola, chi non è ancora nel corso viene
+    registrato; l'icona "?" accanto al campo spiega come ottenere il file), aggiungendoli
+    singolarmente a mano per nome o matricola (dietro una tendina apribile), oppure — più
+    rapidamente ma senza un elenco nominale — indicando solo un numero. Il file della
+    segreteria, quando caricato, ha sempre la precedenza sugli altri.
   </p>
   <p>
     Per ammettere l'intero corso senza un file, "Ammetti tutti gli studenti del corso"
@@ -265,7 +274,10 @@ COMPITO DA CONVERTIRE
     matricola maggiore o uguale a una soglia). Con "Filtra gli iscritti per matricola" si
     tengono solo le matricole da una certa soglia in su, sia dal file sia dall'elenco a mano
     (es. per una prova riservata al primo anno): il file restituito alla segreteria resta
-    comunque intero.
+    comunque intero. Sotto il filtro compare l'elenco degli iscritti esclusi, con
+    l'indicazione DSA/L104: per ciascuno si conferma l'esclusione oppure lo si ammette
+    comunque come eccezione (con una conferma esplicita). Finché non si decide restano
+    esclusi, e la sezione segnala quanti sono ancora da confermare.
   </p>
   <p>
     Quando è stato indicato un elenco nominale (file o aggiunta a mano), correggere o
@@ -482,11 +494,14 @@ COMPITO DA CONVERTIRE
     quel corso, per non perdere dati.
   </p>
   <p>
-    Uno studente può essere segnalato come <strong>DSA</strong> (checkbox nel form di
-    aggiunta/modifica): compare come indicazione nell'elenco studenti e, cliccando
-    sull'intestazione "DSA" della tabella, si filtra l'elenco ai soli studenti DSA. La
-    stessa indicazione compare anche nell'elenco ammessi di una prova parziale (vedi
-    Raggruppamenti).
+    Uno studente può essere segnalato come <strong>DSA</strong> (disturbi specifici
+    dell'apprendimento, L. 170/2010) o <strong>L104</strong> (disabilità, L. 104/1992),
+    scegliendo dal menu nel form di aggiunta/modifica, con una nota facoltativa (es. tempo
+    aggiuntivo): compare come indicazione nell'elenco studenti e, cliccando
+    sull'intestazione "DSA/L104" della tabella, si filtra l'elenco ai soli studenti con
+    una delle due indicazioni. La stessa indicazione compare anche nel registro presenze,
+    nell'elenco ammessi di una prova parziale (vedi Raggruppamenti) e tra gli esclusi dal
+    filtro sulla matricola.
   </p>
   <p>
     Nello storico di uno studente (dentro un corso, o nel riepilogo che aggrega tutti i

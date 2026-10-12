@@ -4,16 +4,8 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <span class="current">{{ corso.nome }}</span> <span class="muted">({{ corso.anno }})</span>
 {% endblock %}
 {% block content %}
-<h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span>
-  {% if corso.importato_da_legacy %}<span class="badge badge-warn" title="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
-</h1>
-<div class="tabs">
-  <a class="active" href="/corsi/{{ corso.tag }}">Appelli</a>
-  <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
-  <a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
-  <a href="/corsi/{{ corso.tag }}/statistiche">Statistiche</a>
-  <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
-</div>
+{% set sezione_corso = "appelli" %}
+{% include "_intestazione_corso.html" %}
 
 <details class="card" open>
   <summary><strong>Appelli</strong></summary>
@@ -85,7 +77,7 @@
   {% endif %}
 </details>
 
-<details class="card dettaglio-fisarmonica" {% if not appelli and not raggruppamenti %}open{% endif %}>
+<details class="card dettaglio-fisarmonica pannello-azione" {% if not appelli and not raggruppamenti %}open{% endif %}>
   <summary>Nuovo appello</summary>
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/nuovo" style="margin-top:1rem">
     <div class="form-grid">
@@ -103,7 +95,7 @@
 </details>
 
 {% if appelli|length >= 2 %}
-<details class="card dettaglio-fisarmonica">
+<details class="card dettaglio-fisarmonica pannello-azione">
   <summary>Nuovo raggruppamento (es. media di prove parziali)</summary>
   <p class="muted" style="margin-top:1rem">
     Un raggruppamento calcola la media dei voti di più appelli come voto finale unico,

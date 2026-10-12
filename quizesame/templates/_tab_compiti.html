@@ -6,8 +6,9 @@
 </div>
 {% endif %}
 
-<details class="card" open>
-  <summary><strong>Iscritti{% if md.numero_iscritti is not none %} ({{ md.numero_iscritti }}){% endif %}</strong></summary>
+{% set iscritti_fatti = md.numero_iscritti is not none %}
+<details class="card sezione-flusso" data-sezione="iscritti-{{ md.appello.id }}" data-fatta="{{ 1 if iscritti_fatti else 0 }}"{% if not iscritti_fatti %} open{% endif %}>
+  <summary><strong>Iscritti{% if md.numero_iscritti is not none %} ({{ md.numero_iscritti }}){% endif %}</strong>{% if iscritti_fatti %} <span class="badge badge-ok">✓ completato</span>{% endif %}</summary>
   {% if md.segreteria_csv %}
   <p class="muted" style="margin-top:0.75rem">
     File caricato: <strong>{{ md.segreteria_csv.nome_file }}</strong> (il {{ md.segreteria_csv.caricato_il }}) —
@@ -61,6 +62,32 @@
     uno (usato per l'elenco stampabile e per il numero suggerito di compiti da generare qui sotto).
   </p>
   {% if not md.appello.chiuso %}
+  <details class="dettaglio-fisarmonica" style="margin-top:0.5rem">
+    <summary>Importa le prenotazioni da Moodle</summary>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-moodle" enctype="multipart/form-data" style="margin-top:0.75rem">
+      <label style="display:flex; align-items:center; gap:0.4rem">
+        File delle prenotazioni esportato da Moodle (.csv, .xlsx)
+        <span class="aiuto" tabindex="0" role="button" aria-label="Come esportare il file da Moodle" aria-describedby="aiuto-moodle-{{ md.appello.id }}">?
+          <span class="aiuto-testo" role="tooltip" id="aiuto-moodle-{{ md.appello.id }}">
+            <strong>Come ottenere il file da Moodle</strong>
+            <ol>
+              <li>Apri su Moodle l'attività con cui gli studenti si prenotano alla prova (es. "Iscrizione primo parziale").</li>
+              <li>Vai all'elenco delle prenotazioni / dei partecipanti dell'attività.</li>
+              <li>Usa <em>Scarica</em> (o <em>Esporta</em>) e scegli il formato <em>CSV</em> (va bene anche Excel).</li>
+              <li>Carica qui il file così com'è.</li>
+            </ol>
+            Il file deve avere le colonne <em>ID number</em> (la matricola), <em>First name</em> e
+            <em>Last name</em> (o le corrispondenti italiane <em>Codice identificativo</em>, <em>Nome</em>,
+            <em>Cognome</em>). Se manca la colonna <em>ID number</em>, va attivata tra i campi
+            identificativi mostrati da Moodle (chiedi all'amministratore della piattaforma).
+            Prima di importare vedrai l'elenco, per scegliere chi aggiungere.
+          </span>
+        </span>
+      </label>
+      <input type="file" name="file" accept=".csv,.xlsx,.xls,text/csv" required>
+      <button type="submit" class="secondary">Carica e controlla</button>
+    </form>
+  </details>
   <details class="dettaglio-fisarmonica" style="margin-top:0.5rem" {% if not md.iscritti_manuali %}open{% endif %}>
     <summary>Aggiungi iscritti manualmente{% if md.iscritti_manuali %} ({{ md.iscritti_manuali|length }}){% endif %}</summary>
     {% if md.iscritti_manuali %}
@@ -138,8 +165,10 @@
     </form>
   </details>
   {% endif %}
+  {% set da_confermare = md.esclusi_filtro|selectattr("decisione", "none")|list %}
   <details class="dettaglio-fisarmonica" style="margin-top:0.75rem" {% if md.appello.matricola_minima_iscritti %}open{% endif %}>
-    <summary>Filtra gli iscritti per matricola{% if md.appello.matricola_minima_iscritti %} (attivo: &ge; {{ md.appello.matricola_minima_iscritti }}){% endif %}</summary>
+    <summary>Filtra gli iscritti per matricola{% if md.appello.matricola_minima_iscritti %} (attivo: &ge; {{ md.appello.matricola_minima_iscritti }}){% endif %}
+      {% if da_confermare %}<span class="badge badge-warn">{{ da_confermare|length }} esclusi da confermare</span>{% endif %}</summary>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-filtro" style="margin-top:1rem">
       <div class="form-grid">
         <div><label>Ammetti solo matricole &ge;</label>
@@ -150,6 +179,64 @@
         essere corretto (ad es. per una prova riservata al primo anno). Il file restituito alla segreteria resta intero.</p>
       <button type="submit" class="secondary">Salva filtro</button>
     </form>
+    {% if md.esclusi_filtro %}
+    <h3 style="margin:1rem 0 0.25rem">Iscritti esclusi dal filtro ({{ md.esclusi_filtro|length }})</h3>
+    <p class="muted" style="margin-top:0">
+      Hanno una matricola inferiore a {{ md.appello.matricola_minima_iscritti }}: conferma l'esclusione per ciascuno,
+      oppure ammettilo comunque come eccezione (es. studenti DSA o con disabilità L104, o casi particolari).
+      Finché non decidi restano esclusi.
+    </p>
+    <table>
+      <thead><tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Decisione</th><th></th></tr></thead>
+      {% for s in md.esclusi_filtro %}
+      <tr>
+        <td>{{ s.matricola }}</td>
+        <td>{{ s.cognome }}</td>
+        <td>{{ s.nome }}</td>
+        <td>{% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% if s.dsa_note %} <span class="muted">{{ s.dsa_note }}</span>{% endif %}{% endif %}</td>
+        <td>
+          {% if s.decisione == 'ammesso' %}<span class="badge badge-ok">ammesso in deroga</span>
+          {% elif s.decisione == 'escluso' %}<span class="badge">esclusione confermata</span>
+          {% else %}<span class="badge badge-warn">da confermare</span>{% endif %}
+        </td>
+        <td style="white-space:nowrap">
+          {% if not md.appello.chiuso %}
+          {% set url_decisione = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/iscritti-filtro/" ~ s.matricola %}
+          {% if s.decisione != 'ammesso' %}
+          <form class="inline form-eccezione-filtro" method="post" action="{{ url_decisione }}"
+                data-conferma="{{ 'Ammettere comunque ' ~ s.cognome ~ ' ' ~ s.nome ~ ' (' ~ s.matricola ~ ')' ~ (' — ' ~ (s.dsa_tipo or 'DSA') if s.dsa else '') ~ ' in deroga al filtro sulla matricola?' }}">
+            <input type="hidden" name="decisione" value="ammesso">
+            <button type="submit" style="margin-top:0">Ammetti comunque</button>
+          </form>
+          {% endif %}
+          {% if s.decisione != 'escluso' %}
+          <form class="inline" method="post" action="{{ url_decisione }}">
+            <input type="hidden" name="decisione" value="escluso">
+            <button type="submit" class="secondary" style="margin-top:0">Conferma esclusione</button>
+          </form>
+          {% endif %}
+          {% if s.decisione %}
+          <form class="inline" method="post" action="{{ url_decisione }}">
+            <input type="hidden" name="decisione" value="">
+            <button type="submit" class="link-simile" style="margin-top:0">annulla</button>
+          </form>
+          {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <script>
+    (function () {
+      // ammettere in deroga va confermato esplicitamente, studente per studente
+      document.currentScript.closest("details").querySelectorAll(".form-eccezione-filtro").forEach(function (form) {
+        form.addEventListener("submit", function (ev) {
+          if (!window.confirm(form.dataset.conferma)) ev.preventDefault();
+        });
+      });
+    })();
+    </script>
+    {% endif %}
   </details>
   <details class="dettaglio-fisarmonica" style="margin-top:0.75rem" {% if not md.segreteria_csv %}open{% endif %}>
     <summary>{{ 'Aggiorna' if md.segreteria_csv else 'Carica' }} il file della segreteria ("Lista Studenti Esame")</summary>
@@ -167,8 +254,9 @@
   {% endif %}
 </details>
 
-<details class="card" open>
-  <summary><strong>Crea compiti</strong></summary>
+{% set fase = md.riepilogo_home.fasi|selectattr("scheda", "equalto", "compiti")|first %}
+<details class="card sezione-flusso" data-sezione="compiti-{{ md.appello.id }}" data-fatta="{{ 1 if fase.fatta else 0 }}"{% if not fase.fatta %} open{% endif %}>
+  <summary><strong>Crea compiti</strong>{% if fase.fatta %} <span class="badge badge-ok">✓ completato</span> <span class="muted">— {{ fase.dettaglio }}</span>{% endif %}</summary>
   {% if md.avviso_pochi_compiti %}
   <div class="flash flash-warning" style="margin-bottom:1rem">
     Attenzione: sono stati generati {{ md.compiti|length }} compiti in totale, ma risultano
@@ -279,13 +367,13 @@
       Scarica anche in <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi.csv">.csv</a>
     </p>
     <table>
-      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA</th><th>Aula</th><th></th></tr>
+      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Aula</th><th></th></tr>
       {% for s in md.ammessi %}
       <tr>
         <td>{{ s.matricola }}</td>
         <td>{{ s.cognome }}</td>
         <td>{{ s.nome }}</td>
-        <td>{% if s.dsa %}<span class="badge badge-info">DSA</span>{% endif %}</td>
+        <td>{% if s.dsa %}<span class="badge badge-info">{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
         <td>
           {% if md.aule %}
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/{{ s.matricola }}/assegna-manuale">

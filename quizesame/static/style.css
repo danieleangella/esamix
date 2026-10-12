@@ -1,31 +1,46 @@
 :root {
-  --bg: #f7f7f9;
+  --bg: #f4f5f8;
   --panel: #ffffff;
   --text: #1f2430;
   --muted: #6b7280;
   --border: #e2e4e9;
+  --border-strong: #cfd3db;
   --accent: #2563eb;
+  --accent-soft: #eff4ff;
+  --accent-border: #c7d7fe;
   --ok-bg: #e8f7ee; --ok-text: #166534;
   --err-bg: #fdecec; --err-text: #991b1b;
+  --radius: 10px;
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   margin: 0;
   font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
 }
 
+/* --- Struttura della pagina: barra superiore (app), briciole (dove sono), intestazione
+   (livello + titolo), schede della sezione, contenuto ------------------------------- */
 .topbar {
+  position: sticky; top: 0; z-index: 50;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1.5rem;
+  gap: 0.75rem;
+  padding: 0.6rem 1.5rem;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
 }
-.topbar .brand { font-weight: 600; text-decoration: none; color: var(--text); font-size: 1rem; line-height: 1; }
+.topbar .brand {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  font-weight: 700; text-decoration: none; color: var(--text); font-size: 1.05rem; line-height: 1;
+}
+.menu-toggle { display: none; }
 .topbar .brand-docente { color: var(--muted); font-size: 0.85rem; margin-left: 0.4rem; }
 .topbar nav { display: flex; align-items: center; gap: 0.1rem; line-height: 1; }
 .topbar nav a {
@@ -35,20 +50,41 @@ body {
 .topbar nav a:hover { background: var(--bg); color: var(--text); }
 .topbar nav a.active { background: var(--accent); color: #fff; }
 
-.container { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
+.container { max-width: 1000px; margin: 0 auto; padding: 1.25rem 1.5rem 2.5rem; }
 
 .breadcrumb-bar { background: var(--panel); border-bottom: 1px solid var(--border); }
 .breadcrumb {
   /* stessa indentazione della topbar (niente centratura a 960px): così il testo parte
      esattamente sotto il titolo "EsaMiX", non sotto il centro della colonna dei contenuti */
-  padding: 0.45rem 1.5rem;
-  font-size: 0.78rem; color: #9ca3af;
+  padding: 0.5rem 1.5rem;
+  font-size: 0.85rem; color: var(--muted);
   display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
 }
-.breadcrumb a { color: #9ca3af; text-decoration: none; }
-.breadcrumb a:hover { color: var(--text); text-decoration: underline; }
-.breadcrumb .sep { color: var(--border); }
-.breadcrumb .current { color: var(--muted); font-weight: 600; }
+.breadcrumb a { color: var(--accent); text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+.breadcrumb .sep { color: var(--border-strong); }
+.breadcrumb .current { color: var(--text); font-weight: 600; }
+
+/* intestazione di pagina: su quale livello si è (Corso, Appello...) e il titolo */
+.intestazione-pagina { margin: 0.25rem 0 1rem; }
+.intestazione-pagina h1 { margin: 0.1rem 0 0; line-height: 1.2; }
+.intestazione-livello {
+  font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent);
+}
+.intestazione-livello a { color: var(--muted); text-decoration: none; text-transform: none; letter-spacing: 0; font-weight: 600; }
+.intestazione-livello a:hover { color: var(--accent); text-decoration: underline; }
+
+/* schede delle sezioni di un corso: barra con sottolineatura, scorre in orizzontale se stretta */
+.schede-sezione {
+  display: flex; gap: 0.25rem; margin: 0 0 1.25rem; border-bottom: 1px solid var(--border-strong);
+  overflow-x: auto; scrollbar-width: thin;
+}
+.schede-sezione a {
+  flex: none; padding: 0.55rem 0.9rem; margin-bottom: -1px; text-decoration: none; white-space: nowrap;
+  color: var(--muted); font-weight: 600; font-size: 0.92rem; border-bottom: 3px solid transparent;
+}
+.schede-sezione a:hover { color: var(--text); border-bottom-color: var(--border-strong); }
+.schede-sezione a.active { color: var(--accent); border-bottom-color: var(--accent); }
 
 .flash {
   position: relative;
@@ -66,37 +102,57 @@ body {
 }
 .flash-close:hover { opacity: 1; }
 
+/* Sezioni. Una card è una sezione di contenuto: titolo scuro, freccia a sinistra se si
+   può richiudere. Le tendine annidate dentro una card sono azioni o approfondimenti:
+   testo blu, più piccolo, su una riga separata da un filetto. */
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1.25rem;
-  margin-bottom: 1.25rem;
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
+.card > h2:first-child { margin-top: 0; }
 
-details.card > summary,
-.card details > summary,
-.card summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--accent);
-  list-style: none;
-}
+summary { cursor: pointer; list-style: none; }
 summary::-webkit-details-marker { display: none; }
-details.card:not([open]) { padding-bottom: 1.25rem; }
+details.card > summary {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+  font-weight: 600; font-size: 1.05rem; color: var(--text);
+  margin: -0.25rem 0; padding: 0.25rem 0;
+}
+details.card > summary strong { font-weight: 700; }
+details.card > summary:hover { color: var(--accent); }
+details.card > summary::before,
+.card details > summary::before {
+  content: "›"; display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 1.3rem; height: 1.3rem; border-radius: 6px; background: var(--bg); color: var(--muted);
+  font-size: 1.1rem; font-weight: 700; line-height: 1; transition: transform 0.15s ease;
+}
+details[open] > summary::before { transform: rotate(90deg); }
+details.card[open] > summary { margin-bottom: 0.5rem; }
 
-details.card > summary::after,
-.card details > summary::after,
-.card summary::after {
-  content: "▸";
-  display: inline-block;
-  margin-left: 0.45rem;
-  transition: transform 0.15s ease;
+.card details > summary {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+  font-weight: 500; color: var(--accent); padding: 0.35rem 0;
 }
-details.card[open] > summary::after,
-.card details[open] > summary::after {
-  transform: rotate(90deg);
-}
+.card details > summary::before { width: 1.1rem; height: 1.1rem; font-size: 0.95rem; background: var(--accent-soft); color: var(--accent); }
+.card details > summary:hover { text-decoration: underline; }
+.card details > summary.muted { color: var(--muted); }
+.card > details:not(.card) { border-top: 1px solid var(--border); padding-top: 0.35rem; }
+
+/* pannelli d'azione ("Nuovo appello", "Aggiungi studente", "Importa da CSV"...): bordo
+   tratteggiato e "+" quando chiusi, per distinguerli a colpo d'occhio dalle sezioni di
+   contenuto; aperti diventano una normale card con il modulo */
+details.card.pannello-azione:not([open]) { background: transparent; border-style: dashed; border-color: var(--border-strong); box-shadow: none; }
+details.card.pannello-azione > summary { color: var(--accent); font-weight: 600; font-size: 1rem; }
+details.card.pannello-azione > summary::before { content: "+"; background: var(--accent-soft); color: var(--accent); transform: none; }
+details.card.pannello-azione[open] > summary::before { content: "−"; }
+details.card.pannello-azione:not([open]):hover { border-color: var(--accent); background: var(--panel); }
+
+a { color: var(--accent); }
+a:not(.button):hover { text-decoration-thickness: 2px; }
 
 .link-simile {
   background: none; border: none; margin: 0; padding: 0;
@@ -108,8 +164,8 @@ h1 { font-size: 1.5rem; }
 h2 { font-size: 1.15rem; margin-top: 0; }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
-th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 600; }
+th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
 td button, td input[type=submit] { margin-top: 0; }
 
 .list-links { list-style: none; padding: 0; margin: 0; }
@@ -139,17 +195,25 @@ input, select, textarea {
 }
 textarea { font-family: monospace; }
 
+/* Pulsanti: pieno blu = azione principale; bordato = azione secondaria; rosso = distruttiva */
 button, input[type=submit], a.button {
-  background: var(--accent); color: white; border: none; border-radius: 6px;
-  padding: 0.5rem 1rem; font-size: 0.9rem; cursor: pointer; margin-top: 0.75rem;
+  background: var(--accent); color: white; border: 1px solid var(--accent); border-radius: 7px;
+  padding: 0.5rem 1rem; font-size: 0.9rem; font-weight: 500; cursor: pointer; margin-top: 0.75rem;
+  line-height: 1.25; font-family: inherit;
 }
-button.secondary, a.button.secondary { background: var(--muted); }
-button.danger, a.button.danger { background: var(--err-text); }
-button.warning, a.button.warning { background: #d97706; }
+button:hover, input[type=submit]:hover, a.button:hover { filter: brightness(0.93); }
+button.secondary, a.button.secondary {
+  background: var(--panel); color: var(--text); border-color: var(--border-strong);
+}
+button.secondary:hover, a.button.secondary:hover { filter: none; background: var(--bg); border-color: var(--muted); }
+button.danger, a.button.danger { background: var(--err-text); border-color: var(--err-text); }
+button.warning, a.button.warning { background: #d97706; border-color: #d97706; }
+button:disabled, input[type=submit]:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+button.link-simile { border: none; }
 a.button { display: inline-block; text-decoration: none; }
-a.button:hover { opacity: 0.9; }
 
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.tabs a:hover { border-color: var(--accent); }
 .tabs a {
   padding: 0.4rem 0.8rem; border-radius: 999px; text-decoration: none; color: var(--text);
   border: 1px solid var(--border); font-size: 0.85rem;
@@ -159,7 +223,7 @@ a.button:hover { opacity: 0.9; }
 .tabs.tabs-globali { border-top: 1px dashed var(--border); padding-top: 0.6rem; margin-top: -0.25rem; }
 .tabs-label { align-self: center; font-weight: 600; color: var(--muted); margin-right: -0.1rem; }
 
-.badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; }
+.badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: var(--bg); color: var(--muted); }
 .badge-ok { background: var(--ok-bg); color: var(--ok-text); }
 .badge-warn { background: #fff7e6; color: #92400e; }
 .badge-err { background: var(--err-bg); color: var(--err-text); }
@@ -269,7 +333,7 @@ textarea:focus-visible, summary:focus-visible {
 .passo a {
   display: flex; align-items: flex-start; gap: 0.5rem; height: 100%; box-sizing: border-box;
   padding: 0.5rem 0.6rem; border: 1px solid var(--border); border-radius: 8px;
-  background: var(--panel); color: var(--text); text-decoration: none;
+  background: var(--panel); color: var(--text); text-decoration: none; position: relative;
 }
 .passo a:hover { border-color: var(--accent); }
 .passo-icona {
@@ -284,8 +348,13 @@ textarea:focus-visible, summary:focus-visible {
 .passo-fatta .passo-icona { background: var(--ok-text); border-color: var(--ok-text); color: #fff; }
 .passo-in_corso .passo-icona { border-color: #d97706; color: #92400e; }
 .passo-saltata a { opacity: 0.6; }
-.passo-prossimo a { border: 2px solid var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
-.passo-prossimo .passo-icona { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* il prossimo passo ha solo un'etichetta: l'evidenziazione forte è per la fase aperta */
+.passo-prossimo .passo-icona { border-color: var(--accent); color: var(--accent); }
+.passo-etichetta-prossimo {
+  align-self: flex-start; margin-top: 0.2rem; padding: 0 0.4rem; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); font-size: 0.68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap;
+}
 
 .prossimo-passo {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
@@ -297,18 +366,108 @@ textarea:focus-visible, summary:focus-visible {
 .prossimo-passo a.button { margin: 0; white-space: nowrap; }
 .prossimo-passo-fatto { background: var(--ok-bg); border-color: #bbe5c8; }
 /* fase la cui scheda è aperta in questo momento */
-.passo a.active { background: #eff4ff; border-color: var(--accent); }
-.passo a.active .passo-nome { color: var(--accent); }
-.tabs.tabs-servizio { margin-top: 0.25rem; }
+.passo a.active { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25); }
+.passo a.active .passo-nome, .passo a.active .passo-dettaglio, .passo a.active .passo-facoltativo { color: #fff; }
+.passo a.active .passo-icona { border-color: #fff; color: #fff; background: transparent; }
+.passo a.active .passo-etichetta-prossimo { background: rgba(255, 255, 255, 0.2); color: #fff; }
+/* Riepilogo, Statistiche, Impostazioni dell'appello: consultazione, non fasi del percorso */
+.tabs.tabs-servizio { margin: 0.25rem 0 1rem; gap: 0.25rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border-strong); }
+.tabs.tabs-servizio a { border: none; border-radius: 6px; padding: 0.3rem 0.65rem; color: var(--muted); font-weight: 600; }
+.tabs.tabs-servizio a:hover { color: var(--text); background: var(--panel); }
+.tabs.tabs-servizio a.active { background: var(--panel); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-border); }
 a.button.passo-link { margin: 0; padding: 0.25rem 0.6rem; font-size: 0.82rem; white-space: nowrap; }
 
-/* schermi stretti: il menu va a capo sotto il nome invece di uscire dalla pagina */
+/* --- Schermi stretti (telefono) -------------------------------------------------- */
 @media (max-width: 700px) {
-  .topbar { flex-wrap: wrap; gap: 0.5rem; padding: 0.6rem 1rem; }
-  .topbar nav { flex-wrap: wrap; }
-  .container { padding: 1rem; }
-  table { display: block; overflow-x: auto; }
+  body { font-size: 15px; }
+  h1 { font-size: 1.3rem; }
+  /* menu principale dietro un pulsante */
+  .topbar { flex-wrap: wrap; padding: 0.5rem 0.75rem; }
+  .menu-toggle {
+    display: inline-flex; align-items: center; gap: 0.35rem; margin: 0;
+    background: var(--panel); color: var(--text); border: 1px solid var(--border-strong); padding: 0.4rem 0.7rem;
+  }
+  .topbar nav { display: none; width: 100%; flex-direction: column; align-items: stretch; gap: 0.15rem; padding-bottom: 0.25rem; }
+  .topbar.menu-aperto nav { display: flex; }
+  .topbar nav a { padding: 0.65rem 0.75rem; font-size: 1rem; }
+  .brand-docente { display: none; }
+  .breadcrumb { padding: 0.45rem 0.75rem; }
+  .container { padding: 0.9rem 0.75rem 2rem; }
+  .card { padding: 0.9rem; border-radius: 8px; }
+  /* tabelle larghe: scorrono in orizzontale dentro la card invece di allargare la pagina */
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* campi e pulsanti comodi da toccare; 16px evita lo zoom automatico di iOS sui campi */
+  input, select, textarea { font-size: 16px; padding: 0.55rem 0.6rem; }
+  button, input[type=submit], a.button { min-height: 2.5rem; }
+  td button, td a.button { min-height: 2.1rem; }
+  .form-grid { grid-template-columns: 1fr; }
+  /* percorso dell'appello: una striscia compatta che scorre in orizzontale */
+  .percorso-passi {
+    display: flex; overflow-x: auto; gap: 0.35rem; padding-bottom: 0.3rem;
+    scroll-snap-type: x proximity; scrollbar-width: thin;
+  }
+  .percorso-passi .passo { flex: 0 0 auto; scroll-snap-align: center; }
+  .passo a { padding: 0.45rem 0.6rem; align-items: center; }
+  .passo-dettaglio { display: none; }
+  .passo-nome { white-space: nowrap; font-size: 0.88rem; }
+  .passo-facoltativo { display: none; }
+  .prossimo-passo { padding: 0.7rem 0.8rem; }
+  .prossimo-passo a.button { width: 100%; text-align: center; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .tabs.tabs-servizio { flex-wrap: nowrap; overflow-x: auto; }
+  .tabs.tabs-servizio a { white-space: nowrap; }
+  .barra-salva { margin-left: -0.75rem; margin-right: -0.75rem; border-radius: 0; padding: 0.5rem 0.75rem; gap: 0.5rem; }
+  .barra-salva button { flex: none; }
+  .barra-salva .stato-impostazioni { flex: 1; font-size: 0.8rem; line-height: 1.3; }
+  .aiuto-testo { position: fixed; left: 50%; top: 4rem; transform: translateX(-50%); }
+  /* esercizi assegnati: ogni esercizio diventa una scheda impilata con tutte le azioni in
+     vista; il trascinamento (non disponibile al tocco) e il campo posizione si nascondono */
+  table.tabella-esercizi-assegnati { display: block; overflow: visible; }
+  .tabella-esercizi-assegnati thead { display: none; }
+  .tabella-esercizi-assegnati tbody.esercizio-assegnato { display: block; border-bottom: 1px solid var(--border); padding: 0.4rem 0; }
+  .tabella-esercizi-assegnati tbody.esercizio-assegnato > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.5rem; }
+  .tabella-esercizi-assegnati tbody.esercizio-assegnato > tr[style*="none"] { display: none; }
+  .tabella-esercizi-assegnati td { border: none; padding: 0.15rem 0; }
+  .tabella-esercizi-assegnati td[colspan] { width: 100%; }
+  .tabella-esercizi-assegnati td:nth-child(2) { flex: 1 1 60%; order: -1; font-size: 1rem; }
+  .tabella-esercizi-assegnati td:nth-child(3)::before { content: "Varianti: "; color: var(--muted); }
+  .tabella-esercizi-assegnati td:nth-child(4)::before { content: "Obbligatorio: "; color: var(--muted); }
+  .tabella-esercizi-assegnati td:nth-child(4) form { display: inline; }
+  .tabella-esercizi-assegnati .maniglia-ordine, .tabella-esercizi-assegnati .posizione-ordine { display: none; }
 }
 
 fieldset.ia-sezione { border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; margin: 0.75rem 0 0; }
 fieldset.ia-sezione legend { font-weight: 600; padding: 0 0.3rem; }
+
+/* riordino degli esercizi assegnati (scheda Testo) */
+.maniglia-ordine { cursor: grab; padding: 0 0.3rem; font-size: 1.1rem; user-select: none; vertical-align: middle; }
+.maniglia-ordine:active { cursor: grabbing; }
+tbody.esercizio-assegnato.trascinato { opacity: 0.5; }
+
+/* pulsante unico di salvataggio delle impostazioni del corso, sempre visibile in basso */
+.barra-salva {
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;
+  margin-top: 1rem; padding: 0.75rem 1rem;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+}
+.barra-salva.modificata { border-color: #d4a017; }
+.barra-salva.modificata .stato-impostazioni { color: #8a6500; font-weight: 600; }
+
+/* icona "?" con istruzioni a comparsa (passaggio del puntatore o focus da tastiera) */
+.aiuto {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 1.25rem; height: 1.25rem; border-radius: 50%; flex: none;
+  border: 1px solid var(--border); background: var(--panel);
+  font-size: 0.8rem; font-weight: 700; cursor: help; user-select: none;
+}
+.aiuto-testo {
+  display: none; position: absolute; z-index: 20; top: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%); width: min(26rem, 85vw);
+  padding: 0.75rem 0.9rem; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: 0.85rem; font-weight: normal; line-height: 1.45; text-align: left; cursor: default;
+}
+.aiuto-testo ol { margin: 0.4rem 0; padding-left: 1.2rem; }
+.aiuto:hover .aiuto-testo, .aiuto:focus .aiuto-testo, .aiuto:focus-within .aiuto-testo { display: block; }

@@ -26,6 +26,7 @@ class LatexContext:
     risposta_vuota: int
     frase_consegna: str
     frase_regole: str
+    frase_obbligatorio: str = ""
     orale_data: str = ""
     orale_ora: str = ""
     orale_aula: str = ""
@@ -160,7 +161,7 @@ def _prefisso_obbligatorio(ctx: LatexContext, obbligatorio: bool) -> str:
     volta nel riquadro delle regole generali."""
     if not obbligatorio:
         return ""
-    frase = _text_consegna(ctx).strip()
+    frase = _safe_format(ctx.frase_obbligatorio, consegna=ctx.consegna).strip()
     return f"\\textbf{{{frase}}} " if frase else ""
 
 
@@ -294,29 +295,45 @@ def crea_file_anteprima(ctx: LatexContext, esercizi_struct: list[dict]) -> str:
     stampare per gli studenti e non crea codici: si può generare in qualunque momento,
     anche prima dei blocchi, per verificare che testo e soluzioni siano corretti.
     esercizi_struct: come per mischia(), con in più "nome" (facoltativo).
-    Margini ampi (soprattutto a destra) per lasciare spazio alle correzioni a mano."""
+    Ogni esercizio ha una barra d'intestazione, le varianti in blocchi separati e, sotto,
+    un riquadro di revisione per chi controlla: caselle "corretta"/"da correggere" per
+    ogni variante e per la soluzione, più uno spazio per le note. Il PDF è compilabile
+    (caselle e note si riempiono e salvano nel lettore PDF); stampato, restano caselle e
+    riquadri vuoti da riempire a mano. Usa solo pacchetti presenti in ogni installazione
+    LaTeX di base (xcolor, framed, hyperref)."""
+    n_varianti = sum(len(es["varianti"]) for es in esercizi_struct)
     tex = BEGIN_DOCUMENT.replace(
         "\\usepackage{fullpage}\n",
-        "\\usepackage[a4paper,top=2.5cm,bottom=2.5cm,left=3cm,right=6cm,marginparwidth=4.5cm]{geometry}\n",
+        "\\usepackage[a4paper,top=2cm,bottom=2cm,left=2.5cm,right=4.5cm]{geometry}\n"
+        "\\usepackage[table]{xcolor}\n",
+    ).replace(
+        "\\begin{document}\n",
+        "\\usepackage[hidelinks]{hyperref}\n"
+        "\\setlength{\\parindent}{0pt}\n"
+        # colore e spessore del filetto a sinistra di ogni variante (ambiente leftbar di framed)
+        "\\renewenvironment{leftbar}{\\def\\FrameCommand{{\\color{black!35}\\vrule width 2.5pt}\\hspace{8pt}}"
+        "\\MakeFramed{\\advance\\hsize-\\width\\FrameRestore}}{\\endMakeFramed}\n\n"
+        "\\begin{document}\n\\begin{Form}\n",
     )
     tex += intestazione_breve(ctx)
     tex += (
-        "\\begin{center}\n{\\bfseries ANTEPRIMA DI CONTROLLO -- con soluzioni, non distribuire}\\\\\n"
-        f"{{\\small\\it {len(esercizi_struct)} esercizi; per ciascuno tutte le varianti, "
-        "la risposta corretta \\`e segnata con $\\checkmark$}\n\\end{center}\n\\vspace{0.5cm}\n\n"
+        "\\begin{center}\n{\\large\\bfseries ANTEPRIMA DI CONTROLLO}\\\\[2pt]\n"
+        "{\\small con soluzioni -- non distribuire agli studenti}\\\\[6pt]\n"
+        f"{{\\small {len(esercizi_struct)} esercizi, {n_varianti} varianti in tutto; "
+        "la risposta corretta \\`e segnata con $\\checkmark$.\\\\\n"
+        "Sotto ogni esercizio, nel riquadro \\emph{Revisione}, segna se ciascuna variante e la "
+        "soluzione sono corrette e annota le correzioni da fare.}\n"
+        "\\end{center}\n\\vspace{0.3cm}\n\n"
     )
     for i, es in enumerate(esercizi_struct, start=1):
-        nome = _escape_testo_semplice(es.get("nome") or f"Esercizio #{es['esercizio_id']}")
-        etichette = []
-        if es.get("obbligatorio"):
-            etichette.append("obbligatorio")
-        if es.get("aperta"):
-            etichette.append("domanda aperta")
-        tex += f"\\section*{{{i}. {nome}" + (f" \\normalfont\\small({', '.join(etichette)})" if etichette else "") + "}\n"
+        if i > 1:
+            tex += "\\pagebreak[3]\\bigskip\n\n"
+        tex += _intestazione_esercizio_anteprima(i, len(esercizi_struct), es)
         varianti = es["varianti"]
-        for j, v in enumerate(varianti):
+        for j, v in enumerate(varianti, start=1):
+            tex += "\\begin{leftbar}\n"
             if len(varianti) > 1:
-                tex += f"\\noindent{{\\bfseries Variante {j + 1}.}}\\par\n"
+                tex += f"{{\\small\\bfseries\\color{{black!60}}VARIANTE {j} DI {len(varianti)}}}\\par\\smallskip\n"
             tex += _prefisso_obbligatorio(ctx, es.get("obbligatorio", False)) + v["testo"] + "\n"
             if not es.get("aperta") and v["risposte"]:
                 tex += "\\begin{description}\n"
@@ -326,14 +343,77 @@ def crea_file_anteprima(ctx: LatexContext, esercizi_struct: list[dict]) -> str:
                     else:
                         tex += f"\\item[{LETTERE.get(k, k + 1)}] {r}\n"
                 tex += "\\end{description}\n"
-            tex += "\\medskip\n\n"
+            tex += "\\end{leftbar}\n\\medskip\n\n"
         if es.get("soluzione"):
-            tex += _box_soluzione(es["soluzione"])
+            tex += (
+                "\\begin{leftbar}\n{\\small\\bfseries\\color{black!60}SOLUZIONE / SUGGERIMENTO}\\par\\smallskip\n"
+                f"{es['soluzione']}\n\\end{{leftbar}}\n\\medskip\n\n"
+            )
         else:
-            tex += "{\\small\\it (nessuna soluzione/suggerimento inserito)}\n\n"
-        tex += _separatore_esercizio()
-    tex += "\n\n\\end{document}"
+            tex += "{\\small\\it (nessuna soluzione/suggerimento inserito)}\\par\\medskip\n\n"
+        tex += _riquadro_revisione(i, es)
+    tex += (
+        "\\clearpage\n"
+        "\\noindent\\colorbox{black!12}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep}{\\large\\bfseries "
+        "Note generali sul compito}}\\par\\medskip\n"
+        "\\noindent\\TextField[name=notegenerali,multiline=true,width=\\linewidth,height=0.8\\textheight,"
+        "bordercolor={0.6 0.6 0.6},backgroundcolor={1 1 1},charsize=10pt]{}\n"
+    )
+    tex += "\n\n\\end{Form}\n\\end{document}"
     return tex
+
+
+def _intestazione_esercizio_anteprima(numero: int, totale: int, es: dict) -> str:
+    """Barra grigia a tutta larghezza con numero e nome dell'esercizio, così l'inizio di
+    ogni esercizio si riconosce a colpo d'occhio anche sfogliando il foglio stampato."""
+    nome = _escape_testo_semplice(es.get("nome") or f"Esercizio #{es['esercizio_id']}")
+    etichette = [f"{len(es['varianti'])} variant{'i' if len(es['varianti']) != 1 else 'e'}"]
+    if es.get("obbligatorio"):
+        etichette.append("obbligatorio")
+    if es.get("aperta"):
+        etichette.append("domanda aperta")
+    return (
+        "\\noindent\\colorbox{black!12}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep}{\\strut"
+        f"{{\\large\\bfseries Esercizio {numero}/{totale}}}\\quad {{\\large {nome}}}"
+        f"\\hfill{{\\small {', '.join(etichette)}}}}}}}\\par\\medskip\n\n"
+    )
+
+
+def _caselle_esito(nome_campo: str) -> str:
+    # il quadratino è disegnato in LaTeX e il campo, senza bordo, ci sta sopra: il bordo
+    # di hyperref includerebbe anche la profondità della riga, risultando un rettangolo alto
+    def casella(nome: str) -> str:
+        return (
+            "\\rlap{\\setlength{\\fboxsep}{0pt}\\fbox{\\rule{0pt}{9pt}\\hspace{9pt}}}"
+            f"\\CheckBox[name={nome},width=9pt,height=9pt,bordercolor={{}},backgroundcolor={{}}]{{}}"
+        )
+    return (
+        f"{casella(nome_campo + 'ok')}\\enspace corretta"
+        f" & {casella(nome_campo + 'ko')}\\enspace da correggere"
+    )
+
+
+def _riquadro_revisione(numero: int, es: dict) -> str:
+    """Riquadro per chi controlla il testo: per ogni variante (e per la soluzione, se
+    c'è) due caselle "corretta" / "da correggere", poi uno spazio per le note sulle
+    correzioni. Non si spezza tra due pagine."""
+    varianti = es["varianti"]
+    righe = []
+    for j in range(1, len(varianti) + 1):
+        etichetta = f"Variante {j}" if len(varianti) > 1 else ("Testo" if es.get("aperta") else "Testo e risposte")
+        righe.append(f"{etichetta} & {_caselle_esito(f'es{numero}v{j}')} \\\\[3pt]\n")
+    if es.get("soluzione"):
+        righe.append(f"Soluzione & {_caselle_esito(f'es{numero}sol')} \\\\[3pt]\n")
+    return (
+        "\\noindent\\fcolorbox{black!45}{yellow!7}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep-2\\fboxrule}{"
+        "\\vspace{3pt}{\\bfseries Revisione}\\par\\smallskip\n"
+        "\\begin{tabular}{@{}l@{\\qquad}l@{\\qquad}l@{}}\n"
+        + "".join(righe)
+        + "\\end{tabular}\\par\\smallskip\n"
+        "{\\small Note per le correzioni:}\\par\\smallskip\n"
+        f"\\TextField[name=note{numero},multiline=true,width=\\linewidth,height=3.2cm,"
+        "bordercolor={0.6 0.6 0.6},backgroundcolor={1 1 1},charsize=10pt]{}\\par\\vspace{3pt}}}\\par\n\n"
+    )
 
 
 def crea_file_blocco(ctx: LatexContext, esercizi_struct: list[dict], numero_studenti: int, codici_esistenti=None):
@@ -451,7 +531,7 @@ def _tabella_ammessi(righe: list[dict]) -> str:
     for i, r in enumerate(righe):
         note_parti = []
         if r.get("dsa"):
-            note_parti.append("DSA")
+            note_parti.append(r.get("dsa_tipo") if r.get("dsa_tipo") in ("DSA", "L104") else "DSA")
         if r.get("in_deroga"):
             note_parti.append("deroga")
         note = ", ".join(note_parti)

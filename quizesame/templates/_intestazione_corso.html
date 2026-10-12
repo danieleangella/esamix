@@ -1,0 +1,17 @@
+{# Intestazione comune alle pagine di un corso: livello ("Corso"), nome e anno, e la barra
+   delle sezioni del corso. Chi la include imposta `sezione_corso` (appelli, studenti,
+   esercizi, statistiche, impostazioni). #}
+<header class="intestazione-pagina">
+  <div class="intestazione-livello">Corso</div>
+  <h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span>
+    {% if corso.importato_da_legacy %}<span class="badge badge-warn" title="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
+  </h1>
+</header>
+<nav class="schede-sezione" aria-label="Sezioni del corso">
+  {% for chiave, url, etichetta in [
+    ("appelli", "", "Appelli"), ("studenti", "/studenti", "Studenti"), ("esercizi", "/esercizi", "Esercizi"),
+    ("statistiche", "/statistiche", "Statistiche"), ("impostazioni", "/impostazioni", "Impostazioni"),
+  ] %}
+  <a href="/corsi/{{ corso.tag }}{{ url }}"{% if chiave == sezione_corso %} class="active" aria-current="page"{% endif %}>{{ etichetta }}</a>
+  {% endfor %}
+</nav>

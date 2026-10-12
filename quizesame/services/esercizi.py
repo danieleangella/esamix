@@ -304,10 +304,12 @@ def assegna_a_appello(tag: str, appello_id: int, esercizio_id: int, obbligatorio
         conn.close()
 
 
-def sposta_esercizio(tag: str, appello_id: int, esercizio_id: int, delta: int) -> None:
-    """Sposta un esercizio assegnato su (delta=-1) o giù (delta=+1) nell'ordine di
-    visualizzazione/stampa. L'ordine non incide sul compito dello studente (gli esercizi
-    lì vengono comunque rimescolati), solo sull'elenco e sul foglio di riferimento."""
+def imposta_ordine(tag: str, appello_id: int, ordine: list[int]) -> None:
+    """Riordina gli esercizi assegnati secondo `ordine` (id degli esercizi, dal primo
+    all'ultimo), come lo invia la tabella della scheda Testo dopo un trascinamento o un
+    ordinamento. L'ordine non incide sul compito dello studente (gli esercizi lì vengono
+    comunque rimescolati), solo sull'elenco e sul foglio di riferimento. Gli esercizi
+    assegnati che mancano da `ordine` (es. aggiunti da un'altra finestra) finiscono in fondo."""
     corsi_service.verifica_appello_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
@@ -315,14 +317,11 @@ def sposta_esercizio(tag: str, appello_id: int, esercizio_id: int, delta: int) -
             "SELECT esercizio_id FROM appello_esercizi WHERE appello_id=? ORDER BY ordine, rowid",
             (appello_id,),
         ).fetchall()
-        ids = [r["esercizio_id"] for r in righe]
-        if esercizio_id not in ids:
-            return
-        idx = ids.index(esercizio_id)
-        nuovo_idx = idx + delta
-        if 0 <= nuovo_idx < len(ids):
-            ids[idx], ids[nuovo_idx] = ids[nuovo_idx], ids[idx]
-        for posizione, eid in enumerate(ids):
+        attuali = [r["esercizio_id"] for r in righe]
+        visti = set()
+        nuovi = [eid for eid in ordine if eid in attuali and not (eid in visti or visti.add(eid))]
+        nuovi += [eid for eid in attuali if eid not in visti]
+        for posizione, eid in enumerate(nuovi):
             conn.execute(
                 "UPDATE appello_esercizi SET ordine=? WHERE appello_id=? AND esercizio_id=?",
                 (posizione, appello_id, eid),
@@ -416,6 +415,7 @@ def anteprima_importa_json(tag: str, dati: dict) -> list[dict]:
             "obbligatorio": bool(e.get("obbligatorio")), "difficolta": e.get("difficolta"),
             "soluzione": e.get("soluzione") or "", "aperta": bool(e.get("aperta")), "varianti": varianti,
             "duplicato_di": (duplicato.nome or f"#{duplicato.id}") if duplicato else None,
+            "duplicato_id": duplicato.id if duplicato else None,
         })
     return risultato
 
@@ -589,6 +589,21 @@ def importa_json(tag: str, appello_id: int, esercizi: list[dict]) -> int:
         )
         n += 1
     return n
+
+
+def sostituisci_con_json(tag: str, appello_id: int, esercizi: list[dict]) -> tuple[int, list[int], int]:
+    """Come importa_json, ma prima toglie dall'appello gli esercizi già assegnati (che
+    restano nella banca: eliminarli è una scelta separata del chiamante). Un esercizio
+    scelto identico a uno già nel compito non viene duplicato: resta quello esistente,
+    con la sua posizione. Ritorna (importati, id degli esercizi tolti, mantenuti)."""
+    _verifica_aperte_consentite(tag, any(e.get("aperta") for e in esercizi))
+    attuali = {e.id for e in list_esercizi_appello(tag, appello_id)}
+    tenuti = {e["duplicato_id"] for e in esercizi if e.get("duplicato_id") in attuali}
+    rimossi = sorted(attuali - tenuti)
+    for esercizio_id in rimossi:
+        rimuovi_da_appello(tag, appello_id, esercizio_id)
+    nuovi = [e for e in esercizi if e.get("duplicato_id") not in tenuti]
+    return importa_json(tag, appello_id, nuovi), rimossi, len(tenuti)
 
 
 def importa_json_banca(tag: str, esercizi: list[dict]) -> int:

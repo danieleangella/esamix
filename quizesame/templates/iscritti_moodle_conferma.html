@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Importa prenotazioni Moodle · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
+<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }}</a>
+<span class="sep">›</span> <span class="current">Importa prenotazioni Moodle</span>
+{% endblock %}
+{% block content %}
+<h1>Importa le prenotazioni da Moodle</h1>
+<p class="muted">
+  Scegli chi aggiungere agli iscritti di questo appello. L'<em>ID number</em> di Moodle viene usato come
+  matricola: chi non è ancora registrato nel corso viene registrato con nome e cognome del file.
+  Le righe con un ID non numerico (spesso un docente o un account di prova) sono deselezionate:
+  spuntale solo se quel codice è davvero una matricola.
+</p>
+
+<form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/iscritti-moodle/conferma">
+  <textarea name="dati_json" style="display:none">{{ dati_json }}</textarea>
+
+  <p style="margin-top:0">
+    <button type="button" id="btn-seleziona-tutti" class="secondary" style="margin-top:0">Seleziona tutti</button>
+    <button type="button" id="btn-deseleziona-tutti" class="secondary" style="margin-top:0">Deseleziona tutti</button>
+  </p>
+
+  <div class="card">
+    <table>
+      <thead><tr><th></th><th>Matricola (ID number)</th><th>Cognome</th><th>Nome</th><th>Email</th><th>Stato</th></tr></thead>
+      {% for s in studenti %}
+      <tr>
+        <td>
+          {% if s.matricola %}
+          <input type="checkbox" name="importa_idx" value="{{ loop.index0 }}" class="campo-incluso" style="width:auto; margin:0"
+                 aria-label="Importa {{ s.cognome }} {{ s.nome }}" {% if s.stato != 'da_verificare' %}checked{% endif %}>
+          {% endif %}
+        </td>
+        <td>{{ s.matricola or '—' }}</td>
+        <td>{{ s.cognome }}</td>
+        <td>{{ s.nome }}</td>
+        <td class="muted">{{ s.email }}</td>
+        <td>
+          {% if s.stato == 'registrato' %}<span class="badge badge-ok">nel corso</span>
+          {% elif s.stato == 'nuovo' %}<span class="badge badge-info">nuovo: verrà registrato</span>
+          {% elif s.stato == 'da_verificare' %}<span class="badge badge-warn">ID non numerico: da verificare</span>
+          {% else %}<span class="badge badge-err">senza ID number: non importabile</span>{% endif %}
+          {% if s.gia_iscritto %}<span class="muted">già iscritto</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  {% if n_iscritti_attuali %}
+  <label style="display:flex; gap:0.5rem; align-items:flex-start; font-weight:normal; cursor:pointer">
+    <input type="checkbox" name="sostituisci" value="1" style="width:auto; margin-top:0.25rem">
+    <span>Togli dagli iscritti di questo appello chi non è tra i selezionati
+      <span class="muted">(es. prenotazioni annullate su Moodle; ora ci sono {{ n_iscritti_attuali }} iscritti nell'elenco)</span></span>
+  </label>
+  {% endif %}
+
+  <button type="submit">Importa selezionati</button>
+  <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}" style="margin-left:1rem">Annulla</a>
+</form>
+<script>
+(function () {
+  var campi = document.querySelectorAll(".campo-incluso");
+  document.getElementById("btn-seleziona-tutti").addEventListener("click", function () {
+    campi.forEach(function (c) { c.checked = true; });
+  });
+  document.getElementById("btn-deseleziona-tutti").addEventListener("click", function () {
+    campi.forEach(function (c) { c.checked = false; });
+  });
+})();
+</script>
+{% endblock %}

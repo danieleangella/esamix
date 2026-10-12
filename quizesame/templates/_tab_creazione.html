@@ -7,24 +7,45 @@
 </div>
 {% endif %}
 
-<div class="card">
-  <h2>Esercizi assegnati ({{ md.esercizi_assegnati|length }})</h2>
+{# sezione richiusa quando la fase è completata (vedi .sezione-flusso in app.js), così
+   risalta il passo successivo del percorso: creare i compiti #}
+{% set fase = md.riepilogo_home.fasi|selectattr("scheda", "equalto", "creazione")|first %}
+<details class="card sezione-flusso" data-sezione="esercizi-{{ md.appello.id }}" data-fatta="{{ 1 if fase.fatta else 0 }}"{% if not fase.fatta %} open{% endif %}>
+  <summary><strong>Esercizi assegnati ({{ md.esercizi_assegnati|length }})</strong>{% if fase.fatta %} <span class="badge badge-ok">✓ completato</span>
+    {% if not md.blocchi %}<span class="muted">— prossimo passo: crea i compiti nella scheda "Compiti d'esame"</span>{% endif %}{% endif %}</summary>
   {% if md.esercizi_assegnati %}
-  <table>
-    <tr><th></th><th>Nome</th><th>Varianti</th><th>Obbligatorio</th><th></th></tr>
+  {% set riordinabile = not md.appello.chiuso and md.esercizi_assegnati|length > 1 %}
+  {% if riordinabile %}
+  <p class="muted" style="margin-top:0; display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center">
+    <span>Per cambiare l'ordine trascina la maniglia &#10303;, usa le frecce o scrivi la posizione.</span>
+    <select class="ordina-per" style="width:auto; margin:0">
+      <option value="">Ordina per…</option>
+      <option value="nome">nome</option>
+      <option value="argomento">argomento</option>
+      <option value="difficolta">difficoltà</option>
+      <option value="obbligatorio">obbligatori prima</option>
+      <option value="aperta">domande aperte in fondo</option>
+      <option value="inverti">inverti l'ordine</option>
+    </select>
+    <span class="stato-ordine" aria-live="polite"></span>
+  </p>
+  {% endif %}
+  <table class="tabella-esercizi-assegnati" data-url-ordine="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esercizi/ordine">
+    <thead><tr><th>#</th><th>Nome</th><th>Varianti</th><th>Obbligatorio</th><th></th></tr></thead>
     {% for e in md.esercizi_assegnati %}
+    <tbody class="esercizio-assegnato" data-esercizio="{{ e.id }}" data-nome="{{ (e.nome or ('#' ~ e.id))|lower }}"
+           data-argomento="{{ (e.argomento or '')|lower }}" data-difficolta="{{ e.difficolta or 0 }}"
+           data-obbligatorio="{{ 1 if e.obbligatorio else 0 }}" data-aperta="{{ 1 if e.aperta else 0 }}">
     <tr>
       <td style="white-space:nowrap">
-        {% if md.appello.chiuso %}
-        <button type="button" class="secondary" disabled title="Sposta su">&uarr;</button>
-        <button type="button" class="secondary" disabled title="Sposta giù">&darr;</button>
+        {% if riordinabile %}
+        <span class="maniglia-ordine" draggable="true" title="Trascina per spostare">&#10303;</span>
+        <input type="number" class="posizione-ordine" min="1" max="{{ md.esercizi_assegnati|length }}" value="{{ loop.index }}"
+               title="Posizione: scrivi un numero e premi Invio" style="width:3.5em; margin:0; padding:0.15rem 0.3rem">
+        <button type="button" class="secondary btn-ordine-su" title="Sposta su">&uarr;</button>
+        <button type="button" class="secondary btn-ordine-giu" title="Sposta giù">&darr;</button>
         {% else %}
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esercizi/{{ e.id }}/sposta-su">
-          <button type="submit" class="secondary" {% if loop.first %}disabled{% endif %} title="Sposta su">&uarr;</button>
-        </form>
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esercizi/{{ e.id }}/sposta-giu">
-          <button type="submit" class="secondary" {% if loop.last %}disabled{% endif %} title="Sposta giù">&darr;</button>
-        </form>
+        <span class="muted">{{ loop.index }}</span>
         {% endif %}
       </td>
       <td>
@@ -65,6 +86,7 @@
       {% set _redirect = "/corsi/" ~ corso.tag ~ "/appelli/" ~ (raggruppamento.appello_id if raggruppamento else md.appello.id) %}
       <td colspan="5" data-url="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/form?redirect_to={{ _redirect | urlencode }}&amp;redirect_anchor={{ ('creazione' ~ pane_suffix) | urlencode }}"></td>
     </tr>
+    </tbody>
     {% endfor %}
   </table>
   <p style="margin-top:0.75rem">
@@ -231,7 +253,7 @@
     {% include "_importa_esercizi_form.html" %}
   </details>
   {% endif %}
-</div>
+</details>
 
 <script>
 (function () {
@@ -274,6 +296,110 @@
       if (!window.confirm(msg)) ev.preventDefault();
     })();
   });
+})();
+</script>
+<script>
+(function () {
+  // Riordino degli esercizi assegnati: ogni esercizio è un <tbody> (la riga principale più
+  // quelle, nascoste, di anteprima e modifica), che si sposta tutto insieme. Ogni
+  // modifica salva subito l'ordine completo, senza ricaricare la pagina.
+  var root = document.currentScript.closest(".tab-pane");
+  var tabella = root.querySelector(".tabella-esercizi-assegnati");
+  if (!tabella || !tabella.querySelector(".maniglia-ordine")) return;
+  var stato = root.querySelector(".stato-ordine");
+  function voci() { return Array.prototype.slice.call(tabella.querySelectorAll("tbody.esercizio-assegnato")); }
+  function aggiornaNumeri() {
+    var tutte = voci();
+    tutte.forEach(function (tb, i) {
+      tb.querySelector(".posizione-ordine").value = i + 1;
+      tb.querySelector(".btn-ordine-su").disabled = i === 0;
+      tb.querySelector(".btn-ordine-giu").disabled = i === tutte.length - 1;
+    });
+  }
+  var timer = null;
+  function salva() {
+    aggiornaNumeri();
+    stato.textContent = "Salvataggio…";
+    clearTimeout(timer);
+    // più spostamenti ravvicinati (es. frecce premute di seguito) diventano un solo salvataggio
+    timer = setTimeout(function () {
+      fetch(tabella.dataset.urlOrdine, {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ordine: voci().map(function (tb) { return Number(tb.dataset.esercizio); })}),
+      }).then(function (r) { return r.json().then(function (d) { return {ok: r.ok, d: d}; }); })
+        .then(function (res) { stato.textContent = res.ok ? "Ordine salvato ✓" : "Errore: " + res.d.errore; })
+        .catch(function () { stato.textContent = "Errore: ordine non salvato"; });
+    }, 400);
+  }
+  function sposta(tb, posizione) {
+    var tutte = voci().filter(function (x) { return x !== tb; });
+    posizione = Math.max(0, Math.min(tutte.length, posizione));
+    tabella.insertBefore(tb, tutte[posizione] || null);
+    salva();
+  }
+  voci().forEach(function (tb) {
+    tb.querySelector(".btn-ordine-su").addEventListener("click", function () { sposta(tb, voci().indexOf(tb) - 1); });
+    tb.querySelector(".btn-ordine-giu").addEventListener("click", function () { sposta(tb, voci().indexOf(tb) + 1); });
+    var campo = tb.querySelector(".posizione-ordine");
+    function applica() {
+      var n = parseInt(campo.value, 10);
+      if (isNaN(n) || n - 1 === voci().indexOf(tb)) { aggiornaNumeri(); return; }
+      sposta(tb, n - 1);
+    }
+    campo.addEventListener("change", applica);
+    campo.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); applica(); } });
+    var maniglia = tb.querySelector(".maniglia-ordine");
+    maniglia.addEventListener("dragstart", function (ev) {
+      ev.dataTransfer.effectAllowed = "move";
+      ev.dataTransfer.setData("text/plain", tb.dataset.esercizio);
+      tabella.dataset.trascinato = tb.dataset.esercizio;
+      tb.classList.add("trascinato");
+    });
+    maniglia.addEventListener("dragend", function () {
+      tb.classList.remove("trascinato");
+      delete tabella.dataset.trascinato;
+    });
+    tb.addEventListener("dragover", function (ev) {
+      var id = tabella.dataset.trascinato;
+      if (!id || id === tb.dataset.esercizio) return;
+      ev.preventDefault();
+      var trascinato = tabella.querySelector('tbody.esercizio-assegnato[data-esercizio="' + id + '"]');
+      // sopra o sotto a seconda di quale metà della riga ha il puntatore
+      var r = tb.getBoundingClientRect();
+      tabella.insertBefore(trascinato, ev.clientY < r.top + r.height / 2 ? tb : tb.nextSibling);
+    });
+    tb.addEventListener("drop", function (ev) { ev.preventDefault(); salva(); });
+  });
+  var ordinaPer = root.querySelector(".ordina-per");
+  ordinaPer.addEventListener("change", function () {
+    var criterio = ordinaPer.value;
+    ordinaPer.value = "";
+    if (!criterio) return;
+    var tutte = voci();
+    if (criterio === "inverti") {
+      tutte.reverse();
+    } else {
+      var chiave = {
+        nome: function (tb) { return [tb.dataset.nome]; },
+        argomento: function (tb) { return [tb.dataset.argomento || "\uffff", tb.dataset.nome]; },
+        difficolta: function (tb) { return [Number(tb.dataset.difficolta) || 99]; },
+        obbligatorio: function (tb) { return [1 - Number(tb.dataset.obbligatorio)]; },
+        aperta: function (tb) { return [Number(tb.dataset.aperta)]; },
+      }[criterio];
+      var confronta = function (a, b) {
+        var ka = chiave(a), kb = chiave(b);
+        for (var i = 0; i < ka.length; i++) {
+          if (ka[i] === kb[i]) continue;
+          return typeof ka[i] === "number" ? ka[i] - kb[i] : ka[i].localeCompare(kb[i], "it", {numeric: true});
+        }
+        return 0;
+      };
+      tutte.sort(confronta);  // stabile: a parità resta l'ordine attuale
+    }
+    tutte.forEach(function (tb) { tabella.appendChild(tb); });
+    salva();
+  });
+  aggiornaNumeri();
 })();
 </script>
 <script>

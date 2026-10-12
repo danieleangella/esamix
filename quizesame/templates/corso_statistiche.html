@@ -4,16 +4,8 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <span class="current">Statistiche</span>
 {% endblock %}
 {% block content %}
-<h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span>
-  {% if corso.importato_da_legacy %}<span class="badge badge-warn" title="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
-</h1>
-<div class="tabs">
-  <a href="/corsi/{{ corso.tag }}">Appelli</a>
-  <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a>
-  <a href="/corsi/{{ corso.tag }}/esercizi">Esercizi</a>
-  <a class="active" href="/corsi/{{ corso.tag }}/statistiche">Statistiche</a>
-  <a href="/corsi/{{ corso.tag }}/impostazioni">Impostazioni</a>
-</div>
+{% set sezione_corso = "statistiche" %}
+{% include "_intestazione_corso.html" %}
 {% if corso.importato_da_legacy %}
 <p class="muted">Corso importato da una migrazione dati legacy: se alcuni compiti storici
   non hanno un collegamento esercizio-posizione completo, le statistiche sugli esercizi

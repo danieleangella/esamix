@@ -16,6 +16,7 @@
         <span class="passo-icona" aria-hidden="true">{% if p.stato == 'fatta' %}✓{% elif p.stato == 'saltata' %}–{% else %}{{ ns.n }}{% endif %}</span>
         <span class="passo-testo">
           <span class="passo-nome">{{ p.nome }}{% if p.facoltativa %} <span class="passo-facoltativo">(facoltativo)</span>{% endif %}</span>
+          {% if p.prossimo %}<span class="passo-etichetta-prossimo" aria-hidden="true">prossimo</span>{% endif %}
           <span class="passo-dettaglio">{{ p.dettaglio }}</span>
         </span>
         <span class="sr-only">— {{ {'fatta': 'completata', 'saltata': 'non usata', 'in_corso': 'in corso', 'da_fare': 'da fare'}[p.stato] }}{% if p.prossimo %}, prossimo passo{% endif %}</span>
@@ -26,7 +27,7 @@
 </nav>
 
 {% if prossimo_passo %}
-<div class="prossimo-passo">
+<div class="prossimo-passo" data-scheda="{{ prossimo_passo.scheda }}">
   <div>
     <div class="prossimo-passo-etichetta">Prossimo passo{% if prossimo_passo.prova %} · {{ prossimo_passo.prova }}{% endif %}</div>
     <div class="prossimo-passo-azione">{{ prossimo_passo.azione }}</div>

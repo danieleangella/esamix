@@ -29,6 +29,11 @@ DEFAULT_ORALE_SOGLIA_VOTO = 10
 # {consegna}/{corretta}/{sbagliata}/{vuota}/{votomin} vengono sostituiti con i valori
 # effettivi dell'appello al momento della generazione dei compiti.
 DEFAULT_FRASE_CONSEGNA = "Consegnate lo svolgimento dei {consegna} esercizi obbligatori.\n"
+# anteposta in grassetto al testo di ciascun esercizio marcato obbligatorio
+DEFAULT_FRASE_OBBLIGATORIO = (
+    "Di questo esercizio \\`e obbligatorio indicare una risposta e consegnare uno svolgimento "
+    "che la giustifichi."
+)
 DEFAULT_FRASE_REGOLE = (
     "Ogni risposta corretta viene valutata $+{corretta}$, "
     "ogni risposta errata ${sbagliata}$, ed ogni risposta non data ${vuota}$. "
@@ -63,6 +68,7 @@ class Corso:
     domande_aperte_attive: bool = True
     frase_consegna: str = DEFAULT_FRASE_CONSEGNA
     frase_regole: str = DEFAULT_FRASE_REGOLE
+    frase_obbligatorio: str = DEFAULT_FRASE_OBBLIGATORIO
     orale_dopo_richiesta: bool = True
     orale_soglia_attiva: bool = False
     orale_soglia_n: Optional[int] = None
@@ -217,6 +223,7 @@ def raggruppa_per_nome(corsi: list[Corso]) -> list[list[Corso]]:
 _META_EREDITABILI = (
     "votomin", "votomin_raggruppamento", "consegna", "risposta_corretta", "risposta_sbagliata",
     "risposta_vuota", "punteggio_max_aperta", "domande_aperte_attive", "frase_consegna", "frase_regole",
+    "frase_obbligatorio",
     "orale_dopo_richiesta", "orale_soglia_attiva", "orale_soglia_n", "orale_soglia_voto",
     "orale_soglia_escludi_parziali", "ritirato_conta_insufficiente", "domande_esame", "domande_esame_lista",
 )
@@ -410,6 +417,7 @@ def get_corso(tag: str) -> Corso:
         domande_aperte_attive=meta.get("domande_aperte_attive", "1") == "1",
         frase_consegna=meta.get("frase_consegna") or DEFAULT_FRASE_CONSEGNA,
         frase_regole=meta.get("frase_regole") or DEFAULT_FRASE_REGOLE,
+        frase_obbligatorio=meta.get("frase_obbligatorio") or DEFAULT_FRASE_OBBLIGATORIO,
         orale_dopo_richiesta=meta.get("orale_dopo_richiesta", "1") == "1",
         orale_soglia_attiva=meta.get(
             "orale_soglia_attiva", "1" if meta.get("orale_soglia_n") and meta.get("orale_soglia_voto") else "0"
@@ -560,6 +568,7 @@ def elimina_appello(tag: str, appello_id: int) -> None:
         conn.execute("DELETE FROM compiti WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM blocchi WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM appello_esercizi WHERE appello_id=?", (appello_id,))
+        conn.execute("DELETE FROM appello_eccezioni_matricola WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM raggruppamento_membri WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM raggruppamenti WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM appelli WHERE id=?", (appello_id,))
@@ -774,19 +783,20 @@ def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) ->
                 # import locale: esportazione importa già questo modulo
                 from quizesame.services import esportazione as esportazione_service
                 righe = [
-                    {"matricola": s["matricola"], "nome": s["nome"], "cognome": s["cognome"], "dsa": s["dsa"]}
+                    {"matricola": s["matricola"], "nome": s["nome"], "cognome": s["cognome"], "dsa": s["dsa"],
+                     "dsa_tipo": s.get("dsa_tipo") or ""}
                     for s in (esportazione_service.list_iscritti(tag, membro.id) or [])
                 ]
             else:
                 righe = [dict(r) for r in conn.execute(
-                    "SELECT matricola, nome, cognome, dsa FROM studenti ORDER BY cognome COLLATE NOCASE, nome COLLATE NOCASE"
+                    "SELECT matricola, nome, cognome, dsa, dsa_tipo FROM studenti ORDER BY cognome COLLATE NOCASE, nome COLLATE NOCASE"
                 ).fetchall()]
             ammessi = [r for r in righe if matricola_ammessa(r["matricola"], raggruppamento.matricola_minima_prima_prova)]
         else:
             corso = get_corso(tag)
             membro_precedente = raggruppamento.membri[indice - 1]
             righe = conn.execute(
-                "SELECT s.matricola, s.nome, s.cognome, s.dsa FROM risultati r "
+                "SELECT s.matricola, s.nome, s.cognome, s.dsa, s.dsa_tipo FROM risultati r "
                 "JOIN studenti s ON s.matricola = r.matricola "
                 "WHERE r.appello_id=? AND r.esito='voto' AND r.voto IS NOT NULL AND r.voto >= ? "
                 "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
@@ -798,7 +808,7 @@ def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) ->
         for s in ammessi:
             s["in_deroga"] = False
         manuali = conn.execute(
-            "SELECT s.matricola, s.nome, s.cognome, s.dsa FROM ammissioni_manuali am "
+            "SELECT s.matricola, s.nome, s.cognome, s.dsa, s.dsa_tipo FROM ammissioni_manuali am "
             "JOIN studenti s ON s.matricola = am.matricola WHERE am.appello_id=?",
             (membro.id,),
         ).fetchall()

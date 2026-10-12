@@ -170,6 +170,17 @@ CREATE TABLE IF NOT EXISTS appello_iscritti_manuali (
     PRIMARY KEY (matricola, appello_id)
 );
 
+-- Decisioni del docente sugli iscritti esclusi dal filtro "matricola >= soglia" di un
+-- appello: ammesso=1 lo tiene comunque nell'elenco (eccezione), ammesso=0 conferma
+-- l'esclusione. Senza riga, l'esclusione è ancora da confermare. Nessun vincolo su
+-- studenti: dal file della segreteria possono arrivare matricole non registrate.
+CREATE TABLE IF NOT EXISTS appello_eccezioni_matricola (
+    appello_id INTEGER NOT NULL REFERENCES appelli(id),
+    matricola TEXT NOT NULL,
+    ammesso BOOLEAN NOT NULL,
+    PRIMARY KEY (appello_id, matricola)
+);
+
 -- Registro presenze di un appello: una spunta "presente" da usare per fare l'appello in
 -- aula, prima ancora della correzione. Senza FK verso studenti perché l'elenco iscritti
 -- può contenere matricole non ancora registrate in questo corso (righe del file della
@@ -225,6 +236,8 @@ ADDITIVE_COLUMNS = {
     "studenti": [
         ("dsa", "BOOLEAN NOT NULL DEFAULT 0"),
         ("dsa_note", "TEXT"),
+        # "DSA" o "L104" quando dsa=1 (vuoto nei corsi precedenti: vale "DSA")
+        ("dsa_tipo", "TEXT"),
     ],
     "raggruppamenti": [
         ("matricola_minima_prima_prova", "TEXT"),

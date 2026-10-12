@@ -16,6 +16,7 @@ import xlrd
 from quizesame import config, db
 from quizesame.services import correzione as correzione_service
 from quizesame.services import corsi as corsi_service
+from quizesame.services import studenti as studenti_service
 
 
 def _decodifica(contenuto: bytes) -> tuple[str, str]:
@@ -160,7 +161,7 @@ def list_iscritti_manuali(tag: str, appello_id: int) -> list[dict]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         rows = conn.execute(
-            "SELECT s.matricola, s.nome, s.cognome, s.dsa, s.dsa_note FROM appello_iscritti_manuali im "
+            "SELECT s.matricola, s.nome, s.cognome, s.dsa, s.dsa_tipo, s.dsa_note FROM appello_iscritti_manuali im "
             "JOIN studenti s ON s.matricola = im.matricola "
             "WHERE im.appello_id=? ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id,),
@@ -168,7 +169,8 @@ def list_iscritti_manuali(tag: str, appello_id: int) -> list[dict]:
         return [
             {
                 "matricola": r["matricola"], "cognome": r["cognome"], "nome": r["nome"],
-                "dsa": bool(r["dsa"]), "dsa_note": r["dsa_note"] or "", "registrato": True,
+                "dsa": bool(r["dsa"]), "dsa_tipo": studenti_service.tipo_dsa(r["dsa"], r["dsa_tipo"]),
+                "dsa_note": r["dsa_note"] or "", "registrato": True,
             }
             for r in rows
         ]
@@ -190,6 +192,117 @@ def aggiungi_iscritto_manuale(tag: str, appello_id: int, matricola: str) -> None
         conn.commit()
     finally:
         conn.close()
+
+
+# --- Prenotazioni esportate da Moodle (es. "Iscrizione primo parziale.csv"): colonne
+# "First name", "Last name", "Email address", "ID number" (in italiano "Nome", "Cognome",
+# "Indirizzo email", "Codice identificativo"). L'ID number è la matricola: le righe
+# diventano iscritti aggiunti a mano, registrando nel corso chi non c'è ancora. ---------
+
+_COLONNE_MOODLE = {
+    "matricola": ("id number", "codice identificativo", "numero identificativo", "matricola"),
+    "nome": ("first name", "nome"),
+    "cognome": ("last name", "cognome"),
+    "email": ("email address", "indirizzo email", "email"),
+}
+
+
+def anteprima_iscritti_moodle(tag: str, appello_id: int, nome_file: str, contenuto: bytes) -> list[dict]:
+    """Legge il file (CSV o Excel) e ritorna una riga per studente con lo stato rispetto
+    al corso: "registrato" (matricola già nel corso), "nuovo" (verrà registrato),
+    "da_verificare" (ID non numerico: spesso un docente o un account di prova, quindi
+    deselezionato di default) o "senza_matricola" (non importabile). "gia_iscritto"
+    segnala chi è già nell'elenco iscritti di questo appello."""
+    righe, _ = _righe_e_codifica(nome_file, contenuto)
+    indice, colonne = None, {}
+    for i, riga in enumerate(righe):
+        normalizzate = [c.strip().lower() for c in riga]
+        trovate = {
+            campo: next((normalizzate.index(n) for n in nomi if n in normalizzate), None)
+            for campo, nomi in _COLONNE_MOODLE.items()
+        }
+        if trovate["matricola"] is not None and trovate["cognome"] is not None:
+            indice, colonne = i, trovate
+            break
+    if indice is None:
+        raise ValueError(
+            "Non trovo nel file le colonne di Moodle 'ID number' e 'Last name' "
+            "(o 'Codice identificativo' e 'Cognome')"
+        )
+
+    def cella(riga: list[str], campo: str) -> str:
+        idx = colonne.get(campo)
+        return riga[idx].strip() if idx is not None and idx < len(riga) else ""
+
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        registrati = {r["matricola"] for r in conn.execute("SELECT matricola FROM studenti")}
+        gia_iscritti = {
+            r["matricola"] for r in conn.execute(
+                "SELECT matricola FROM appello_iscritti_manuali WHERE appello_id=?", (appello_id,)
+            )
+        }
+    finally:
+        conn.close()
+
+    risultato, viste = [], set()
+    for riga in righe[indice + 1:]:
+        if not any(c.strip() for c in riga):
+            continue
+        matricola = cella(riga, "matricola")
+        if matricola in viste:
+            continue  # stessa persona prenotata due volte: conta una sola volta
+        if matricola:
+            viste.add(matricola)
+        if not matricola:
+            stato = "senza_matricola"
+        elif matricola in registrati:
+            stato = "registrato"
+        elif not matricola.isdigit():
+            stato = "da_verificare"
+        else:
+            stato = "nuovo"
+        risultato.append({
+            "matricola": matricola, "nome": cella(riga, "nome"), "cognome": cella(riga, "cognome"),
+            "email": cella(riga, "email"), "stato": stato, "gia_iscritto": matricola in gia_iscritti,
+        })
+    return risultato
+
+
+def importa_iscritti_moodle(tag: str, appello_id: int, studenti: list[dict], sostituisci: bool = False) -> dict:
+    """Registra nel corso gli studenti scelti che non ci sono ancora (nome e cognome dal
+    file) e li aggiunge agli iscritti di questo appello. Con `sostituisci`, prima toglie
+    dall'elenco iscritti chi non è tra gli scelti (es. prenotazioni annullate su Moodle).
+    Ritorna i conteggi per il messaggio di conferma."""
+    scelti = [s for s in studenti if s.get("matricola")]
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        registrati = {r["matricola"] for r in conn.execute("SELECT matricola FROM studenti")}
+        nuovi = [s for s in scelti if s["matricola"] not in registrati]
+        conn.executemany(
+            "INSERT INTO studenti (matricola, nome, cognome) VALUES (?,?,?)",
+            [(s["matricola"], s.get("nome") or "", s.get("cognome") or "") for s in nuovi],
+        )
+        rimossi = 0
+        if sostituisci:
+            prima = conn.total_changes
+            segnaposti = ",".join("?" * len(scelti)) or "''"
+            conn.execute(
+                f"DELETE FROM appello_iscritti_manuali WHERE appello_id=? AND matricola NOT IN ({segnaposti})",
+                (appello_id, *[s["matricola"] for s in scelti]),
+            )
+            rimossi = conn.total_changes - prima
+        prima = conn.total_changes
+        conn.executemany(
+            "INSERT INTO appello_iscritti_manuali (matricola, appello_id) VALUES (?,?) "
+            "ON CONFLICT(matricola, appello_id) DO NOTHING",
+            [(s["matricola"], appello_id) for s in scelti],
+        )
+        aggiunti = conn.total_changes - prima
+        conn.commit()
+    finally:
+        conn.close()
+    return {"aggiunti": aggiunti, "registrati": len(nuovi), "rimossi": rimossi}
 
 
 def iscrivi_tutti_gli_studenti(tag: str, appello_id: int, matricola_minima: str = "") -> int:
@@ -242,7 +355,66 @@ def list_iscritti(tag: str, appello_id: int) -> Optional[list[dict]]:
         return None
     appello = corsi_service.get_appello(tag, appello_id)
     soglia = appello.matricola_minima_iscritti if appello else None
-    return [s for s in elenco if corsi_service.matricola_ammessa(s["matricola"], soglia)]
+    if not soglia:
+        return elenco
+    ammessi_in_deroga = {m for m, ammesso in _decisioni_filtro(tag, appello_id).items() if ammesso}
+    return [
+        s for s in elenco
+        if corsi_service.matricola_ammessa(s["matricola"], soglia) or s["matricola"] in ammessi_in_deroga
+    ]
+
+
+def _decisioni_filtro(tag: str, appello_id: int) -> dict[str, bool]:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        return {
+            r["matricola"]: bool(r["ammesso"]) for r in conn.execute(
+                "SELECT matricola, ammesso FROM appello_eccezioni_matricola WHERE appello_id=?", (appello_id,)
+            )
+        }
+    finally:
+        conn.close()
+
+
+def list_esclusi_dal_filtro(tag: str, appello_id: int) -> list[dict]:
+    """Iscritti con matricola sotto la soglia del filtro di questo appello, ognuno con la
+    decisione del docente: "decisione" è "ammesso" (eccezione: resta tra gli iscritti),
+    "escluso" (esclusione confermata) o None (ancora da confermare). Vuoto se il filtro
+    non è attivo. I dati DSA/L104 servono a decidere con cognizione di causa."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    soglia = appello.matricola_minima_iscritti if appello else None
+    elenco = _list_iscritti_senza_filtro(tag, appello_id)
+    if not soglia or not elenco:
+        return []
+    decisioni = _decisioni_filtro(tag, appello_id)
+    esclusi = []
+    for s in elenco:
+        if corsi_service.matricola_ammessa(s["matricola"], soglia):
+            continue
+        decisione = decisioni.get(s["matricola"])
+        esclusi.append({**s, "decisione": None if decisione is None else ("ammesso" if decisione else "escluso")})
+    return esclusi
+
+
+def decidi_eccezione_filtro(tag: str, appello_id: int, matricola: str, decisione: str) -> None:
+    """`decisione`: "ammesso" (eccezione al filtro), "escluso" (conferma l'esclusione)
+    oppure "" (torna da confermare)."""
+    corsi_service.verifica_appello_aperto(tag, appello_id)
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        if decisione in ("ammesso", "escluso"):
+            conn.execute(
+                "INSERT INTO appello_eccezioni_matricola (appello_id, matricola, ammesso) VALUES (?,?,?) "
+                "ON CONFLICT(appello_id, matricola) DO UPDATE SET ammesso=excluded.ammesso",
+                (appello_id, matricola, decisione == "ammesso"),
+            )
+        else:
+            conn.execute(
+                "DELETE FROM appello_eccezioni_matricola WHERE appello_id=? AND matricola=?", (appello_id, matricola)
+            )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _list_iscritti_senza_filtro(tag: str, appello_id: int) -> Optional[list[dict]]:
@@ -260,7 +432,7 @@ def _list_iscritti_senza_filtro(tag: str, appello_id: int) -> Optional[list[dict
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         anagrafica = {
-            r["matricola"]: r for r in conn.execute("SELECT matricola, nome, cognome, dsa, dsa_note FROM studenti")
+            r["matricola"]: r for r in conn.execute("SELECT matricola, nome, cognome, dsa, dsa_tipo, dsa_note FROM studenti")
         }
     finally:
         conn.close()
@@ -278,14 +450,15 @@ def _list_iscritti_senza_filtro(tag: str, appello_id: int) -> Optional[list[dict
         if studente:
             iscritti.append({
                 "matricola": matricola, "cognome": studente["cognome"], "nome": studente["nome"],
-                "dsa": bool(studente["dsa"]), "dsa_note": studente["dsa_note"] or "", "registrato": True,
+                "dsa": bool(studente["dsa"]), "dsa_tipo": studenti_service.tipo_dsa(studente["dsa"], studente["dsa_tipo"]),
+                "dsa_note": studente["dsa_note"] or "", "registrato": True,
             })
         else:
             iscritti.append({
                 "matricola": matricola,
                 "cognome": r[idx_cognome].strip() if idx_cognome is not None and len(r) > idx_cognome else "",
                 "nome": r[idx_nome].strip() if idx_nome is not None and len(r) > idx_nome else "",
-                "dsa": False, "dsa_note": "", "registrato": False,
+                "dsa": False, "dsa_tipo": "", "dsa_note": "", "registrato": False,
             })
     iscritti.sort(key=lambda s: (s["cognome"], s["nome"]))
     return iscritti

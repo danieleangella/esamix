@@ -16,6 +16,20 @@ class Studente:
     laurea_nome: Optional[str] = None
     dsa: bool = False
     dsa_note: str = ""
+    dsa_tipo: str = ""  # "DSA" o "L104" se dsa, altrimenti ""
+
+
+# Tipi di bisogni speciali registrabili per uno studente: disturbi specifici
+# dell'apprendimento (L. 170/2010) o disabilità (L. 104/1992).
+TIPI_DSA = ("DSA", "L104")
+
+
+def tipo_dsa(dsa, tipo: Optional[str]) -> str:
+    """L'etichetta da mostrare ("DSA", "L104" o "" se nessuno): i corsi creati prima di
+    poter scegliere il tipo hanno solo dsa=1, che vale "DSA"."""
+    if not dsa:
+        return ""
+    return tipo if tipo in TIPI_DSA else "DSA"
 
 
 def _clean(value: Optional[str]) -> str:
@@ -30,6 +44,8 @@ def _row_to_studente(row) -> Studente:
         laurea_ctype=row["laurea_ctype"], laurea_nome=row["laurea_nome"] if "laurea_nome" in row.keys() else None,
         dsa=bool(row["dsa"]) if "dsa" in row.keys() else False,
         dsa_note=(row["dsa_note"] or "") if "dsa_note" in row.keys() else "",
+        dsa_tipo=tipo_dsa(row["dsa"], row["dsa_tipo"]) if "dsa_tipo" in row.keys() else
+        ("DSA" if "dsa" in row.keys() and row["dsa"] else ""),
     )
 
 
@@ -79,10 +95,10 @@ def esporta_ammessi_csv(lista: list[dict]) -> bytes:
     (aggiunto a mano pur non soddisfacendo i requisiti automatici)."""
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\r\n")
-    writer.writerow(["Matricola", "Cognome", "Nome", "DSA", "Aula", "In deroga"])
+    writer.writerow(["Matricola", "Cognome", "Nome", "DSA/L104", "Aula", "In deroga"])
     for s in lista:
         writer.writerow([
-            s["matricola"], s["cognome"], s["nome"], "Sì" if s.get("dsa") else "",
+            s["matricola"], s["cognome"], s["nome"], tipo_dsa(s.get("dsa"), s.get("dsa_tipo")),
             s.get("aula_nome") or "non assegnata", "Sì" if s.get("in_deroga") else "",
         ])
     return buffer.getvalue().encode("utf-8-sig")
@@ -279,10 +295,10 @@ def get_studente(tag: str, matricola: str) -> Optional[Studente]:
 
 
 def crea_studente(
-    tag: str, matricola: str, nome: str, cognome: str, laurea_ctype: Optional[str] = None, dsa: bool = False,
+    tag: str, matricola: str, nome: str, cognome: str, laurea_ctype: Optional[str] = None, dsa_tipo: str = "",
     dsa_note: str = "",
 ) -> None:
-    """A differenza di upsert_studente, rifiuta la matricola se già assegnata a qualcun
+    """`dsa_tipo`: "DSA", "L104" o "" (nessuno). A differenza di upsert_studente, rifiuta la matricola se già assegnata a qualcun
     altro: usata dal form "Aggiungi studente", dove un inserimento con matricola sbagliata
     non deve sovrascrivere in silenzio lo studente già presente."""
     matricola = _clean(matricola)
@@ -296,8 +312,9 @@ def crea_studente(
                 f"La matricola {matricola} è già assegnata a {esistente['cognome']} {esistente['nome']}"
             )
         conn.execute(
-            "INSERT INTO studenti (matricola, nome, cognome, laurea_ctype, dsa, dsa_note) VALUES (?,?,?,?,?,?)",
-            (matricola, _clean(nome), _clean(cognome), laurea_ctype or None, dsa, _clean(dsa_note) or None),
+            "INSERT INTO studenti (matricola, nome, cognome, laurea_ctype, dsa, dsa_tipo, dsa_note) VALUES (?,?,?,?,?,?,?)",
+            (matricola, _clean(nome), _clean(cognome), laurea_ctype or None, dsa_tipo in TIPI_DSA,
+             dsa_tipo if dsa_tipo in TIPI_DSA else None, _clean(dsa_note) or None),
         )
         conn.commit()
     finally:
@@ -320,7 +337,7 @@ def upsert_studente(tag: str, matricola: str, nome: str, cognome: str, laurea_ct
 
 
 def aggiorna_studente(
-    tag: str, matricola: str, nome: str, cognome: str, nuova_matricola: Optional[str] = None, dsa: bool = False,
+    tag: str, matricola: str, nome: str, cognome: str, nuova_matricola: Optional[str] = None, dsa_tipo: str = "",
     dsa_note: str = "",
 ) -> None:
     matricola = _clean(matricola)
@@ -335,8 +352,9 @@ def aggiorna_studente(
             # può aggiornare prima la tabella genitore e poi le tabelle figlie in sicurezza.
             conn.execute("PRAGMA defer_foreign_keys = ON")
         cur = conn.execute(
-            "UPDATE studenti SET nome=?, cognome=?, matricola=?, dsa=?, dsa_note=? WHERE matricola=?",
-            (_clean(nome), _clean(cognome), nuova_matricola, dsa, _clean(dsa_note) or None, matricola),
+            "UPDATE studenti SET nome=?, cognome=?, matricola=?, dsa=?, dsa_tipo=?, dsa_note=? WHERE matricola=?",
+            (_clean(nome), _clean(cognome), nuova_matricola, dsa_tipo in TIPI_DSA,
+             dsa_tipo if dsa_tipo in TIPI_DSA else None, _clean(dsa_note) or None, matricola),
         )
         if cur.rowcount == 0:
             raise ValueError(f"Studente con matricola '{matricola}' non trovato")

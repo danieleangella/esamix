@@ -499,6 +499,7 @@ def impostazioni_corso(request: Request, tag: str):
         "corso": corso,
         "default_frase_consegna": corsi_service.DEFAULT_FRASE_CONSEGNA,
         "default_frase_regole": corsi_service.DEFAULT_FRASE_REGOLE,
+        "default_frase_obbligatorio": corsi_service.DEFAULT_FRASE_OBBLIGATORIO,
     })
 
 
@@ -510,7 +511,7 @@ def modifica_corso(
     risposta_corretta: int = Form(...), risposta_sbagliata: int = Form(...), risposta_vuota: int = Form(...),
     punteggio_max_aperta: int = Form(corsi_service.DEFAULT_PUNTEGGIO_MAX_APERTA),
     domande_aperte_attive: str = Form(""),
-    frase_consegna: str = Form(""), frase_regole: str = Form(""),
+    frase_consegna: str = Form(""), frase_regole: str = Form(""), frase_obbligatorio: str = Form(""),
     orale_dopo_richiesta: str = Form(""), orale_soglia_attiva: str = Form(""),
     orale_soglia_n: str = Form(""), orale_soglia_voto: str = Form(""),
     orale_soglia_escludi_parziali: str = Form(""),
@@ -525,6 +526,7 @@ def modifica_corso(
             domande_aperte_attive="1" if domande_aperte_attive else "0",
             frase_consegna=frase_consegna.strip() or corsi_service.DEFAULT_FRASE_CONSEGNA,
             frase_regole=frase_regole.strip() or corsi_service.DEFAULT_FRASE_REGOLE,
+            frase_obbligatorio=frase_obbligatorio.strip() or corsi_service.DEFAULT_FRASE_OBBLIGATORIO,
             orale_dopo_richiesta="1" if orale_dopo_richiesta else "0",
             orale_soglia_attiva="1" if orale_soglia_attiva else "0",
             orale_soglia_n=orale_soglia_n.strip(), orale_soglia_voto=orale_soglia_voto.strip(),
@@ -779,6 +781,7 @@ def _dati_appello(tag: str, corso, appello) -> dict:
         "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
         "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
         "segreteria_csv": esportazione_service.get_segreteria_csv(tag, appello.id),
+        "esclusi_filtro": esportazione_service.list_esclusi_dal_filtro(tag, appello.id),
         "iscritti": iscritti,
         "iscritti_manuali": esportazione_service.list_iscritti_manuali(tag, appello.id),
         "numero_iscritti": numero_iscritti,
@@ -1201,26 +1204,17 @@ def imposta_obbligatorio(tag: str, appello_id: int, esercizio_id: int, backgroun
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
-@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/sposta-su")
-def sposta_su_esercizio(tag: str, appello_id: int, esercizio_id: int):
-    appello = corsi_service.get_appello(tag, appello_id)
-    anchor = _anchor_membro(appello, "creazione")
+@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/ordine")
+async def ordina_esercizi(tag: str, appello_id: int, request: Request):
+    """Salva il nuovo ordine degli esercizi assegnati, inviato dalla tabella della scheda
+    Testo (trascinamento, frecce, posizione o "Ordina per") senza ricaricare la pagina."""
+    dati = await request.json()
     try:
-        esercizi_service.sposta_esercizio(tag, appello_id, esercizio_id, -1)
-    except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Ordine aggiornato", anchor=anchor)
-
-
-@app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/{esercizio_id}/sposta-giu")
-def sposta_giu_esercizio(tag: str, appello_id: int, esercizio_id: int):
-    appello = corsi_service.get_appello(tag, appello_id)
-    anchor = _anchor_membro(appello, "creazione")
-    try:
-        esercizi_service.sposta_esercizio(tag, appello_id, esercizio_id, 1)
-    except ValueError as e:
-        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Ordine aggiornato", anchor=anchor)
+        ordine = [int(i) for i in dati.get("ordine") or []]
+        esercizi_service.imposta_ordine(tag, appello_id, ordine)
+    except (ValueError, TypeError) as e:
+        return JSONResponse({"errore": str(e)}, status_code=400)
+    return JSONResponse({"ok": True})
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/nuovo")
@@ -1330,6 +1324,7 @@ async def importa_esercizi_json(
     return templates.TemplateResponse(request, "esercizi_importa_conferma.html", {
         "corso": corso, "appello": appello, "candidati": candidati,
         "dati_json": json.dumps(contenuto, ensure_ascii=False),
+        "esercizi_compito": esercizi_service.list_esercizi_appello(tag, appello_id),
     })
 
 
@@ -1346,13 +1341,42 @@ async def importa_esercizi_json_conferma(request: Request, tag: str, appello_id:
         scelti = [c for i, c in enumerate(candidati) if i in indici_scelti]
         if not scelti:
             return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessun esercizio selezionato per l'import", "error", anchor=anchor)
-        n = esercizi_service.importa_json(tag, appello_id, scelti)
-        msg = f"Importati {n} esercizi dal file" + _rigenera_se_necessario(tag, appello_id, background_tasks)
+        # "aggiungi" (default), "sostituisci" (i vecchi restano nella banca) oppure
+        # "sostituisci_elimina" (i vecchi vengono eliminati anche dalla banca dati)
+        modalita = form.get("modalita") or "aggiungi"
+        if modalita in ("sostituisci", "sostituisci_elimina"):
+            n, rimossi, tenuti = esercizi_service.sostituisci_con_json(tag, appello_id, scelti)
+            msg = f"Importati {n} esercizi dal file, al posto dei {len(rimossi)} esercizi precedenti del compito"
+            if tenuti:
+                msg += f" ({tenuti} già presenti e identici sono stati mantenuti)"
+        else:
+            n, rimossi = esercizi_service.importa_json(tag, appello_id, scelti), []
+            msg = f"Importati {n} esercizi dal file"
+        msg += "." + _rigenera_se_necessario(tag, appello_id, background_tasks)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Errore import: {e}", "error", anchor=anchor)
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
+    kind = "success"
+    if modalita == "sostituisci":
+        msg += " I vecchi esercizi restano nella banca dati del corso."
+    elif modalita == "sostituisci_elimina":
+        # dopo la rigenerazione: i blocchi di questo appello non li referenziano più
+        non_eliminati = 0
+        for esercizio_id in rimossi:
+            try:
+                esercizi_service.elimina_esercizio(tag, esercizio_id)
+            except ValueError:
+                non_eliminati += 1
+        msg += f" Eliminati dalla banca dati {len(rimossi) - non_eliminati} vecchi esercizi"
+        if non_eliminati:
+            msg += (
+                f"; {non_eliminati} restano nella banca perché assegnati ad altri appelli "
+                "o presenti in loro compiti già generati"
+            )
+            kind = "warning"
+        msg += "."
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, kind, anchor=anchor)
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/ia", response_class=HTMLResponse)
@@ -1401,6 +1425,7 @@ def genera_ia(
     return templates.TemplateResponse(request, "esercizi_importa_conferma.html", {
         "corso": corsi_service.get_corso(tag), "appello": appello, "candidati": candidati,
         "dati_json": json.dumps(contenuto, ensure_ascii=False), "generati_ia": True,
+        "esercizi_compito": esercizi_service.list_esercizi_appello(tag, appello_id),
     })
 
 
@@ -1795,6 +1820,48 @@ def aggiungi_iscritto_manuale(tag: str, appello_id: int, matricola: str = Form(.
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Iscritto aggiunto", anchor=anchor)
 
 
+@app.post("/corsi/{tag}/appelli/{appello_id}/iscritti-moodle", response_class=HTMLResponse)
+async def carica_iscritti_moodle(request: Request, tag: str, appello_id: int, file: UploadFile = File(...)):
+    """Prenotazioni esportate da Moodle: prima un'anteprima, in cui scegliere chi
+    importare, poi la conferma (iscritti_moodle_conferma)."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "compiti")
+    try:
+        studenti = esportazione_service.anteprima_iscritti_moodle(tag, appello_id, file.filename, await file.read())
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"File non valido: {e}", "error", anchor=anchor)
+    if not studenti:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Il file non contiene prenotazioni", "error", anchor=anchor)
+    return templates.TemplateResponse(request, "iscritti_moodle_conferma.html", {
+        "corso": corsi_service.get_corso(tag), "appello": appello, "studenti": studenti, "anchor": anchor,
+        "dati_json": json.dumps(studenti, ensure_ascii=False),
+        "n_iscritti_attuali": len(esportazione_service.list_iscritti_manuali(tag, appello_id)),
+    })
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/iscritti-moodle/conferma")
+async def conferma_iscritti_moodle(request: Request, tag: str, appello_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "compiti")
+    form = await request.form()
+    studenti = json.loads(form.get("dati_json") or "[]")
+    indici = {int(i) for i in form.getlist("importa_idx")}
+    scelti = [s for i, s in enumerate(studenti) if i in indici and s.get("matricola")]
+    if not scelti:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessuno studente selezionato", "error", anchor=anchor)
+    esito = esportazione_service.importa_iscritti_moodle(
+        tag, appello_id, scelti, sostituisci=bool(form.get("sostituisci")),
+    )
+    msg = f"Importate {len(scelti)} prenotazioni da Moodle: {esito['aggiunti']} nuovi iscritti"
+    if esito["registrati"]:
+        msg += f", di cui {esito['registrati']} registrati ora nel corso"
+    if esito["rimossi"]:
+        msg += f"; {esito['rimossi']} iscritti non più presenti nel file sono stati tolti dall'elenco"
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg + ".", anchor=anchor)
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/iscritti-manuale/tutti")
 def iscrivi_tutti(tag: str, appello_id: int, matricola_minima: str = Form("")):
     appello = corsi_service.get_appello(tag, appello_id)
@@ -1816,6 +1883,23 @@ def imposta_filtro_iscritti(tag: str, appello_id: int, matricola_minima: str = F
     msg = (f"Filtro salvato: solo matricole ≥ {soglia}" if soglia else "Filtro sulle matricole rimosso")
     if n is not None:
         msg += f" — {n} iscritti nell'elenco"
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/iscritti-filtro/{matricola}")
+def decidi_eccezione_filtro(tag: str, appello_id: int, matricola: str, decisione: str = Form("")):
+    """Decisione del docente su un iscritto escluso dal filtro sulla matricola: ammetterlo
+    comunque (eccezione), confermarne l'esclusione o rimettere la decisione in sospeso."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "compiti")
+    try:
+        esportazione_service.decidi_eccezione_filtro(tag, appello_id, matricola, decisione)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    msg = {
+        "ammesso": f"Matricola {matricola} ammessa in deroga al filtro",
+        "escluso": f"Esclusione della matricola {matricola} confermata",
+    }.get(decisione, f"Decisione sulla matricola {matricola} annullata: torna da confermare")
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
@@ -2224,7 +2308,7 @@ def studente_dettaglio_corso(request: Request, tag: str, matricola: str):
 
 @app.post("/corsi/{tag}/studenti/nuovo")
 def nuovo_studente(
-    tag: str, matricola: str = Form(...), nome: str = Form(...), cognome: str = Form(...), dsa: bool = Form(False),
+    tag: str, matricola: str = Form(...), nome: str = Form(...), cognome: str = Form(...), dsa_tipo: str = Form(""),
     dsa_note: str = Form(""), next: str = Form(""),
 ):
     # "next" (usato dai form di registrazione rapida su Compiti d'esame/Presenze/
@@ -2238,7 +2322,7 @@ def nuovo_studente(
     if not (destinazione.startswith("/corsi/") and not destinazione.startswith("//")):
         destinazione, ancora = f"/corsi/{tag}/studenti", ""
     try:
-        studenti_service.crea_studente(tag, matricola, nome, cognome, dsa=dsa, dsa_note=dsa_note)
+        studenti_service.crea_studente(tag, matricola, nome, cognome, dsa_tipo=dsa_tipo, dsa_note=dsa_note)
     except ValueError as e:
         return flash_redirect(destinazione, str(e), "error", anchor=ancora)
     return flash_redirect(destinazione, "Studente salvato", anchor=ancora)
@@ -2247,11 +2331,11 @@ def nuovo_studente(
 @app.post("/corsi/{tag}/studenti/{matricola}/modifica")
 def modifica_studente(
     tag: str, matricola: str, nome: str = Form(...), cognome: str = Form(...), nuova_matricola: str = Form(""),
-    dsa: bool = Form(False), dsa_note: str = Form(""),
+    dsa_tipo: str = Form(""), dsa_note: str = Form(""),
 ):
     try:
         studenti_service.aggiorna_studente(
-            tag, matricola, nome, cognome, nuova_matricola or None, dsa=dsa, dsa_note=dsa_note,
+            tag, matricola, nome, cognome, nuova_matricola or None, dsa_tipo=dsa_tipo, dsa_note=dsa_note,
         )
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/studenti", str(e), "error")
