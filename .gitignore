@@ -7,6 +7,7 @@ __pycache__/
 corsi/*/db.sqlite
 corsi/*/output/
 corsi/app_settings.json
+corsi/registro.jsonl
 *.sqlite
 *.sqlite3
 GeoOZ-IngMEL-UniFi25/

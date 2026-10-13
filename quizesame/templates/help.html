@@ -119,7 +119,7 @@
     compito, tutte le loro varianti, la risposta corretta segnata e la
     soluzione/suggerimento: si può aprire in qualunque momento, anche prima dei blocchi, e
     non crea codici. Si aggiorna da solo quando cambiano gli esercizi o le impostazioni del
-    corso; <strong>↻ Rigenera</strong> lo ricompila comunque da zero. Ha margini ampi (soprattutto a destra) per annotare a mano le
+    corso. Ha margini ampi (soprattutto a destra) per annotare a mano le
     correzioni sul foglio stampato. Sotto ogni esercizio c'è un riquadro
     <em>Revisione</em> con le caselle "corretta" / "da correggere" per ogni variante e per la
     soluzione e uno spazio per le note sulle correzioni; in fondo, una pagina per le note
@@ -169,15 +169,33 @@
     solo testi di esercizi e impostazioni del corso, mai dati degli studenti.
   </p>
   <p id="verifica-ia">
-    <strong>Verifica delle soluzioni.</strong> Nel titolo di "Esercizi assegnati" della scheda
-    Testo, <strong>✓ Verifica con l'IA</strong> fa risolvere al modello ogni esercizio del
-    compito, in ogni variante, e segnala se la risposta indicata come corretta è sbagliata o non
-    è l'unica corretta, se il testo è ambiguo o ha formule scritte male e se la soluzione contiene
-    errori. Il risultato mostra per ogni esercizio "corretto", "da controllare" o "errore", con la
-    risposta calcolata dal modello e una spiegazione. È un aiuto, non una garanzia: anche il
-    modello può sbagliare. Senza configurazione si copia il prompt in claude.ai e poi si
-    incolla la risposta di Claude nella stessa pagina ("Con claude.ai: incolla la risposta"),
-    che mostra lo stesso riepilogo.
+    <strong>Verifica delle soluzioni.</strong> Il modello risolve per conto suo ogni esercizio, in
+    ogni variante, e segnala se la risposta indicata come corretta è sbagliata o non è l'unica
+    corretta, se il testo è ambiguo o ha formule scritte male e se la soluzione contiene errori.
+    Si può verificare il compito di un appello (<strong>✓ Verifica con l'IA</strong> nel titolo di
+    "Esercizi assegnati" della scheda Testo), l'intera banca di un corso (pagina Esercizi del
+    corso), un singolo esercizio (dal suo stato, accanto al nome) oppure tutte le banche insieme
+    (pagina "Tutti gli esercizi"). È un aiuto, non una garanzia: anche il modello può sbagliare.
+  </p>
+  <p>
+    L'esito resta <strong>salvato per ogni esercizio</strong> e compare accanto al nome
+    (✓ verificato, ✗ errore, ? da controllare, "modificato" se è stato cambiato dopo l'ultima
+    verifica, "da verificare" se non è mai stato verificato). Con "Controlla solo quelli da
+    verificare" gli esercizi già verificati e non modificati vengono saltati. Se un dubbio
+    dell'IA è infondato, <strong>Segna come corretto</strong> lo segna come verificato.
+  </p>
+  <p>
+    <strong>Correzione con l'IA.</strong> Per un esercizio con errori o dubbi,
+    <strong>Proponi una correzione con l'IA</strong> (o "Correggi con l'IA" accanto al titolo) fa
+    riscrivere l'esercizio correggendo solo ciò che è stato segnalato, elenca le modifiche fatte
+    (testo, risposta corretta, risposte sbagliate, soluzione) e mostra <em>prima</em> e <em>dopo</em> affiancati. La proposta si può
+    modificare a mano ("Modifica la proposta prima di salvarla") e si salva solo con
+    <strong>Accetta e salva la correzione</strong>: l'esercizio viene aggiornato come per una
+    modifica fatta a mano (anche negli appelli che lo usano) e segnato come verificato.
+  </p>
+  <p>
+    Senza una configurazione IA, in ogni pagina si copia il prompt in claude.ai e si incolla poi
+    la risposta di Claude ("Con claude.ai: incolla la risposta"): il risultato è lo stesso.
   </p>
   <p>
     Indipendentemente dall'IA, l'app non accetta esercizi con <strong>due risposte uguali</strong>
@@ -604,6 +622,42 @@ COMPITO DA CONVERTIRE
   </p>
 </details>
 
+<details class="card dettaglio-fisarmonica" id="documenti">
+  <summary>Documenti: PDF, formati e rigenerazione</summary>
+  <p>
+    I compiti sono scritti in un carattere senza grazie chiaro (Helvetica), senza corsivi, con
+    un'intestazione su fondo grigio chiaro (corso, prova, codice del compito, campi per i dati,
+    griglia delle risposte e voto) e una riga verticale tra le due colonne di esercizi.
+    <strong>Ogni compito occupa sempre due pagine</strong>, cioè un foglio fronte-retro: se il testo
+    sta in una pagina la seconda resta bianca; se non sta in due, la generazione lo segnala.
+  </p>
+  <p>
+    Nella sezione <strong>Compiti generati</strong> della scheda Compiti d'esame,
+    <strong>↻ Rigenera tutti i documenti</strong> ricostruisce compiti, griglie, fogli di
+    riferimento e anteprima con gli esercizi e la grafica attuali, mantenendo gli stessi codici e
+    lo stesso ordine di esercizi e risposte: i compiti già stampati restano validi. I fogli da
+    pubblicare (con e senza soluzioni) sono comunque sempre aggiornati agli esercizi attuali.
+    Vengono rigenerati anche gli elenchi di iscritti e ammessi e i risultati, se presenti.
+  </p>
+  <p>
+    Ogni documento è disponibile in più formati: <strong>PDF</strong> da stampare,
+    <strong>HTML</strong> da consultare a schermo (con un pulsante Stampa), <strong>TeX</strong>
+    (il sorgente) e, per i documenti da pubblicare (fogli di riferimento e risultati),
+    <strong>Markdown</strong>, da incollare in Moodle, in una pagina web o in un'email. Dopo ogni
+    generazione l'app segnala se in qualche punto del testo esce dal margine.
+  </p>
+</details>
+
+<details class="card dettaglio-fisarmonica" id="registro">
+  <summary>Registro delle azioni</summary>
+  <p>
+    La voce <strong>Registro</strong> del menu elenca, una riga per azione, tutto ciò che è stato
+    fatto nell'app (ogni modulo inviato, con l'esito, e ogni documento aperto o scaricato), le
+    verifiche con l'IA e gli aggiornamenti installati, con le novità di ciascuno. Si può filtrare
+    per corso, tipo e testo. Il registro è nel file <code>registro.jsonl</code> accanto ai corsi.
+  </p>
+</details>
+
 <details class="card dettaglio-fisarmonica" id="aggiornamento">
   <summary>Aggiornamento</summary>
   <p>
@@ -613,6 +667,12 @@ COMPITO DA CONVERTIRE
     <code>aggiorna.bat</code>. Lo script scarica il codice più recente e reinstalla le
     eventuali dipendenze cambiate, senza toccare i corsi già presenti nella cartella
     <code>corsi/</code>.
+  </p>
+  <p>
+    Dopo un aggiornamento <strong>EsaMiX va riavviato</strong> (Ctrl+C nel terminale e di nuovo
+    <code>./esamix.sh</code>): finché non lo fai, in alto in ogni pagina compare un avviso, perché
+    alcune funzioni nuove non funzionerebbero. Dopo il riavvio, per avere i PDF già generati con
+    la nuova grafica usa "Rigenera tutti i documenti" nella scheda Compiti d'esame.
   </p>
 </details>
 

@@ -4,9 +4,9 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <span class="current">Esercizi</span>
 {% endblock %}
 {% block katex %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="/static/katex/katex.min.css">
+<script defer src="/static/katex/katex.min.js"></script>
+<script defer src="/static/katex/contrib/auto-render.min.js"></script>
 {% endblock %}
 {% block content %}
 {% set sezione_corso = "esercizi" %}
@@ -51,6 +51,14 @@
       </select>
     </div>
   </div>
+  {% from "_stato_verifica.html" import stato_verifica %}
+  {% set stati_v = stati_verifica(corso.tag, esercizi) %}
+  {% set n_da_verificare = stati_v.values() | selectattr("stato", "in", ["mai", "modificato"]) | list | length %}
+  {% set n_problemi = stati_v.values() | selectattr("stato", "in", ["errore", "dubbio"]) | list | length %}
+  <p style="margin:0.75rem 0 0; display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center">
+    <a class="icona-azione" href="/corsi/{{ corso.tag }}/esercizi/ia/verifica">✓ Verifica con l'IA la banca</a>
+    <span class="muted">{{ esercizi|length - n_da_verificare - n_problemi }} verificati · {{ n_da_verificare }} da verificare{% if n_problemi %} · <strong>{{ n_problemi }} con errori o dubbi</strong>{% endif %}</span>
+  </p>
   <table class="tabella-banca-esercizi" style="margin-top:0.75rem">
     <tr><th>Nome</th><th>Argomento</th><th>Varianti</th><th>Anteprima</th><th></th></tr>
     {% for e in esercizi %}
@@ -60,6 +68,7 @@
         {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
         {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
         {% set problemi = problemi_risposte(e) %}{% if problemi %}<span class="badge badge-err" title="{{ problemi|join('; ') }}">⚠ risposte uguali</span>{% endif %}
+        {{ stato_verifica(corso.tag, e, stati_v[e.id], "/corsi/" ~ corso.tag ~ "/esercizi") }}
       </td>
       <td>{{ e.argomento or '-' }}</td>
       <td>{{ e.varianti|length }}</td>

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Correzione con l'IA · {{ esercizio.nome or esercizio.id }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
+<a href="{{ torna }}">indietro</a> <span class="sep">›</span> <span class="current">Correzione con l'IA</span>
+{% endblock %}
+{% block katex %}
+<link rel="stylesheet" href="/static/katex/katex.min.css">
+<script defer src="/static/katex/katex.min.js"></script>
+<script defer src="/static/katex/contrib/auto-render.min.js"></script>
+{% endblock %}
+{% block content %}
+<header class="intestazione-pagina">
+  <div class="intestazione-livello">Correzione con l'IA · <a href="/corsi/{{ corso.tag }}/esercizi">{{ corso.nome }} ({{ corso.anno }})</a></div>
+  <h1>{{ esercizio.nome or ('Esercizio #' ~ esercizio.id) }}</h1>
+</header>
+
+{% if errore %}<div class="flash flash-error">{{ errore }}</div>{% endif %}
+
+{% macro mostra(varianti, soluzione, aperta) %}
+  {% for v in varianti %}
+  <div class="rif-variante" style="margin-top:0.25rem">{% if varianti|length > 1 %}Variante {{ loop.index }}{% else %}Testo{% endif %}</div>
+  <div class="rif-testo">{{ v.testo }}</div>
+  {% if not aperta %}
+  <ol class="rif-risposte" type="A">
+    {% for r in v.risposte %}<li{% if loop.first %} class="corretta"{% endif %}>{{ r }}{% if loop.first %} <span class="badge badge-ok">✓</span>{% endif %}</li>{% endfor %}
+  </ol>
+  {% endif %}
+  {% endfor %}
+  {% if soluzione %}<div class="rif-soluzione"><strong>Soluzione.</strong> {{ soluzione }}</div>{% endif %}
+{% endmacro %}
+
+{% set problemi = stato.dettaglio if stato.dettaglio else None %}
+{% if problemi %}
+<div class="card">
+  <strong>Problemi segnalati dalla verifica</strong>
+  <ul style="margin:0.4rem 0 0">
+    {% if problemi.commento %}<li>{{ problemi.commento }}</li>{% endif %}
+    {% for v in problemi.varianti or [] %}{% if v.esito != 'ok' %}
+    <li>Variante {{ v.numero }} ({{ v.esito }}): {{ v.commento }}{% if v.risposta_calcolata %} — secondo l'IA: {{ v.risposta_calcolata }}{% endif %}</li>
+    {% endif %}{% endfor %}
+    {% if problemi.soluzione and problemi.soluzione.esito in ('errore', 'dubbio') %}<li>Soluzione ({{ problemi.soluzione.esito }}): {{ problemi.soluzione.commento }}</li>{% endif %}
+  </ul>
+</div>
+{% else %}
+<div class="flash flash-warning">Per questo esercizio non c'è una verifica salvata: la correzione si baserà solo sul testo. Conviene
+  <a href="/corsi/{{ corso.tag }}/esercizi/{{ esercizio.id }}/ia/verifica">verificarlo prima</a>.</div>
+{% endif %}
+
+{% if proposta %}
+<div class="card riepilogo-modifiche">
+  <strong>Modifiche proposte{% if modificata %} (con le tue modifiche){% endif %}</strong>
+  {% if modifiche %}
+  <ul style="margin:0.4rem 0 0">{% for m in modifiche %}<li>{{ m }}</li>{% endfor %}</ul>
+  {% else %}
+  <p class="muted" style="margin:0.4rem 0 0">Nessuna differenza rispetto all'esercizio attuale: secondo l'IA non c'è niente da cambiare.
+    Se sei d'accordo, puoi segnarlo come verificato.</p>
+  {% endif %}
+</div>
+<div class="confronto-correzione">
+  <div class="card">
+    <div class="titoletto" style="margin-top:0">Prima (attuale)</div>
+    {{ mostra(esercizio.varianti, esercizio.soluzione, esercizio.aperta) }}
+  </div>
+  <div class="card proposta">
+    <div class="titoletto" style="margin-top:0">Dopo (proposta dell'IA)</div>
+    {{ mostra(proposta.varianti, proposta.soluzione, proposta.aperta) }}
+  </div>
+</div>
+<div class="card">
+  <p style="margin-top:0">Controlla la proposta: se la accetti, l'esercizio viene aggiornato come per una modifica fatta a mano
+    (anche negli appelli che lo usano) e segnato come verificato. Puoi sempre modificarlo ancora dopo.</p>
+  <form method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ esercizio.id }}/ia/correggi/conferma" style="display:inline">
+    <textarea name="proposta_json" hidden>{{ proposta_json }}</textarea>
+    <input type="hidden" name="firma_attuale" value="{{ firma_attuale }}">
+    <input type="hidden" name="torna" value="{{ torna }}">
+    <button type="submit">Accetta e salva la correzione</button>
+  </form>
+  <a class="button secondary" href="{{ torna }}">Annulla</a>
+  <a href="/corsi/{{ corso.tag }}/esercizi/{{ esercizio.id }}/ia/correggi?torna={{ torna|urlencode }}" style="margin-left:0.75rem">chiedi un'altra proposta</a>
+</div>
+<details class="card" {% if modificata %}open{% endif %}>
+  <summary><strong>Modifica la proposta prima di salvarla</strong></summary>
+  <p class="muted">La proposta in formato testo: cambia ciò che vuoi (testo, risposte — la corretta inizia con "+", le
+    sbagliate con "-" — e soluzione), poi aggiorna il confronto e accetta.</p>
+  <form method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ esercizio.id }}/ia/correggi">
+    <input type="hidden" name="torna" value="{{ torna }}">
+    <input type="hidden" name="modifica" value="1">
+    <textarea name="risposta" rows="14" style="font-family:monospace">{{ proposta_testo }}</textarea>
+    <button type="submit">Aggiorna il confronto</button>
+  </form>
+  <p class="muted" style="margin-bottom:0">Oppure modificalo direttamente nella <a href="/corsi/{{ corso.tag }}/esercizi">banca esercizi</a>
+    (pulsante Modifica) e poi segnalo come verificato.</p>
+</details>
+{% else %}
+<div class="card">
+  <p style="margin-top:0">L'IA riscrive l'esercizio correggendo <strong>solo</strong> ciò che è stato segnalato. Prima di salvare vedrai
+    prima e dopo affiancati e deciderai tu se accettare.</p>
+  <form method="post" class="form-correzione-ia">
+    <input type="hidden" name="torna" value="{{ torna }}">
+    {% if profili_ia|length > 1 %}{% set appello = {'id': 'c'} %}{% include "_scelta_profilo_ia.html" %}{% endif %}
+    <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-top:0.75rem">
+      {% if fornitore_ia %}<button type="submit" style="margin:0">Proponi una correzione</button>{% endif %}
+      <button type="button" class="secondary btn-copia-prompt-correzione" style="margin:0">{{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</button>
+      <span class="muted stato-correzione" role="status"></span>
+    </div>
+  </form>
+</div>
+<details class="card" {% if not fornitore_ia or risposta_incollata %}open{% endif %}>
+  <summary><strong>Con claude.ai: incolla la risposta</strong></summary>
+  <p class="muted">Copia il prompt, incollalo su <a href="https://claude.ai" target="_blank" rel="noopener">claude.ai</a>, poi incolla qui
+    l'esercizio corretto che ti restituisce (il blocco di testo con "### ESERCIZIO").</p>
+  <form method="post">
+    <input type="hidden" name="torna" value="{{ torna }}">
+    <textarea name="risposta" rows="10" required placeholder="### ESERCIZIO&#10;...">{{ risposta_incollata or '' }}</textarea>
+    <button type="submit">Mostra il confronto</button>
+  </form>
+</details>
+<div class="card">
+  <div class="titoletto" style="margin-top:0">Esercizio attuale</div>
+  {{ mostra(esercizio.varianti, esercizio.soluzione, esercizio.aperta) }}
+</div>
+{% endif %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () { renderizzaLatex(document.getElementById("contenuto")); });
+(function () {
+  var form = document.querySelector(".form-correzione-ia");
+  if (!form) return;
+  var stato = form.querySelector(".stato-correzione");
+  // arrivando da "Correggi con l'IA" nei risultati della verifica, la proposta parte da sola
+  if (new URLSearchParams(location.search).get("auto") === "1" && form.querySelector('button[type="submit"]')) {
+    setTimeout(function () { form.requestSubmit(); }, 50);
+  }
+  form.addEventListener("submit", function () {
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) { btn.disabled = true; btn.textContent = "Correzione in corso…"; }
+    stato.textContent = "Può richiedere qualche minuto.";
+  });
+  form.querySelector(".btn-copia-prompt-correzione").addEventListener("click", function () {
+    fetch("/corsi/{{ corso.tag }}/esercizi/{{ esercizio.id }}/ia/correggi/prompt")
+      .then(function (r) { return r.text(); })
+      .then(function (t) { return navigator.clipboard.writeText(t); })
+      .then(function () { stato.textContent = "Prompt copiato: incollalo in claude.ai."; })
+      .catch(function () { stato.textContent = "Copia non riuscita"; });
+  });
+})();
+</script>
+{% endblock %}

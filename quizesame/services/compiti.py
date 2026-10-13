@@ -141,18 +141,43 @@ def _salva_riferimenti(tag: str, appello_id: int, ctx: LatexContext, esercizi_st
     )
 
 
+def riferimento_aggiornato(tag: str, appello_id: int, con_soluzioni: bool = False) -> tuple[Path, bool]:
+    """Riscrive il .tex del foglio di riferimento (da pubblicare, con o senza soluzioni)
+    con gli esercizi e le impostazioni attuali, solo se è cambiato. Ritorna il percorso e
+    se è cambiato: in quel caso, o se il PDF manca, il chiamante lo ricompila. Così il
+    file da mettere online riflette sempre gli esercizi attuali, anche dopo modifiche."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    ctx = _crea_contesto(corsi_service.get_corso(tag), appello)
+    tex = crea_file_riferimento(ctx, _esercizi_per_generazione(tag, appello_id), con_soluzioni=con_soluzioni)
+    path = (path_riferimento_soluzioni if con_soluzioni else path_riferimento)(tag, appello_id, "tex", appello=appello)
+    cambiato = not path.exists() or path.read_text(encoding="utf-8") != tex
+    if cambiato:
+        _salva_testo(path, tex)
+    return path, cambiato
+
+
+def compiti_oltre_due_pagine(tag: str, tex_path: Path, pagine: int | None) -> int | None:
+    """Se il PDF di un blocco ha più di due pagine per compito, quante ne ha in media
+    (arrotondate per eccesso a un numero pari); None se va tutto bene."""
+    if not pagine:
+        return None
+    testo = tex_path.read_text(encoding="utf-8") if tex_path.exists() else ""
+    n_compiti = testo.count("Codice del compito")
+    if n_compiti and pagine > 2 * n_compiti:
+        return pagine // n_compiti
+    return None
+
+
 def ricostruisci_documenti(tag: str, appello_id: int) -> list[Path]:
-    """Riscrive con la grafica attuale i .tex dei documenti già generati per l'appello —
-    fogli di riferimento, testo e griglia di ogni blocco — mantenendo gli stessi codici,
+    """Riscrive con la grafica attuale i .tex dei documenti dell'appello — fogli di
+    riferimento, anteprima e, se ci sono, testo e griglia di ogni blocco — mantenendo gli stessi codici,
     lo stesso ordine di esercizi e risposte e quindi le stesse griglie: i compiti già
     stampati o distribuiti restano validi. Usa il testo attuale degli esercizi (se un
     esercizio è stato modificato dopo la generazione, compare la versione modificata).
     Ritorna i .tex da compilare."""
     from quizesame.services.latex import BEGIN_DOCUMENT as INIZIO, pagina_compito
     appello = corsi_service.get_appello(tag, appello_id)
-    blocchi = list_blocchi(tag, appello_id)
-    if not blocchi:
-        raise ValueError("Nessun blocco di compiti ancora generato per questo appello")
+    blocchi = list_blocchi(tag, appello_id)  # anche nessuno: si rigenerano riferimenti e anteprima
     ctx = _crea_contesto(corsi_service.get_corso(tag), appello)
     _salva_riferimenti(tag, appello_id, ctx, _esercizi_per_generazione(tag, appello_id))
     da_compilare = [path_riferimento(tag, appello_id, "tex"), path_riferimento_soluzioni(tag, appello_id, "tex")]
@@ -187,6 +212,7 @@ def ricostruisci_documenti(tag: str, appello_id: int) -> list[Path]:
                              path_griglia(tag, appello_id, b["numero"], "tex", appello=appello)]
     finally:
         conn.close()
+    da_compilare.append(genera_anteprima(tag, appello_id)[0])
     return da_compilare
 
 
@@ -515,9 +541,12 @@ class CompilazioneResult:
     # righe o blocchi che escono dai margini (overfull) in modo visibile: il PDF è stato
     # prodotto, ma qualcosa sporge; ogni voce è un estratto leggibile del log
     sporgenze: list[str] = field(default_factory=list)
+    pagine: int | None = None
 
 
-_OVERFULL = re.compile(r"Overfull \\[hv]box \(([\d.]+)pt too (?:wide|high)\)[^\n]*\n(.*)")
+# solo gli sforamenti orizzontali (testo che esce dal margine laterale): quelli verticali,
+# di pochi punti a fine pagina, non si vedono
+_OVERFULL = re.compile(r"Overfull \\hbox \(([\d.]+)pt too wide\)[^\n]*\n(.*)")
 
 
 def _sporgenze_latex(log: str, soglia_pt: float = 2.0) -> list[str]:
@@ -570,7 +599,9 @@ def compila_pdf(tex_path: Path) -> CompilazioneResult:
     if pdf_path.exists():
         log_path = tex_path.with_suffix(".log")
         log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
-        return CompilazioneResult(ok=True, messaggio="PDF compilato", pdf_path=pdf_path, sporgenze=_sporgenze_latex(log))
+        pagine = re.search(r"Output written on .*?\((\d+) pages?", log)
+        return CompilazioneResult(ok=True, messaggio="PDF compilato", pdf_path=pdf_path, sporgenze=_sporgenze_latex(log),
+                                  pagine=int(pagine.group(1)) if pagine else None)
     return CompilazioneResult(
         ok=False, messaggio="Compilazione PDF fallita: controlla il testo LaTeX degli esercizi",
         errore_dettagliato=_estrai_errore_latex(risultato.stdout or risultato.stderr or ""),

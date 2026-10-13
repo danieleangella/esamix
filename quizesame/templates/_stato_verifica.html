@@ -1,0 +1,16 @@
+{# Stato della verifica di un esercizio (vedi esercizi_service.stati_verifica), come
+   piccolo badge cliccabile: porta alla verifica di quel solo esercizio o, se ha errori o
+   dubbi segnalati, alla proposta di correzione. Uso: {% from "_stato_verifica.html" import stato_verifica %}
+   {{ stato_verifica(corso.tag, e, stati[e.id], torna) }} #}
+{% macro stato_verifica(tag, e, st, torna="") -%}
+{%- if st.stato == 'verificato' -%}
+<span class="badge badge-ok" title="Verificato il {{ st.quando[:16] }}{% if st.origine == 'manuale' %} (a mano){% elif st.origine == 'correzione' %} (corretto con l'IA){% endif %}">✓ verificato</span>
+{%- elif st.stato in ('errore', 'dubbio') -%}
+<a class="badge {{ 'badge-err' if st.stato == 'errore' else 'badge-warn' }}" href="/corsi/{{ tag }}/esercizi/{{ e.id }}/ia/correggi?torna={{ torna|urlencode }}"
+   title="La verifica con l'IA ha segnalato {{ 'un errore' if st.stato == 'errore' else 'un dubbio' }}: apri per vederlo e correggerlo">{{ '✗ errore' if st.stato == 'errore' else '? da controllare' }}</a>
+{%- elif st.stato == 'modificato' -%}
+<a class="badge badge-warn" href="/corsi/{{ tag }}/esercizi/{{ e.id }}/ia/verifica" title="Modificato dopo l'ultima verifica: verificalo di nuovo">modificato</a>
+{%- else -%}
+<a class="badge" href="/corsi/{{ tag }}/esercizi/{{ e.id }}/ia/verifica" title="Mai verificato con l'IA: verificalo">da verificare</a>
+{%- endif -%}
+{%- endmacro %}

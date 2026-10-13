@@ -58,7 +58,7 @@
         {% if not p.da_ambiente %}
         <form class="inline" method="post" action="/impostazioni/ia/profili/{{ p.id }}/elimina"
               onsubmit="return confirm({{ ('Eliminare la configurazione «' ~ p.nome ~ '» e la sua chiave?')|js }});">
-          <button type="submit" class="secondary pulsante-piccolo">Elimina</button>
+          <button type="submit" class="danger pulsante-piccolo">Elimina</button>
         </form>
         {% else %}<span class="muted">dalla variabile d'ambiente</span>{% endif %}
       </span>

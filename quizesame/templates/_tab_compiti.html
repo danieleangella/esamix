@@ -312,6 +312,14 @@
   <summary><strong>Compiti generati ({{ md.compiti|length }})</strong></summary>
   {% from "_formati.html" import formati %}
   {% set url_appello = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
+  {% if md.esercizi_assegnati %}
+  <form method="post" action="{{ url_appello }}/ricompila-pdf" class="barra-rigenera">
+    <button type="submit" class="secondary pulsante-piccolo" style="margin:0">↻ Rigenera tutti i documenti</button>
+    <span class="muted">compiti, griglie, fogli da pubblicare (con e senza soluzioni), anteprima, elenchi e risultati: PDF e altri
+      formati con gli esercizi e la grafica attuali{% if md.blocchi %}; stessi codici e stesso ordine di esercizi e risposte, quindi
+      i compiti già stampati restano validi{% endif %}. I file qui sotto vengono sostituiti dalla versione rigenerata.</span>
+  </form>
+  {% endif %}
   {% if md.blocchi %}
   <table class="tabella-documenti">
     <thead><tr><th>Blocco</th><th>Compiti</th><th>Testo da stampare</th><th>Griglia delle risposte</th><th>Creato il</th><th></th></tr></thead>
@@ -326,19 +334,13 @@
         {% if not md.appello.chiuso %}
         <form class="inline" method="post" action="{{ url_appello }}/blocchi/{{ b.numero }}/elimina"
               onsubmit="return confirm('Eliminare il blocco {{ b.numero }} ({{ b.numero_studenti }} compiti)? Possibile solo se non ha già risultati registrati.');">
-          <button type="submit" class="secondary pulsante-piccolo" title="Elimina il blocco {{ b.numero }}">Elimina</button>
+          <button type="submit" class="danger pulsante-piccolo" title="Elimina il blocco {{ b.numero }}">Elimina</button>
         </form>
         {% endif %}
       </td>
     </tr>
     {% endfor %}
   </table>
-  {% if not md.appello.chiuso %}
-  <form method="post" action="{{ url_appello }}/ricompila-pdf" style="margin:0.5rem 0 0; display:inline-block"
-        title="Ricostruisce compiti, griglie e fogli di riferimento con la grafica attuale, con gli stessi codici e lo stesso ordine di esercizi e risposte: i compiti già stampati restano validi">
-    <button type="submit" class="secondary pulsante-piccolo">↻ Rigenera i PDF con la grafica attuale</button>
-  </form>
-  {% endif %}
   {% if md.blocchi|length > 1 %}
   <p style="margin:0.5rem 0 0"><a class="icona-azione formato-pdf" href="{{ url_appello }}/blocchi/tutti.pdf" target="_blank" rel="noopener">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
@@ -346,16 +348,15 @@
   {% endif %}
   {% endif %}
   {% if md.esercizi_assegnati %}
-  <h3 class="titoletto">Fogli di riferimento (comuni a tutti i blocchi)</h3>
+  <h3 class="titoletto">Fogli di riferimento (comuni a tutti i blocchi, sempre aggiornati agli esercizi attuali)</h3>
   <ul class="elenco-documenti">
     <li>
       <span><strong>Senza soluzioni</strong> <span class="muted">— testo e risposte corrette, da pubblicare online</span></span>
-      {{ formati(url_appello ~ "/riferimento", pdf=md.riferimento_pdf_esiste, html=True, tex=md.riferimento_tex_esiste, md=True) }}
+      {{ formati(url_appello ~ "/riferimento", pdf=True, html=True, tex=True, md=True) }}
     </li>
     <li>
-      <span><strong>Con soluzioni e suggerimenti</strong>
-        {% if not md.riferimento_sol_tex_esiste %}<span class="muted">— viene creato con il prossimo blocco di compiti</span>{% endif %}</span>
-      {{ formati(url_appello ~ "/riferimento-soluzioni", pdf=md.riferimento_sol_pdf_esiste, html=True, tex=md.riferimento_sol_tex_esiste, md=True) }}
+      <span><strong>Con soluzioni e suggerimenti</strong> <span class="muted">— per il docente, o da pubblicare dopo la prova</span></span>
+      {{ formati(url_appello ~ "/riferimento-soluzioni", pdf=True, html=True, tex=True, md=True) }}
     </li>
     <li>
       <span><strong>Anteprima di controllo</strong> <span class="muted">— tutte le varianti, con il riquadro di revisione</span></span>

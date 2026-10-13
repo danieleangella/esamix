@@ -174,6 +174,19 @@ CREATE TABLE IF NOT EXISTS appello_iscritti_manuali (
 -- appello: ammesso=1 lo tiene comunque nell'elenco (eccezione), ammesso=0 conferma
 -- l'esclusione. Senza riga, l'esclusione è ancora da confermare. Nessun vincolo su
 -- studenti: dal file della segreteria possono arrivare matricole non registrate.
+-- Ultima verifica di un esercizio (con l'IA, o segnato a mano come corretto): "firma" è
+-- un'impronta del contenuto (testi, risposte, soluzione) al momento della verifica, così
+-- un esercizio modificato dopo risulta di nuovo "da verificare". esito: ok | dubbio |
+-- errore; dettaglio: il risultato completo della verifica (JSON) da rimostrare.
+CREATE TABLE IF NOT EXISTS esercizio_verifiche (
+    esercizio_id INTEGER PRIMARY KEY REFERENCES esercizi(id),
+    firma TEXT NOT NULL,
+    esito TEXT NOT NULL,
+    origine TEXT NOT NULL DEFAULT 'ia',
+    dettaglio TEXT,
+    verificato_il TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS appello_eccezioni_matricola (
     appello_id INTEGER NOT NULL REFERENCES appelli(id),
     matricola TEXT NOT NULL,

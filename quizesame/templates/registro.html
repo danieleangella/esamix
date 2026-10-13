@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Registro{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <span class="current">Registro</span>
+{% endblock %}
+{% block content %}
+<header class="intestazione-pagina">
+  <div class="intestazione-livello">Registro</div>
+  <h1>Azioni svolte e aggiornamenti</h1>
+</header>
+<p class="muted" style="margin-top:0">Ogni modulo inviato e ogni documento aperto o scaricato, con l'esito, più gli
+  aggiornamenti dell'app installati (file <code>registro.jsonl</code> accanto ai corsi).</p>
+
+<form method="get" class="filtri-registro">
+  <select name="corso" aria-label="Corso"><option value="">Tutti i corsi</option>
+    {% for tag, c in corsi.items() %}<option value="{{ tag }}" {% if tag == filtro_corso %}selected{% endif %}>{{ c.nome }} ({{ c.anno }})</option>{% endfor %}
+  </select>
+  <select name="tipo" aria-label="Tipo">
+    <option value="">Tutti i tipi</option>
+    <option value="azione" {% if filtro_tipo == 'azione' %}selected{% endif %}>Azioni</option>
+    <option value="ia" {% if filtro_tipo == 'ia' %}selected{% endif %}>Intelligenza artificiale</option>
+    <option value="aggiornamento" {% if filtro_tipo == 'aggiornamento' %}selected{% endif %}>Aggiornamenti dell'app</option>
+  </select>
+  <input name="q" value="{{ q }}" placeholder="Cerca (es. blocco, verifica)" aria-label="Cerca">
+  <button type="submit" class="secondary" style="margin:0">Filtra</button>
+  {% if filtro_corso or filtro_tipo or q %}<a href="/registro">Mostra tutto</a>{% endif %}
+  <span class="muted" style="margin-left:auto">{{ totale }} voci{% if totale > voci|length %} (ultime {{ voci|length }}){% endif %}</span>
+</form>
+
+<div class="card" style="padding:0.25rem 0.75rem">
+  {% if voci %}
+  <table class="tabella-registro">
+    {% for v in voci %}
+    {% set corso = corsi.get(v.tag) %}
+    <tr class="registro-{{ v.gravita }}" title="{{ v.azione }}: {{ v.esito }}">
+      <td class="r-quando">{{ v.quando[8:10] }}/{{ v.quando[5:7] }}/{{ v.quando[2:4] }} {{ v.quando[11:16] }}</td>
+      <td class="r-dove">
+        {%- if v.tipo == 'aggiornamento' %}<span class="badge badge-info">app</span>
+        {%- elif v.tipo == 'ia' %}<span class="badge">IA</span>{% if corso %} <a href="/corsi/{{ v.tag }}">{{ corso.nome }}</a>{% endif %}
+        {%- elif corso %}<a href="/corsi/{{ v.tag }}">{{ corso.nome }}</a>{% if v.appello_id %} › <a href="/corsi/{{ v.tag }}/appelli/{{ v.appello_id }}">{{ nomi_appelli.get((v.tag, v.appello_id)) or ('#' ~ v.appello_id) }}</a>{% endif %}
+        {%- else %}<span class="muted">—</span>{% endif -%}
+      </td>
+      <td class="r-azione">{{ v.azione }}</td>
+      <td class="r-esito" title="{{ v.esito }}">
+        {%- if v.gravita == 'error' %}<span class="badge badge-err">errore</span> {% elif v.gravita == 'warning' %}<span class="badge badge-warn">!</span> {% endif -%}
+        {{ v.esito }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nessuna voce{% if filtro_corso or filtro_tipo or q %} con questi filtri{% endif %}.</p>
+  {% endif %}
+</div>
+{% endblock %}

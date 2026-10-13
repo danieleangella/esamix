@@ -14,13 +14,36 @@
     di risultati e verbalizzazioni, e produce statistiche sull'appello.
   </p>
   <p class="muted">
-    Gira interamente in locale: nessun dato lascia il computer su cui è installata.
+    Gira interamente in locale: nessun dato lascia il computer su cui è installata (con l'unica
+    eccezione, facoltativa, dei testi degli esercizi inviati all'IA quando lo chiedi tu: mai dati
+    degli studenti). Funziona anche senza connessione a Internet.
   </p>
   {% if versione %}
   <p class="muted">Versione: {{ versione }}</p>
   {% endif %}
   <p>
     Codice sorgente: <a href="https://github.com/danieleangella/esamix" target="_blank" rel="noopener">github.com/danieleangella/esamix</a>
+    · <a href="/registro?tipo=aggiornamento">aggiornamenti installati</a> · <a href="/help">guida</a>
   </p>
+</div>
+
+<div class="card">
+  <h2>Novità della versione 0.4</h2>
+  <ul>
+    <li><strong>Interfaccia</strong> riorganizzata e usabile da telefono; sezioni completate richiuse; percorso
+      dell'appello più chiaro; pagine più veloci (formule mostrate senza bisogno di Internet).</li>
+    <li><strong>Compiti PDF</strong> più leggibili (anche per studenti con DSA): carattere senza grazie, intestazione
+      compatta su fondo grigio, griglia delle risposte a tabella, sempre due pagine per compito; rigenerazione dei PDF
+      con la grafica attuale mantenendo codici e ordine; avviso se il testo esce dal margine.</li>
+    <li><strong>Formati</strong>: ogni documento in PDF, HTML, TeX e, per quelli da pubblicare, Markdown.</li>
+    <li><strong>Intelligenza artificiale</strong>: verifica delle soluzioni (compito, banca, singolo esercizio o
+      tutti i corsi) con esito salvato per esercizio, correzione proposta e modificabile prima di salvarla, più
+      configurazioni salvate, risposta di claude.ai incollabile.</li>
+    <li><strong>Esercizi</strong>: riordino con trascinamento, import che può sostituire gli esercizi del compito,
+      controllo delle risposte duplicate, anteprima di controllo con riquadro di revisione.</li>
+    <li><strong>Iscritti</strong>: import delle prenotazioni Moodle, eccezioni al filtro sulla matricola,
+      indicazione DSA o L104.</li>
+    <li><strong>Registro</strong> di tutte le azioni e degli aggiornamenti; avviso quando l'app va riavviata.</li>
+  </ul>
 </div>
 {% endblock %}

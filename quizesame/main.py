@@ -34,6 +34,7 @@ from quizesame.services import latex as latex_service
 from quizesame.services import presenze as presenze_service
 from quizesame.services import ia as ia_service
 from quizesame.services import documenti as documenti_service
+from quizesame.services import registro as registro_service
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
@@ -101,12 +102,101 @@ def _codice_aggiornato() -> bool:
 templates.env.globals["codice_aggiornato"] = _codice_aggiornato
 # segnalazione degli esercizi con risposte ripetute in una variante (vedi esercizi_service)
 templates.env.globals["problemi_risposte"] = esercizi_service.problemi_risposte
+templates.env.globals["stati_verifica"] = esercizi_service.stati_verifica
+# contrassegno nei link ai documenti, diverso a ogni apertura della pagina: il browser scarica
+# sempre la versione attuale di un PDF rigenerato invece di mostrarne una copia conservata
+templates.env.globals["versione_link"] = lambda: str(int(__import__("time").time()))
 templates.env.filters["js"] = lambda value: json.dumps(str(value))
 templates.env.globals["static_version"] = _static_version
 templates.env.globals["get_app_settings"] = app_config_service.get_settings
 
-app = FastAPI(title="EsaMiX")
+@__import__("contextlib").asynccontextmanager
+async def _ciclo_di_vita(_app):
+    _registra_aggiornamento()  # definita più sotto: viene chiamata solo all'avvio
+    # compila subito tutti i template: altrimenti la prima apertura di ogni pagina paga
+    # la compilazione (fino a qualche decimo di secondo per le pagine più grandi)
+    for nome in templates.env.list_templates(extensions=["html"]):
+        try:
+            templates.env.get_template(nome)
+        except Exception:
+            pass
+    yield
+
+
+app = FastAPI(title="EsaMiX", lifespan=_ciclo_di_vita)
 app.mount("/static", StaticFiles(directory=str(PACKAGE_DIR / "static")), name="static")
+
+
+_CORSO_APPELLO = re.compile(r"^/corsi/([^/]+)(?:/appelli/(\d+))?(?:/esercizi/(\d+))?")
+
+
+_DOCUMENTO = re.compile(r"\.(pdf|tex|md|csv|zip|json)$")
+
+
+@app.middleware("http")
+async def registra_azioni(request: Request, call_next):
+    """Registro di tutte le azioni dell'utente: ogni modulo inviato (con il messaggio di
+    esito mostrato al docente, quando c'è) e ogni documento scaricato o aperto (PDF, TeX,
+    Markdown, CSV, backup), con corso, appello ed esercizio ricavati dall'indirizzo. Le
+    semplici visite alle pagine e le richieste interne (file statici, ricerche) no."""
+    risposta = await call_next(request)
+    percorso = request.url.path
+    if percorso.startswith(("/static", "/api/")) or percorso.endswith(("/modelli-ollama", "/form", "/anteprima")):
+        return risposta
+    documento = request.method == "GET" and _DOCUMENTO.search(percorso)
+    if request.method != "POST" and not documento:
+        return risposta
+    from urllib.parse import parse_qs, urlparse
+    query = parse_qs(urlparse(risposta.headers.get("location", "")).query) if risposta.status_code in (302, 303) else {}
+    m = _CORSO_APPELLO.match(percorso)
+    if documento:
+        azione, esito = f"Documento aperto ({documento.group(1).upper()})", percorso.rsplit("/", 1)[-1]
+    else:
+        azione = _etichetta_azione(percorso)
+        esito = query["msg"][0] if "msg" in query else ("completata" if risposta.status_code < 400 else "non riuscita")
+    gravita = (query.get("kind") or ["success" if risposta.status_code < 400 else "error"])[0]
+    if documento:
+        # i documenti si rigenerano con lo stesso nome: il browser non deve mai riusarne una copia vecchia
+        risposta.headers["Cache-Control"] = "no-store"
+    registro_service.registra(
+        "azione", azione, esito=esito, tag=m.group(1) if m else "",
+        appello_id=int(m.group(2)) if m and m.group(2) else None,
+        esercizio_id=int(m.group(3)) if m and m.group(3) else None,
+        gravita=gravita, percorso=percorso, metodo=request.method,
+    )
+    return risposta
+
+
+_ETICHETTE_AZIONI = [
+    ("ia/verifica", "Verifica con l'IA"), ("ia/genera", "Generazione esercizi con l'IA"),
+    ("ia/correggi/conferma", "Conferma correzione con l'IA"), ("ia/correggi", "Correzione proposta dall'IA"),
+    ("esercizi/ordine", "Riordino esercizi"), ("importa-json", "Import esercizi"),
+    ("ricompila-pdf", "Rigenerazione PDF"), ("importa-da-altri-corsi", "Import da altri corsi"),
+    ("esercizi/nuovo", "Nuovo esercizio"), ("/modifica", "Modifica"), ("/elimina", "Eliminazione"),
+    ("/rimuovi", "Rimozione"),
+    ("/verificato", "Esercizio segnato come verificato"), ("/obbligatorio", "Esercizio obbligatorio"),
+    ("esercizi/assegna", "Assegnazione esercizi"), ("iscritti", "Iscritti"), ("segreteria-csv", "File della segreteria"),
+    ("presenze", "Presenze"), ("correggi", "Correzione"), ("risultati", "Risultati"), ("verbalizz", "Verbalizzazione"),
+    ("chiudi", "Chiusura"), ("riapri", "Riapertura"), ("impostazioni", "Impostazioni"), ("studenti", "Studenti"),
+    ("orale", "Orale"), ("aule", "Aule"), ("blocchi", "Blocchi di compiti"), ("backup", "Backup"),
+]
+
+
+def _etichetta_azione(percorso: str) -> str:
+    for chiave, etichetta in _ETICHETTE_AZIONI:
+        if chiave in percorso:
+            return etichetta
+    ultimo = [p for p in percorso.split("/") if p and not p.isdigit()]
+    return (ultimo[-1] if ultimo else percorso).replace("-", " ").capitalize()
+
+
+def _registra_aggiornamento() -> None:
+    """All'avvio: se versione o codice sono cambiati dall'avvio precedente, lo annota nel
+    registro con l'elenco delle novità (titoli dei commit)."""
+    commit = registro_service.commit_corrente()
+    precedente = next((v for v in registro_service.leggi(5000) if v.get("tipo") == "aggiornamento"), None)
+    novita = registro_service.novita_tra((precedente or {}).get("commit"), commit)
+    registro_service.registra_avvio(_versione_app(), commit, novita)
 
 
 def _anchor_membro(appello, base: str) -> str:
@@ -1002,6 +1092,12 @@ def genera_compiti(tag: str, appello_id: int, numero_studenti: int = Form(...)):
             continue
         comp = risultati_compilazione[etichetta]
         msg += f". {etichetta}: " + comp.messaggio
+        if etichetta == "Blocco" and comp.ok:
+            oltre = compiti_service.compiti_oltre_due_pagine(tag, da_compilare[etichetta], comp.pagine)
+            if oltre:
+                msg += (f" (attenzione: i compiti occupano {oltre} pagine invece di 2: accorcia o togli qualche"
+                        " esercizio, o riduci le formule molto alte, per stare in un foglio fronte-retro)")
+                kind = "warning" if kind == "success" else kind
         if comp.ok and comp.sporgenze:
             msg += (f" (attenzione: {len(comp.sporgenze)} punti escono dal margine, controlla il PDF;"
                     " di solito basta accorciare una formula o andare a capo nel testo dell'esercizio)")
@@ -1029,9 +1125,20 @@ def ricompila_pdf(tag: str, appello_id: int):
         da_compilare = compiti_service.ricostruisci_documenti(tag, appello_id)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    # anche gli elenchi (iscritti, ammessi) e i risultati, se esistono già per questo appello
+    for tipo in ("iscritti", "ammessi"):
+        _, _, elenco, _, tex_path = _elenco_studenti(tag, appello_id, tipo)
+        if elenco is not None and tex_path is not None:
+            da_compilare.append(tex_path)
+    tex_risultati = compiti_service.path_risultati(tag, appello_id, "tex", appello=appello)
+    if tex_risultati.exists():
+        tex_risultati.write_text(risultati_service.stampa_risultati(tag, appello_id), encoding="utf-8")
+        da_compilare.append(tex_risultati)
     with ThreadPoolExecutor(max_workers=min(8, len(da_compilare))) as pool:
         esiti = list(pool.map(compiti_service.compila_pdf, da_compilare))
     falliti = [(p, e) for p, e in zip(da_compilare, esiti) if not e.ok]
+    oltre = [p.name for p, e in zip(da_compilare, esiti) if e.ok and p.name.startswith("blocco")
+             and compiti_service.compiti_oltre_due_pagine(tag, p, e.pagine)]
     sporgenti = [(p, e) for p, e in zip(da_compilare, esiti) if e.ok and e.sporgenze]
     if falliti:
         p, e = falliti[0]
@@ -1039,7 +1146,10 @@ def ricompila_pdf(tag: str, appello_id: int):
             f"/corsi/{tag}/appelli/{appello_id}", f"{len(falliti)} PDF non compilati ({p.name}): {e.messaggio}",
             "error", anchor=anchor, dettaglio=e.errore_dettagliato or "",
         )
-    msg = f"Rigenerati {len(da_compilare)} PDF con la grafica attuale (stessi codici e stesso ordine di esercizi e risposte)."
+    msg = f"Rigenerati {len(da_compilare)} documenti (PDF e altri formati) con gli esercizi e la grafica attuali"
+    msg += (" (stessi codici e stesso ordine di esercizi e risposte)." if compiti_service.list_blocchi(tag, appello_id) else ".")
+    if oltre:
+        msg += f" Attenzione: in {', '.join(oltre)} i compiti superano le due pagine."
     if sporgenti:
         dettaglio = "\n".join(f"{p.name}: {v}" for p, e in sporgenti for v in e.sporgenze[:5])
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}",
@@ -1048,36 +1158,56 @@ def ricompila_pdf(tag: str, appello_id: int):
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
+def _pdf_da_ricompilare(tex_path: Path) -> bool:
+    """Il PDF manca o è più vecchio del .tex (es. il .tex è stato aggiornato aprendo la
+    versione .tex prima del PDF): va ricompilato."""
+    pdf_path = tex_path.with_suffix(".pdf")
+    return not pdf_path.exists() or pdf_path.stat().st_mtime < tex_path.stat().st_mtime
+
+
+def _riferimento(tag: str, appello_id: int, con_soluzioni: bool, formato: str, rigenera: bool = False):
+    """Foglio di riferimento (con o senza soluzioni) sempre aggiornato agli esercizi
+    attuali: il .tex viene riscritto se è cambiato e il PDF ricompilato solo in quel caso
+    (o se manca); mai servito dalla cache del browser."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    try:
+        tex_path, cambiato = compiti_service.riferimento_aggiornato(tag, appello_id, con_soluzioni)
+    except ValueError as e:
+        return PlainTextResponse(str(e), status_code=404)
+    if formato == "tex":
+        return PlainTextResponse(tex_path.read_text(encoding="utf-8"), media_type="application/x-tex",
+                                 headers={"Cache-Control": "no-store"})
+    pdf_path = tex_path.with_suffix(".pdf")
+    if cambiato or rigenera or _pdf_da_ricompilare(tex_path):
+        compilazione = compiti_service.compila_pdf(tex_path)
+        if not compilazione.ok:
+            return flash_redirect(
+                f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error",
+                anchor=_anchor_membro(appello, "compiti"), dettaglio=compilazione.errore_dettagliato or "",
+            )
+        pdf_path = compilazione.pdf_path
+    return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name,
+                        content_disposition_type="inline", headers={"Cache-Control": "no-store"})
+
+
 @app.get("/corsi/{tag}/appelli/{appello_id}/riferimento.tex", response_class=PlainTextResponse)
 def scarica_riferimento_tex(tag: str, appello_id: int):
-    path = compiti_service.path_riferimento(tag, appello_id, "tex")
-    if not path.exists():
-        return PlainTextResponse("Testo non ancora generato", status_code=404)
-    return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="application/x-tex")
+    return _riferimento(tag, appello_id, False, "tex")
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/riferimento.pdf")
-def scarica_riferimento_pdf(tag: str, appello_id: int):
-    path = compiti_service.path_riferimento(tag, appello_id, "pdf")
-    if not path.exists():
-        return PlainTextResponse("PDF non ancora compilato", status_code=404)
-    return FileResponse(path, media_type="application/pdf", filename=path.name)
+def scarica_riferimento_pdf(tag: str, appello_id: int, rigenera: str = ""):
+    return _riferimento(tag, appello_id, False, "pdf", bool(rigenera))
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/riferimento-soluzioni.tex", response_class=PlainTextResponse)
 def scarica_riferimento_soluzioni_tex(tag: str, appello_id: int):
-    path = compiti_service.path_riferimento_soluzioni(tag, appello_id, "tex")
-    if not path.exists():
-        return PlainTextResponse("Testo non ancora generato", status_code=404)
-    return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="application/x-tex")
+    return _riferimento(tag, appello_id, True, "tex")
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/riferimento-soluzioni.pdf")
-def scarica_riferimento_soluzioni_pdf(tag: str, appello_id: int):
-    path = compiti_service.path_riferimento_soluzioni(tag, appello_id, "pdf")
-    if not path.exists():
-        return PlainTextResponse("PDF non ancora compilato", status_code=404)
-    return FileResponse(path, media_type="application/pdf", filename=path.name)
+def scarica_riferimento_soluzioni_pdf(tag: str, appello_id: int, rigenera: str = ""):
+    return _riferimento(tag, appello_id, True, "pdf", bool(rigenera))
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/anteprima.pdf")
@@ -1093,7 +1223,7 @@ def scarica_anteprima_pdf(tag: str, appello_id: int, rigenera: str = ""):
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     pdf_path = tex_path.with_suffix(".pdf")
-    if cambiato or rigenera or not pdf_path.exists():
+    if cambiato or rigenera or _pdf_da_ricompilare(tex_path):
         compilazione = compiti_service.compila_pdf(tex_path)
         if not compilazione.ok:
             return flash_redirect(
@@ -1518,48 +1648,218 @@ def prompt_ia(tag: str, appello_id: int, n: int = 10, varianti: int = 2, istruzi
     return prompt["sistema"] + "\n\n" + "=" * 40 + "\n\n" + prompt["richiesta"]
 
 
-def _pagina_verifica_ia(request: Request, tag: str, appello, **extra):
+def _ambito_verifica(tag: str, appello_id: Optional[int] = None, esercizio_id: Optional[int] = None) -> dict:
+    """Cosa verificare con l'IA: gli esercizi di un appello, uno solo, o tutta la banca
+    del corso; con l'indirizzo della pagina e quello a cui tornare per correggere."""
+    corso = corsi_service.get_corso(tag)
+    if esercizio_id is not None:
+        e = esercizi_service.get_esercizio(tag, esercizio_id)
+        if e is None:
+            raise ValueError("Esercizio non trovato")
+        return {"esercizi": [e], "titolo": f"Esercizio «{e.nome or '#' + str(e.id)}»",
+                "contesto": "Banca esercizi del corso", "url": f"/corsi/{tag}/esercizi/{esercizio_id}/ia/verifica",
+                "torna": f"/corsi/{tag}/esercizi", "torna_etichetta": "Banca esercizi", "corso": corso, "appello": None}
+    if appello_id is not None:
+        appello = corsi_service.get_appello(tag, appello_id)
+        return {"esercizi": esercizi_service.list_esercizi_appello(tag, appello_id), "titolo": f"Compito: {appello.nome}",
+                "contesto": f"Prova: {appello.nome}" + (f" del {appello.data}" if appello.data else ""),
+                "url": f"/corsi/{tag}/appelli/{appello_id}/ia/verifica",
+                "torna": f"/corsi/{tag}/appelli/{appello_id}#{_anchor_membro(appello, 'creazione')}",
+                "torna_etichetta": appello.nome, "corso": corso, "appello": appello}
+    return {"esercizi": esercizi_service.list_esercizi(tag), "titolo": "Banca esercizi del corso",
+            "contesto": "Banca esercizi del corso", "url": f"/corsi/{tag}/esercizi/ia/verifica",
+            "torna": f"/corsi/{tag}/esercizi", "torna_etichetta": "Banca esercizi", "corso": corso, "appello": None}
+
+
+def _da_verificare(tag: str, esercizi: list, stati: dict) -> list:
+    """Gli esercizi mai verificati o modificati dopo l'ultima verifica."""
+    return [e for e in esercizi if stati[e.id]["stato"] in ("mai", "modificato")]
+
+
+def _pagina_verifica_ia(request: Request, tag: str, ambito: dict, **extra):
+    stati = esercizi_service.stati_verifica(tag, ambito["esercizi"])
     return templates.TemplateResponse(request, "verifica_ia.html", {
-        "corso": corsi_service.get_corso(tag), "appello": appello,
-        "esercizi": esercizi_service.list_esercizi_appello(tag, appello.id),
+        **ambito, "stati": stati, "da_verificare": _da_verificare(tag, ambito["esercizi"], stati),
         "fornitore_ia": ia_service.fornitore(extra.pop("profilo", "")), "profili_ia": ia_service.profili(),
-        "anchor": _anchor_membro(appello, "creazione"), **extra,
+        "tag": tag, **extra,
     })
+
+
+def _esegui_verifica(request: Request, tag: str, ambito: dict, profilo: str, risposta: str, solo_da_verificare: str):
+    """Avvia la verifica (o legge la risposta incollata da claude.ai), salva l'esito di
+    ogni esercizio verificato — così i corretti non vanno ricontrollati — e mostra i risultati."""
+    stati = esercizi_service.stati_verifica(tag, ambito["esercizi"])
+    esercizi = _da_verificare(tag, ambito["esercizi"], stati) if solo_da_verificare else ambito["esercizi"]
+    if not esercizi:
+        return _pagina_verifica_ia(request, tag, ambito, errore="Non c'è nessun esercizio da verificare: sono già "
+                                   "tutti verificati e non modificati da allora. Togli la spunta per ricontrollarli comunque.")
+    try:
+        if risposta.strip():
+            # la risposta incollata si riferisce agli esercizi del prompt copiato: stessi criteri
+            risultati = ia_service.leggi_risposta_verifica(esercizi, risposta)
+            conf = {"nome": "risposta incollata", "modello": "claude.ai"}
+        else:
+            esito = ia_service.verifica(tag, esercizi, ambito["contesto"], profilo_id=profilo)
+            risultati, conf = esito["esercizi"], esito["conf"]
+    except ValueError as e:
+        return _pagina_verifica_ia(request, tag, ambito, errore=str(e), profilo=profilo, risposta_incollata=risposta)
+    for r in risultati:
+        esercizi_service.registra_verifica(tag, r["esercizio"], r["esito"], ia_service.risultato_serializzabile(r))
+    conteggi = {k: sum(1 for r in risultati if r["esito"] == k) for k in ia_service.ESITI_VERIFICA}
+    registro_service.registra(
+        "ia", f"Verifica con l'IA: {ambito['titolo']}", tag=tag, appello_id=ambito["appello"].id if ambito["appello"] else None,
+        esito=f"{len(risultati)} esercizi: {conteggi['ok']} corretti, {conteggi['dubbio']} dubbi, {conteggi['errore']} errori ({conf['nome']})",
+    )
+    return _pagina_verifica_ia(request, tag, ambito, risultati=risultati, conf_usata=conf, conteggi=conteggi, profilo=profilo)
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/ia/verifica", response_class=HTMLResponse)
 def pagina_verifica_ia(request: Request, tag: str, appello_id: int):
-    """Verifica con l'IA delle soluzioni del compito: qui si sceglie con quale
-    configurazione e si avvia (oppure si copia il prompt per claude.ai)."""
-    return _pagina_verifica_ia(request, tag, corsi_service.get_appello(tag, appello_id))
+    return _pagina_verifica_ia(request, tag, _ambito_verifica(tag, appello_id=appello_id))
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/ia/verifica", response_class=HTMLResponse)
-def esegui_verifica_ia(request: Request, tag: str, appello_id: int, profilo: str = Form(""), risposta: str = Form("")):
-    """Avvia la verifica con la configurazione scelta oppure, se è stata incollata la
-    risposta ottenuta da claude.ai con il prompt copiato, la legge e la mostra."""
-    appello = corsi_service.get_appello(tag, appello_id)
+def esegui_verifica_ia(request: Request, tag: str, appello_id: int, profilo: str = Form(""), risposta: str = Form(""),
+                       solo_da_verificare: str = Form("")):
+    return _esegui_verifica(request, tag, _ambito_verifica(tag, appello_id=appello_id), profilo, risposta, solo_da_verificare)
+
+
+@app.get("/corsi/{tag}/esercizi/ia/verifica", response_class=HTMLResponse)
+def pagina_verifica_banca(request: Request, tag: str):
+    return _pagina_verifica_ia(request, tag, _ambito_verifica(tag))
+
+
+@app.post("/corsi/{tag}/esercizi/ia/verifica", response_class=HTMLResponse)
+def esegui_verifica_banca(request: Request, tag: str, profilo: str = Form(""), risposta: str = Form(""),
+                          solo_da_verificare: str = Form("")):
+    return _esegui_verifica(request, tag, _ambito_verifica(tag), profilo, risposta, solo_da_verificare)
+
+
+@app.get("/corsi/{tag}/esercizi/{esercizio_id}/ia/verifica", response_class=HTMLResponse)
+def pagina_verifica_esercizio(request: Request, tag: str, esercizio_id: int):
+    return _pagina_verifica_ia(request, tag, _ambito_verifica(tag, esercizio_id=esercizio_id))
+
+
+@app.post("/corsi/{tag}/esercizi/{esercizio_id}/ia/verifica", response_class=HTMLResponse)
+def esegui_verifica_esercizio(request: Request, tag: str, esercizio_id: int, profilo: str = Form(""),
+                              risposta: str = Form(""), solo_da_verificare: str = Form("")):
+    return _esegui_verifica(request, tag, _ambito_verifica(tag, esercizio_id=esercizio_id), profilo, risposta, solo_da_verificare)
+
+
+def _prompt_verifica_testo(tag: str, ambito: dict, solo_da_verificare: str) -> PlainTextResponse:
+    stati = esercizi_service.stati_verifica(tag, ambito["esercizi"])
+    esercizi = _da_verificare(tag, ambito["esercizi"], stati) if solo_da_verificare else ambito["esercizi"]
     try:
-        if risposta.strip():
-            esito = {"esercizi": ia_service.leggi_risposta_verifica(tag, appello, risposta),
-                     "conf": {"nome": "risposta incollata", "modello": "claude.ai"}}
-        else:
-            esito = ia_service.verifica(tag, appello, profilo_id=profilo)
+        prompt = ia_service.costruisci_prompt_verifica(tag, esercizi, ambito["contesto"])
     except ValueError as e:
-        return _pagina_verifica_ia(request, tag, appello, errore=str(e), profilo=profilo, risposta_incollata=risposta)
-    conteggi = {k: sum(1 for r in esito["esercizi"] if r["esito"] == k) for k in ia_service.ESITI_VERIFICA}
-    return _pagina_verifica_ia(request, tag, appello, risultati=esito["esercizi"], conf_usata=esito["conf"],
-                               conteggi=conteggi, profilo=profilo)
+        return PlainTextResponse(str(e), status_code=404)
+    return PlainTextResponse(prompt["sistema"] + "\n\n" + "=" * 40 + "\n\n" + prompt["richiesta"])
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/ia/verifica/prompt", response_class=PlainTextResponse)
-def prompt_verifica_ia(tag: str, appello_id: int):
+def prompt_verifica_ia(tag: str, appello_id: int, solo_da_verificare: str = ""):
     """Lo stesso prompt della verifica, da copiare in claude.ai senza chiave API."""
+    return _prompt_verifica_testo(tag, _ambito_verifica(tag, appello_id=appello_id), solo_da_verificare)
+
+
+@app.get("/corsi/{tag}/esercizi/ia/verifica/prompt", response_class=PlainTextResponse)
+def prompt_verifica_banca(tag: str, solo_da_verificare: str = ""):
+    return _prompt_verifica_testo(tag, _ambito_verifica(tag), solo_da_verificare)
+
+
+@app.get("/corsi/{tag}/esercizi/{esercizio_id}/ia/verifica/prompt", response_class=PlainTextResponse)
+def prompt_verifica_esercizio(tag: str, esercizio_id: int, solo_da_verificare: str = ""):
+    return _prompt_verifica_testo(tag, _ambito_verifica(tag, esercizio_id=esercizio_id), solo_da_verificare)
+
+
+@app.post("/corsi/{tag}/esercizi/{esercizio_id}/verificato")
+def segna_verificato(tag: str, esercizio_id: int, torna: str = Form("")):
+    """Il docente ha ricontrollato l'esercizio (es. il dubbio dell'IA era infondato): lo
+    segna come verificato, finché non viene modificato."""
+    e = esercizi_service.get_esercizio(tag, esercizio_id)
+    if e is None:
+        return flash_redirect(torna or f"/corsi/{tag}/esercizi", "Esercizio non trovato", "error")
+    esercizi_service.registra_verifica(tag, e, "ok", origine="manuale")
+    return flash_redirect(torna or f"/corsi/{tag}/esercizi", f"Esercizio «{e.nome or e.id}» segnato come verificato")
+
+
+# --- Correzione con l'IA: proposta, confronto, conferma ------------------------------------
+
+def _pagina_correzione(request: Request, tag: str, esercizio_id: int, torna: str, **extra):
+    e = esercizi_service.get_esercizio(tag, esercizio_id)
+    stato = esercizi_service.stati_verifica(tag, [e])[e.id]
+    return templates.TemplateResponse(request, "correzione_ia.html", {
+        "corso": corsi_service.get_corso(tag), "esercizio": e, "stato": stato, "torna": torna or f"/corsi/{tag}/esercizi",
+        "fornitore_ia": ia_service.fornitore(extra.pop("profilo", "")), "profili_ia": ia_service.profili(),
+        "appello": None, **extra,
+    })
+
+
+@app.get("/corsi/{tag}/esercizi/{esercizio_id}/ia/correggi", response_class=HTMLResponse)
+def pagina_correzione_ia(request: Request, tag: str, esercizio_id: int, torna: str = ""):
+    return _pagina_correzione(request, tag, esercizio_id, torna)
+
+
+@app.get("/corsi/{tag}/esercizi/{esercizio_id}/ia/correggi/prompt", response_class=PlainTextResponse)
+def prompt_correzione_ia(tag: str, esercizio_id: int):
+    e = esercizi_service.get_esercizio(tag, esercizio_id)
+    stato = esercizi_service.stati_verifica(tag, [e])[e.id]
+    prompt = ia_service.costruisci_prompt_correzione(e, stato.get("dettaglio") or {})
+    return PlainTextResponse(prompt["sistema"] + "\n\n" + "=" * 40 + "\n\n" + prompt["richiesta"])
+
+
+@app.post("/corsi/{tag}/esercizi/{esercizio_id}/ia/correggi", response_class=HTMLResponse)
+def proponi_correzione_ia(request: Request, tag: str, esercizio_id: int, torna: str = Form(""),
+                          profilo: str = Form(""), risposta: str = Form(""), modifica: str = Form("")):
+    """Chiede all'IA (o legge dalla risposta incollata di claude.ai) la versione corretta
+    dell'esercizio e mostra il confronto: non salva nulla finché il docente non conferma."""
+    e = esercizi_service.get_esercizio(tag, esercizio_id)
+    stato = esercizi_service.stati_verifica(tag, [e])[e.id]
     try:
-        prompt = ia_service.costruisci_prompt_verifica(tag, corsi_service.get_appello(tag, appello_id))
-    except ValueError as e:
-        return PlainTextResponse(str(e), status_code=404)
-    return prompt["sistema"] + "\n\n" + "=" * 40 + "\n\n" + prompt["richiesta"]
+        if risposta.strip():
+            proposta = ia_service.leggi_correzione(risposta)
+        else:
+            proposta = ia_service.proponi_correzione(e, stato.get("dettaglio") or {}, profilo_id=profilo)
+    except ValueError as err:
+        return _pagina_correzione(request, tag, esercizio_id, torna, errore=str(err), profilo=profilo, risposta_incollata=risposta)
+    return _pagina_correzione(request, tag, esercizio_id, torna, proposta=proposta, profilo=profilo,
+                              proposta_json=json.dumps(proposta, ensure_ascii=False),
+                              proposta_testo=ia_service.proposta_come_testo(proposta),
+                              modifiche=ia_service.modifiche_proposte(e, proposta),
+                              modificata=bool(risposta.strip()) and modifica == "1",
+                              firma_attuale=esercizi_service.firma_contenuto(e))
+
+
+@app.post("/corsi/{tag}/esercizi/{esercizio_id}/ia/correggi/conferma")
+def conferma_correzione_ia(tag: str, esercizio_id: int, background_tasks: BackgroundTasks, proposta_json: str = Form(...),
+                           firma_attuale: str = Form(""), torna: str = Form("")):
+    """Salva la correzione accettata (come una modifica fatta a mano: gli appelli che
+    usano l'esercizio vengono aggiornati) e segna l'esercizio come verificato."""
+    destinazione = torna or f"/corsi/{tag}/esercizi"
+    e = esercizi_service.get_esercizio(tag, esercizio_id)
+    if e is None:
+        return flash_redirect(destinazione, "Esercizio non trovato", "error")
+    if firma_attuale and firma_attuale != esercizi_service.firma_contenuto(e):
+        return flash_redirect(destinazione, "L'esercizio è stato modificato dopo la proposta: richiedi una nuova correzione", "error")
+    proposta = json.loads(proposta_json)
+    appelli_coinvolti = esercizi_service.appelli_che_usano(tag, esercizio_id)
+    try:
+        for appello_id in appelli_coinvolti:
+            _proteggi_modifica_esercizi(tag, appello_id)
+        for appello_id in appelli_coinvolti:
+            compiti_service.svuota_blocchi_appello(tag, appello_id)
+        aggiornato = esercizi_service.aggiorna_esercizio(
+            tag, esercizio_id, nome=e.nome or proposta.get("nome") or "", note=e.note or "",
+            argomento=e.argomento or proposta.get("argomento") or "", varianti=proposta["varianti"],
+            difficolta=e.difficolta, soluzione=proposta.get("soluzione") or "", aperta=bool(proposta.get("aperta")),
+        )
+        esercizi_service.registra_verifica(tag, aggiornato, "ok", origine="correzione")
+        msg = f"Correzione dell'esercizio «{e.nome or e.id}» salvata e segnata come verificata"
+        for appello_id in appelli_coinvolti:
+            msg += _rigenera_se_necessario(tag, appello_id, background_tasks)
+    except ValueError as err:
+        return flash_redirect(destinazione, str(err), "error")
+    return flash_redirect(destinazione, msg)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/ia/genera", response_class=HTMLResponse)
@@ -2662,8 +2962,14 @@ def _contesto_elenco_esercizi(escludi_tag: str = "", corso_corrente=None) -> dic
     nome_preselezionato = ""
     if corso_corrente and corso_corrente.nome in nomi_corso:
         nome_preselezionato = corso_corrente.nome
+    # stato della verifica con l'IA di ogni esercizio, per la piccola icona nella lista
+    stati_ia = {}
+    for c in corsi_presenti:
+        esercizi_c = [e for cc, e in righe if cc is c]
+        for eid, st in esercizi_service.stati_verifica(c.tag, esercizi_c).items():
+            stati_ia[(c.tag, eid)] = st["stato"]
     return {
-        "righe_esercizi": righe, "corsi_presenti": corsi_presenti, "nomi_corso": nomi_corso,
+        "righe_esercizi": righe, "corsi_presenti": corsi_presenti, "nomi_corso": nomi_corso, "stati_ia": stati_ia,
         "argomenti_tutti": sorted({e.argomento for _, e in righe if e.argomento}),
         "nome_corso_preselezionato": nome_preselezionato,
     }
@@ -2677,7 +2983,56 @@ def esercizi_tutti(request: Request):
     corsi o anni precedenti"."""
     contesto = _contesto_elenco_esercizi()
     contesto["selezionabile"] = False
+    contesto["verifiche_corsi"] = _riepilogo_verifiche_corsi()
+    contesto["fornitore_ia"], contesto["profili_ia"] = ia_service.fornitore(), ia_service.profili()
     return templates.TemplateResponse(request, "esercizi_tutti.html", contesto)
+
+
+def _riepilogo_verifiche_corsi() -> list[dict]:
+    """Per ogni corso con esercizi: quanti sono verificati, da verificare, con problemi."""
+    righe = []
+    for c in corsi_service.list_corsi():
+        esercizi = esercizi_service.list_esercizi(c.tag)
+        if not esercizi:
+            continue
+        stati = [s["stato"] for s in esercizi_service.stati_verifica(c.tag, esercizi).values()]
+        righe.append({
+            "corso": c, "totale": len(esercizi), "verificati": stati.count("verificato"),
+            "da_verificare": stati.count("mai") + stati.count("modificato"),
+            "problemi": stati.count("errore") + stati.count("dubbio"),
+        })
+    return righe
+
+
+@app.post("/esercizi/ia/verifica")
+def verifica_tutti_i_corsi(profilo: str = Form("")):
+    """Verifica con l'IA, corso per corso, tutti gli esercizi da verificare di tutte le
+    banche (mai verificati o modificati dopo l'ultima verifica); gli esiti restano salvati."""
+    totale = {"ok": 0, "dubbio": 0, "errore": 0}
+    corsi_fatti, errori = 0, []
+    for riga in _riepilogo_verifiche_corsi():
+        if not riga["da_verificare"]:
+            continue
+        ambito = _ambito_verifica(riga["corso"].tag)
+        stati = esercizi_service.stati_verifica(riga["corso"].tag, ambito["esercizi"])
+        try:
+            esito = ia_service.verifica(riga["corso"].tag, _da_verificare(riga["corso"].tag, ambito["esercizi"], stati),
+                                        ambito["contesto"], profilo_id=profilo)
+        except ValueError as e:
+            errori.append(f"{riga['corso'].nome} ({riga['corso'].anno}): {e}")
+            continue
+        for r in esito["esercizi"]:
+            esercizi_service.registra_verifica(riga["corso"].tag, r["esercizio"], r["esito"], ia_service.risultato_serializzabile(r))
+            totale[r["esito"]] += 1
+        corsi_fatti += 1
+    if not corsi_fatti and not errori:
+        return flash_redirect("/esercizi", "Non c'è nessun esercizio da verificare: sono già tutti verificati", anchor="verifica-ia")
+    msg = (f"Verificati gli esercizi di {corsi_fatti} {'corso' if corsi_fatti == 1 else 'corsi'}: {totale['ok']} corretti, {totale['dubbio']} da controllare, "
+           f"{totale['errore']} con errori (vedi le banche dei corsi per correggerli)")
+    if errori:
+        return flash_redirect("/esercizi", msg + f". Non riuscita per {len(errori)} {'corso' if len(errori) == 1 else 'corsi'}", "warning",
+                              anchor="verifica-ia", dettaglio="\n".join(errori))
+    return flash_redirect("/esercizi", msg, anchor="verifica-ia")
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/esercizi/altri-corsi", response_class=HTMLResponse)
@@ -2864,6 +3219,33 @@ def _versione_app() -> Optional[str]:
         return version("quizesame")
     except PackageNotFoundError:
         return None
+
+
+@app.get("/registro", response_class=HTMLResponse)
+def pagina_registro(request: Request, corso: str = "", tipo: str = "", q: str = ""):
+    """Registro di tutte le azioni svolte e degli aggiornamenti installati, filtrabile."""
+    corsi = {c.tag: c for c in corsi_service.list_corsi()}
+    voci = registro_service.leggi()
+    if corso:
+        voci = [v for v in voci if v.get("tag") == corso]
+    if tipo:
+        voci = [v for v in voci if v.get("tipo") == tipo]
+    if q.strip():
+        cerca = q.strip().lower()
+        voci = [v for v in voci if cerca in (v.get("azione", "") + " " + v.get("esito", "")).lower()]
+    nomi_appelli = {}
+    for v in voci[:500]:
+        chiave = (v.get("tag"), v.get("appello_id"))
+        if chiave[0] in corsi and chiave[1] and chiave not in nomi_appelli:
+            try:
+                a = corsi_service.get_appello(*chiave)
+                nomi_appelli[chiave] = a.nome if a else None
+            except Exception:
+                nomi_appelli[chiave] = None
+    return templates.TemplateResponse(request, "registro.html", {
+        "voci": voci[:500], "totale": len(voci), "corsi": corsi, "nomi_appelli": nomi_appelli,
+        "filtro_corso": corso, "filtro_tipo": tipo, "q": q,
+    })
 
 
 @app.get("/about", response_class=HTMLResponse)

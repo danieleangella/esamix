@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Anteprima blocco {{ numero }} · {{ appello.nome }}{% endblock %}
 {% block katex %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="/static/katex/katex.min.css">
+<script defer src="/static/katex/katex.min.js"></script>
+<script defer src="/static/katex/contrib/auto-render.min.js"></script>
 {% endblock %}
 {% block content %}
 <p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#compiti">&larr; {{ appello.nome }}</a></p>

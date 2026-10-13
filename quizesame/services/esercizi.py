@@ -66,6 +66,60 @@ def problemi_risposte(esercizio: "Esercizio") -> list[str]:
     return problemi
 
 
+def firma_contenuto(esercizio: "Esercizio") -> str:
+    """Impronta di ciò che una verifica controlla (testi, risposte, soluzione, domanda
+    aperta): cambia se l'esercizio viene modificato, non se cambiano nome o argomento."""
+    import hashlib
+    dati = json.dumps([
+        bool(esercizio.aperta), (esercizio.soluzione or "").strip(),
+        [[v.testo.strip(), list(v.risposte)] for v in esercizio.varianti],
+    ], ensure_ascii=False)
+    return hashlib.sha256(dati.encode("utf-8")).hexdigest()[:16]
+
+
+def registra_verifica(tag: str, esercizio: "Esercizio", esito: str, dettaglio: Optional[dict] = None, origine: str = "ia") -> None:
+    """Salva l'esito della verifica di un esercizio, legato al suo contenuto attuale.
+    `origine`: "ia" (verifica con l'IA), "manuale" (segnato corretto dal docente) o
+    "correzione" (correzione proposta dall'IA e accettata)."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute(
+            "INSERT INTO esercizio_verifiche (esercizio_id, firma, esito, origine, dettaglio, verificato_il) "
+            "VALUES (?,?,?,?,?,datetime('now','localtime')) ON CONFLICT(esercizio_id) DO UPDATE SET "
+            "firma=excluded.firma, esito=excluded.esito, origine=excluded.origine, dettaglio=excluded.dettaglio, "
+            "verificato_il=excluded.verificato_il",
+            (esercizio.id, firma_contenuto(esercizio), esito, origine,
+             json.dumps(dettaglio, ensure_ascii=False) if dettaglio else None),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def stati_verifica(tag: str, esercizi: list["Esercizio"]) -> dict[int, dict]:
+    """Per ogni esercizio, lo stato della verifica: {"stato": "verificato" | "errore" |
+    "dubbio" | "modificato" | "mai", "esito", "origine", "quando", "dettaglio"}.
+    "modificato" = verificato in passato, ma il contenuto è cambiato da allora."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        righe = {r["esercizio_id"]: r for r in conn.execute("SELECT * FROM esercizio_verifiche")}
+    finally:
+        conn.close()
+    stati = {}
+    for e in esercizi:
+        r = righe.get(e.id)
+        if r is None:
+            stati[e.id] = {"stato": "mai"}
+            continue
+        base = {"esito": r["esito"], "origine": r["origine"], "quando": r["verificato_il"],
+                "dettaglio": json.loads(r["dettaglio"]) if r["dettaglio"] else None}
+        if r["firma"] != firma_contenuto(e):
+            stati[e.id] = {**base, "stato": "modificato"}
+        else:
+            stati[e.id] = {**base, "stato": "verificato" if r["esito"] == "ok" else r["esito"]}
+    return stati
+
+
 def _row_to_esercizio(conn, row, assegnato_il: Optional[str] = None, obbligatorio: bool = False) -> Esercizio:
     varianti_rows = conn.execute(
         "SELECT id, testo, risposte_json FROM esercizio_varianti WHERE esercizio_id=? ORDER BY id",
@@ -295,6 +349,7 @@ def elimina_esercizio(tag: str, esercizio_id: int) -> None:
         ).fetchone()[0]
         if in_compiti:
             raise ValueError("Questo esercizio compare in compiti già generati: non può essere eliminato")
+        conn.execute("DELETE FROM esercizio_verifiche WHERE esercizio_id=?", (esercizio_id,))
         conn.execute("DELETE FROM esercizio_varianti WHERE esercizio_id=?", (esercizio_id,))
         conn.execute("DELETE FROM esercizi WHERE id=?", (esercizio_id,))
         conn.commit()

@@ -41,6 +41,11 @@
       <td style="white-space:nowrap"><a href="/corsi/{{ c.tag }}/esercizi">{{ c.nome }}</a>{% if c.anno %} <span class="muted">({{ c.anno }})</span>{% endif %}</td>
       <td>
         {{ e.nome or ('#' ~ e.id) }}
+        {% set st_ia = stati_ia.get((c.tag, e.id)) if stati_ia is defined else None %}
+        {% if st_ia == 'verificato' %}<span class="icona-ia icona-ia-ok" title="Verificato con l'IA">✓</span>
+        {% elif st_ia == 'errore' %}<span class="icona-ia icona-ia-errore" title="La verifica con l'IA ha trovato un errore">✗</span>
+        {% elif st_ia == 'dubbio' %}<span class="icona-ia icona-ia-dubbio" title="La verifica con l'IA ha un dubbio da controllare">?</span>
+        {% elif st_ia == 'modificato' %}<span class="icona-ia icona-ia-dubbio" title="Modificato dopo la verifica con l'IA">↻</span>{% endif %}
         {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
         {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
         {% set problemi = problemi_risposte(e) %}{% if problemi %}<span class="badge badge-err" title="{{ problemi|join('; ') }}">⚠ risposte uguali</span>{% endif %}

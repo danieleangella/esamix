@@ -206,7 +206,9 @@ button.secondary, a.button.secondary {
   background: var(--panel); color: var(--text); border-color: var(--border-strong);
 }
 button.secondary:hover, a.button.secondary:hover { filter: none; background: var(--bg); border-color: var(--muted); }
-button.danger, a.button.danger { background: var(--err-text); border-color: var(--err-text); }
+/* azioni distruttive (Elimina, Rimuovi...): scritta e bordo rossi, si riempiono al passaggio */
+button.danger, a.button.danger { background: var(--panel); color: var(--err-text); border-color: var(--err-text); font-weight: 600; }
+button.danger:hover:not(:disabled), a.button.danger:hover { background: var(--err-text); color: #fff; filter: none; }
 button.warning, a.button.warning { background: #d97706; border-color: #d97706; }
 button:disabled, input[type=submit]:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
 button.link-simile { border: none; }
@@ -524,3 +526,33 @@ details.card.esito-dubbio { border-left: 4px solid #d97706; }
 /* elenchi (iscritti, ammessi, risultati): righe alternate, più facili da seguire */
 .tabella-elenco tbody tr:nth-child(even), .tabella-elenco tr:nth-child(even) { background: var(--bg); }
 .tabella-elenco td { padding: 0.55rem 0.5rem; }
+/* correzione con l'IA: prima e dopo affiancati (uno sotto l'altro su schermi stretti) */
+.confronto-correzione { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.confronto-correzione .proposta { border-color: var(--accent-border); background: var(--accent-soft); }
+@media (max-width: 800px) { .confronto-correzione { grid-template-columns: 1fr; } }
+.barra-rigenera { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin: 0.25rem 0 0.75rem; padding: 0.5rem 0.75rem; background: var(--bg); border-radius: 8px; font-size: 0.85rem; }
+
+/* registro: una riga per azione */
+.filtri-registro { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; font-size: 0.9rem; }
+.filtri-registro select, .filtri-registro input { width: auto; flex: 0 1 14rem; padding: 0.35rem 0.5rem; }
+.tabella-registro { font-size: 0.82rem; table-layout: fixed; }
+.tabella-registro td { padding: 0.28rem 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tabella-registro tr:nth-child(even) { background: var(--bg); }
+.tabella-registro .r-quando { width: 7.5rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tabella-registro .r-dove { width: 26%; }
+.tabella-registro .r-azione { width: 22%; font-weight: 600; }
+.tabella-registro tr.registro-error .r-azione { color: var(--err-text); }
+@media (max-width: 700px) {
+  /* sul telefono: data, dove e azione (l'esito resta nel testo che compare toccando la riga) */
+  .tabella-registro { display: table; table-layout: fixed; width: 100%; }
+  .tabella-registro .r-esito { display: none; }
+  .tabella-registro .r-quando { width: 5.2rem; white-space: normal; }
+  .tabella-registro .r-dove { width: 42%; }
+  .tabella-registro .r-azione { width: auto; }
+}
+/* piccola icona dello stato della verifica con l'IA (lista di tutti gli esercizi) */
+.icona-ia { display: inline-flex; align-items: center; justify-content: center; width: 1.1rem; height: 1.1rem; border-radius: 50%; font-size: 0.7rem; font-weight: 700; vertical-align: middle; margin-left: 0.2rem; cursor: help; }
+.icona-ia-ok { background: var(--ok-bg); color: var(--ok-text); }
+.icona-ia-errore { background: var(--err-bg); color: var(--err-text); }
+.icona-ia-dubbio { background: #fff7e6; color: #92400e; }
+.riepilogo-modifiche { border-left: 4px solid var(--accent); }

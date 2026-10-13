@@ -20,7 +20,6 @@
       <a class="icona-azione" href="{{ url_anteprima }}.pdf" target="_blank" rel="noopener" aria-label="Apri l'anteprima di controllo in PDF">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
         Anteprima</a>
-      <a class="icona-azione" href="{{ url_anteprima }}.pdf?rigenera=1" target="_blank" rel="noopener" title="Ricompila l'anteprima da zero" aria-label="Rigenera l'anteprima PDF">↻ Rigenera</a>
       <a class="icona-azione" href="{{ url_anteprima }}.tex" title="Sorgente LaTeX dell'anteprima">.tex</a>
       <a class="icona-azione" href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ia/verifica"
          title="Fai ricontrollare all'IA risposte corrette e soluzioni di tutti gli esercizi">✓ Verifica con l'IA</a>
@@ -43,6 +42,8 @@
     <span class="stato-ordine" aria-live="polite"></span>
   </p>
   {% endif %}
+  {% from "_stato_verifica.html" import stato_verifica %}
+  {% set stati_v = stati_verifica(corso.tag, md.esercizi_assegnati) %}
   <table class="tabella-esercizi-assegnati" data-url-ordine="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/esercizi/ordine">
     <thead><tr><th>#</th><th>Nome</th><th>Varianti</th><th>Obbligatorio</th><th></th></tr></thead>
     {% for e in md.esercizi_assegnati %}
@@ -66,6 +67,7 @@
         {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
         {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
         {% set problemi = problemi_risposte(e) %}{% if problemi %}<span class="badge badge-err" title="{{ problemi|join('; ') }}">⚠ risposte uguali</span>{% endif %}
+        {{ stato_verifica(corso.tag, e, stati_v[e.id], "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id) }}
       </td>
       <td>{{ e.varianti|length }}</td>
       <td>

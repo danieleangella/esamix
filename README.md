@@ -91,6 +91,10 @@ parte del codice scaricato con git). Se hai modificato a mano qualche file del p
 l'aggiornamento si ferma per non farti perdere quelle modifiche: te lo segnala e ti dice
 come procedere.
 
+Dopo l'aggiornamento **riavvia EsaMiX** (Ctrl+C nel terminale, poi di nuovo l'avvio): finché
+non lo fai, ogni pagina mostra un avviso, perché il programma in esecuzione è ancora quello
+vecchio.
+
 ## Avvio
 
 **Linux / macOS**
@@ -121,6 +125,21 @@ Ogni corso è una cartella dentro `corsi/`, con il proprio database (`db.sqlite`
 testi generati (`corsi/<corso>/output/`). I dati non vengono mai inviati altrove: tutto
 resta sul computer su cui gira l'app.
 
+## Documenti
+
+Compiti, griglie, fogli di riferimento (con e senza soluzioni), anteprima di controllo,
+risultati ed elenchi di iscritti sono disponibili in PDF, HTML e TeX; i documenti da
+pubblicare anche in Markdown. Ogni compito occupa sempre due pagine (un foglio
+fronte-retro), in un carattere senza grazie leggibile anche per studenti con DSA. Dopo un
+aggiornamento, "Rigenera tutti i documenti" (scheda Compiti d'esame) ricrea i PDF con la
+grafica nuova mantenendo codici e ordine di esercizi e risposte.
+
+## Registro
+
+La voce **Registro** del menu elenca tutte le azioni svolte nell'app (moduli inviati con
+l'esito, documenti aperti o scaricati, verifiche con l'IA) e gli aggiornamenti installati.
+Il registro è nel file `corsi/registro.jsonl`.
+
 ## Generazione di esercizi con l'IA (facoltativa)
 
 Nella scheda Testo di un appello, **"Genera con l'IA"** crea nuovi esercizi con Claude
@@ -131,7 +150,12 @@ importare.
 
 Dalla stessa scheda, **"✓ Verifica con l'IA"** fa ricontrollare al modello tutti gli
 esercizi del compito (risposte indicate come corrette, unicità della risposta, testi e
-soluzioni) e mostra per ciascuno se è corretto, da controllare o sbagliato.
+soluzioni) e mostra per ciascuno se è corretto, da controllare o sbagliato. La verifica si
+può fare anche su tutta la banca di un corso, su un singolo esercizio o su tutti i corsi
+("Tutti gli esercizi"); l'esito resta salvato per ogni esercizio, così quelli corretti non
+vanno ricontrollati finché non vengono modificati. Per gli esercizi con problemi, l'IA può
+proporre una correzione: si vede prima e dopo, la si può ritoccare e la si salva solo
+confermando.
 
 In Impostazioni → "Intelligenza artificiale" si possono salvare più configurazioni (chiavi
 o server diversi) e scegliere ogni volta quale usare. I fornitori possibili sono:

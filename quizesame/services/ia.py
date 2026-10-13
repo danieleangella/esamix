@@ -418,11 +418,12 @@ def _esercizio_da_verificare(numero: int, e) -> str:
     return "\n".join(righe)
 
 
-def costruisci_prompt_verifica(tag: str, appello) -> dict:
+def costruisci_prompt_verifica(tag: str, esercizi: list, contesto: str = "") -> dict:
+    """Prompt di verifica per un elenco qualunque di esercizi (di un appello, della banca
+    del corso o uno solo); `contesto` è una riga descrittiva (es. "Prova: Primo parziale")."""
     corso = corsi_service.get_corso(tag)
-    esercizi = esercizi_service.list_esercizi_appello(tag, appello.id)
     if not esercizi:
-        raise ValueError("Nessun esercizio assegnato a questo appello da verificare")
+        raise ValueError("Nessun esercizio da verificare")
     sistema = (
         "Sei un docente universitario esperto che ricontrolla, prima della stampa, il testo di un compito "
         "d'esame a risposta multipla scritto da un collega. Per ogni esercizio e per ogni variante: risolvi "
@@ -444,7 +445,7 @@ def costruisci_prompt_verifica(tag: str, appello) -> dict:
     )
     richiesta = (
         f"Corso: {corso.nome}" + (f" ({corso.facolta})" if corso.facolta else "")
-        + f"\nProva: {appello.nome}" + (f" del {appello.data}" if appello.data else "")
+        + (f"\n{contesto}" if contesto else "")
         + f"\n\nCi sono {len(esercizi)} esercizi da controllare:\n\n"
         + "\n\n".join(_esercizio_da_verificare(i, e) for i, e in enumerate(esercizi, start=1))
     )
@@ -522,28 +523,33 @@ def _leggi_verifica(testo: str, esercizi: list) -> list[dict]:
     return risultato
 
 
-def leggi_risposta_verifica(tag: str, appello, testo: str) -> list[dict]:
+def risultato_serializzabile(r: dict) -> dict:
+    """Il risultato della verifica di un esercizio senza l'oggetto Esercizio, da salvare
+    nel database insieme allo stato di verifica."""
+    return {k: v for k, v in r.items() if k != "esercizio"}
+
+
+def leggi_risposta_verifica(esercizi: list, testo: str) -> list[dict]:
     """La risposta della verifica ottenuta copiando il prompt in claude.ai (o altrove) e
     incollata nell'app: stesso formato e stesso risultato della verifica diretta."""
-    esercizi = esercizi_service.list_esercizi_appello(tag, appello.id)
     try:
         return _leggi_verifica(testo, esercizi)
     except ValueError as e:
         raise ValueError(
             f"La risposta incollata non è nel formato atteso: {e}. Copia l'intera risposta di Claude "
-            "(il blocco con il JSON); se il compito è cambiato nel frattempo, ripeti la verifica con un prompt nuovo."
+            "(il blocco con il JSON); se gli esercizi sono cambiati nel frattempo, ripeti con un prompt nuovo."
         ) from None
 
 
-def verifica(tag: str, appello, profilo_id: str = "") -> dict:
-    """Fa ricontrollare al modello tutti gli esercizi assegnati all'appello. Ritorna
-    {"esercizi": [...], "conf": configurazione usata}: per ogni esercizio l'esito
-    complessivo (ok / dubbio / errore), quello di ogni variante con la risposta calcolata
-    dal modello, e quello della soluzione."""
+def verifica(tag: str, esercizi: list, contesto: str = "", profilo_id: str = "") -> dict:
+    """Fa ricontrollare al modello gli esercizi indicati. Ritorna {"esercizi": [...],
+    "conf": configurazione usata}: per ogni esercizio l'esito complessivo (ok / dubbio /
+    errore), quello di ogni variante con la risposta calcolata dal modello, e quello della
+    soluzione."""
     conf = fornitore(profilo_id)
     if not conf:
         raise ValueError("Nessuna configurazione IA (Anthropic, OpenRouter o Ollama): vedi Impostazioni")
-    prompt = costruisci_prompt_verifica(tag, appello)
+    prompt = costruisci_prompt_verifica(tag, esercizi, contesto)
     messaggi = [{"role": "user", "content": prompt["richiesta"]}]
     for tentativo in range(2):
         risposta = _chiama(conf, prompt["sistema"], messaggi)
@@ -555,5 +561,128 @@ def verifica(tag: str, appello, profilo_id: str = "") -> dict:
             messaggi += [
                 {"role": "assistant", "content": risposta.content},
                 {"role": "user", "content": f"La risposta non è nel formato richiesto: {e}. Rispondi di nuovo con il solo JSON completo."},
+            ]
+    raise AssertionError("non raggiungibile")
+
+
+# --- Correzione di un esercizio a partire dalla sua verifica: il modello riscrive
+# l'esercizio nel formato di import correggendo solo ciò che la verifica ha segnalato; il
+# docente vede prima e dopo e decide se accettare. ------------------------------------------
+
+def _esercizio_completo_come_testo(e) -> str:
+    """L'esercizio con TUTTE le varianti, nel formato di import (la corretta con "+")."""
+    righe = ["### ESERCIZIO"]
+    for campo, valore in (("nome", e.nome), ("argomento", e.argomento), ("difficolta", e.difficolta), ("note", e.note)):
+        if valore:
+            righe.append(f"{campo}: {valore}")
+    if e.aperta:
+        righe.append("aperta: sì")
+    for v in e.varianti:
+        righe += ["", "### VARIANTE", v.testo.strip()]
+        if not e.aperta and v.risposte:
+            righe.append(f"+ {v.risposte[0]}")
+            righe += [f"- {r}" for r in v.risposte[1:]]
+    if e.soluzione:
+        righe += ["", "### SOLUZIONE", e.soluzione.strip()]
+    return "\n".join(righe)
+
+
+def modifiche_proposte(esercizio, proposta: dict) -> list[str]:
+    """Elenco leggibile delle differenze tra l'esercizio attuale e la correzione proposta,
+    da mostrare prima della conferma (testo, risposta corretta, risposte sbagliate e
+    soluzione di ogni variante)."""
+    modifiche = []
+    vecchie, nuove = esercizio.varianti, proposta.get("varianti") or []
+    if len(vecchie) != len(nuove):
+        modifiche.append(f"Numero di varianti: da {len(vecchie)} a {len(nuove)}")
+    for k, (v, n) in enumerate(zip(vecchie, nuove), start=1):
+        nome = f"Variante {k}" if max(len(vecchie), len(nuove)) > 1 else "Esercizio"
+        if v.testo.strip() != (n.get("testo") or "").strip():
+            modifiche.append(f"{nome}: testo modificato")
+        r_vecchie, r_nuove = list(v.risposte), list(n.get("risposte") or [])
+        if r_vecchie[:1] != r_nuove[:1]:
+            modifiche.append(f"{nome}: risposta corretta da {r_vecchie[0] if r_vecchie else '—'} a {r_nuove[0] if r_nuove else '—'}")
+        tolte = [r for r in r_vecchie[1:] if r not in r_nuove[1:]]
+        aggiunte = [r for r in r_nuove[1:] if r not in r_vecchie[1:]]
+        if tolte or aggiunte:
+            modifiche.append(f"{nome}: risposte sbagliate" + (f" — tolte: {', '.join(tolte)}" if tolte else "")
+                             + (f" — nuove: {', '.join(aggiunte)}" if aggiunte else ""))
+    if (esercizio.soluzione or "").strip() != (proposta.get("soluzione") or "").strip():
+        modifiche.append("Soluzione " + ("aggiunta" if not (esercizio.soluzione or "").strip() else "modificata"))
+    if bool(esercizio.aperta) != bool(proposta.get("aperta")):
+        modifiche.append("Tipo: " + ("diventa domanda aperta" if proposta.get("aperta") else "diventa a scelta multipla"))
+    return modifiche
+
+
+def proposta_come_testo(proposta: dict) -> str:
+    """Una proposta di correzione (dict come quelli di parse_testo_esercizi) di nuovo nel
+    formato di import, da modificare a mano prima di accettarla."""
+    from types import SimpleNamespace
+    return _esercizio_completo_come_testo(SimpleNamespace(
+        nome=proposta.get("nome"), argomento=proposta.get("argomento"), difficolta=proposta.get("difficolta"),
+        note=proposta.get("note"), aperta=bool(proposta.get("aperta")), soluzione=proposta.get("soluzione") or "",
+        varianti=[SimpleNamespace(testo=v["testo"], risposte=list(v.get("risposte") or [])) for v in proposta["varianti"]],
+    ))
+
+
+def _problemi_come_testo(risultato: dict) -> str:
+    righe = []
+    if risultato.get("commento"):
+        righe.append(f"- In generale: {risultato['commento']}")
+    for v in risultato.get("varianti") or []:
+        if v.get("esito") != "ok":
+            righe.append(f"- Variante {v['numero']} ({v['esito']}): {v.get('commento') or ''}"
+                         + (f" Risultato calcolato: {v['risposta_calcolata']}." if v.get("risposta_calcolata") else ""))
+    sol = risultato.get("soluzione") or {}
+    if sol.get("esito") in ("errore", "dubbio"):
+        righe.append(f"- Soluzione ({sol['esito']}): {sol.get('commento') or ''}")
+    return "\n".join(righe) or "- (nessun problema specifico indicato: ricontrolla comunque l'esercizio)"
+
+
+def costruisci_prompt_correzione(esercizio, risultato: dict) -> dict:
+    sistema = (
+        "Sei un docente universitario esperto. Correggi un esercizio d'esame a risposta multipla in cui una "
+        "verifica ha trovato errori o dubbi. Cambia SOLO ciò che serve a risolvere i problemi segnalati "
+        "(dopo averli ricontrollati tu stesso): mantieni lo stesso numero di varianti, lo stesso stile, gli "
+        "stessi dati quando sono corretti, e per ogni variante una sola risposta corretta e risposte "
+        "sbagliate verosimili e tutte diverse tra loro. Se un problema segnalato in realtà non c'è, lascia "
+        "quella parte invariata. Scrivi in italiano.\n\n"
+        "Rispondi SOLO con l'esercizio corretto, dentro un unico blocco di codice, nel formato seguente.\n\n"
+        + FORMATO_ESERCIZI
+    )
+    richiesta = (
+        "ESERCIZIO ATTUALE:\n\n" + _esercizio_completo_come_testo(esercizio)
+        + "\n\nPROBLEMI SEGNALATI DALLA VERIFICA:\n" + _problemi_come_testo(risultato)
+    )
+    return {"sistema": sistema, "richiesta": richiesta}
+
+
+def leggi_correzione(testo: str) -> dict:
+    """Dal testo nel formato di import all'esercizio corretto (dict come quelli di
+    parse_testo_esercizi): ValueError se non c'è esattamente un esercizio valido."""
+    esercizi = esercizi_service.parse_testo_esercizi(_estrai_file(testo))["esercizi"]
+    if len(esercizi) != 1:
+        raise ValueError(f"attesa la correzione di un solo esercizio, trovati {len(esercizi)}")
+    esercizi_service._valida_varianti([dict(v) for v in esercizi[0]["varianti"]], esercizi[0]["aperta"])
+    return esercizi[0]
+
+
+def proponi_correzione(esercizio, risultato: dict, profilo_id: str = "") -> dict:
+    """Chiede al modello la versione corretta dell'esercizio (non salva nulla)."""
+    conf = fornitore(profilo_id)
+    if not conf:
+        raise ValueError("Nessuna configurazione IA (Anthropic, OpenRouter o Ollama): vedi Impostazioni")
+    prompt = costruisci_prompt_correzione(esercizio, risultato)
+    messaggi = [{"role": "user", "content": prompt["richiesta"]}]
+    for tentativo in range(2):
+        risposta = _chiama(conf, prompt["sistema"], messaggi, max_tokens=32000)
+        try:
+            return leggi_correzione(_testo(risposta))
+        except ValueError as e:
+            if tentativo == 1:
+                raise ValueError(f"La correzione proposta non è valida: {e}")
+            messaggi += [
+                {"role": "assistant", "content": risposta.content},
+                {"role": "user", "content": f"La risposta non è valida: {e}. Rispondi di nuovo con il solo esercizio corretto, nel formato richiesto."},
             ]
     raise AssertionError("non raggiungibile")

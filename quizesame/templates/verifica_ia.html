@@ -1,38 +1,46 @@
 {% extends "base.html" %}
-{% block title %}Verifica con l'IA · {{ appello.nome }}{% endblock %}
+{% block title %}Verifica con l'IA · {{ titolo }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
-<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }}</a>
+<a href="{{ torna }}">{{ torna_etichetta }}</a>
 <span class="sep">›</span> <span class="current">Verifica con l'IA</span>
 {% endblock %}
 {% block katex %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="/static/katex/katex.min.css">
+<script defer src="/static/katex/katex.min.js"></script>
+<script defer src="/static/katex/contrib/auto-render.min.js"></script>
 {% endblock %}
 {% block content %}
+{% from "_stato_verifica.html" import stato_verifica %}
+{% set n_verificati = stati.values() | selectattr("stato", "equalto", "verificato") | list | length %}
 <header class="intestazione-pagina">
-  <div class="intestazione-livello">Verifica con l'IA ·
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }} — {{ corso.nome }}</a></div>
-  <h1>Controllo delle soluzioni</h1>
+  <div class="intestazione-livello">Verifica con l'IA · <a href="{{ torna }}">{{ corso.nome }} ({{ corso.anno }})</a></div>
+  <h1>{{ titolo }}</h1>
 </header>
 
 {% if errore %}<div class="flash flash-error">{{ errore }}</div>{% endif %}
 
+{% set etichette = {'ok': ('badge-ok', 'corretto'), 'verificato': ('badge-ok', '✓ verificato'), 'dubbio': ('badge-warn', 'da controllare'),
+                    'errore': ('badge-err', 'errore'), 'modificato': ('badge-warn', 'modificato dopo la verifica'),
+                    'mai': ('', 'mai verificato'), 'assente': ('', 'nessuna soluzione')} %}
+
 {% if not risultati %}
 <div class="card">
   <p style="margin-top:0">
-    Il modello risolve per conto suo ciascuno dei <strong>{{ esercizi|length }} esercizi</strong> assegnati, in ogni
-    variante, e segnala se la risposta indicata come corretta è sbagliata o non è l'unica corretta, se il testo è
-    ambiguo o ha formule scritte male, e se la soluzione contiene errori. È un aiuto, non una garanzia: anche il
-    modello può sbagliare, quindi ricontrolla tu i casi segnalati.
+    Il modello risolve per conto suo ogni esercizio, in ogni variante, e segnala se la risposta indicata come corretta è
+    sbagliata o non è l'unica corretta, se il testo è ambiguo o ha formule scritte male, e se la soluzione contiene errori.
+    L'esito resta salvato per ogni esercizio: quelli corretti non vanno ricontrollati finché non li modifichi.
+    Anche il modello può sbagliare: ricontrolla tu i casi segnalati.
   </p>
-  <form method="post" class="form-verifica-ia">
-    {% if profili_ia|length > 1 %}{% include "_scelta_profilo_ia.html" %}{% endif %}
+  <p><strong>{{ esercizi|length }}</strong> esercizi: <strong>{{ n_verificati }}</strong> già verificati,
+    <strong>{{ da_verificare|length }}</strong> da verificare (mai verificati o modificati dopo l'ultima verifica).</p>
+  <form method="post" action="{{ url }}" class="form-verifica-ia">
+    <label style="display:inline-flex; align-items:center; gap:0.4rem; color:var(--text)">
+      <input type="checkbox" name="solo_da_verificare" value="1" class="campo-solo-da-verificare" style="width:auto; margin:0" {% if da_verificare %}checked{% endif %}>
+      Controlla solo i {{ da_verificare|length }} da verificare</label>
+    {% if profili_ia|length > 1 %}{% set appello = appello or {'id': 'v'} %}{% include "_scelta_profilo_ia.html" %}{% endif %}
     <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-top:0.75rem">
-      {% if fornitore_ia %}
-      <button type="submit" style="margin:0" {% if not esercizi %}disabled{% endif %}>Avvia la verifica</button>
-      {% endif %}
+      {% if fornitore_ia %}<button type="submit" style="margin:0" {% if not esercizi %}disabled{% endif %}>Avvia la verifica</button>{% endif %}
       <button type="button" class="secondary btn-copia-prompt-verifica" style="margin:0" {% if not esercizi %}disabled{% endif %}>
         {{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</button>
       <span class="muted stato-verifica" role="status"></span>
@@ -49,18 +57,34 @@
 <details class="card" id="incolla-risposta" {% if not fornitore_ia or risposta_incollata %}open{% endif %}>
   <summary><strong>Con claude.ai: incolla la risposta</strong></summary>
   <ol style="margin:0.5rem 0 0; padding-left:1.2rem">
-    <li>Premi <strong>{{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</strong> qui sopra e incollalo in
-      una nuova chat su <a href="https://claude.ai" target="_blank" rel="noopener">claude.ai</a>.</li>
-    <li>Quando Claude ha finito, copia tutta la risposta (il blocco con il JSON: c'è il pulsante di copia in alto a destra del blocco).</li>
-    <li>Incollala qui sotto e premi <strong>Mostra il risultato</strong>: vedrai lo stesso riepilogo della verifica diretta.</li>
+    <li>Premi <strong>{{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</strong> qui sopra (con la stessa scelta
+      "solo da verificare" che userai qui) e incollalo in una nuova chat su <a href="https://claude.ai" target="_blank" rel="noopener">claude.ai</a>.</li>
+    <li>Quando Claude ha finito, copia tutta la risposta (il blocco con il JSON).</li>
+    <li>Incollala qui sotto e premi <strong>Mostra il risultato</strong>.</li>
   </ol>
-  <form method="post" style="margin-top:0.75rem">
+  <form method="post" action="{{ url }}" style="margin-top:0.75rem">
+    <input type="hidden" name="solo_da_verificare" value="1" class="eco-solo-da-verificare">
     <textarea name="risposta" rows="8" placeholder='{"esercizi": [ ... ]}' required>{{ risposta_incollata or '' }}</textarea>
     <button type="submit">Mostra il risultato</button>
   </form>
-  <p class="muted" style="margin-bottom:0">La risposta va incollata finché gli esercizi del compito sono quelli del prompt: se nel
-    frattempo li modifichi, copia un prompt nuovo.</p>
 </details>
+
+{% if esercizi|length > 1 %}
+<details class="card">
+  <summary><strong>Stato degli esercizi</strong></summary>
+  <table class="tabella-elenco">
+    {% for e in esercizi %}{% set st = stati[e.id] %}
+    <tr>
+      <td>{{ e.nome or ('#' ~ e.id) }}</td>
+      <td>{{ stato_verifica(corso.tag, e, st, url) }}
+        {% if st.quando %}<span class="muted" style="font-size:0.8rem">{{ st.quando[:16] }}{% if st.origine == 'manuale' %} · a mano{% elif st.origine == 'correzione' %} · corretto con l'IA{% endif %}</span>{% endif %}</td>
+      <td style="text-align:right"><a href="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/ia/verifica">verifica solo questo</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</details>
+{% endif %}
+
 {% else %}
 <div class="card riepilogo-verifica">
   <div class="stats-grid" style="margin-top:0">
@@ -68,17 +92,16 @@
     <div class="stat-tile stat-warn"><div class="stat-value">{{ conteggi.dubbio }}</div><div class="stat-label">dubbi da controllare</div></div>
     <div class="stat-tile stat-danger"><div class="stat-value">{{ conteggi.errore }}</div><div class="stat-label">errori trovati</div></div>
   </div>
-  <p class="muted" style="margin-bottom:0">Verifica fatta con {{ conf_usata.nome }} ({{ conf_usata.modello }}). Anche il modello può
-    sbagliare: ricontrolla i casi segnalati prima di correggere.
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/ia/verifica">Ripeti la verifica</a> ·
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">torna alla scheda Testo per correggere</a></p>
+  <p class="muted" style="margin-bottom:0">Verifica fatta con {{ conf_usata.nome }} ({{ conf_usata.modello }}); esiti salvati.
+    Anche il modello può sbagliare: ricontrolla i casi segnalati, poi chiedi una correzione o segnali come corretti.
+    <a href="{{ url }}">Nuova verifica</a> · <a href="{{ torna }}">torna a {{ torna_etichetta }}</a></p>
 </div>
 
-{% set etichette = {'ok': ('badge-ok', 'corretto'), 'dubbio': ('badge-warn', 'da controllare'), 'errore': ('badge-err', 'errore'), 'assente': ('', 'nessuna soluzione')} %}
 {% for r in risultati %}
 <details class="card esito-{{ r.esito }}" {% if r.esito != 'ok' %}open{% endif %}>
   <summary><strong>{{ r.numero }}. {{ r.esercizio.nome or ('Esercizio #' ~ r.esercizio.id) }}</strong>
-    <span class="badge {{ etichette[r.esito][0] }}">{{ etichette[r.esito][1] }}</span></summary>
+    <span class="badge {{ etichette[r.esito][0] }}">{{ etichette[r.esito][1] }}</span>
+    {% if r.esito != 'ok' %}<a class="icona-azione" style="margin-left:auto" href="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi?torna={{ (url ~ '')|urlencode }}&amp;auto=1">Correggi con l'IA</a>{% endif %}</summary>
   {% if r.commento %}<p style="margin-top:0.25rem">{{ r.commento }}</p>{% endif %}
   {% for v in r.varianti %}
   <div class="variante-verificata">
@@ -94,23 +117,47 @@
   <div class="variante-verificata"><strong>Soluzione</strong> <span class="badge {{ etichette[r.soluzione.esito][0] }}">{{ etichette[r.soluzione.esito][1] }}</span>
     {% if r.soluzione.commento %}<div>{{ r.soluzione.commento }}</div>{% endif %}</div>
   {% endif %}
+  {% if r.esito != 'ok' %}
+  <div class="azioni-rapide" style="border-top:1px solid var(--border); padding-top:0.6rem">
+    {% if fornitore_ia %}
+    <form class="inline form-proponi" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi">
+      <input type="hidden" name="torna" value="{{ url }}">
+      <input type="hidden" name="profilo" value="{{ fornitore_ia.id }}">
+      <button type="submit" style="margin:0">Proponi una correzione con l'IA</button>
+    </form>
+    {% else %}
+    <a class="button" href="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi?torna={{ (url ~ '')|urlencode }}">Proponi una correzione (con claude.ai)</a>
+    {% endif %}
+    <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/verificato">
+      <input type="hidden" name="torna" value="{{ url }}">
+      <button type="submit" class="secondary" style="margin:0" title="Hai ricontrollato tu: il dubbio era infondato">Segna come corretto</button>
+    </form>
+  </div>
+  {% endif %}
 </details>
 {% endfor %}
 {% endif %}
 
 <script>
 document.addEventListener("DOMContentLoaded", function () { renderizzaLatex(document.getElementById("contenuto")); });
+document.querySelectorAll(".form-proponi").forEach(function (f) {
+  f.addEventListener("submit", function () { var b = f.querySelector("button"); b.disabled = true; b.textContent = "Proposta in corso…"; });
+});
 (function () {
   var form = document.querySelector(".form-verifica-ia");
   if (!form) return;
   var stato = form.querySelector(".stato-verifica");
+  var solo = form.querySelector(".campo-solo-da-verificare");
+  var eco = document.querySelector(".eco-solo-da-verificare");
+  function allinea() { if (eco) eco.disabled = !solo.checked; }
+  solo.addEventListener("change", allinea); allinea();
   form.addEventListener("submit", function () {
     var btn = form.querySelector('button[type="submit"]');
     if (btn) { btn.disabled = true; btn.textContent = "Verifica in corso…"; }
     stato.textContent = "Il modello sta risolvendo gli esercizi: può richiedere alcuni minuti, non chiudere la pagina.";
   });
   form.querySelector(".btn-copia-prompt-verifica").addEventListener("click", function () {
-    fetch("/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/ia/verifica/prompt")
+    fetch("{{ url }}/prompt" + (solo.checked ? "?solo_da_verificare=1" : ""))
       .then(function (r) { return r.text(); })
       .then(function (t) { return navigator.clipboard.writeText(t); })
       .then(function () { stato.textContent = "Prompt copiato: incollalo in claude.ai."; })

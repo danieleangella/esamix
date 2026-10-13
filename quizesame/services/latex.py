@@ -68,7 +68,20 @@ BEGIN_DOCUMENT = (
     "\\usepackage{booktabs}\n\n"
     "\\renewcommand{\\familydefault}{\\sfdefault}\n"
     # un po' più di interlinea rispetto al minimo: righe meno fitte, più facili da seguire
-    "\\linespread{1.08}\n\n"
+    "\\linespread{1.08}\n"
+    # riga verticale sottile tra le due colonne di esercizi
+    "\\setlength{\\columnseprule}{0.4pt}\n\\setlength{\\columnsep}{0.8cm}\n"
+    # nelle colonne strette: un po' di elasticità in più negli spazi e possibilità di andare
+    # a capo dopo una virgola dentro una formula in linea (es. "$A=(1,0,2), B=(2,1,0)$"),
+    # altrimenti le formule lunghe escono dal margine
+    "\\setlength{\\emergencystretch}{1.5em}\n"
+    "\\AtBeginDocument{\\mathchardef\\virgolamat=\\mathcode`\\,\\mathcode`\\,=\"8000"
+    "\\mathchardef\\puntovirgolamat=\\mathcode`\\;\\mathcode`\\;=\"8000}\n"
+    "{\\catcode`\\,=\\active\\gdef,{\\virgolamat\\penalty500\\relax}}\n"
+    "{\\catcode`\\;=\\active\\gdef;{\\puntovirgolamat\\penalty500\\relax}}\n"
+    # le formule in display non vanno mai a capo: nelle colonne strette i \qquad tra le parti
+    # (es. "A=(1,0,2), \qquad B=...") diventano \quad, per stare nella larghezza della colonna
+    "\\everydisplay\\expandafter{\\the\\everydisplay\\def\\qquad{\\quad}}\n\n"
     "\\theoremstyle{definition}\n"
     "\\newtheorem{ex}{Esercizio}\n\n"
     "\\renewcommand{\\Re}{\\mathsf{Re}}\n"
@@ -106,6 +119,13 @@ def _titolo_documento(titolo: str, dettaglio: str = "") -> str:
 # righe alternate a fondo grigio chiarissimo: nelle tabelle lunghe aiutano a seguire la
 # riga giusta (anche a chi ha difficoltà di lettura), e restano leggibili in bianco e nero
 _RIGHE_ALTERNATE = "\\rowcolors{2}{black!4}{white}\n\\renewcommand{\\arraystretch}{1.5}\n"
+
+
+def _riga_intestazione(*celle: str, altezza: str = "") -> str:
+    """Riga d'intestazione di una tabella: tutte le celle in grassetto, fondo grigio e la
+    stessa altezza delle righe del corpo (`altezza`, se queste hanno uno strut più alto)."""
+    strut = f"\\rule{{0pt}}{{{altezza}}}" if altezza else ""
+    return "\\rowcolor{black!10}" + strut + " & ".join(f"{{\\normalfont\\bfseries {c}}}" for c in celle) + " \\\\\n"
 
 
 def _titolo_prova(ctx: LatexContext) -> str:
@@ -148,9 +168,11 @@ def _griglia_risposte(posizioni: list[dict]) -> str:
         colonne = "|" + "|".join(">{\\centering\\arraybackslash}p{0.62cm}" for _ in gruppo) + "|"
         numeri = " & ".join(f"{{\\footnotesize {inizio + k + 1}}}" for k in range(len(gruppo)))
         caselle = " & ".join("{\\Large --}" if p["aperta"] else "" for p in gruppo)
+        # un unico fondo bianco dietro la tabella (sul grigio dell'intestazione): un fondo per
+        # cella coprirebbe le righe verticali tra le caselle
         righe.append(
-            f"\\begin{{tabular}}{{{colonne}}}\\hline\n{numeri} \\\\\\hline\n"
-            f"\\rule{{0pt}}{{0.8cm}}{caselle} \\\\\\hline\n\\end{{tabular}}"
+            f"{{\\setlength{{\\fboxsep}}{{0pt}}\\colorbox{{white}}{{\\begin{{tabular}}{{{colonne}}}\\hline\n{numeri} \\\\\\hline\n"
+            f"\\rule{{0pt}}{{0.65cm}}{caselle} \\\\\\hline\n\\end{{tabular}}}}}}"
         )
     return "\\\\[4pt]\n".join(righe)
 
@@ -162,36 +184,38 @@ def intestazione(ctx: LatexContext, codice, posizioni: list[dict]) -> str:
     tondo o grassetto, mai in corsivo, per la leggibilità (anche per studenti con DSA)."""
     linea = "\\rule[-2pt]{{{}}}{{0.4pt}}"
     return (
+        # tutta l'intestazione su un fondo grigio chiarissimo (le caselle da scrivere restano bianche)
+        "\\noindent\\colorbox{black!5}{\\begin{minipage}{\\dimexpr\\textwidth-2\\fboxsep}\\vspace{2pt}\n"
         # corso e prova a sinistra, codice del compito a destra
         "\\noindent\\begin{minipage}[b]{0.70\\textwidth}\\raggedright\n"
-        f"{{\\Large\\bfseries {ctx.corso}}}\\\\[3pt]\n"
-        f"{{\\large {_titolo_prova(ctx)}" + (f" \\quad {ctx.appello_data}" if ctx.appello_data else "") + "}\n"
+        f"{{\\large\\bfseries {ctx.corso}}}\\\\[2pt]\n"
+        f"{{{_titolo_prova(ctx)}" + (f" \\quad {ctx.appello_data}" if ctx.appello_data else "") + "}\n"
         "\\end{minipage}\\hfill\n"
-        "\\fbox{\\begin{minipage}[b]{0.22\\textwidth}\\centering\n"
-        "{\\footnotesize Codice del compito}\\\\[2pt]\n"
-        f"{{\\LARGE\\bfseries {codice}}}\n"
+        "\\fcolorbox{black}{white}{\\begin{minipage}[b]{0.22\\textwidth}\\centering\n"
+        "{\\scriptsize Codice del compito}\\\\[1pt]\n"
+        f"{{\\Large\\bfseries {codice}}}\n"
         "\\end{minipage}}\\par\n"
-        "\\vspace{0.5cm}\n\n"
+        "\\vspace{0.35cm}\n\n"
         # dati dello studente
         "\\noindent{\\bfseries Cognome}\\enspace" + linea.format("0.36\\textwidth")
         + "\\hfill{\\bfseries Nome}\\enspace" + linea.format("0.36\\textwidth") + "\\par\n"
-        "\\vspace{0.55cm}\n"
+        "\\vspace{0.4cm}\n"
         "\\noindent{\\bfseries Matricola}\\enspace" + linea.format("0.30\\textwidth") + "\\par\n"
-        "\\vspace{0.5cm}\n\n"
+        "\\vspace{0.3cm}\n\n"
         # griglia delle risposte e voto
         "\\noindent\\begin{minipage}[t]{0.76\\textwidth}\\raggedright\n"
-        "{\\bfseries Risposte} {\\footnotesize (scrivi la lettera scelta sotto il numero dell'esercizio)}\\\\[4pt]\n"
+        "{\\bfseries Risposte}\\\\[2pt]\n"
         f"{_griglia_risposte(posizioni)}\n"
         "\\end{minipage}\\hfill\n"
         "\\begin{minipage}[t]{0.20\\textwidth}\\raggedleft\n"
-        "\\vspace{0.55cm}\n"
-        "\\fbox{\\begin{minipage}{0.92\\linewidth}\\centering\n"
-        "{\\bfseries Voto}\\\\[0.45cm]\n"
+        "\\vspace{0.4cm}\n"
+        "\\fcolorbox{black}{white}{\\begin{minipage}{0.92\\linewidth}\\centering\n"
+        "{\\bfseries Voto}\\\\[0.35cm]\n"
         "\\rule{0.5\\linewidth}{0.4pt}\\,/30\\\\[2pt]\n"
         "\\end{minipage}}\n"
-        "\\end{minipage}\\par\n"
-        "\\vspace{0.35cm}\\noindent\\rule{\\textwidth}{0.8pt}\\par\n"
-        "\\vspace{0.3cm}\n\n"
+        "\\end{minipage}\\par\\vspace{3pt}\n"
+        "\\end{minipage}}\\par\n"
+        "\\vspace{0.2cm}\n\n"
         "\\begin{center}\n"
         f"{{\\bfseries {_text_consegna(ctx)}}}"
         "\\end{center}\n"
@@ -263,13 +287,13 @@ def stampa_codici(ctx: LatexContext, studenti) -> str:
         "compare su quel foglio; il trattino indica una domanda aperta.}\\par\\medskip\n\n"
         + _RIGHE_ALTERNATE +
         "\\begin{longtable}{>{\\bfseries}l l}\n\\toprule\n"
-        "Codice & Risposte corrette \\\\\n\\midrule\n\\endhead\n"
+        + _riga_intestazione("Codice", "Risposte corrette") + "\\midrule\n\\endhead\n"
     )
     for codice, griglia in studenti:
         # lettere distanziate e a gruppi di cinque, come nella casella della correzione
         gruppi = [griglia[i:i + 5] for i in range(0, len(griglia), 5)]
         lettere = "\\quad ".join("\\,".join(g) for g in gruppi)
-        tex += f"{codice} & \\large {lettere}\\\\\n"
+        tex += f"{codice} & {{\\ttfamily {lettere}}}\\\\\n"
     tex += "\\bottomrule\n\\end{longtable}\n\n"
     return tex
 
@@ -393,6 +417,7 @@ def crea_file_anteprima(ctx: LatexContext, esercizi_struct: list[dict]) -> str:
         "\\begin{document}\n",
         "\\usepackage[hidelinks]{hyperref}\n"
         "\\setlength{\\parindent}{0pt}\n"
+        "\\raggedbottom\n"
         # colore e spessore del filetto a sinistra di ogni variante (ambiente leftbar di framed)
         "\\renewenvironment{leftbar}{\\def\\FrameCommand{{\\color{black!35}\\vrule width 2.5pt}\\hspace{8pt}}"
         "\\MakeFramed{\\advance\\hsize-\\width\\FrameRestore}}{\\endMakeFramed}\n\n"
@@ -489,7 +514,9 @@ def _riquadro_revisione(numero: int, es: dict) -> str:
         righe.append(f"Soluzione & {_caselle_esito(f'es{numero}sol')} \\\\[3pt]\n")
     return (
         "\\noindent\\fcolorbox{black!45}{yellow!7}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep-2\\fboxrule}{"
-        "\\vspace{3pt}{\\bfseries Revisione}\\par\\smallskip\n"
+        "\\vspace{3pt}{\\bfseries Revisione dell'esercizio " + str(numero) + "}"
+        + (f" \\quad({_escape_testo_semplice(es.get('nome') or '')})" if es.get("nome") else "")
+        + "\\par\\smallskip\n"
         "\\begin{tabular}{@{}l@{\\qquad}l@{\\qquad}l@{}}\n"
         + "".join(righe)
         + "\\end{tabular}\\par\\smallskip\n"
@@ -515,7 +542,10 @@ def pagina_compito(ctx: LatexContext, codice, posizioni: list[dict]) -> str:
         tex += _separatore_esercizio()
     tex += "\\end{multicols}\n\\end{small}\n\n\\vfill\n"
     tex += regole(ctx)
-    tex += "\\clearpage\n\n"
+    # ogni compito occupa esattamente due pagine (un foglio fronte-retro): se il testo sta
+    # in una pagina, la seconda resta bianca, così nella stampa fronte-retro nessun compito
+    # comincia sul retro di quello prima. Più di due pagine: lo segnala la generazione.
+    tex += "\\clearpage\n\\ifodd\\value{page}\\else\\null\\clearpage\\fi\n\n"
     return tex
 
 
@@ -601,7 +631,7 @@ def crea_tex_risultati(ctx: LatexContext, lista) -> str:
         "\\noindent{\\small Le matricole sono parzialmente oscurate; tra parentesi le iniziali di nome e cognome.}"
         "\\par\\medskip\n\n" + _RIGHE_ALTERNATE +
         "\\begin{center}\n\\begin{longtable}{>{\\ttfamily}l c >{\\bfseries}l}\n\\toprule\n"
-        "{\\normalfont\\bfseries Matricola} & {\\bfseries Iniziali} & Esito \\\\\n\\midrule\n\\endhead\n"
+        + _riga_intestazione("Matricola", "Iniziali", "Esito") + "\\midrule\n\\endhead\n"
     )
     for matricola, nome, cognome, etichetta in lista:
         iniziali = f"{(nome or ' ')[0]}{(cognome or ' ')[0]}".strip()
@@ -622,7 +652,7 @@ def _tabella_ammessi(righe: list[dict]) -> str:
     con uno spazio diverso (più stretto) da quello, uniforme, fra tutte le altre righe."""
     tex = _RIGHE_ALTERNATE + (
         "\\begin{longtable}{c >{\\ttfamily}l >{\\bfseries}p{0.3\\textwidth} p{0.25\\textwidth} l}\n\\toprule\n"
-        "{\\bfseries Presente} & {\\normalfont\\bfseries Matricola} & Cognome & {\\bfseries Nome} & {\\bfseries Note} \\\\\n\\midrule\n\\endhead\n"
+        + _riga_intestazione("Presente", "Matricola", "Cognome", "Nome", "Note", altezza="0.75cm") + "\\midrule\n\\endhead\n"
     )
     for i, r in enumerate(righe):
         note_parti = []

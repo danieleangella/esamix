@@ -4,12 +4,46 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <span class="current">Tutti gli esercizi</span>
 {% endblock %}
 {% block katex %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="/static/katex/katex.min.css">
+<script defer src="/static/katex/katex.min.js"></script>
+<script defer src="/static/katex/contrib/auto-render.min.js"></script>
 {% endblock %}
 {% block content %}
 <h1>Tutti gli esercizi <span class="muted">({{ righe_esercizi|length }})</span></h1>
+{% if verifiche_corsi %}
+{% set tot_da = verifiche_corsi | sum(attribute="da_verificare") %}
+<details class="card" id="verifica-ia" {% if tot_da %}open{% endif %}>
+  <summary><strong>Verifica con l'IA delle banche esercizi</strong>
+    {% if tot_da %}<span class="badge badge-warn">{{ tot_da }} da verificare</span>{% else %}<span class="badge badge-ok">tutti verificati</span>{% endif %}</summary>
+  <table class="tabella-elenco">
+    <thead><tr><th>Corso</th><th>Esercizi</th><th>Verificati</th><th>Da verificare</th><th>Errori o dubbi</th><th></th></tr></thead>
+    {% for r in verifiche_corsi %}
+    <tr>
+      <td><a href="/corsi/{{ r.corso.tag }}/esercizi">{{ r.corso.nome }}</a> <span class="muted">({{ r.corso.anno }})</span></td>
+      <td>{{ r.totale }}</td><td>{{ r.verificati }}</td><td>{{ r.da_verificare }}</td>
+      <td>{% if r.problemi %}<strong>{{ r.problemi }}</strong>{% else %}0{% endif %}</td>
+      <td style="text-align:right"><a href="/corsi/{{ r.corso.tag }}/esercizi/ia/verifica">verifica</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% if fornitore_ia %}
+  <form method="post" action="/esercizi/ia/verifica" class="form-verifica-tutti" style="margin-top:0.75rem">
+    {% if profili_ia|length > 1 %}{% set appello = {'id': 't'} %}{% include "_scelta_profilo_ia.html" %}{% endif %}
+    <button type="submit" {% if not tot_da %}disabled{% endif %}>Verifica tutti i {{ tot_da }} esercizi da verificare</button>
+    <p class="muted" style="margin-bottom:0">Un corso alla volta; può richiedere parecchi minuti. Gli esercizi già verificati e non
+      modificati vengono saltati. Per la verifica con claude.ai, usa il link "verifica" di ogni corso.</p>
+  </form>
+  <script>
+  document.querySelector(".form-verifica-tutti").addEventListener("submit", function (ev) {
+    var b = ev.target.querySelector('button[type="submit"]'); b.disabled = true; b.textContent = "Verifica in corso, non chiudere la pagina…";
+  });
+  </script>
+  {% else %}
+  <p class="muted" style="margin-bottom:0">Per verificare tutto in un colpo solo serve una configurazione IA in
+    <a href="/impostazioni#ia">Impostazioni</a>; con claude.ai usa il link "verifica" di ogni corso.</p>
+  {% endif %}
+</details>
+{% endif %}
 <div class="card">
   <p class="muted" style="margin-top:0">Gli esercizi di tutti i corsi, in un unico elenco da filtrare per nome del corso
     (tutte le sue edizioni), corso specifico, argomento o testo. Ogni corso ha la sua banca separata: per usare uno di
