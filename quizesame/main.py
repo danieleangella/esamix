@@ -1826,6 +1826,7 @@ def proponi_correzione_ia(request: Request, tag: str, esercizio_id: int, torna: 
                               proposta_json=json.dumps(proposta, ensure_ascii=False),
                               proposta_testo=ia_service.proposta_come_testo(proposta),
                               modifiche=ia_service.modifiche_proposte(e, proposta),
+                              confronto=ia_service.confronto_correzione(e, proposta),
                               modificata=bool(risposta.strip()) and modifica == "1",
                               firma_attuale=esercizi_service.firma_contenuto(e))
 

@@ -32,7 +32,7 @@
       </td>
       <td>
         <div class="azioni-rapide">
-          {% if loop.first %}<a class="button secondary" href="/corsi/{{ r.corso.tag }}" title="Appelli, studenti, esercizi e impostazioni del corso {{ r.corso.nome }}">Corso</a>{% endif %}
+          <a class="button secondary" href="/corsi/{{ r.corso.tag }}" title="Appelli, studenti, esercizi e impostazioni del corso {{ r.corso.nome }}">Corso</a>
           <a class="button secondary" href="{{ r.url }}#creazione{{ suffisso }}">Testo</a>
           <a class="button secondary" href="{{ r.url }}#compiti{{ suffisso }}">Compiti</a>
           <a class="button secondary" href="{{ r.url }}#valutazione{{ suffisso }}">Correzione</a>

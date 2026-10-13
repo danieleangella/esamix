@@ -57,14 +57,34 @@
     Se sei d'accordo, puoi segnarlo come verificato.</p>
   {% endif %}
 </div>
+<p class="muted legenda-diff">In <del class="diff-tolto">rosso barrato</del> ciò che viene tolto, in <ins class="diff-nuovo">verde</ins>
+  ciò che viene aggiunto; le risposte cambiate sono evidenziate per intero.</p>
+{% macro colonna(lato) %}
+  {% for v in confronto.varianti %}
+  <div class="rif-variante" style="margin-top:0.25rem">{% if confronto.varianti|length > 1 %}Variante {{ loop.index }}{% else %}Testo{% endif %}</div>
+  {% if (lato == 'prima' and v.assente_prima) or (lato == 'dopo' and v.assente_dopo) %}
+  <p class="muted">(variante assente)</p>
+  {% else %}
+  <div class="rif-testo">{{ (v.prima_testo if lato == 'prima' else v.dopo_testo)|safe }}</div>
+  {% set risposte = v.prima_risposte if lato == 'prima' else v.dopo_risposte %}
+  {% if risposte %}
+  <ol class="rif-risposte" type="A">
+    {% for r, cambiata in risposte %}<li class="{% if loop.first %}corretta{% endif %}{% if cambiata %} {{ 'diff-risposta-tolta' if lato == 'prima' else 'diff-risposta-nuova' }}{% endif %}">{{ r|safe }}{% if loop.first %} <span class="badge badge-ok">✓</span>{% endif %}</li>{% endfor %}
+  </ol>
+  {% endif %}
+  {% endif %}
+  {% endfor %}
+  {% set sol = confronto.prima_soluzione if lato == 'prima' else confronto.dopo_soluzione %}
+  {% if sol %}<div class="rif-soluzione"><strong>Soluzione.</strong> {{ sol|safe }}</div>{% endif %}
+{% endmacro %}
 <div class="confronto-correzione">
   <div class="card">
     <div class="titoletto" style="margin-top:0">Prima (attuale)</div>
-    {{ mostra(esercizio.varianti, esercizio.soluzione, esercizio.aperta) }}
+    {{ colonna('prima') }}
   </div>
   <div class="card proposta">
     <div class="titoletto" style="margin-top:0">Dopo (proposta dell'IA)</div>
-    {{ mostra(proposta.varianti, proposta.soluzione, proposta.aperta) }}
+    {{ colonna('dopo') }}
   </div>
 </div>
 <div class="card">

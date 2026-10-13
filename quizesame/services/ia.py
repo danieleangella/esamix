@@ -587,6 +587,63 @@ def _esercizio_completo_come_testo(e) -> str:
     return "\n".join(righe)
 
 
+_PEZZI = re.compile(r"\$\$.*?\$\$|\$[^$]*\$|\\\[.*?\\\]|\s+|[^\s$]+", re.DOTALL)
+
+
+def _evidenzia(prima: str, dopo: str) -> tuple[str, str]:
+    """Le due versioni di un testo in HTML, con le parti tolte (in `prima`) e aggiunte (in
+    `dopo`) evidenziate. Il confronto è per parole, ma ogni formula ($...$, $$...$$,
+    \\[...\\]) è un pezzo unico, così l'evidenziazione non la spezza e resta visualizzabile."""
+    from difflib import SequenceMatcher
+    from html import escape
+    a, b = _PEZZI.findall(prima or ""), _PEZZI.findall(dopo or "")
+    out_a, out_b = [], []
+    for op, i1, i2, j1, j2 in SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        pa, pb = escape("".join(a[i1:i2])), escape("".join(b[j1:j2]))
+        if op == "equal":
+            out_a.append(pa); out_b.append(pb)
+        else:
+            if pa.strip():
+                out_a.append(f'<del class="diff-tolto">{pa}</del>')
+            else:
+                out_a.append(pa)
+            if pb.strip():
+                out_b.append(f'<ins class="diff-nuovo">{pb}</ins>')
+            else:
+                out_b.append(pb)
+    return "".join(out_a), "".join(out_b)
+
+
+def _risposte_segnate(queste: list, altre: list) -> list[tuple[str, bool]]:
+    """(risposta in HTML, cambiata?) — la prima, la corretta, è cambiata se è diversa
+    dalla corretta dell'altra versione; una sbagliata, se non è tra le sbagliate dell'altra."""
+    from html import escape
+    return [(escape(r), (r != (altre[0] if altre else None)) if j == 0 else (r not in altre[1:]))
+            for j, r in enumerate(queste)]
+
+
+def confronto_correzione(esercizio, proposta: dict) -> dict:
+    """Prima e dopo pronti da mostrare affiancati, con le differenze evidenziate: per ogni
+    variante il testo e le risposte (segnate se cambiate), e la soluzione."""
+    from html import escape
+    varianti = []
+    vecchie, nuove = list(esercizio.varianti), list(proposta.get("varianti") or [])
+    for k in range(max(len(vecchie), len(nuove))):
+        v = vecchie[k] if k < len(vecchie) else None
+        n = nuove[k] if k < len(nuove) else None
+        testo_a, testo_b = _evidenzia(v.testo if v else "", (n or {}).get("testo", ""))
+        r_a, r_b = list(v.risposte) if v else [], list((n or {}).get("risposte") or [])
+        varianti.append({
+            "prima_testo": testo_a, "dopo_testo": testo_b,
+            "prima_risposte": _risposte_segnate(r_a, r_b),
+            "dopo_risposte": _risposte_segnate(r_b, r_a),
+            "assente_prima": v is None, "assente_dopo": n is None,
+        })
+    sol_a, sol_b = _evidenzia(esercizio.soluzione or "", proposta.get("soluzione") or "")
+    return {"varianti": varianti, "prima_soluzione": sol_a, "dopo_soluzione": sol_b,
+            "aperta_prima": bool(esercizio.aperta), "aperta_dopo": bool(proposta.get("aperta"))}
+
+
 def modifiche_proposte(esercizio, proposta: dict) -> list[str]:
     """Elenco leggibile delle differenze tra l'esercizio attuale e la correzione proposta,
     da mostrare prima della conferma (testo, risposta corretta, risposte sbagliate e
