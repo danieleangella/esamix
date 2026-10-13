@@ -207,6 +207,12 @@
       {% block breadcrumb %}<a href="/">Corsi</a>{% endblock %}
     </div>
   </nav>
+  {% if codice_aggiornato() %}
+  <div class="avviso-riavvio" role="alert">
+    <strong>EsaMiX è stato aggiornato:</strong> riavvialo per usare la nuova versione (nel terminale dove è
+    in esecuzione premi Ctrl+C e lancialo di nuovo). Fino ad allora alcune funzioni potrebbero non funzionare.
+  </div>
+  {% endif %}
   <main class="container" id="contenuto">
     {% set msg = request.query_params.get('msg') %}
     {% set dettaglio = request.query_params.get('dettaglio') %}

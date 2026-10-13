@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Foglio di riferimento · {{ appello.nome }}{% endblock %}
+{% set titolo_pagina = 'Anteprima di controllo' if tutte else ('Foglio di riferimento con soluzioni' if soluzioni else 'Foglio di riferimento') %}
+{% block title %}{{ titolo_pagina }} · {{ appello.nome }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
 <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#compiti">{{ appello.nome }}</a>
-<span class="sep">›</span> <span class="current">Foglio di riferimento</span>
+<span class="sep">›</span> <span class="current">{{ titolo_pagina }}</span>
 {% endblock %}
 {% block katex %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
@@ -12,16 +13,17 @@
 {% endblock %}
 {% block content %}
 <header class="intestazione-pagina">
-  <div class="intestazione-livello">Foglio di riferimento ·
+  <div class="intestazione-livello">{{ titolo_pagina }} ·
     <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#compiti">{{ corso.nome }} ({{ corso.anno }})</a></div>
   <h1>{{ appello.nome }}{% if appello.data %} <span class="muted">· {{ appello.data }}</span>{% endif %}</h1>
 </header>
 <div class="barra-riferimento non-stampare">
-  <p class="muted" style="margin:0">Compito di esempio con la prima variante di ogni esercizio; la risposta corretta è
-    segnata con ✓ (nel PDF pubblicato è sempre la A).</p>
+  <p class="muted" style="margin:0">{% if tutte %}Tutte le varianti di ogni esercizio, con la risposta corretta segnata con ✓
+    e le soluzioni.{% else %}Compito di esempio con la prima variante di ogni esercizio; la risposta corretta è
+    segnata con ✓ (nel PDF pubblicato è sempre la A).{% endif %}</p>
   <span class="formati">
     <label style="display:inline-flex; align-items:center; gap:0.35rem; margin:0; color:var(--text)">
-      <input type="checkbox" id="mostra-soluzioni" style="width:auto; margin:0"> Mostra le soluzioni</label>
+      <input type="checkbox" id="mostra-soluzioni" style="width:auto; margin:0" {% if soluzioni %}checked{% endif %}> Mostra le soluzioni</label>
     <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">Stampa</button>
   </span>
 </div>
@@ -33,13 +35,16 @@
       {% if r.obbligatorio %}<span class="badge badge-warn">obbligatorio</span>{% endif %}
       {% if r.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
       {% if r.n_varianti > 1 %}<span class="badge" title="Qui è mostrata la prima">{{ r.n_varianti }} varianti</span>{% endif %}</div>
-    <div class="rif-testo">{{ r.testo }}</div>
+    {% for v in (r.varianti if tutte else [{'testo': r.testo, 'risposte': r.risposte}]) %}
+    {% if tutte and r.varianti|length > 1 %}<div class="rif-variante">Variante {{ loop.index }} di {{ r.varianti|length }}</div>{% endif %}
+    <div class="rif-testo">{{ v.testo }}</div>
     {% if not r.aperta %}
     <ol class="rif-risposte" type="A">
-      {% for s in r.risposte %}<li{% if loop.first %} class="corretta"{% endif %}>{{ s }}{% if loop.first %} <span class="badge badge-ok">✓ corretta</span>{% endif %}</li>{% endfor %}
+      {% for s in v.risposte %}<li{% if loop.first %} class="corretta"{% endif %}>{{ s }}{% if loop.first %} <span class="badge badge-ok">✓ corretta</span>{% endif %}</li>{% endfor %}
     </ol>
     {% endif %}
-    {% if r.soluzione %}<div class="rif-soluzione" hidden><strong>Soluzione / suggerimento.</strong> {{ r.soluzione }}</div>{% endif %}
+    {% endfor %}
+    {% if r.soluzione %}<div class="rif-soluzione" {% if not soluzioni %}hidden{% endif %}><strong>Soluzione / suggerimento.</strong> {{ r.soluzione }}</div>{% endif %}
   </li>
 {% else %}
   <p class="muted">Nessun esercizio assegnato a questo appello.</p>

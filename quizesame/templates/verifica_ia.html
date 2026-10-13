@@ -40,11 +40,27 @@
     <p class="muted" style="margin-bottom:0">
       {% if fornitore_ia %}{% if profili_ia|length <= 1 %}Configurazione: <strong>{{ fornitore_ia.nome }}</strong> ({{ fornitore_ia.modello }}). {% endif %}
       Può richiedere alcuni minuti. Vengono inviati solo i testi degli esercizi, nessun dato degli studenti.
-      {% else %}Nessuna configurazione IA: copia il prompt in <a href="https://claude.ai" target="_blank" rel="noopener">claude.ai</a>,
-      oppure aggiungine una in <a href="/impostazioni#ia">Impostazioni</a>.{% endif %}
+      {% else %}Nessuna configurazione IA: usa il prompt con claude.ai (qui sotto), oppure aggiungine una in
+      <a href="/impostazioni#ia">Impostazioni</a>.{% endif %}
     </p>
   </form>
 </div>
+
+<details class="card" id="incolla-risposta" {% if not fornitore_ia or risposta_incollata %}open{% endif %}>
+  <summary><strong>Con claude.ai: incolla la risposta</strong></summary>
+  <ol style="margin:0.5rem 0 0; padding-left:1.2rem">
+    <li>Premi <strong>{{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</strong> qui sopra e incollalo in
+      una nuova chat su <a href="https://claude.ai" target="_blank" rel="noopener">claude.ai</a>.</li>
+    <li>Quando Claude ha finito, copia tutta la risposta (il blocco con il JSON: c'è il pulsante di copia in alto a destra del blocco).</li>
+    <li>Incollala qui sotto e premi <strong>Mostra il risultato</strong>: vedrai lo stesso riepilogo della verifica diretta.</li>
+  </ol>
+  <form method="post" style="margin-top:0.75rem">
+    <textarea name="risposta" rows="8" placeholder='{"esercizi": [ ... ]}' required>{{ risposta_incollata or '' }}</textarea>
+    <button type="submit">Mostra il risultato</button>
+  </form>
+  <p class="muted" style="margin-bottom:0">La risposta va incollata finché gli esercizi del compito sono quelli del prompt: se nel
+    frattempo li modifichi, copia un prompt nuovo.</p>
+</details>
 {% else %}
 <div class="card riepilogo-verifica">
   <div class="stats-grid" style="margin-top:0">

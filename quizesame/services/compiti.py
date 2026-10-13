@@ -1,6 +1,7 @@
 import json
+import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from shutil import which
 from typing import Optional
@@ -45,10 +46,11 @@ def _esercizi_per_generazione(tag: str, appello_id: int):
     ]
 
 
-def anteprima_riferimento(tag: str, appello_id: int) -> list[dict]:
+def anteprima_riferimento(tag: str, appello_id: int, tutte_varianti: bool = False) -> list[dict]:
     """Righe del "Compito A" del foglio di riferimento (prima variante di ciascun
     esercizio assegnato, risposte non mischiate: la corretta è sempre la prima), da
-    mostrare in pagina senza generare/scaricare il PDF."""
+    mostrare in pagina senza generare/scaricare il PDF. Con `tutte_varianti` ogni riga ha
+    anche "varianti": tutte le varianti dell'esercizio (anteprima di controllo a schermo)."""
     esercizi = esercizi_service.list_esercizi_appello(tag, appello_id)
     righe = []
     for e in esercizi:
@@ -59,6 +61,7 @@ def anteprima_riferimento(tag: str, appello_id: int) -> list[dict]:
             "esercizio_nome": e.nome or f"Esercizio #{e.id}", "obbligatorio": e.obbligatorio,
             "aperta": e.aperta, "testo": variante.testo, "risposte": list(variante.risposte),
             "soluzione": e.soluzione or "", "n_varianti": len(e.varianti),
+            "varianti": [{"testo": v.testo, "risposte": list(v.risposte)} for v in e.varianti] if tutte_varianti else [],
         })
     return righe
 
@@ -136,6 +139,55 @@ def _salva_riferimenti(tag: str, appello_id: int, ctx: LatexContext, esercizi_st
         path_riferimento_soluzioni(tag, appello_id, "tex"),
         crea_file_riferimento(ctx, esercizi_struct, con_soluzioni=True),
     )
+
+
+def ricostruisci_documenti(tag: str, appello_id: int) -> list[Path]:
+    """Riscrive con la grafica attuale i .tex dei documenti già generati per l'appello —
+    fogli di riferimento, testo e griglia di ogni blocco — mantenendo gli stessi codici,
+    lo stesso ordine di esercizi e risposte e quindi le stesse griglie: i compiti già
+    stampati o distribuiti restano validi. Usa il testo attuale degli esercizi (se un
+    esercizio è stato modificato dopo la generazione, compare la versione modificata).
+    Ritorna i .tex da compilare."""
+    from quizesame.services.latex import BEGIN_DOCUMENT as INIZIO, pagina_compito
+    appello = corsi_service.get_appello(tag, appello_id)
+    blocchi = list_blocchi(tag, appello_id)
+    if not blocchi:
+        raise ValueError("Nessun blocco di compiti ancora generato per questo appello")
+    ctx = _crea_contesto(corsi_service.get_corso(tag), appello)
+    _salva_riferimenti(tag, appello_id, ctx, _esercizi_per_generazione(tag, appello_id))
+    da_compilare = [path_riferimento(tag, appello_id, "tex"), path_riferimento_soluzioni(tag, appello_id, "tex")]
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        for b in blocchi:
+            compiti = conn.execute(
+                "SELECT c.id, c.codice, c.soluzioni FROM compiti c JOIN blocchi bl ON bl.id = c.blocco_id "
+                "WHERE bl.appello_id=? AND bl.numero=? ORDER BY c.id",
+                (appello_id, b["numero"]),
+            ).fetchall()
+            tex = INIZIO
+            for c in compiti:
+                posizioni = conn.execute(
+                    "SELECT ce.obbligatorio, ce.risposte_mischiate, e.aperta, ev.testo FROM compito_esercizi ce "
+                    "JOIN esercizi e ON e.id = ce.esercizio_id JOIN esercizio_varianti ev ON ev.id = ce.variante_id "
+                    "WHERE ce.compito_id=? ORDER BY ce.posizione",
+                    (c["id"],),
+                ).fetchall()
+                tex += pagina_compito(ctx, c["codice"], [
+                    {"testo": p["testo"], "obbligatorio": bool(p["obbligatorio"]), "aperta": bool(p["aperta"]),
+                     "risposte": json.loads(p["risposte_mischiate"]) if p["risposte_mischiate"] else []}
+                    for p in posizioni
+                ])
+            tex += "\n\n\\end{document}"
+            _salva_testo(path_blocco(tag, appello_id, b["numero"], "tex", appello=appello), tex)
+            _salva_testo(
+                path_griglia(tag, appello_id, b["numero"], "tex", appello=appello),
+                crea_file_griglia(ctx, [(c["codice"], c["soluzioni"]) for c in compiti]),
+            )
+            da_compilare += [path_blocco(tag, appello_id, b["numero"], "tex", appello=appello),
+                             path_griglia(tag, appello_id, b["numero"], "tex", appello=appello)]
+    finally:
+        conn.close()
+    return da_compilare
 
 
 def genera_anteprima(tag: str, appello_id: int) -> tuple[Path, bool]:
@@ -460,6 +512,24 @@ class CompilazioneResult:
     messaggio: str
     pdf_path: Path | None = None
     errore_dettagliato: str | None = None
+    # righe o blocchi che escono dai margini (overfull) in modo visibile: il PDF è stato
+    # prodotto, ma qualcosa sporge; ogni voce è un estratto leggibile del log
+    sporgenze: list[str] = field(default_factory=list)
+
+
+_OVERFULL = re.compile(r"Overfull \\[hv]box \(([\d.]+)pt too (?:wide|high)\)[^\n]*\n(.*)")
+
+
+def _sporgenze_latex(log: str, soglia_pt: float = 2.0) -> list[str]:
+    """Gli overfull oltre `soglia_pt` (sotto i 2pt non si vedono a occhio), con il testo
+    della riga interessata ripulito dai comandi di font di TeX."""
+    voci = []
+    for misura, riga in _OVERFULL.findall(log):
+        if float(misura) < soglia_pt:
+            continue
+        testo = re.sub(r"\\[A-Za-z0-9]+/[^ ]+ ", "", riga).replace("[]", " ").strip()
+        voci.append(f"sporge di {float(misura) * 0.3515:.1f} mm: {testo[:80] or '(riquadro o tabella)'}")
+    return voci
 
 
 def _estrai_errore_latex(output: str) -> str:
@@ -498,7 +568,9 @@ def compila_pdf(tex_path: Path) -> CompilazioneResult:
 
     pdf_path = tex_path.with_suffix(".pdf")
     if pdf_path.exists():
-        return CompilazioneResult(ok=True, messaggio="PDF compilato", pdf_path=pdf_path)
+        log_path = tex_path.with_suffix(".log")
+        log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
+        return CompilazioneResult(ok=True, messaggio="PDF compilato", pdf_path=pdf_path, sporgenze=_sporgenze_latex(log))
     return CompilazioneResult(
         ok=False, messaggio="Compilazione PDF fallita: controlla il testo LaTeX degli esercizi",
         errore_dettagliato=_estrai_errore_latex(risultato.stdout or risultato.stderr or ""),

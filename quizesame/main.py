@@ -33,6 +33,7 @@ from quizesame.services import aule as aule_service
 from quizesame.services import latex as latex_service
 from quizesame.services import presenze as presenze_service
 from quizesame.services import ia as ia_service
+from quizesame.services import documenti as documenti_service
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
@@ -79,6 +80,25 @@ def _data_iso_a_it(data: str) -> str:
 
 
 templates.env.filters["data_iso"] = _data_it_a_iso
+# Il codice Python viene caricato una volta sola all'avvio, mentre i template vengono
+# riletti dal disco: dopo un aggiornamento senza riavvio le pagine nuove girano sul codice
+# vecchio (pulsanti che non fanno nulla, campi ignorati). Se un file .py è più recente
+# dell'avvio, ogni pagina mostra un avviso a riavviare.
+_AVVIO = __import__("time").time()
+_controllo_codice = {"quando": 0.0, "aggiornato": False}
+
+
+def _codice_aggiornato() -> bool:
+    import time
+    adesso = time.time()
+    if not _controllo_codice["aggiornato"] and adesso - _controllo_codice["quando"] > 15:
+        _controllo_codice["quando"] = adesso
+        cartella = Path(__file__).parent
+        _controllo_codice["aggiornato"] = any(f.stat().st_mtime > _AVVIO for f in cartella.rglob("*.py"))
+    return _controllo_codice["aggiornato"]
+
+
+templates.env.globals["codice_aggiornato"] = _codice_aggiornato
 # segnalazione degli esercizi con risposte ripetute in una variante (vedi esercizi_service)
 templates.env.globals["problemi_risposte"] = esercizi_service.problemi_risposte
 templates.env.filters["js"] = lambda value: json.dumps(str(value))
@@ -982,6 +1002,12 @@ def genera_compiti(tag: str, appello_id: int, numero_studenti: int = Form(...)):
             continue
         comp = risultati_compilazione[etichetta]
         msg += f". {etichetta}: " + comp.messaggio
+        if comp.ok and comp.sporgenze:
+            msg += (f" (attenzione: {len(comp.sporgenze)} punti escono dal margine, controlla il PDF;"
+                    " di solito basta accorciare una formula o andare a capo nel testo dell'esercizio)")
+            kind = "warning" if kind == "success" else kind
+            if not dettaglio:
+                dettaglio = f"{etichetta}, testo che esce dal margine:\n" + "\n".join(comp.sporgenze[:10])
         if not comp.ok:
             kind = "error"
             if comp.errore_dettagliato and not dettaglio:
@@ -991,6 +1017,35 @@ def genera_compiti(tag: str, appello_id: int, numero_studenti: int = Form(...)):
         msg += " " + result.avviso_obbligatori
         kind = "warning" if kind == "success" else kind
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, kind, anchor=anchor, dettaglio=dettaglio)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/ricompila-pdf")
+def ricompila_pdf(tag: str, appello_id: int):
+    """Rigenera con la grafica attuale i PDF già generati (compiti, griglie, fogli di
+    riferimento), mantenendo codici e ordine: utile dopo un aggiornamento dell'app."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "compiti")
+    try:
+        da_compilare = compiti_service.ricostruisci_documenti(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    with ThreadPoolExecutor(max_workers=min(8, len(da_compilare))) as pool:
+        esiti = list(pool.map(compiti_service.compila_pdf, da_compilare))
+    falliti = [(p, e) for p, e in zip(da_compilare, esiti) if not e.ok]
+    sporgenti = [(p, e) for p, e in zip(da_compilare, esiti) if e.ok and e.sporgenze]
+    if falliti:
+        p, e = falliti[0]
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}", f"{len(falliti)} PDF non compilati ({p.name}): {e.messaggio}",
+            "error", anchor=anchor, dettaglio=e.errore_dettagliato or "",
+        )
+    msg = f"Rigenerati {len(da_compilare)} PDF con la grafica attuale (stessi codici e stesso ordine di esercizi e risposte)."
+    if sporgenti:
+        dettaglio = "\n".join(f"{p.name}: {v}" for p, e in sporgenti for v in e.sporgenze[:5])
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}",
+                              msg + f" Attenzione: in {len(sporgenti)} file del testo esce dal margine, controllali.",
+                              "warning", anchor=anchor, dettaglio=dettaglio)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/riferimento.tex", response_class=PlainTextResponse)
@@ -1061,14 +1116,56 @@ def scarica_anteprima_tex(tag: str, appello_id: int):
     return PlainTextResponse(tex_path.read_text(encoding="utf-8"), media_type="application/x-tex")
 
 
-@app.get("/corsi/{tag}/appelli/{appello_id}/riferimento.html", response_class=HTMLResponse)
-def riferimento_anteprima(request: Request, tag: str, appello_id: int):
+def _pagina_riferimento(request: Request, tag: str, appello_id: int, soluzioni: bool = False, tutte: bool = False):
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
-    righe = compiti_service.anteprima_riferimento(tag, appello_id)
+    righe = compiti_service.anteprima_riferimento(tag, appello_id, tutte_varianti=tutte)
     return templates.TemplateResponse(request, "riferimento_anteprima.html", {
-        "corso": corso, "appello": appello, "righe": righe,
+        "corso": corso, "appello": appello, "righe": righe, "soluzioni": soluzioni, "tutte": tutte,
     })
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/riferimento.html", response_class=HTMLResponse)
+def riferimento_anteprima(request: Request, tag: str, appello_id: int):
+    return _pagina_riferimento(request, tag, appello_id)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/riferimento-soluzioni.html", response_class=HTMLResponse)
+def riferimento_soluzioni_html(request: Request, tag: str, appello_id: int):
+    return _pagina_riferimento(request, tag, appello_id, soluzioni=True)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/anteprima.html", response_class=HTMLResponse)
+def anteprima_html(request: Request, tag: str, appello_id: int):
+    """Anteprima di controllo a schermo: tutte le varianti di ogni esercizio, con
+    risposta corretta e soluzioni (come il PDF di controllo, senza il riquadro di revisione)."""
+    return _pagina_riferimento(request, tag, appello_id, soluzioni=True, tutte=True)
+
+
+def _markdown(testo: str, nome_file: str) -> PlainTextResponse:
+    return PlainTextResponse(testo, media_type="text/markdown; charset=utf-8",
+                             headers={"Content-Disposition": f'inline; filename="{nome_file}"'})
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/riferimento.md", response_class=PlainTextResponse)
+def riferimento_md(tag: str, appello_id: int):
+    try:
+        return _markdown(documenti_service.riferimento_md(tag, appello_id), "riferimento.md")
+    except ValueError as e:
+        return PlainTextResponse(str(e), status_code=404)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/riferimento-soluzioni.md", response_class=PlainTextResponse)
+def riferimento_soluzioni_md(tag: str, appello_id: int):
+    try:
+        return _markdown(documenti_service.riferimento_md(tag, appello_id, con_soluzioni=True), "riferimento-soluzioni.md")
+    except ValueError as e:
+        return PlainTextResponse(str(e), status_code=404)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/risultati.md", response_class=PlainTextResponse)
+def risultati_md(tag: str, appello_id: int):
+    return _markdown(documenti_service.risultati_md(tag, appello_id), "risultati.md")
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/blocchi/{numero}/testo.tex", response_class=PlainTextResponse)
@@ -1438,12 +1535,18 @@ def pagina_verifica_ia(request: Request, tag: str, appello_id: int):
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/ia/verifica", response_class=HTMLResponse)
-def esegui_verifica_ia(request: Request, tag: str, appello_id: int, profilo: str = Form("")):
+def esegui_verifica_ia(request: Request, tag: str, appello_id: int, profilo: str = Form(""), risposta: str = Form("")):
+    """Avvia la verifica con la configurazione scelta oppure, se è stata incollata la
+    risposta ottenuta da claude.ai con il prompt copiato, la legge e la mostra."""
     appello = corsi_service.get_appello(tag, appello_id)
     try:
-        esito = ia_service.verifica(tag, appello, profilo_id=profilo)
+        if risposta.strip():
+            esito = {"esercizi": ia_service.leggi_risposta_verifica(tag, appello, risposta),
+                     "conf": {"nome": "risposta incollata", "modello": "claude.ai"}}
+        else:
+            esito = ia_service.verifica(tag, appello, profilo_id=profilo)
     except ValueError as e:
-        return _pagina_verifica_ia(request, tag, appello, errore=str(e), profilo=profilo)
+        return _pagina_verifica_ia(request, tag, appello, errore=str(e), profilo=profilo, risposta_incollata=risposta)
     conteggi = {k: sum(1 for r in esito["esercizi"] if r["esito"] == k) for k in ia_service.ESITI_VERIFICA}
     return _pagina_verifica_ia(request, tag, appello, risultati=esito["esercizi"], conf_usata=esito["conf"],
                                conteggi=conteggi, profilo=profilo)
@@ -1979,18 +2082,58 @@ def scarica_iscritti_csv(tag: str, appello_id: int):
     )
 
 
+def _elenco_studenti(tag: str, appello_id: int, tipo: str):
+    """(appello, titolo, elenco, aule, percorso del .tex) per l'elenco degli iscritti o
+    degli ammessi a una prova (tipo "iscritti" | "ammessi"); elenco None se non disponibile.
+    Il .tex viene sempre riscritto: l'elenco cambia man mano che si aggiungono studenti."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    corso = corsi_service.get_corso(tag)
+    if tipo == "iscritti":
+        elenco, aule = esportazione_service.list_iscritti(tag, appello_id), []
+        titolo, tex_path = f"Studenti iscritti: {appello.nome}", compiti_service.path_iscritti(tag, appello_id, "tex", appello=appello)
+    else:
+        raggruppamento, indice = _membro_e_indice(tag, appello_id)
+        if raggruppamento is None:
+            return appello, "", None, [], None
+        elenco = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
+        aule = aule_service.list_aule(tag, appello_id)
+        titolo, tex_path = f"Studenti ammessi: {appello.nome}", compiti_service.path_ammessi(tag, appello_id, "tex", appello=appello)
+    if elenco is not None:
+        ctx = risultati_service.ctx_for(tag, corso, appello)
+        tex_path.write_text(latex_service.crea_tex_ammessi(ctx, titolo, elenco, aule), encoding="utf-8")
+    return appello, titolo, elenco, aule, tex_path
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/{tipo}.tex", response_class=PlainTextResponse)
+def elenco_studenti_tex(tag: str, appello_id: int, tipo: str):
+    if tipo not in ("iscritti", "ammessi"):
+        return PlainTextResponse("Documento non trovato", status_code=404)
+    _, _, elenco, _, tex_path = _elenco_studenti(tag, appello_id, tipo)
+    if elenco is None:
+        return PlainTextResponse("Elenco non disponibile per questa prova", status_code=404)
+    return PlainTextResponse(tex_path.read_text(encoding="utf-8"), media_type="application/x-tex")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/{tipo}.html", response_class=HTMLResponse)
+def elenco_studenti_html(request: Request, tag: str, appello_id: int, tipo: str):
+    if tipo not in ("iscritti", "ammessi"):
+        return PlainTextResponse("Documento non trovato", status_code=404)
+    appello, titolo, elenco, aule, _ = _elenco_studenti(tag, appello_id, tipo)
+    if elenco is None:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Elenco non disponibile per questa prova", "error",
+                              anchor=_anchor_membro(appello, "compiti"))
+    return templates.TemplateResponse(request, "elenco_studenti.html", {
+        "corso": corsi_service.get_corso(tag), "appello": appello, "titolo": titolo, "elenco": elenco,
+        "aule": aule, "tipo": tipo, "anchor": _anchor_membro(appello, "compiti"),
+    })
+
+
 @app.get("/corsi/{tag}/appelli/{appello_id}/iscritti.pdf")
 def scarica_iscritti_pdf(tag: str, appello_id: int):
-    appello = corsi_service.get_appello(tag, appello_id)
+    appello, _, iscritti, _, tex_path = _elenco_studenti(tag, appello_id, "iscritti")
     anchor = _anchor_membro(appello, "compiti")
-    iscritti = esportazione_service.list_iscritti(tag, appello_id)
     if iscritti is None:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessun elenco iscritti caricato", "error", anchor=anchor)
-    corso = corsi_service.get_corso(tag)
-    ctx = risultati_service.ctx_for(tag, corso, appello)
-    tex = latex_service.crea_tex_ammessi(ctx, f"Studenti iscritti: {appello.nome}", iscritti, [])
-    tex_path = compiti_service.path_iscritti(tag, appello_id, "tex", appello=appello)
-    tex_path.write_text(tex, encoding="utf-8")
     compilazione = compiti_service.compila_pdf(tex_path)
     if not compilazione.ok:
         return flash_redirect(
@@ -2281,17 +2424,9 @@ def scarica_ammessi_csv(tag: str, appello_id: int):
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/ammessi.pdf")
 def scarica_ammessi_pdf(tag: str, appello_id: int):
-    raggruppamento, indice = _membro_e_indice(tag, appello_id)
-    if raggruppamento is None:
+    _, _, ammessi, _, tex_path = _elenco_studenti(tag, appello_id, "ammessi")
+    if ammessi is None:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Questa prova non appartiene a un raggruppamento", "error")
-    corso = corsi_service.get_corso(tag)
-    appello = corsi_service.get_appello(tag, appello_id)
-    ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
-    aule = aule_service.list_aule(tag, appello_id)
-    ctx = risultati_service.ctx_for(tag, corso, appello)
-    tex = latex_service.crea_tex_ammessi(ctx, f"Studenti ammessi: {appello.nome}", ammessi, aule)
-    tex_path = compiti_service.path_ammessi(tag, appello_id, "tex", appello=appello)
-    tex_path.write_text(tex, encoding="utf-8")
     compilazione = compiti_service.compila_pdf(tex_path)
     if not compilazione.ok:
         return flash_redirect(

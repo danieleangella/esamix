@@ -456,14 +456,42 @@ def _esito(valore, ammessi=ESITI_VERIFICA) -> str:
     return v if v in ammessi else "dubbio"
 
 
+# Escape JSON che, scritti da un modello senza raddoppiare le barre, sono in realtà comandi
+# LaTeX: \frac diventa "salto pagina" + "rac", \theta "tab" + "heta", \neq "a capo" + "eq"...
+_CONTROLLO_A_LATEX = {"\f": "\\f", "\b": "\\b", "\t": "\\t", "\r": "\\r"}
+_COMANDI_CON_N = re.compile(r"\n(?=(?:eq|u|abla|ot|otin|i|ewline|orm|eg|leq|geq|parallel|exists|mid)\b)")
+_ESCAPE_NON_VALIDO = re.compile(r'(?<!\\)((?:\\\\)*)\\(?=[^"\\/bfnrtu])')
+
+
+def _ripara_stringhe(valore):
+    if isinstance(valore, str):
+        for c, sostituto in _CONTROLLO_A_LATEX.items():
+            valore = valore.replace(c, sostituto)
+        return _COMANDI_CON_N.sub(r"\\n", valore)
+    if isinstance(valore, list):
+        return [_ripara_stringhe(v) for v in valore]
+    if isinstance(valore, dict):
+        return {k: _ripara_stringhe(v) for k, v in valore.items()}
+    return valore
+
+
+def _json_tollerante(testo: str):
+    """Legge il JSON della verifica anche quando il LaTeX non ha le barre raddoppiate
+    (capita spesso con le risposte copiate da claude.ai): prima raddoppia le barre che
+    non formano un escape JSON valido (\\det, \\sqrt, \\lambda...), poi ricostruisce i
+    comandi LaTeX che il JSON ha interpretato come caratteri di controllo (\\frac...)."""
+    import json
+    try:
+        dati = json.loads(_ESCAPE_NON_VALIDO.sub(r"\1\\\\", testo))
+    except json.JSONDecodeError as e:
+        raise ValueError(f"JSON non valido ({e})")
+    return _ripara_stringhe(dati)
+
+
 def _leggi_verifica(testo: str, esercizi: list) -> list[dict]:
     """Dal JSON del modello a un elenco allineato agli esercizi: ValueError se il JSON non
     è leggibile o non ha la struttura richiesta (il chiamante chiede allora di correggerlo)."""
-    import json
-    try:
-        dati = json.loads(_estrai_file(testo))
-    except json.JSONDecodeError as e:
-        raise ValueError(f"JSON non valido ({e})")
+    dati = _json_tollerante(_estrai_file(testo))
     voci = dati.get("esercizi") if isinstance(dati, dict) else None
     if not isinstance(voci, list):
         raise ValueError("manca l'elenco \"esercizi\"")
@@ -492,6 +520,19 @@ def _leggi_verifica(testo: str, esercizi: list) -> list[dict]:
             "varianti": varianti, "soluzione": {"esito": esito_sol, "commento": str(sol.get("commento") or "")},
         })
     return risultato
+
+
+def leggi_risposta_verifica(tag: str, appello, testo: str) -> list[dict]:
+    """La risposta della verifica ottenuta copiando il prompt in claude.ai (o altrove) e
+    incollata nell'app: stesso formato e stesso risultato della verifica diretta."""
+    esercizi = esercizi_service.list_esercizi_appello(tag, appello.id)
+    try:
+        return _leggi_verifica(testo, esercizi)
+    except ValueError as e:
+        raise ValueError(
+            f"La risposta incollata non è nel formato atteso: {e}. Copia l'intera risposta di Claude "
+            "(il blocco con il JSON); se il compito è cambiato nel frattempo, ripeti la verifica con un prompt nuovo."
+        ) from None
 
 
 def verifica(tag: str, appello, profilo_id: str = "") -> dict:

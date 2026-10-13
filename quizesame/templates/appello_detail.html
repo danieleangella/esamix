@@ -307,10 +307,9 @@
     {% endif %}
     {% if risultati_tex_esiste or risultati_pdf_esiste %}
     <p style="margin-top:0.75rem">
-      Scarica elenco risultati:
-      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.html">.html</a>
-      {% if risultati_tex_esiste %} · <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.tex">.tex</a>{% endif %}
-      {% if risultati_pdf_esiste %} · <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati.pdf">.pdf</a>{% endif %}
+      {% from "_formati.html" import formati %}
+      Elenco risultati da pubblicare:
+      {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/risultati", pdf=risultati_pdf_esiste, html=True, tex=risultati_tex_esiste, md=True) }}
     </p>
     {% endif %}
   </details>

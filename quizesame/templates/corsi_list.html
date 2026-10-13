@@ -26,12 +26,13 @@
       <td>
         {% if loop.first %}
         <a href="{{ r.url }}"><strong>{{ r.appello.nome }}</strong></a>
-        <span class="muted">{{ r.corso.nome }}{% if r.appello.data %} · {{ r.appello.data }}{% endif %}</span>
+        <span class="muted"><a href="/corsi/{{ r.corso.tag }}" title="Apri il corso">{{ r.corso.nome }}</a>{% if r.corso.anno %} ({{ r.corso.anno }}){% endif %}{% if r.appello.data %} · {{ r.appello.data }}{% endif %}</span>
         {% endif %}
         {% if nome_prova %}<div class="muted">{{ nome_prova }}</div>{% endif %}
       </td>
       <td>
         <div class="azioni-rapide">
+          {% if loop.first %}<a class="button secondary" href="/corsi/{{ r.corso.tag }}" title="Appelli, studenti, esercizi e impostazioni del corso {{ r.corso.nome }}">Corso</a>{% endif %}
           <a class="button secondary" href="{{ r.url }}#creazione{{ suffisso }}">Testo</a>
           <a class="button secondary" href="{{ r.url }}#compiti{{ suffisso }}">Compiti</a>
           <a class="button secondary" href="{{ r.url }}#valutazione{{ suffisso }}">Correzione</a>

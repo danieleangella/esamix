@@ -1,18 +1,33 @@
 {% extends "base.html" %}
 {% block title %}Risultati · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
+<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">{{ appello.nome }}</a>
+<span class="sep">›</span> <span class="current">Risultati</span>
+{% endblock %}
 {% block content %}
-<p><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">&larr; {{ appello.nome }}</a></p>
-<h1>Elenco risultati — {{ appello.nome }}</h1>
-
-<div class="card">
+{% from "_formati.html" import formati %}
+<header class="intestazione-pagina">
+  <div class="intestazione-livello">Risultati della prova scritta ·
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">{{ corso.nome }} ({{ corso.anno }})</a></div>
+  <h1>{{ appello.nome }}{% if appello.data %} <span class="muted">· {{ appello.data }}</span>{% endif %}</h1>
+</header>
+<div class="barra-riferimento non-stampare">
+  <p class="muted" style="margin:0">Matricole parzialmente oscurate, iniziali di nome e cognome: pronto da pubblicare.</p>
+  <span class="formati">
+    {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/risultati", pdf=True, tex=True, md=True) }}
+    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">Stampa</button>
+  </span>
+</div>
+<div class="card" style="padding:0.5rem 1rem">
   {% if righe %}
-  <table>
-    <tr><th>Matricola</th><th>Studente</th><th>Esito</th></tr>
+  <table class="tabella-elenco">
+    <thead><tr><th>Matricola</th><th>Iniziali</th><th>Esito</th></tr></thead>
     {% for r in righe %}
     <tr>
       <td style="font-family:monospace">{{ r.matricola }}</td>
-      <td>{{ r.nome[0] }}{{ r.cognome[0] }}</td>
-      <td>{{ r.etichetta }}</td>
+      <td>{{ (r.nome or ' ')[0] }}{{ (r.cognome or ' ')[0] }}</td>
+      <td><strong>{{ r.etichetta }}</strong></td>
     </tr>
     {% endfor %}
   </table>

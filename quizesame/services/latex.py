@@ -54,13 +54,21 @@ BEGIN_DOCUMENT = (
     "\\usepackage[english]{babel}\n"
     "\\usepackage{amssymb}\n"
     "\\usepackage[utf8]{inputenc}\n"
+    "\\usepackage[T1]{fontenc}\n"
+    # Helvetica: un sans serif chiaro e regolare (tipo Arial), tra quelli consigliati per
+    # la lettura di studenti con DSA; presente in ogni installazione LaTeX (psnfss)
+    "\\usepackage[scaled=0.95]{helvet}\n"
+    "\\usepackage{array}\n"
+    "\\usepackage[table]{xcolor}\n"
     "\\usepackage{fullpage}\n"
     "\\usepackage{longtable}\n"
     "\\usepackage{framed}\n"
     "\\usepackage{lipsum}\n"
     "\\usepackage{multicol}\n"
     "\\usepackage{booktabs}\n\n"
-    "\\renewcommand{\\familydefault}{\\sfdefault}\n\n"
+    "\\renewcommand{\\familydefault}{\\sfdefault}\n"
+    # un po' più di interlinea rispetto al minimo: righe meno fitte, più facili da seguire
+    "\\linespread{1.08}\n\n"
     "\\theoremstyle{definition}\n"
     "\\newtheorem{ex}{Esercizio}\n\n"
     "\\renewcommand{\\Re}{\\mathsf{Re}}\n"
@@ -70,66 +78,120 @@ BEGIN_DOCUMENT = (
 )
 
 
+_FRASE_CONSEGNA_PREDEFINITA = "Consegnate lo svolgimento dei {consegna} esercizi obbligatori."
+
+
 def _text_consegna(ctx: LatexContext) -> str:
     if ctx.consegna and ctx.consegna > 0:
+        # la frase predefinita, con un solo esercizio, diventerebbe "dei 1 esercizi"
+        if ctx.consegna == 1 and ctx.frase_consegna.strip() == _FRASE_CONSEGNA_PREDEFINITA:
+            return "Consegnate lo svolgimento dell'esercizio obbligatorio.\n"
         return _safe_format(ctx.frase_consegna, consegna=ctx.consegna)
     return ""
 
 
-def intestazione_breve(ctx: LatexContext) -> str:
-    appello_label = ctx.appello_nome.replace("-", " ")
-    # righe facoltative: un campo vuoto (facoltà/università/anno non impostati) non deve
-    # produrre una riga vuota, altrimenti due \\ consecutivi generano un errore fatale
-    # di compilazione LaTeX ("There's no line here to end").
-    universita_anno = ", a.a. ".join(p for p in (ctx.universita, ctx.anno) if p)
-    righe = [r for r in (ctx.corso, ctx.facolta, universita_anno) if r]
-    intestazione_corso = "".join(f"{r}\\\\\n" for r in righe)
+def _quanti(n: int, singolare: str, plurale: str) -> str:
+    return f"{n} {singolare if n == 1 else plurale}"
+
+
+def _titolo_documento(titolo: str, dettaglio: str = "") -> str:
+    """Titolo di un documento sotto l'intestazione (es. "Risultati", "Studenti ammessi")."""
     return (
-        "\\begin{center}\n"
-        "\\fbox{\n"
-        "\\begin{minipage}{0.6\\textwidth}\n"
-        "\\bfseries\n"
-        "\\small\n"
-        "\\begin{center}\n"
-        f"{intestazione_corso}"
-        f"{appello_label} ({ctx.appello_data})\\\n"
-        "\\medskip\n"
-        "\\\\\n"
-        "\\end{center}\n"
-        "\\end{minipage}\n"
-        "}\n"
-        "\\end{center}\n"
-        "\\vspace{1cm}\n\n"
+        f"\\noindent{{\\Large\\bfseries {titolo}}}"
+        + (f"\\hfill{{\\normalsize {dettaglio}}}" if dettaglio else "")
+        + "\\par\\vspace{0.5cm}\n\n"
     )
+
+
+# righe alternate a fondo grigio chiarissimo: nelle tabelle lunghe aiutano a seguire la
+# riga giusta (anche a chi ha difficoltà di lettura), e restano leggibili in bianco e nero
+_RIGHE_ALTERNATE = "\\rowcolors{2}{black!4}{white}\n\\renewcommand{\\arraystretch}{1.5}\n"
+
+
+def _titolo_prova(ctx: LatexContext) -> str:
+    return ctx.appello_nome.replace("-", " ")
+
+
+def intestazione_breve(ctx: LatexContext) -> str:
+    """Intestazione dei documenti per il docente o da pubblicare (fogli di riferimento,
+    griglia, anteprima, risultati, elenchi): una fascia con il corso a sinistra (corso di
+    studi, università e anno sotto) e la prova con la data a destra, chiusa da un filetto.
+    Le righe facoltative vuote (facoltà/università/anno non impostati) vengono omesse."""
+    universita_anno = ", a.a. ".join(p for p in (ctx.universita, ctx.anno) if p)
+    sotto = " \\\\[1pt]\n".join(r for r in (ctx.facolta, universita_anno) if r)
+    return (
+        "\\noindent\\begin{minipage}[t]{0.64\\textwidth}\\raggedright\n"
+        f"{{\\large\\bfseries {ctx.corso}}}"
+        + (f"\\\\[2pt]\n{{\\small {sotto}}}" if sotto else "")
+        + "\n\\end{minipage}\\hfill\n"
+        "\\begin{minipage}[t]{0.34\\textwidth}\\raggedleft\n"
+        f"{{\\large\\bfseries {_titolo_prova(ctx)}}}"
+        + (f"\\\\[2pt]\n{{\\small {ctx.appello_data}}}" if ctx.appello_data else "")
+        + "\n\\end{minipage}\\par\n"
+        "\\vspace{4pt}\\noindent\\rule{\\textwidth}{0.8pt}\\par\n"
+        "\\vspace{0.6cm}\n\n"
+    )
+
+
+# caselle della griglia delle risposte nell'intestazione del compito: al più tante per riga
+# (oltre si va a capo), larghe abbastanza da scrivere una lettera grande e leggibile
+_CASELLE_PER_RIGA = 12
+
+
+def _griglia_risposte(posizioni: list[dict]) -> str:
+    """Tabella con il numero dell'esercizio sopra e la casella vuota sotto, in cui lo
+    studente scrive la lettera; per una domanda aperta la casella contiene un trattino
+    (non c'è una lettera da scrivere). Con molti esercizi va a capo ogni _CASELLE_PER_RIGA."""
+    righe = []
+    for inizio in range(0, len(posizioni), _CASELLE_PER_RIGA):
+        gruppo = posizioni[inizio:inizio + _CASELLE_PER_RIGA]
+        colonne = "|" + "|".join(">{\\centering\\arraybackslash}p{0.62cm}" for _ in gruppo) + "|"
+        numeri = " & ".join(f"{{\\footnotesize {inizio + k + 1}}}" for k in range(len(gruppo)))
+        caselle = " & ".join("{\\Large --}" if p["aperta"] else "" for p in gruppo)
+        righe.append(
+            f"\\begin{{tabular}}{{{colonne}}}\\hline\n{numeri} \\\\\\hline\n"
+            f"\\rule{{0pt}}{{0.8cm}}{caselle} \\\\\\hline\n\\end{{tabular}}"
+        )
+    return "\\\\[4pt]\n".join(righe)
 
 
 def intestazione(ctx: LatexContext, codice, posizioni: list[dict]) -> str:
-    """`posizioni` (vedi mischia()) determina quante caselle mette la griglia delle
-    risposte in testa al foglio (una per esercizio del compito) e quali sono domande
-    aperte (casella con un grande "-" invece del numero, dato che non c'è una lettera
-    da scrivere)."""
-    griglia = "".join(
-        "\\fbox{\\parbox{20pt}{\\centering\\Large -}}" if p["aperta"]
-        else f"\\fbox{{\\parbox{{20pt}}{{\\scriptsize {i + 1}}}}}"
-        for i, p in enumerate(posizioni)
-    )
+    """Intestazione del compito dello studente: corso, prova e data con il codice del
+    compito ben visibile; poi i dati dello studente su righe ampie da scrivere a mano, la
+    griglia delle risposte (vedi _griglia_risposte) e il riquadro del voto. Etichette in
+    tondo o grassetto, mai in corsivo, per la leggibilità (anche per studenti con DSA)."""
+    linea = "\\rule[-2pt]{{{}}}{{0.4pt}}"
     return (
-        "\\begin{flushright}\n"
-        "\\begin{minipage}{0.80\\textwidth}\n"
-        "\\begin{framed}\n"
-        "{\\it Nome:}\\enspace\\hrulefill\\quad \n"
-        "{\\it Cognome:}\\enspace\\hrulefill\\newline\n"
-        f"{{\\it Corso:}}\\enspace{{\\bf {ctx.corso}}}\\quad\n"
-        "{\\it Matricola:}\\enspace\\hrulefill\\quad\\newline\n"
-        f"{{\\it Data:}}\\enspace{{\\bf {ctx.appello_data}}}\\newline\n\n\\medskip\n\n"
-        f"{{\\it Risposte:}}\\enspace{{\\Huge\\bf{griglia}}}\n"
-        "\\bigskip\\newline\n"
-        f"{{\\it Codice:}}\\enspace{{\\bf {codice}}}\\hfill\\fbox{{\\parbox{{3cm}}{{\\Large\\bf Voto:}}"
-        "\\enspace\\hrulefill\\,{\\bf/30}}\n"
-        "\\end{framed}\n"
-        "\\end{minipage}\n"
-        "\\end{flushright}\n\n"
-        "\\vspace{1cm}\n\n"
+        # corso e prova a sinistra, codice del compito a destra
+        "\\noindent\\begin{minipage}[b]{0.70\\textwidth}\\raggedright\n"
+        f"{{\\Large\\bfseries {ctx.corso}}}\\\\[3pt]\n"
+        f"{{\\large {_titolo_prova(ctx)}" + (f" \\quad {ctx.appello_data}" if ctx.appello_data else "") + "}\n"
+        "\\end{minipage}\\hfill\n"
+        "\\fbox{\\begin{minipage}[b]{0.22\\textwidth}\\centering\n"
+        "{\\footnotesize Codice del compito}\\\\[2pt]\n"
+        f"{{\\LARGE\\bfseries {codice}}}\n"
+        "\\end{minipage}}\\par\n"
+        "\\vspace{0.5cm}\n\n"
+        # dati dello studente
+        "\\noindent{\\bfseries Cognome}\\enspace" + linea.format("0.36\\textwidth")
+        + "\\hfill{\\bfseries Nome}\\enspace" + linea.format("0.36\\textwidth") + "\\par\n"
+        "\\vspace{0.55cm}\n"
+        "\\noindent{\\bfseries Matricola}\\enspace" + linea.format("0.30\\textwidth") + "\\par\n"
+        "\\vspace{0.5cm}\n\n"
+        # griglia delle risposte e voto
+        "\\noindent\\begin{minipage}[t]{0.76\\textwidth}\\raggedright\n"
+        "{\\bfseries Risposte} {\\footnotesize (scrivi la lettera scelta sotto il numero dell'esercizio)}\\\\[4pt]\n"
+        f"{_griglia_risposte(posizioni)}\n"
+        "\\end{minipage}\\hfill\n"
+        "\\begin{minipage}[t]{0.20\\textwidth}\\raggedleft\n"
+        "\\vspace{0.55cm}\n"
+        "\\fbox{\\begin{minipage}{0.92\\linewidth}\\centering\n"
+        "{\\bfseries Voto}\\\\[0.45cm]\n"
+        "\\rule{0.5\\linewidth}{0.4pt}\\,/30\\\\[2pt]\n"
+        "\\end{minipage}}\n"
+        "\\end{minipage}\\par\n"
+        "\\vspace{0.35cm}\\noindent\\rule{\\textwidth}{0.8pt}\\par\n"
+        "\\vspace{0.3cm}\n\n"
         "\\begin{center}\n"
         f"{{\\bfseries {_text_consegna(ctx)}}}"
         "\\end{center}\n"
@@ -141,7 +203,7 @@ def regole(ctx: LatexContext) -> str:
         "\\begin{footnotesize}\n"
         "\\begin{center}\n"
         "\\fbox{\\fbox{\\parbox{5.5in}{\\centering\n"
-        "Compilate {\\it subito} con nome, cognome, numero di matricola. "
+        "Compilate {\\bfseries subito} con nome, cognome, numero di matricola. "
         "Lasciate sul banco il libretto universitario.\n"
         "Non \\`e consentito l'utilizzo di libri, appunti, "
         "telefoni cellulari, strumenti elettronici.\n"
@@ -195,16 +257,20 @@ def _separatore_esercizio() -> str:
 
 def stampa_codici(ctx: LatexContext, studenti) -> str:
     tex = intestazione_breve(ctx)
+    tex += _titolo_documento("Griglia delle risposte corrette", _quanti(len(studenti), "compito", "compiti"))
     tex += (
-        "\\begin{center}\n{\\large\\bfseries Griglia delle risposte corrette}\\\\[2pt]\n"
-        "{\\small per ogni codice di compito, le lettere corrette nell'ordine; ``-'' indica una domanda aperta}\n"
-        "\\end{center}\n\\medskip\n\n"
-        "\\begin{center}\n\\begin{longtable}{cc}\n\\toprule\n"
-        "{\\bfseries Codice} & {\\bfseries Griglia} \\\\\n\\toprule\n\\endhead\n"
+        "\\noindent{\\small Per ogni codice di compito, la lettera corretta di ogni esercizio, nell'ordine in cui "
+        "compare su quel foglio; il trattino indica una domanda aperta.}\\par\\medskip\n\n"
+        + _RIGHE_ALTERNATE +
+        "\\begin{longtable}{>{\\bfseries}l l}\n\\toprule\n"
+        "Codice & Risposte corrette \\\\\n\\midrule\n\\endhead\n"
     )
     for codice, griglia in studenti:
-        tex += f"{codice} & {griglia}\\\\\n"
-    tex += "\\bottomrule\n\\end{longtable}\n\\end{center}\n\n"
+        # lettere distanziate e a gruppi di cinque, come nella casella della correzione
+        gruppi = [griglia[i:i + 5] for i in range(0, len(griglia), 5)]
+        lettere = "\\quad ".join("\\,".join(g) for g in gruppi)
+        tex += f"{codice} & \\large {lettere}\\\\\n"
+    tex += "\\bottomrule\n\\end{longtable}\n\n"
     return tex
 
 
@@ -274,7 +340,7 @@ def crea_file_riferimento(ctx: LatexContext, esercizi_struct: list[dict], con_so
     tex += intestazione_breve(ctx)
     tex += (
         "\\begin{center}\n"
-        "{\\small\\it (foglio di riferimento"
+        "{\\small (foglio di riferimento"
         + (" con soluzioni e suggerimenti" if con_soluzioni else "")
         + ": un compito completo per ogni combinazione "
         "di varianti degli esercizi; la risposta corretta \\`e sempre la A, segnata con $\\checkmark$)}\n"
@@ -322,8 +388,7 @@ def crea_file_anteprima(ctx: LatexContext, esercizi_struct: list[dict]) -> str:
     n_varianti = sum(len(es["varianti"]) for es in esercizi_struct)
     tex = BEGIN_DOCUMENT.replace(
         "\\usepackage{fullpage}\n",
-        "\\usepackage[a4paper,top=2cm,bottom=2cm,left=2.5cm,right=4.5cm]{geometry}\n"
-        "\\usepackage[table]{xcolor}\n",
+        "\\usepackage[a4paper,top=2cm,bottom=2cm,left=2.5cm,right=4.5cm]{geometry}\n",
     ).replace(
         "\\begin{document}\n",
         "\\usepackage[hidelinks]{hyperref}\n"
@@ -368,7 +433,7 @@ def crea_file_anteprima(ctx: LatexContext, esercizi_struct: list[dict]) -> str:
                 f"{es['soluzione']}\n\\end{{leftbar}}\n\\medskip\n\n"
             )
         else:
-            tex += "{\\small\\it (nessuna soluzione/suggerimento inserito)}\\par\\medskip\n\n"
+            tex += "{\\small (nessuna soluzione/suggerimento inserito)}\\par\\medskip\n\n"
         tex += _riquadro_revisione(i, es)
     tex += (
         "\\clearpage\n"
@@ -434,6 +499,26 @@ def _riquadro_revisione(numero: int, es: dict) -> str:
     )
 
 
+def pagina_compito(ctx: LatexContext, codice, posizioni: list[dict]) -> str:
+    """Il foglio di un singolo studente: intestazione con codice e griglia, esercizi su due
+    colonne nell'ordine di `posizioni` (ciascuna con testo, risposte nell'ordine stampato,
+    obbligatorio, aperta) e regole in fondo. Usata sia per generare un blocco nuovo sia per
+    ricostruire, con la grafica attuale, i compiti già generati (stessi codici e ordine)."""
+    tex = intestazione(ctx, codice, posizioni)
+    # testo allineato a sinistra: giustificato, nelle colonne strette, lascia spazi enormi
+    tex += "\\begin{small}\n\n\\begin{multicols}{2}\n\\raggedright\n\\setcounter{ex}{0}\n"
+    for p in posizioni:
+        if p["aperta"]:
+            tex += tex_esercizio_aperto(ctx, p["testo"], p["obbligatorio"])
+        else:
+            tex += tex_esercizio(ctx, [p["testo"], p["risposte"]], p["obbligatorio"])
+        tex += _separatore_esercizio()
+    tex += "\\end{multicols}\n\\end{small}\n\n\\vfill\n"
+    tex += regole(ctx)
+    tex += "\\clearpage\n\n"
+    return tex
+
+
 def crea_file_blocco(ctx: LatexContext, esercizi_struct: list[dict], numero_studenti: int, codici_esistenti=None):
     """esercizi_struct: vedi mischia(). Ritorna (studenti, tex) dove
     studenti = [(codice, griglia_soluzioni, posizioni), ...] e posizioni è la lista, in
@@ -457,9 +542,7 @@ def crea_file_blocco(ctx: LatexContext, esercizi_struct: list[dict], numero_stud
             code = randint(0, 999999)
         codici_usati.add(code)
         posizioni = mischia(esercizi_struct)
-        tex += intestazione(ctx, code, posizioni)
-        # testo allineato a sinistra: giustificato, nelle colonne strette, lascia spazi enormi
-        tex += "\\begin{small}\n\n\\begin{multicols}{2}\n\\raggedright\n\\setcounter{ex}{0}\n"
+        tex += pagina_compito(ctx, code, posizioni)
         # "-" segnala una domanda aperta: nessuna lettera "corretta" da confrontare, il
         # punteggio per quella posizione lo assegna sempre il docente in correzione.
         griglia = "".join("-" if p["aperta"] else LETTERE[p["indice_corretta"]] for p in posizioni)
@@ -470,15 +553,6 @@ def crea_file_blocco(ctx: LatexContext, esercizi_struct: list[dict], numero_stud
             }
             for p in posizioni
         ]))
-        for p in posizioni:
-            if p["aperta"]:
-                tex += tex_esercizio_aperto(ctx, p["testo"], p["obbligatorio"])
-            else:
-                tex += tex_esercizio(ctx, [p["testo"], p["risposte"]], p["obbligatorio"])
-            tex += _separatore_esercizio()
-        tex += "\\end{multicols}\n\\end{small}\n\n\\vfill\n"
-        tex += regole(ctx)
-        tex += "\\clearpage\n\n"
 
     tex += "\n\n\\end{document}"
     return studenti, tex
@@ -510,9 +584,8 @@ def _intestazione_orale(ctx: LatexContext) -> str:
         return ""
     dettagli = ", ".join(p for p in (ctx.orale_data, ctx.orale_ora, ctx.orale_aula) if p)
     return (
-        "\\begin{center}\n"
-        f"{{\\bfseries Orale: {dettagli}}}\n"
-        "\\end{center}\n\\vspace{0.5cm}\n\n"
+        "\\noindent\\fbox{\\parbox{\\dimexpr\\textwidth-2\\fboxsep-2\\fboxrule}{\\strut"
+        f"{{\\bfseries Orale:}} {dettagli}}}}}\\par\\vspace{{0.4cm}}\n\n"
     )
 
 
@@ -522,13 +595,17 @@ def crea_tex_risultati(ctx: LatexContext, lista) -> str:
     "ritirato", ...): la logica su quale etichetta usare vive in risultati.py."""
     tex = BEGIN_DOCUMENT
     tex += intestazione_breve(ctx)
+    tex += _titolo_documento("Risultati della prova scritta", _quanti(len(lista), "studente", "studenti"))
     tex += _intestazione_orale(ctx)
     tex += (
-        "\\begin{center}\n\\begin{longtable}{cc}\n\\toprule\n"
-        "{\\bfseries Matricola} & {\\bfseries Voto} \\\\\n\\toprule\n\\endhead\n"
+        "\\noindent{\\small Le matricole sono parzialmente oscurate; tra parentesi le iniziali di nome e cognome.}"
+        "\\par\\medskip\n\n" + _RIGHE_ALTERNATE +
+        "\\begin{center}\n\\begin{longtable}{>{\\ttfamily}l c >{\\bfseries}l}\n\\toprule\n"
+        "{\\normalfont\\bfseries Matricola} & {\\bfseries Iniziali} & Esito \\\\\n\\midrule\n\\endhead\n"
     )
     for matricola, nome, cognome, etichetta in lista:
-        tex += f"{celamatr(matricola)}({nome[0]}{cognome[0]}) & {etichetta}\\\\\n"
+        iniziali = f"{(nome or ' ')[0]}{(cognome or ' ')[0]}".strip()
+        tex += f"{celamatr(matricola)} & {iniziali} & {etichetta}\\\\\n"
     tex += "\\bottomrule\n\\end{longtable}\n\\end{center}\n\n"
     tex += "\\vfill\n\\end{document}"
     return tex
@@ -543,9 +620,9 @@ def _tabella_ammessi(righe: list[dict]) -> str:
     invisibile dentro ogni riga (non da un salto riga finale tipo '\\\\[0.9cm]'): messo
     dopo l'ultima riga, quest'ultimo lascerebbe la prima riga incollata all'intestazione,
     con uno spazio diverso (più stretto) da quello, uniforme, fra tutte le altre righe."""
-    tex = (
-        "\\begin{center}\n\\begin{longtable}{clllc}\n\\toprule\n"
-        "{} & {\\bfseries Matricola} & {\\bfseries Cognome} & {\\bfseries Nome} & {\\bfseries Note} \\\\\n\\toprule\n\\endhead\n"
+    tex = _RIGHE_ALTERNATE + (
+        "\\begin{longtable}{c >{\\ttfamily}l >{\\bfseries}p{0.3\\textwidth} p{0.25\\textwidth} l}\n\\toprule\n"
+        "{\\bfseries Presente} & {\\normalfont\\bfseries Matricola} & Cognome & {\\bfseries Nome} & {\\bfseries Note} \\\\\n\\midrule\n\\endhead\n"
     )
     for i, r in enumerate(righe):
         note_parti = []
@@ -554,10 +631,8 @@ def _tabella_ammessi(righe: list[dict]) -> str:
         if r.get("in_deroga"):
             note_parti.append("deroga")
         note = ", ".join(note_parti)
-        if i > 0:
-            tex += "\\midrule\n"
-        tex += f"\\rule{{0pt}}{{0.9cm}}{{\\Large $\\square$}} & {r['matricola']} & {r['cognome']} & {r['nome']} & {note} \\\\\n"
-    tex += "\\bottomrule\n\\end{longtable}\n\\end{center}\n\n"
+        tex += f"\\rule{{0pt}}{{0.75cm}}{{\\Large $\\square$}} & {r['matricola']} & {r['cognome']} & {r['nome']} & {note} \\\\\n"
+    tex += "\\bottomrule\n\\end{longtable}\n\n"
     return tex
 
 
@@ -569,12 +644,12 @@ def crea_tex_ammessi(ctx: LatexContext, titolo: str, lista: list[dict], aule: li
     aula con solo gli studenti assegnati a quella specifica aula."""
     tex = BEGIN_DOCUMENT
     tex += intestazione_breve(ctx)
-    tex += f"\\begin{{center}}{{\\bfseries {titolo}}} — {len(lista)} ammessi\\end{{center}}\\vspace{{0.5cm}}\n\n"
+    tex += _titolo_documento(titolo, _quanti(len(lista), "studente", "studenti"))
     tex += _tabella_ammessi(lista)
     for aula in aule:
         righe_aula = [r for r in lista if r.get("aula_id") == aula.id]
         tex += "\\newpage\n"
-        tex += f"\\begin{{center}}{{\\bfseries Aula: {aula.nome} (capienza {aula.capienza})}} — {len(righe_aula)} studenti\\end{{center}}\\vspace{{0.5cm}}\n\n"
+        tex += _titolo_documento(f"Aula {aula.nome}", _quanti(len(righe_aula), "studente", "studenti") + f" (capienza {aula.capienza})")
         tex += _tabella_ammessi(righe_aula)
     tex += "\\end{document}"
     return tex

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ titolo }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
+<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }}</a>
+<span class="sep">›</span> <span class="current">{{ 'Iscritti' if tipo == 'iscritti' else 'Ammessi' }}</span>
+{% endblock %}
+{% block content %}
+{% from "_formati.html" import formati %}
+<header class="intestazione-pagina">
+  <div class="intestazione-livello">{{ 'Elenco iscritti' if tipo == 'iscritti' else 'Elenco ammessi' }} ·
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ corso.nome }} ({{ corso.anno }})</a></div>
+  <h1>{{ appello.nome }}{% if appello.data %} <span class="muted">· {{ appello.data }}</span>{% endif %}</h1>
+</header>
+<div class="barra-riferimento non-stampare">
+  <p class="muted" style="margin:0">{{ elenco|length }} studenti. Spunta "presente" a penna sul foglio stampato.</p>
+  <span class="formati">
+    {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/" ~ tipo, pdf=True, tex=True, csv=True) }}
+    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">Stampa</button>
+  </span>
+</div>
+{% macro tabella(righe) %}
+<div class="card" style="padding:0.5rem 1rem">
+  <table class="tabella-elenco">
+    <thead><tr><th>Presente</th><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Note</th></tr></thead>
+    {% for s in righe %}
+    <tr>
+      <td style="font-size:1.3rem">☐</td>
+      <td style="font-family:monospace">{{ s.matricola }}</td>
+      <td><strong>{{ s.cognome }}</strong></td>
+      <td>{{ s.nome }}</td>
+      <td>{% if s.dsa %}<span class="badge badge-info">{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}
+        {% if s.in_deroga %}<span class="badge badge-warn">deroga</span>{% endif %}
+        {% if s.registrato is defined and not s.registrato %}<span class="badge">non registrato nel corso</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endmacro %}
+{{ tabella(elenco) }}
+{% for aula in aule %}
+{% set righe_aula = elenco | selectattr("aula_id", "equalto", aula.id) | list %}
+<h2 style="margin-top:1.5rem">Aula {{ aula.nome }} <span class="muted" style="font-weight:400">· {{ righe_aula|length }} studenti (capienza {{ aula.capienza }})</span></h2>
+{{ tabella(righe_aula) }}
+{% endfor %}
+{% endblock %}

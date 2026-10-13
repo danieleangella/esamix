@@ -16,9 +16,9 @@
     eventuale numero inserito a mano.
   </p>
   <p class="muted">
+    {% from "_formati.html" import formati %}
     Elenco stampabile per fare l'appello:
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti.csv">.csv</a> ·
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti.pdf">.pdf</a>
+    {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/iscritti", pdf=True, html=True, tex=True, csv=True) }}
   </p>
   {% set non_registrati = md.iscritti | rejectattr('registrato') | list %}
   {% if non_registrati %}
@@ -333,6 +333,12 @@
     </tr>
     {% endfor %}
   </table>
+  {% if not md.appello.chiuso %}
+  <form method="post" action="{{ url_appello }}/ricompila-pdf" style="margin:0.5rem 0 0; display:inline-block"
+        title="Ricostruisce compiti, griglie e fogli di riferimento con la grafica attuale, con gli stessi codici e lo stesso ordine di esercizi e risposte: i compiti già stampati restano validi">
+    <button type="submit" class="secondary pulsante-piccolo">↻ Rigenera i PDF con la grafica attuale</button>
+  </form>
+  {% endif %}
   {% if md.blocchi|length > 1 %}
   <p style="margin:0.5rem 0 0"><a class="icona-azione formato-pdf" href="{{ url_appello }}/blocchi/tutti.pdf" target="_blank" rel="noopener">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
@@ -344,16 +350,16 @@
   <ul class="elenco-documenti">
     <li>
       <span><strong>Senza soluzioni</strong> <span class="muted">— testo e risposte corrette, da pubblicare online</span></span>
-      {{ formati(url_appello ~ "/riferimento", pdf=md.riferimento_pdf_esiste, html=True, tex=md.riferimento_tex_esiste) }}
+      {{ formati(url_appello ~ "/riferimento", pdf=md.riferimento_pdf_esiste, html=True, tex=md.riferimento_tex_esiste, md=True) }}
     </li>
     <li>
       <span><strong>Con soluzioni e suggerimenti</strong>
         {% if not md.riferimento_sol_tex_esiste %}<span class="muted">— viene creato con il prossimo blocco di compiti</span>{% endif %}</span>
-      {{ formati(url_appello ~ "/riferimento-soluzioni", pdf=md.riferimento_sol_pdf_esiste, tex=md.riferimento_sol_tex_esiste) }}
+      {{ formati(url_appello ~ "/riferimento-soluzioni", pdf=md.riferimento_sol_pdf_esiste, html=True, tex=md.riferimento_sol_tex_esiste, md=True) }}
     </li>
     <li>
       <span><strong>Anteprima di controllo</strong> <span class="muted">— tutte le varianti, con il riquadro di revisione</span></span>
-      {{ formati(url_appello ~ "/anteprima", pdf=True, tex=True) }}
+      {{ formati(url_appello ~ "/anteprima", pdf=True, html=True, tex=True) }}
     </li>
   </ul>
   {% endif %}
@@ -365,7 +371,8 @@
 <details class="card" open>
   <summary><strong>Studenti ammessi e aule ({{ md.ammessi|length }})</strong></summary>
   <p class="muted" style="margin-top:0.75rem">
-    Scarica elenco ammessi: <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi.pdf">.pdf</a>
+    {% from "_formati.html" import formati %}
+    Elenco ammessi: {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/ammessi", pdf=True, html=True, tex=True, csv=True) }}
   </p>
 
   <details style="margin-top:0.5rem">
