@@ -29,9 +29,12 @@
     <label for="ia-istr-{{ appello.id }}" style="margin-top:0.5rem">Indicazioni aggiuntive (facoltative)</label>
     <textarea id="ia-istr-{{ appello.id }}" name="istruzioni" rows="2"
               placeholder="es. niente esercizi sui numeri complessi; almeno due esercizi sugli autovalori; difficoltà un po' più bassa"></textarea>
+    {% if profili_ia|length > 1 %}
+    {% include "_scelta_profilo_ia.html" %}
+    {% endif %}
     <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-top:0.5rem">
       {% if fornitore_ia %}
-      <button type="submit" class="btn-genera-ia" style="margin:0">Genera con {{ fornitore_ia.nome }}</button>
+      <button type="submit" class="btn-genera-ia" style="margin:0">Genera con l'IA</button>
       {% endif %}
       <button type="button" class="secondary btn-prompt-ia" style="margin:0">{{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</button>
       <span class="muted stato-ia" role="status"></span>
@@ -43,11 +46,10 @@
       configura Anthropic, OpenRouter o un server Ollama in <a href="/impostazioni#ia">Impostazioni</a>.
     </p>
     {% else %}
-    <p class="muted" style="margin-top:0.5rem">Modello: <strong>{{ fornitore_ia.modello }}</strong> tramite {{ fornitore_ia.nome }}
-      (<a href="/impostazioni#ia">cambia</a>). La generazione richiede di solito alcuni minuti. Prima di importare
-      vedrai tutti gli esercizi proposti e sceglierai quali tenere.
-      {% if fornitore_ia.id == 'ollama' %}I testi degli esercizi vanno solo al tuo server Ollama.
-      {% else %}Vengono inviati {{ 'ad Anthropic' if fornitore_ia.id == 'anthropic' else 'a OpenRouter (che li inoltra ad Anthropic)' }} solo testi di esercizi, nessun dato degli studenti.{% endif %}</p>
+    <p class="muted" style="margin-top:0.5rem">{% if profili_ia|length <= 1 %}Configurazione: <strong>{{ fornitore_ia.nome }}</strong>
+      ({{ fornitore_ia.modello }}, <a href="/impostazioni#ia">gestisci</a>). {% endif %}La generazione richiede di solito alcuni
+      minuti. Prima di importare vedrai tutti gli esercizi proposti e sceglierai quali tenere. Vengono inviati solo testi
+      di esercizi, nessun dato degli studenti.</p>
     {% endif %}
   </form>
 </div>

@@ -16,7 +16,7 @@
 <div class="flash flash-warning">
   Controlla ogni esercizio prima di importarlo: Claude può sbagliare, soprattutto i calcoli. Apri "Mostra
   tutto" per vedere testo, risposte (la corretta è segnata con ✓) e soluzione. Dopo l'import puoi comunque
-  modificarli, e l'Anteprima PDF con soluzioni della scheda Testo permette un controllo completo.
+  modificarli, e l'Anteprima della scheda Testo (icona nel titolo di "Esercizi assegnati") permette un controllo completo.
 </div>
 {% else %}
 <h1>Importa esercizi da file</h1>
@@ -63,12 +63,14 @@
     <div style="padding:0.75rem 0; {% if not loop.first %}border-top:1px solid var(--border);{% endif %}">
       <label style="display:flex; align-items:flex-start; gap:0.6rem; cursor:pointer">
         <input type="checkbox" name="importa_idx" value="{{ loop.index0 }}" class="campo-esercizio-incluso" style="width:auto; margin-top:0.25rem"
+               {% if c.errore %}disabled{% endif %}
                {% if ids_compito and c.duplicato_id in ids_compito %}data-nel-compito="1"{% endif %}
-               {% if not c.duplicato_di %}checked{% endif %}>
+               {% if not c.duplicato_di and not c.errore %}checked{% endif %}>
         <span>
           <strong>{{ c.nome or ('Esercizio ' ~ loop.index) }}</strong>
           {% if c.argomento %}<span class="muted">— {{ c.argomento }}</span>{% endif %}
           {% if c.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
+          {% if c.errore %}<br><span class="badge badge-err">non importabile — {{ c.errore }}</span>{% endif %}
           <br>
           <span class="muted">{{ c.varianti|length }} variante/i</span>
           {% if c.duplicato_di %}
@@ -111,7 +113,7 @@
   });
   var campi = document.querySelectorAll(".campo-esercizio-incluso");
   document.getElementById("btn-seleziona-tutti-esercizi").addEventListener("click", function () {
-    campi.forEach(function (c) { c.checked = true; });
+    campi.forEach(function (c) { if (!c.disabled) c.checked = true; });
   });
   document.getElementById("btn-deseleziona-tutti-esercizi").addEventListener("click", function () {
     campi.forEach(function (c) { c.checked = false; });

@@ -29,73 +29,115 @@
 </div>
 
 <details class="card" id="ia" {% if not ia_attivo %}open{% endif %}>
-  <summary><strong>Generazione esercizi con l'IA</strong>
-    {% if ia_attivo %}<span class="badge badge-ok">{{ ia_attivo.nome }} · {{ ia_attivo.modello }}</span>{% endif %}</summary>
-  <p class="muted" style="margin-top:1rem">
-    Il pannello <strong>"Genera con l'IA"</strong> nella scheda Testo di un appello crea nuovi esercizi
-    sul modello delle prove analoghe degli anni precedenti. Gli esercizi proposti passano sempre da una
-    pagina di conferma. Vengono inviati solo testi di esercizi e impostazioni del corso, mai dati degli
-    studenti, e solo quando premi il pulsante. Senza nessun fornitore puoi comunque copiare il prompt in claude.ai.
+  <summary><strong>Intelligenza artificiale</strong>
+    {% if ia_attivo %}<span class="badge badge-ok">predefinita: {{ ia_attivo.nome }}</span>{% endif %}</summary>
+  <p class="muted" style="margin-top:0.75rem">
+    Serve per <strong>generare esercizi</strong> e per <strong>verificare le soluzioni</strong> di un compito
+    (scheda Testo di un appello). Puoi salvare più configurazioni — chiavi diverse, fornitori diversi, un tuo
+    server — e scegliere ogni volta quale usare. Vengono inviati solo testi di esercizi e impostazioni del corso,
+    mai dati degli studenti, e solo quando premi il pulsante. Senza nessuna configurazione puoi comunque copiare
+    i prompt in claude.ai.
   </p>
-  <form method="post" action="/impostazioni/ia" id="form-ia" style="margin-top:0.75rem">
-    <label for="ia-fornitore">Fornitore da usare</label>
-    <select name="fornitore" id="ia-fornitore" style="max-width:24rem">
-      <option value="anthropic" {% if ia_scelto == 'anthropic' %}selected{% endif %}>Anthropic (Claude Opus 5, chiave sk-ant-…)</option>
-      <option value="openrouter" {% if ia_scelto == 'openrouter' %}selected{% endif %}>OpenRouter (Claude Opus 5, chiave sk-or-…)</option>
-      <option value="ollama" {% if ia_scelto == 'ollama' %}selected{% endif %}>Ollama su un tuo server</option>
-    </select>
 
-    <fieldset class="ia-sezione" data-fornitore="anthropic">
-      <legend>Anthropic</legend>
-      <p class="muted" style="margin-top:0">A pagamento sul tuo account; la chiave si crea su
-        <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a>.</p>
-      <label for="ia-chiave-anthropic">Chiave API</label>
-      <input type="password" id="ia-chiave-anthropic" name="chiave_anthropic" autocomplete="off"
-             placeholder="{{ ('salvata: …' ~ ia_finali.anthropic ~ ' (lascia vuoto per non cambiarla)') if ia_finali.anthropic else 'sk-ant-…' }}">
-      {% if ia_env.anthropic and not ia_finali.anthropic %}<p class="muted" style="margin-top:0.25rem">In uso la variabile d'ambiente ANTHROPIC_API_KEY.</p>{% endif %}
-      {% if ia_finali.anthropic %}<button type="submit" name="rimuovi" value="anthropic" class="secondary">Rimuovi chiave</button>{% endif %}
-    </fieldset>
+  {% if ia_profili %}
+  <ul class="elenco-documenti">
+    {% for p in ia_profili %}
+    <li>
+      <span>
+        <strong>{{ p.nome }}</strong>
+        {% if ia_attivo and ia_attivo.id == p.id %}<span class="badge badge-ok">predefinita</span>{% endif %}<br>
+        <span class="muted">{{ p.nome_fornitore }} · {{ p.modello }}
+          {% if p.fornitore == 'ollama' %}· {{ p.url }}{% elif p.finale_chiave %}· chiave …{{ p.finale_chiave }}{% endif %}</span>
+      </span>
+      <span class="formati">
+        {% if not (ia_attivo and ia_attivo.id == p.id) %}
+        <form class="inline" method="post" action="/impostazioni/ia/profili/{{ p.id }}/predefinito">
+          <button type="submit" class="secondary pulsante-piccolo">Usa come predefinita</button>
+        </form>
+        {% endif %}
+        {% if not p.da_ambiente %}
+        <form class="inline" method="post" action="/impostazioni/ia/profili/{{ p.id }}/elimina"
+              onsubmit="return confirm({{ ('Eliminare la configurazione «' ~ p.nome ~ '» e la sua chiave?')|js }});">
+          <button type="submit" class="secondary pulsante-piccolo">Elimina</button>
+        </form>
+        {% else %}<span class="muted">dalla variabile d'ambiente</span>{% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p><span class="badge badge-warn">nessuna configurazione</span></p>
+  {% endif %}
 
-    <fieldset class="ia-sezione" data-fornitore="openrouter">
-      <legend>OpenRouter</legend>
-      <p class="muted" style="margin-top:0">Usa Claude Opus 5 tramite il tuo credito su
-        <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai</a>.</p>
-      <label for="ia-chiave-openrouter">Chiave API</label>
-      <input type="password" id="ia-chiave-openrouter" name="chiave_openrouter" autocomplete="off"
-             placeholder="{{ ('salvata: …' ~ ia_finali.openrouter ~ ' (lascia vuoto per non cambiarla)') if ia_finali.openrouter else 'sk-or-…' }}">
-      {% if ia_env.openrouter and not ia_finali.openrouter %}<p class="muted" style="margin-top:0.25rem">In uso la variabile d'ambiente OPENROUTER_API_KEY.</p>{% endif %}
-      {% if ia_finali.openrouter %}<button type="submit" name="rimuovi" value="openrouter" class="secondary">Rimuovi chiave</button>{% endif %}
-    </fieldset>
-
-    <fieldset class="ia-sezione" data-fornitore="ollama">
-      <legend>Ollama</legend>
-      <p class="muted" style="margin-top:0">Un modello che gira su un tuo server: i testi degli esercizi non escono
-        dalla tua rete. Serve un modello abbastanza grande (i modelli piccoli sbagliano spesso i calcoli) e un
-        contesto ampio: sul server imposta <code>OLLAMA_CONTEXT_LENGTH</code> ad almeno 32768, altrimenti le prove
-        di riferimento vengono troncate.</p>
+  <details class="dettaglio-fisarmonica" style="margin-top:0.75rem" {% if not ia_profili %}open{% endif %}>
+    <summary>Aggiungi una configurazione</summary>
+    <form method="post" action="/impostazioni/ia/profili" id="form-ia" style="margin-top:0.75rem">
       <div class="form-grid">
-        <div><label for="ia-ollama-url">Indirizzo del server</label>
-          <input id="ia-ollama-url" name="ollama_url" value="{{ app_settings.ollama_url }}" placeholder="http://192.168.1.10:11434"></div>
-        <div><label for="ia-ollama-modello">Modello</label>
-          <input id="ia-ollama-modello" name="ollama_modello" value="{{ app_settings.ollama_modello }}" list="ia-modelli-ollama" autocomplete="off" placeholder="es. qwen3:32b">
-          <datalist id="ia-modelli-ollama"></datalist></div>
-        <div><label for="ia-ollama-token">Token (facoltativo)</label>
-          <input type="password" id="ia-ollama-token" name="ollama_token" autocomplete="off"
-                 placeholder="{{ 'salvato (lascia vuoto per non cambiarlo)' if app_settings.ollama_token else 'solo se il server è dietro un proxy con login' }}"></div>
+        <div><label for="ia-nome">Nome</label>
+          <input id="ia-nome" name="nome" placeholder="es. Chiave personale, Dipartimento, Server di laboratorio"></div>
+        <div><label for="ia-fornitore">Fornitore</label>
+          <select name="fornitore" id="ia-fornitore">
+            <option value="anthropic">Anthropic (chiave sk-ant-…)</option>
+            <option value="openrouter">OpenRouter (chiave sk-or-…)</option>
+            <option value="ollama">Ollama su un tuo server</option>
+          </select></div>
       </div>
-      <button type="button" class="secondary" id="btn-verifica-ollama">Verifica connessione ed elenca i modelli</button>
-      {% if app_settings.ollama_token %}<button type="submit" name="rimuovi" value="ollama" class="secondary">Rimuovi token</button>{% endif %}
-      <p class="muted" id="esito-verifica-ollama" role="status" style="margin-top:0.25rem"></p>
-    </fieldset>
 
-    <button type="submit">Salva</button>
-  </form>
+      <div class="ia-sezione" data-fornitore="anthropic openrouter" style="margin-top:0.5rem">
+        <p class="muted" style="margin:0 0 0.4rem">
+          <span data-solo="anthropic">A pagamento sul tuo account; la chiave si crea su
+            <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a>.</span>
+          <span data-solo="openrouter">Usa il tuo credito su
+            <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai</a>.</span>
+        </p>
+        <div class="form-grid">
+          <div><label for="ia-chiave">Chiave API</label>
+            <input type="password" id="ia-chiave" name="chiave" autocomplete="off"></div>
+          <div><label for="ia-modello">Modello (facoltativo)</label>
+            <input id="ia-modello" name="modello" autocomplete="off"
+                   data-predefinito-anthropic="{{ ia_modelli_predefiniti.anthropic }}" data-predefinito-openrouter="{{ ia_modelli_predefiniti.openrouter }}"></div>
+        </div>
+      </div>
+
+      <div class="ia-sezione" data-fornitore="ollama" style="margin-top:0.5rem">
+        <p class="muted" style="margin:0 0 0.4rem">Un modello che gira su un tuo server: i testi degli esercizi non escono
+          dalla tua rete. Serve un modello abbastanza grande (i modelli piccoli sbagliano spesso i calcoli) e un
+          contesto ampio: sul server imposta <code>OLLAMA_CONTEXT_LENGTH</code> ad almeno 32768.</p>
+        <div class="form-grid">
+          <div><label for="ia-ollama-url">Indirizzo del server</label>
+            <input id="ia-ollama-url" name="url" placeholder="http://192.168.1.10:11434"></div>
+          <div><label for="ia-ollama-modello">Modello</label>
+            <input id="ia-ollama-modello" name="modello" list="ia-modelli-ollama" autocomplete="off" placeholder="es. qwen3:32b">
+            <datalist id="ia-modelli-ollama"></datalist></div>
+          <div><label for="ia-ollama-token">Token (facoltativo)</label>
+            <input type="password" id="ia-ollama-token" name="token" autocomplete="off" placeholder="solo se il server è dietro un proxy con login"></div>
+        </div>
+        <button type="button" class="secondary" id="btn-verifica-ollama">Verifica connessione ed elenca i modelli</button>
+        <p class="muted" id="esito-verifica-ollama" role="status" style="margin-top:0.25rem"></p>
+      </div>
+
+      <label style="display:inline-flex; align-items:center; gap:0.4rem; margin-top:0.5rem">
+        <input type="checkbox" name="predefinito" value="1" style="width:auto" {% if not ia_profili %}checked{% endif %}>
+        Usala come predefinita
+      </label><br>
+      <button type="submit">Salva configurazione</button>
+    </form>
+  </details>
 </details>
 <script>
 (function () {
   var scelta = document.getElementById("ia-fornitore");
+  var modello = document.getElementById("ia-modello");
   function aggiorna() {
-    document.querySelectorAll(".ia-sezione").forEach(function (f) { f.hidden = f.dataset.fornitore !== scelta.value; });
+    // i campi delle sezioni nascoste vengono disattivati, così non arrivano al server
+    // (le due sezioni hanno entrambe un campo "modello")
+    document.querySelectorAll(".ia-sezione").forEach(function (f) {
+      var visibile = f.dataset.fornitore.split(" ").indexOf(scelta.value) !== -1;
+      f.hidden = !visibile;
+      f.querySelectorAll("input").forEach(function (c) { c.disabled = !visibile; });
+    });
+    document.querySelectorAll("[data-solo]").forEach(function (el) { el.hidden = el.dataset.solo !== scelta.value; });
+    modello.placeholder = "vuoto = " + (modello.dataset["predefinito" + (scelta.value === "openrouter" ? "Openrouter" : "Anthropic")]);
   }
   scelta.addEventListener("change", aggiorna);
   aggiorna();

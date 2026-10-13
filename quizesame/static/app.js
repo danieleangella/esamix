@@ -122,6 +122,18 @@ function inizializzaFormEsercizi(radice) {
             mostraErrore("Manca almeno una risposta sbagliata in una variante con il testo già compilato.", campoSbagliata);
             return;
           }
+          // due risposte uguali (a meno di spazi e maiuscole) sarebbero indistinguibili sul foglio
+          var viste = {};
+          var campi = [corretta].concat(sbagliate).filter(function (c) { return c.value.trim(); });
+          for (var k = 0; k < campi.length; k++) {
+            var chiave = campi[k].value.replace(/\s+/g, "").toLowerCase();
+            if (viste[chiave]) {
+              ev.preventDefault();
+              mostraErrore("Due risposte della stessa variante sono uguali (\"" + campi[k].value.trim() + "\"): cambiane una.", campi[k]);
+              return;
+            }
+            viste[chiave] = true;
+          }
         }
       }
     });

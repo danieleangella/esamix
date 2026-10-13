@@ -1,31 +1,52 @@
 """Impostazioni dell'app nel suo complesso (non di un singolo corso): nome del docente,
-mostrato nel menu in alto, e se mostrare il riquadro di riepilogo generale in homepage.
-Salvate in un file JSON accanto alle cartelle dei corsi, non in un database per corso,
-perché valgono per l'intera installazione."""
+mostrato nel menu in alto, se mostrare il riquadro di riepilogo generale in homepage e
+le configurazioni per l'IA. Salvate in un file JSON accanto alle cartelle dei corsi, non
+in un database per corso, perché valgono per l'intera installazione."""
 import json
-from dataclasses import asdict, dataclass
+import uuid
+from dataclasses import asdict, dataclass, field
 
 from quizesame import config
 
 SETTINGS_PATH = config.DATA_ROOT / "app_settings.json"
+
+FORNITORI_IA = ("anthropic", "openrouter", "ollama")
 
 
 @dataclass
 class AppSettings:
     docente: str = ""
     mostra_riepilogo_home: bool = True
-    # chiave per la generazione di esercizi con Claude (vedi services/ia.py): resta solo
-    # in questo file sul computer, e non viene mai rimostrata per intero nelle pagine
-    anthropic_api_key: str = ""
-    openrouter_api_key: str = ""  # alternativa ad Anthropic diretto, stessa API (vedi ia.py)
-    # Ollama su un proprio server: indirizzo (es. http://192.168.1.10:11434), modello
-    # installato sul server, e token facoltativo se il server è dietro un proxy con login
-    ollama_url: str = ""
-    ollama_modello: str = ""
-    ollama_token: str = ""
-    # fornitore scelto esplicitamente ("anthropic" | "openrouter" | "ollama"); vuoto =
-    # il primo configurato, nell'ordine
-    ia_fornitore: str = ""
+    # Configurazioni per l'IA (vedi services/ia.py): se ne possono salvare più d'una (es.
+    # una chiave personale e una del dipartimento, o un server Ollama) e scegliere di volta
+    # in volta quale usare. Ognuna è {"id", "nome", "fornitore" (anthropic | openrouter |
+    # ollama), "chiave", "url", "modello", "token"}: chiave per Anthropic/OpenRouter,
+    # url/token per Ollama, modello facoltativo (vuoto = quello predefinito del fornitore).
+    # Le chiavi restano solo in questo file sul computer e non vengono mai rimostrate.
+    ia_profili: list = field(default_factory=list)
+    ia_profilo_predefinito: str = ""
+
+
+def nuovo_id_profilo() -> str:
+    return uuid.uuid4().hex[:8]
+
+
+def _profili_da_vecchie_impostazioni(data: dict) -> tuple[list, str]:
+    """Le versioni precedenti salvavano una sola chiave per fornitore: diventano una
+    configurazione ciascuna, e il fornitore scelto diventa quella predefinita."""
+    profili = []
+    if data.get("anthropic_api_key"):
+        profili.append({"id": "anthropic", "nome": "Anthropic", "fornitore": "anthropic",
+                        "chiave": data["anthropic_api_key"], "url": "", "modello": "", "token": ""})
+    if data.get("openrouter_api_key"):
+        profili.append({"id": "openrouter", "nome": "OpenRouter", "fornitore": "openrouter",
+                        "chiave": data["openrouter_api_key"], "url": "", "modello": "", "token": ""})
+    if data.get("ollama_url") and data.get("ollama_modello"):
+        profili.append({"id": "ollama", "nome": "Ollama", "fornitore": "ollama", "chiave": "",
+                        "url": data["ollama_url"], "modello": data["ollama_modello"], "token": data.get("ollama_token", "")})
+    scelto = data.get("ia_fornitore", "")
+    predefinito = scelto if any(p["id"] == scelto for p in profili) else (profili[0]["id"] if profili else "")
+    return profili, predefinito
 
 
 def get_settings() -> AppSettings:
@@ -35,15 +56,16 @@ def get_settings() -> AppSettings:
         data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return AppSettings()
+    if "ia_profili" in data:
+        profili = [p for p in data.get("ia_profili") or [] if isinstance(p, dict) and p.get("fornitore") in FORNITORI_IA]
+        predefinito = data.get("ia_profilo_predefinito", "")
+    else:
+        profili, predefinito = _profili_da_vecchie_impostazioni(data)
     return AppSettings(
         docente=data.get("docente", ""),
         mostra_riepilogo_home=bool(data.get("mostra_riepilogo_home", True)),
-        anthropic_api_key=data.get("anthropic_api_key", ""),
-        openrouter_api_key=data.get("openrouter_api_key", ""),
-        ollama_url=data.get("ollama_url", ""),
-        ollama_modello=data.get("ollama_modello", ""),
-        ollama_token=data.get("ollama_token", ""),
-        ia_fornitore=data.get("ia_fornitore", ""),
+        ia_profili=profili,
+        ia_profilo_predefinito=predefinito,
     )
 
 

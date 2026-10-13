@@ -1,0 +1,12 @@
+{# Pulsanti compatti per aprire un documento nei suoi formati: il PDF (da stampare) in
+   evidenza, poi le versioni .html (da consultare a schermo) e .tex (sorgente).
+   Uso: {% from "_formati.html" import formati %} {{ formati(base, pdf=..., html=..., tex=...) }}
+   dove `base` è l'URL senza estensione e ogni formato è mostrato solo se True. #}
+{% macro formati(base, pdf=False, html=False, tex=False, nuova_scheda=True) -%}
+<span class="formati">
+  {%- if pdf %}<a class="icona-azione formato-pdf" href="{{ base }}.pdf"{% if nuova_scheda %} target="_blank" rel="noopener"{% endif %} title="Apri il PDF">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>PDF</a>{% endif -%}
+  {%- if html %}<a class="icona-azione" href="{{ base }}.html" title="Versione da consultare a schermo">HTML</a>{% endif -%}
+  {%- if tex %}<a class="icona-azione" href="{{ base }}.tex" title="Sorgente LaTeX">.tex</a>{% endif -%}
+</span>
+{%- endmacro %}

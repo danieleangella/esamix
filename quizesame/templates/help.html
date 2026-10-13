@@ -114,10 +114,12 @@
     corso, oppure lasciarvelo per riusarlo in futuro.
   </p>
   <p>
-    Dalla scheda Testo, <strong>Anteprima PDF con soluzioni</strong> crea un PDF di controllo
-    con tutti gli esercizi del compito, tutte le loro varianti, la risposta corretta segnata e
-    la soluzione/suggerimento: si può generare in qualunque momento, anche prima dei blocchi,
-    e non crea codici. Ha margini ampi (soprattutto a destra) per annotare a mano le
+    Nella scheda Testo, l'icona <strong>Anteprima</strong> nel titolo di "Esercizi assegnati"
+    (visibile anche a sezione chiusa) apre un PDF di controllo con tutti gli esercizi del
+    compito, tutte le loro varianti, la risposta corretta segnata e la
+    soluzione/suggerimento: si può aprire in qualunque momento, anche prima dei blocchi, e
+    non crea codici. Si aggiorna da solo quando cambiano gli esercizi o le impostazioni del
+    corso; <strong>↻ Rigenera</strong> lo ricompila comunque da zero. Ha margini ampi (soprattutto a destra) per annotare a mano le
     correzioni sul foglio stampato. Sotto ogni esercizio c'è un riquadro
     <em>Revisione</em> con le caselle "corretta" / "da correggere" per ogni variante e per la
     soluzione e uno spazio per le note sulle correzioni; in fondo, una pagina per le note
@@ -150,11 +152,13 @@
     Gli esercizi proposti si vedono per intero (testo, risposte con la corretta segnata,
     soluzione) in una pagina di conferma, dove si sceglie quali importare: <strong>vanno
     sempre controllati</strong>, perché l'IA può sbagliare i calcoli. Dopo l'import
-    l'Anteprima PDF con soluzioni permette un controllo completo.
+    l'Anteprima della scheda Testo permette un controllo completo.
   </p>
   <p>
-    Per generare direttamente dall'app si sceglie un fornitore in Impostazioni → "Generazione
-    esercizi con l'IA": <strong>Anthropic</strong> (Claude Opus 5, chiave API a pagamento sul
+    Per usare l'IA direttamente dall'app si salva almeno una configurazione in Impostazioni →
+    "Intelligenza artificiale". Se ne possono salvare più d'una (es. una chiave personale e una
+    del dipartimento, o un server) e scegliere ogni volta quale usare dal menu del pannello;
+    quella predefinita è già selezionata. I fornitori sono <strong>Anthropic</strong> (Claude Opus 5, chiave API a pagamento sul
     proprio account), <strong>OpenRouter</strong> (Claude Opus 5 con il credito OpenRouter) oppure
     <strong>Ollama</strong> su un proprio server (indirizzo e modello; "Verifica connessione"
     elenca i modelli installati). Con Ollama i testi non escono dalla propria rete, ma servono un
@@ -163,6 +167,20 @@
     fornitore, "Copia il prompt per claude.ai" copia la richiesta completa: incollala in
     claude.ai e importa la risposta con "Importa un compito da un unico file". Vengono inviati
     solo testi di esercizi e impostazioni del corso, mai dati degli studenti.
+  </p>
+  <p id="verifica-ia">
+    <strong>Verifica delle soluzioni.</strong> Nel titolo di "Esercizi assegnati" della scheda
+    Testo, <strong>✓ Verifica con l'IA</strong> fa risolvere al modello ogni esercizio del
+    compito, in ogni variante, e segnala se la risposta indicata come corretta è sbagliata o non
+    è l'unica corretta, se il testo è ambiguo o ha formule scritte male e se la soluzione contiene
+    errori. Il risultato mostra per ogni esercizio "corretto", "da controllare" o "errore", con la
+    risposta calcolata dal modello e una spiegazione. È un aiuto, non una garanzia: anche il
+    modello può sbagliare. Senza configurazione si può copiare il prompt in claude.ai.
+  </p>
+  <p>
+    Indipendentemente dall'IA, l'app non accetta esercizi con <strong>due risposte uguali</strong>
+    nella stessa variante (a meno di spazi e maiuscole): lo segnala nel modulo, nell'import, nella
+    banca esercizi e prima di generare i compiti.
   </p>
 </details>
 

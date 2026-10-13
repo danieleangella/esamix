@@ -165,11 +165,18 @@ def _prefisso_obbligatorio(ctx: LatexContext, obbligatorio: bool) -> str:
     return f"\\textbf{{{frase}}} " if frase else ""
 
 
-def tex_esercizio(ctx: LatexContext, exx, obbligatorio: bool = False) -> str:
+def tex_esercizio(ctx: LatexContext, exx, obbligatorio: bool = False, evidenzia_corretta: bool = False) -> str:
+    """`evidenzia_corretta` (fogli di riferimento, dove la corretta è sempre la prima):
+    segna la risposta A con un segno di spunta e in grassetto. La lettera va dalla
+    posizione e non dal testo, che potrebbe ripetersi tra due risposte."""
     testo, risposte = exx[0], exx[1]
     out = "\n\\begin{ex}\n" + _prefisso_obbligatorio(ctx, obbligatorio) + testo + "\n\\begin{description}\n"
-    for sol in risposte:
-        out += f"\\item[{LETTERE[risposte.index(sol)]}] {sol}\n"
+    for k, sol in enumerate(risposte):
+        lettera = LETTERE.get(k, str(k + 1))
+        if evidenzia_corretta and k == 0:
+            out += f"\\item[{lettera} $\\checkmark$] \\textbf{{{sol}}}\n"
+        else:
+            out += f"\\item[{lettera}] {sol}\n"
     out += "\\end{description}\n\\end{ex}\n\n"
     return out
 
@@ -189,6 +196,9 @@ def _separatore_esercizio() -> str:
 def stampa_codici(ctx: LatexContext, studenti) -> str:
     tex = intestazione_breve(ctx)
     tex += (
+        "\\begin{center}\n{\\large\\bfseries Griglia delle risposte corrette}\\\\[2pt]\n"
+        "{\\small per ogni codice di compito, le lettere corrette nell'ordine; ``-'' indica una domanda aperta}\n"
+        "\\end{center}\n\\medskip\n\n"
         "\\begin{center}\n\\begin{longtable}{cc}\n\\toprule\n"
         "{\\bfseries Codice} & {\\bfseries Griglia} \\\\\n\\toprule\n\\endhead\n"
     )
@@ -230,10 +240,12 @@ def mischia(esercizi_struct: list[dict]) -> list[dict]:
 
 
 def _box_soluzione(soluzione: str) -> str:
+    """Soluzione sotto un esercizio dei fogli di riferimento: blocco con un filetto a
+    sinistra (ambiente leftbar di framed), che a differenza di un riquadro a larghezza
+    fissa segue la colonna e si spezza tra due pagine se serve."""
     return (
-        "\\begin{center}\\fbox{\\parbox{0.9\\linewidth}{\\small "
-        f"{{\\bfseries Soluzione/suggerimento:}} {soluzione}"
-        "}}\\end{center}\n\n"
+        "\\begin{leftbar}\n\\small{\\bfseries Soluzione / suggerimento.} "
+        f"{soluzione}\n\\end{{leftbar}}\n\n"
     )
 
 
@@ -265,21 +277,27 @@ def crea_file_riferimento(ctx: LatexContext, esercizi_struct: list[dict], con_so
         "{\\small\\it (foglio di riferimento"
         + (" con soluzioni e suggerimenti" if con_soluzioni else "")
         + ": un compito completo per ogni combinazione "
-        "di varianti degli esercizi, la risposta corretta \\`e sempre \"A\")}\n"
+        "di varianti degli esercizi; la risposta corretta \\`e sempre la A, segnata con $\\checkmark$)}\n"
         "\\end{center}\n\\vspace{1cm}\n\n"
     )
     for indice_compito in range(n_varianti_max):
         if indice_compito > 0:
             tex += "\\clearpage\n\n"
-        tex += f"\\begin{{center}}{{\\bfseries Compito {LETTERE.get(indice_compito, indice_compito + 1)}}}\\end{{center}}\n\\vspace{{0.5cm}}\n\n"
-        tex += "\\begin{multicols}{2}\n\\setcounter{ex}{0}\n"
+        tex += (
+            "\\noindent\\fbox{\\parbox{\\dimexpr\\linewidth-2\\fboxsep-2\\fboxrule}{\\centering\\strut"
+            f"\\large\\bfseries Compito {LETTERE.get(indice_compito, indice_compito + 1)}"
+            + (f"\\quad{{\\normalsize\\mdseries (variante {indice_compito + 1} di ogni esercizio)}}" if n_varianti_max > 1 else "")
+            + "}}\n\\vspace{0.4cm}\n\n"
+        )
+        tex += "\\begin{multicols}{2}\n\\raggedright\n\\setcounter{ex}{0}\n"
         for es in esercizi_struct:
             varianti = es["varianti"]
             variante = varianti[indice_compito % len(varianti)]
             if es.get("aperta"):
                 tex += tex_esercizio_aperto(ctx, variante["testo"], es.get("obbligatorio", False))
             else:
-                tex += tex_esercizio(ctx, [variante["testo"], variante["risposte"]], es.get("obbligatorio", False))
+                tex += tex_esercizio(ctx, [variante["testo"], variante["risposte"]], es.get("obbligatorio", False),
+                                     evidenzia_corretta=True)
             if con_soluzioni and es.get("soluzione"):
                 tex += _box_soluzione(es["soluzione"])
             tex += _separatore_esercizio()
@@ -440,7 +458,8 @@ def crea_file_blocco(ctx: LatexContext, esercizi_struct: list[dict], numero_stud
         codici_usati.add(code)
         posizioni = mischia(esercizi_struct)
         tex += intestazione(ctx, code, posizioni)
-        tex += "\\begin{small}\n\n\\begin{multicols}{2}\n\\setcounter{ex}{0}\n"
+        # testo allineato a sinistra: giustificato, nelle colonne strette, lascia spazi enormi
+        tex += "\\begin{small}\n\n\\begin{multicols}{2}\n\\raggedright\n\\setcounter{ex}{0}\n"
         # "-" segnala una domanda aperta: nessuna lettera "corretta" da confrontare, il
         # punteggio per quella posizione lo assegna sempre il docente in correzione.
         griglia = "".join("-" if p["aperta"] else LETTERE[p["indice_corretta"]] for p in posizioni)

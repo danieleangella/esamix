@@ -129,8 +129,12 @@ per una prova parziale, le prove parziali corrispondenti; per un appello, gli ap
 Gli esercizi proposti passano sempre da una pagina di conferma, dove si sceglie quali
 importare.
 
-Si può generare con tre fornitori, da scegliere in Impostazioni → "Generazione esercizi
-con l'IA":
+Dalla stessa scheda, **"✓ Verifica con l'IA"** fa ricontrollare al modello tutti gli
+esercizi del compito (risposte indicate come corrette, unicità della risposta, testi e
+soluzioni) e mostra per ciascuno se è corretto, da controllare o sbagliato.
+
+In Impostazioni → "Intelligenza artificiale" si possono salvare più configurazioni (chiavi
+o server diversi) e scegliere ogni volta quale usare. I fornitori possibili sono:
 
 - **Anthropic** (Claude Opus 5): chiave API `sk-ant-…`, oppure la variabile d'ambiente
   `ANTHROPIC_API_KEY`. A pagamento sul proprio account Anthropic.
@@ -142,7 +146,8 @@ con l'IA":
   server impostare `OLLAMA_CONTEXT_LENGTH` ad almeno 32768.
 
 Le chiavi restano solo in `corsi/app_settings.json` e non vengono mai rimostrate per
-intero nelle pagine. Senza nessun fornitore si può copiare il prompt, incollarlo in
+intero nelle pagine. Le chiavi salvate con le versioni precedenti diventano automaticamente
+una configurazione ciascuna. Senza nessun fornitore si può copiare il prompt, incollarlo in
 claude.ai e importare la risposta con "Importa un compito da un unico file".
 
 Vengono inviati solo i testi degli esercizi e le impostazioni del corso (mai dati degli

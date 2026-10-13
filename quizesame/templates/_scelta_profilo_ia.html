@@ -1,0 +1,9 @@
+{# Scelta della configurazione IA da usare per questa richiesta (quando ce n'è più d'una):
+   la predefinita delle Impostazioni è già selezionata. Va dentro il <form> che la invia. #}
+<label style="margin-top:0.5rem" for="ia-profilo-{{ appello.id }}">Configurazione da usare</label>
+<select name="profilo" id="ia-profilo-{{ appello.id }}" style="max-width:28rem">
+  {% for p in profili_ia %}
+  <option value="{{ p.id }}" {% if fornitore_ia and p.id == fornitore_ia.id %}selected{% endif %}>{{ p.nome }} — {{ p.nome_fornitore }}, {{ p.modello }}</option>
+  {% endfor %}
+</select>
+<span class="muted" style="font-size:0.85rem"><a href="/impostazioni#ia">gestisci le configurazioni</a></span>

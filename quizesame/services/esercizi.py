@@ -36,6 +36,36 @@ class Esercizio:
     obbligatorio: bool = False  # valorizzato solo da list_esercizi_appello
 
 
+def _chiave_risposta(risposta: str) -> str:
+    """Due risposte sono considerate uguali se coincidono a meno di spazi e maiuscole
+    (es. "$2$" e "$ 2 $"): stampate sul foglio sarebbero indistinguibili."""
+    return "".join((risposta or "").split()).lower()
+
+
+def risposte_duplicate(risposte: list[str]) -> list[str]:
+    """Le risposte che compaiono più di una volta nella stessa variante (una per gruppo)."""
+    viste, doppie = {}, []
+    for r in risposte:
+        chiave = _chiave_risposta(r)
+        if chiave in viste and viste[chiave] not in doppie:
+            doppie.append(viste[chiave])
+        viste.setdefault(chiave, r)
+    return doppie
+
+
+def problemi_risposte(esercizio: "Esercizio") -> list[str]:
+    """Descrizioni leggibili delle varianti con risposte ripetute (vuoto se va tutto bene)."""
+    if esercizio.aperta:
+        return []
+    problemi = []
+    for n, v in enumerate(esercizio.varianti, start=1):
+        doppie = risposte_duplicate(v.risposte)
+        if doppie:
+            etichetta = f"variante {n}" if len(esercizio.varianti) > 1 else "risposte"
+            problemi.append(f"{etichetta}: ripetuta {', '.join(repr(d) for d in doppie)}")
+    return problemi
+
+
 def _row_to_esercizio(conn, row, assegnato_il: Optional[str] = None, obbligatorio: bool = False) -> Esercizio:
     varianti_rows = conn.execute(
         "SELECT id, testo, risposte_json FROM esercizio_varianti WHERE esercizio_id=? ORDER BY id",
@@ -214,6 +244,13 @@ def _valida_varianti(varianti: list[dict], aperta: bool = False) -> list[dict]:
         risposte = [r for r in v.get("risposte", []) if r and r.strip()]
         if len(risposte) < 2:
             raise ValueError("Ogni variante richiede la risposta corretta e almeno una sbagliata")
+        doppie = risposte_duplicate(risposte)
+        if doppie:
+            n = varianti.index(v) + 1
+            raise ValueError(
+                f"Variante {n}: due risposte sono uguali ({', '.join(repr(d) for d in doppie)}): "
+                "sul foglio sarebbero indistinguibili"
+            )
         v["risposte"] = risposte
     return varianti
 
@@ -410,7 +447,15 @@ def anteprima_importa_json(tag: str, dati: dict) -> list[dict]:
     for e in esercizi_input:
         varianti = e.get("varianti") or []
         duplicato = firme_esistenti.get(_firma_varianti(varianti))
+        errore = None
+        if not e.get("aperta"):
+            for n, v in enumerate(varianti, start=1):
+                doppie = risposte_duplicate(v.get("risposte") or [])
+                if doppie:
+                    errore = f"variante {n}: risposte uguali ({', '.join(repr(d) for d in doppie)})"
+                    break
         risultato.append({
+            "errore": errore,
             "nome": e.get("nome") or "", "argomento": e.get("argomento") or "", "note": e.get("note") or "",
             "obbligatorio": bool(e.get("obbligatorio")), "difficolta": e.get("difficolta"),
             "soluzione": e.get("soluzione") or "", "aperta": bool(e.get("aperta")), "varianti": varianti,
@@ -551,6 +596,11 @@ def parse_testo_esercizi(testo: str) -> dict:
                 if not sbagliate:
                     raise ValueError(f"Variante a riga {v['riga']}: serve almeno una risposta sbagliata '-'")
                 risposte = corrette + sbagliate
+                doppie = risposte_duplicate(risposte)
+                if doppie:
+                    raise ValueError(
+                        f"Variante a riga {v['riga']}: risposte uguali ({', '.join(repr(d) for d in doppie)})"
+                    )
             varianti.append({"testo": testo_variante, "risposte": risposte})
 
         risultato.append({
@@ -578,7 +628,7 @@ def importa_json(tag: str, appello_id: int, esercizi: list[dict]) -> int:
     dal docente nella pagina di conferma (vedi anteprima_importa_json): a differenza delle
     versioni precedenti non importa più l'intero file alla cieca."""
     # controllo prima di creare qualcosa, per non lasciare un import a metà
-    _verifica_aperte_consentite(tag, any(e.get("aperta") for e in esercizi))
+    _verifica_import(tag, esercizi)
     n = 0
     for e in esercizi:
         crea_e_assegna(
@@ -596,7 +646,7 @@ def sostituisci_con_json(tag: str, appello_id: int, esercizi: list[dict]) -> tup
     restano nella banca: eliminarli è una scelta separata del chiamante). Un esercizio
     scelto identico a uno già nel compito non viene duplicato: resta quello esistente,
     con la sua posizione. Ritorna (importati, id degli esercizi tolti, mantenuti)."""
-    _verifica_aperte_consentite(tag, any(e.get("aperta") for e in esercizi))
+    _verifica_import(tag, esercizi)  # prima di togliere gli esercizi attuali
     attuali = {e.id for e in list_esercizi_appello(tag, appello_id)}
     tenuti = {e["duplicato_id"] for e in esercizi if e.get("duplicato_id") in attuali}
     rimossi = sorted(attuali - tenuti)
@@ -606,12 +656,23 @@ def sostituisci_con_json(tag: str, appello_id: int, esercizi: list[dict]) -> tup
     return importa_json(tag, appello_id, nuovi), rimossi, len(tenuti)
 
 
+def _verifica_import(tag: str, esercizi: list[dict]) -> None:
+    """Controlla tutti gli esercizi da importare prima di crearne anche uno solo, così un
+    errore (es. due risposte uguali) non lascia l'import a metà."""
+    _verifica_aperte_consentite(tag, any(e.get("aperta") for e in esercizi))
+    for i, e in enumerate(esercizi, start=1):
+        try:
+            _valida_varianti([dict(v) for v in e.get("varianti") or []], bool(e.get("aperta")))
+        except ValueError as err:
+            raise ValueError(f"Esercizio {e.get('nome') or i}: {err}") from None
+
+
 def importa_json_banca(tag: str, esercizi: list[dict]) -> int:
     """Come importa_json, ma crea gli esercizi solo nella banca del corso senza
     assegnarli a nessun appello: per l'import dalla scheda Esercizi del corso, non
     legata a un appello specifico."""
     # controllo prima di creare qualcosa, per non lasciare un import a metà
-    _verifica_aperte_consentite(tag, any(e.get("aperta") for e in esercizi))
+    _verifica_import(tag, esercizi)
     n = 0
     for e in esercizi:
         create_esercizio(

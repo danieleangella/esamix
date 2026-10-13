@@ -59,6 +59,7 @@
         <button type="button" class="link-simile btn-anteprima-esercizio" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button>
         {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
         {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
+        {% set problemi = problemi_risposte(e) %}{% if problemi %}<span class="badge badge-err" title="{{ problemi|join('; ') }}">⚠ risposte uguali</span>{% endif %}
       </td>
       <td>{{ e.argomento or '-' }}</td>
       <td>{{ e.varianti|length }}</td>

@@ -303,56 +303,63 @@
   })();
   </script>
   {% endif %}
-  {% if md.esercizi_assegnati %}
-  <p>
-    <strong>Foglio di riferimento senza soluzioni</strong> (testo e risposte corrette, comune a tutti i blocchi, da pubblicare online):
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.html">.html</a>
-    {% if md.riferimento_tex_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.tex">.tex</a>{% endif %}
-    {% if md.riferimento_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento.pdf">.pdf</a>{% endif %}
-  </p>
-  <p>
-    <strong>Foglio di riferimento con soluzioni e suggerimenti</strong>:
-    {% if md.riferimento_sol_tex_esiste %}<a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento-soluzioni.tex">.tex</a>{% endif %}
-    {% if md.riferimento_sol_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riferimento-soluzioni.pdf">.pdf</a>{% endif %}
-    {% if not md.riferimento_sol_tex_esiste %}<span class="muted">viene creato con il prossimo blocco di compiti</span>{% endif %}
-    &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/anteprima.pdf" target="_blank">anteprima di controllo (PDF)</a>
-  </p>
-  {% endif %}
+</details>
+
+{# I documenti generati restano sempre a portata di mano in una sezione propria: "Crea
+   compiti" qui sopra si richiude quando la fase è completata, i PDF no. #}
+{% if md.blocchi or md.esercizi_assegnati %}
+<details class="card" open>
+  <summary><strong>Compiti generati ({{ md.compiti|length }})</strong></summary>
+  {% from "_formati.html" import formati %}
+  {% set url_appello = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
   {% if md.blocchi %}
-  {% if md.blocchi|length > 1 %}
-  <p><a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/tutti.pdf">Scarica tutti i blocchi insieme in un unico PDF</a></p>
-  {% endif %}
-  <table>
-    <tr><th>Blocco</th><th>Studenti</th><th>Creato il</th><th>Testo</th><th>Griglia soluzioni</th><th></th></tr>
+  <table class="tabella-documenti">
+    <thead><tr><th>Blocco</th><th>Compiti</th><th>Testo da stampare</th><th>Griglia delle risposte</th><th>Creato il</th><th></th></tr></thead>
     {% for b in md.blocchi %}
     <tr>
-      <td>{{ b.numero }}</td>
+      <td><strong>{{ b.numero }}</strong></td>
       <td>{{ b.numero_studenti }}</td>
-      <td class="muted">{{ b.creato_il or 'recuperato (generato prima di questo aggiornamento)' }}</td>
-      <td>
-        <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/testo.html">.html</a>
-        {% if b.tex_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/testo.tex">.tex</a>{% endif %}
-        {% if b.pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/testo.pdf">.pdf</a>{% endif %}
-      </td>
-      <td>
-        <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/griglia.html">.html</a> ·
-        <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/griglia.tex">.tex</a>
-        {% if b.griglia_pdf_esiste %} &middot; <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/griglia.pdf">.pdf</a>{% endif %}
-      </td>
+      <td>{{ formati(url_appello ~ "/blocchi/" ~ b.numero ~ "/testo", pdf=b.pdf_esiste, html=True, tex=b.tex_esiste) }}</td>
+      <td>{{ formati(url_appello ~ "/blocchi/" ~ b.numero ~ "/griglia", pdf=b.griglia_pdf_esiste, html=True, tex=True) }}</td>
+      <td class="muted">{{ b.creato_il or 'recuperato' }}</td>
       <td>
         {% if not md.appello.chiuso %}
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/blocchi/{{ b.numero }}/elimina"
+        <form class="inline" method="post" action="{{ url_appello }}/blocchi/{{ b.numero }}/elimina"
               onsubmit="return confirm('Eliminare il blocco {{ b.numero }} ({{ b.numero_studenti }} compiti)? Possibile solo se non ha già risultati registrati.');">
-          <button type="submit" class="danger">Elimina</button>
+          <button type="submit" class="secondary pulsante-piccolo" title="Elimina il blocco {{ b.numero }}">Elimina</button>
         </form>
         {% endif %}
       </td>
     </tr>
     {% endfor %}
   </table>
+  {% if md.blocchi|length > 1 %}
+  <p style="margin:0.5rem 0 0"><a class="icona-azione formato-pdf" href="{{ url_appello }}/blocchi/tutti.pdf" target="_blank" rel="noopener">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+    Tutti i blocchi in un unico PDF</a></p>
   {% endif %}
-  <p class="muted">{{ md.compiti|length }} compiti registrati in totale.</p>
+  {% endif %}
+  {% if md.esercizi_assegnati %}
+  <h3 class="titoletto">Fogli di riferimento (comuni a tutti i blocchi)</h3>
+  <ul class="elenco-documenti">
+    <li>
+      <span><strong>Senza soluzioni</strong> <span class="muted">— testo e risposte corrette, da pubblicare online</span></span>
+      {{ formati(url_appello ~ "/riferimento", pdf=md.riferimento_pdf_esiste, html=True, tex=md.riferimento_tex_esiste) }}
+    </li>
+    <li>
+      <span><strong>Con soluzioni e suggerimenti</strong>
+        {% if not md.riferimento_sol_tex_esiste %}<span class="muted">— viene creato con il prossimo blocco di compiti</span>{% endif %}</span>
+      {{ formati(url_appello ~ "/riferimento-soluzioni", pdf=md.riferimento_sol_pdf_esiste, tex=md.riferimento_sol_tex_esiste) }}
+    </li>
+    <li>
+      <span><strong>Anteprima di controllo</strong> <span class="muted">— tutte le varianti, con il riquadro di revisione</span></span>
+      {{ formati(url_appello ~ "/anteprima", pdf=True, tex=True) }}
+    </li>
+  </ul>
+  {% endif %}
+  {% if not md.blocchi %}<p class="muted">Nessun blocco di compiti ancora generato.</p>{% endif %}
 </details>
+{% endif %}
 
 {% if md.ammessi is defined %}
 <details class="card" open>

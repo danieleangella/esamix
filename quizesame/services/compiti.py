@@ -58,6 +58,7 @@ def anteprima_riferimento(tag: str, appello_id: int) -> list[dict]:
         righe.append({
             "esercizio_nome": e.nome or f"Esercizio #{e.id}", "obbligatorio": e.obbligatorio,
             "aperta": e.aperta, "testo": variante.testo, "risposte": list(variante.risposte),
+            "soluzione": e.soluzione or "", "n_varianti": len(e.varianti),
         })
     return righe
 
@@ -137,17 +138,22 @@ def _salva_riferimenti(tag: str, appello_id: int, ctx: LatexContext, esercizi_st
     )
 
 
-def genera_anteprima(tag: str, appello_id: int) -> Path:
+def genera_anteprima(tag: str, appello_id: int) -> tuple[Path, bool]:
     """Scrive il .tex dell'anteprima di controllo del compito (tutti gli esercizi
     assegnati con tutte le varianti, risposte corrette e soluzioni): non tocca blocchi
-    né codici, quindi si può rigenerare quando si vuole. Ritorna il percorso del .tex."""
+    né codici, quindi si può rigenerare quando si vuole. Ritorna il percorso del .tex e
+    se il testo è cambiato rispetto all'ultima anteprima (esercizi o impostazioni del
+    corso modificati): se non è cambiato e il PDF esiste già, non serve ricompilarlo."""
     appello = corsi_service.get_appello(tag, appello_id)
     if appello is None:
         raise ValueError("Appello non trovato")
     ctx = _crea_contesto(corsi_service.get_corso(tag), appello)
     path = path_anteprima(tag, appello_id, "tex", appello=appello)
-    _salva_testo(path, crea_file_anteprima(ctx, _esercizi_per_generazione(tag, appello_id)))
-    return path
+    tex = crea_file_anteprima(ctx, _esercizi_per_generazione(tag, appello_id))
+    cambiato = not path.exists() or path.read_text(encoding="utf-8") != tex
+    if cambiato:
+        _salva_testo(path, tex)
+    return path, cambiato
 
 
 def path_risultati(tag: str, appello_id: int, ext: str, appello=None) -> Path:
@@ -273,6 +279,17 @@ def genera_blocco(tag: str, appello_id: int, numero_studenti: int) -> BloccoResu
     corso = corsi_service.get_corso(tag)
 
     esercizi_struct = _esercizi_per_generazione(tag, appello_id)
+    # due risposte uguali sullo stesso foglio lo renderebbero ambiguo: si correggono prima
+    problemi = [
+        f"'{e.nome or e.id}' ({'; '.join(esercizi_service.problemi_risposte(e))})"
+        for e in esercizi_service.list_esercizi_appello(tag, appello_id)
+        if esercizi_service.problemi_risposte(e)
+    ]
+    if problemi:
+        raise ValueError(
+            "Alcuni esercizi hanno due risposte uguali nella stessa variante: correggili nella scheda "
+            "Testo prima di generare i compiti. " + " · ".join(problemi)
+        )
 
     n_obbligatori = sum(1 for e in esercizi_struct if e["obbligatorio"])
     avviso_obbligatori = None

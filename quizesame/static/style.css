@@ -471,3 +471,49 @@ tbody.esercizio-assegnato.trascinato { opacity: 0.5; }
 }
 .aiuto-testo ol { margin: 0.4rem 0; padding-left: 1.2rem; }
 .aiuto:hover .aiuto-testo, .aiuto:focus .aiuto-testo, .aiuto:focus-within .aiuto-testo { display: block; }
+
+/* piccoli comandi a icona nel titolo di una sezione (es. anteprima di controllo del testo):
+   restano utilizzabili anche quando la sezione è chiusa */
+.barra-anteprima { margin-left: auto; display: inline-flex; flex-wrap: wrap; gap: 0.25rem; font-size: 0.85rem; font-weight: 500; }
+.icona-azione {
+  display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.55rem; border-radius: 6px;
+  border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); text-decoration: none; white-space: nowrap;
+}
+.icona-azione:hover { border-color: var(--accent); color: var(--accent); }
+
+/* documenti generati: pulsanti di formato (PDF in evidenza) ed elenco dei fogli */
+.formati { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; vertical-align: middle; }
+.formati .icona-azione, a.icona-azione.formato-pdf { font-size: 0.8rem; padding: 0.15rem 0.5rem; }
+.icona-azione.formato-pdf { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); font-weight: 600; }
+.titoletto { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 1.25rem 0 0.4rem; }
+.elenco-documenti { list-style: none; margin: 0; padding: 0; }
+.elenco-documenti li {
+  display: flex; justify-content: space-between; align-items: center; gap: 0.5rem 1rem; flex-wrap: wrap;
+  padding: 0.5rem 0; border-bottom: 1px solid var(--border);
+}
+button.pulsante-piccolo { margin: 0; padding: 0.2rem 0.6rem; font-size: 0.8rem; min-height: 0; }
+
+/* risultati della verifica con l'IA */
+details.card.esito-errore { border-left: 4px solid var(--err-text); }
+details.card.esito-dubbio { border-left: 4px solid #d97706; }
+.variante-verificata { border-top: 1px solid var(--border); padding: 0.6rem 0; display: flex; flex-direction: column; gap: 0.3rem; }
+
+/* foglio di riferimento in HTML (da consultare o pubblicare) */
+.barra-riferimento { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.foglio-riferimento { list-style: none; padding: 0; margin: 0; }
+.rif-titolo { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem; }
+.rif-testo { white-space: pre-wrap; }
+.rif-risposte { margin: 0.5rem 0 0; padding-left: 1.6rem; }
+.rif-risposte li { padding: 0.15rem 0; }
+.rif-risposte li::marker { font-weight: 700; color: var(--muted); }
+.rif-risposte li.corretta { font-weight: 600; }
+.rif-risposte li.corretta::marker { color: var(--ok-text); }
+.rif-soluzione { margin-top: 0.6rem; padding: 0.4rem 0 0.4rem 0.75rem; border-left: 3px solid var(--border-strong); white-space: pre-wrap; }
+
+/* stampa: solo il contenuto, senza menu, barre e comandi */
+@media print {
+  .topbar, .breadcrumb-bar, .non-stampare, .flash, .salta-al-contenuto { display: none !important; }
+  body { background: #fff; }
+  .container { max-width: none; padding: 0; }
+  .card { box-shadow: none; break-inside: avoid; }
+}

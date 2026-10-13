@@ -12,7 +12,20 @@
 {% set fase = md.riepilogo_home.fasi|selectattr("scheda", "equalto", "creazione")|first %}
 <details class="card sezione-flusso" data-sezione="esercizi-{{ md.appello.id }}" data-fatta="{{ 1 if fase.fatta else 0 }}"{% if not fase.fatta %} open{% endif %}>
   <summary><strong>Esercizi assegnati ({{ md.esercizi_assegnati|length }})</strong>{% if fase.fatta %} <span class="badge badge-ok">✓ completato</span>
-    {% if not md.blocchi %}<span class="muted">— prossimo passo: crea i compiti nella scheda "Compiti d'esame"</span>{% endif %}{% endif %}</summary>
+    {% if not md.blocchi %}<span class="muted">— prossimo passo: crea i compiti nella scheda "Compiti d'esame"</span>{% endif %}{% endif %}
+    {% if md.esercizi_assegnati %}
+    {# anteprima di controllo sempre raggiungibile, anche a sezione chiusa #}
+    {% set url_anteprima = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/anteprima" %}
+    <span class="barra-anteprima" title="Anteprima di controllo: tutti gli esercizi con tutte le varianti, la risposta corretta e la soluzione (non crea compiti né codici)">
+      <a class="icona-azione" href="{{ url_anteprima }}.pdf" target="_blank" rel="noopener" aria-label="Apri l'anteprima di controllo in PDF">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+        Anteprima</a>
+      <a class="icona-azione" href="{{ url_anteprima }}.pdf?rigenera=1" target="_blank" rel="noopener" title="Ricompila l'anteprima da zero" aria-label="Rigenera l'anteprima PDF">↻ Rigenera</a>
+      <a class="icona-azione" href="{{ url_anteprima }}.tex" title="Sorgente LaTeX dell'anteprima">.tex</a>
+      <a class="icona-azione" href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ia/verifica"
+         title="Fai ricontrollare all'IA risposte corrette e soluzioni di tutti gli esercizi">✓ Verifica con l'IA</a>
+    </span>
+    {% endif %}</summary>
   {% if md.esercizi_assegnati %}
   {% set riordinabile = not md.appello.chiuso and md.esercizi_assegnati|length > 1 %}
   {% if riordinabile %}
@@ -52,6 +65,7 @@
         <button type="button" class="link-simile btn-anteprima-assegnato" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button>
         {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
         {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
+        {% set problemi = problemi_risposte(e) %}{% if problemi %}<span class="badge badge-err" title="{{ problemi|join('; ') }}">⚠ risposte uguali</span>{% endif %}
       </td>
       <td>{{ e.varianti|length }}</td>
       <td>
@@ -89,12 +103,6 @@
     </tbody>
     {% endfor %}
   </table>
-  <p style="margin-top:0.75rem">
-    <a class="button" href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/anteprima.pdf" target="_blank">Anteprima PDF con soluzioni</a>
-    <span class="muted">— tutti gli esercizi con tutte le varianti, la risposta corretta e la soluzione/suggerimento, per
-      controllare che il testo sia corretto (non crea compiti né codici).
-      <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/anteprima.tex">.tex</a></span>
-  </p>
   <p class="muted">Un esercizio obbligatorio richiede consegna e svolgimento scritto: se non
     svolto il compito risulta insufficiente; se svolto, in correzione viene chiesto di
     confermare se lo svolgimento è corretto. L'ordine qui non incide sul compito dello
@@ -158,6 +166,7 @@
             {{ e.nome or ('#' ~ e.id) }}
             {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
             {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
+        {% set problemi = problemi_risposte(e) %}{% if problemi %}<span class="badge badge-err" title="{{ problemi|join('; ') }}">⚠ risposte uguali</span>{% endif %}
           </td>
           <td>{{ e.argomento or '-' }}</td>
           <td>{{ e.varianti|length }}</td>
