@@ -1,6 +1,9 @@
 {% set tag = corso.tag if corso is defined else corso_tag %}
 <div class="card">
-  {% if risultato.codice %}
+  {% if risultato.esito == 'annullato' %}
+  <p><span class="badge badge-err">Compito annullato</span>{% if risultato.annullamento_nota %} — {{ risultato.annullamento_nota }}{% endif %}</p>
+  {% if risultato.codice %}<p class="muted">Codice compito: <strong>{{ risultato.codice }}</strong></p>{% endif %}
+  {% elif risultato.codice %}
   <p class="muted">Codice compito: <strong>{{ risultato.codice }}</strong></p>
   <p>
     Voto:
@@ -68,7 +71,8 @@
         {% if s.corrente %} <span class="badge badge-info">questo compito</span>{% endif %}
       </td>
       <td>
-        {% if s.esito != 'voto' %}{{ s.esito }}
+        {% if s.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if s.annullamento_nota %} <span class="muted">— {{ s.annullamento_nota }}</span>{% endif %}
+        {% elif s.esito != 'voto' %}{{ s.esito }}
         {% else %}{{ s.voto }}{% endif %}
         {% if s.verbalizzato %}
         {% if s.superato is not none %}

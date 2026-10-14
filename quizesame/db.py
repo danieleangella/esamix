@@ -272,6 +272,8 @@ ADDITIVE_COLUMNS = {
         ("esito_orale", "TEXT"),
         ("valutazione_sospesa", "BOOLEAN NOT NULL DEFAULT 0"),
         ("raggruppamento_da_confermare", "BOOLEAN NOT NULL DEFAULT 0"),
+        # spiegazione scritta dal docente quando esito='annullato' (es. "cellulare in aula")
+        ("annullamento_nota", "TEXT"),
     ],
     "esercizi": [
         ("argomento", "TEXT"),

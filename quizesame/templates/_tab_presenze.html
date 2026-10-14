@@ -47,6 +47,7 @@
           {% if s.bloccato %}
           {% if s.esito == 'assente' %}<span class="badge badge-err">Assente</span>
           {% elif s.esito == 'ritirato' %}<span class="badge badge-warn">Ritirato</span>
+          {% elif s.esito == 'annullato' %}<span class="badge badge-err">Annullato</span>
           {% else %}<span class="badge badge-ok">Presente</span>{% endif %}
           {% elif s.presente %}
           <span class="badge badge-ok">Presente</span>
@@ -196,6 +197,50 @@
       var root = document.currentScript.closest(".tab-pane");
       creaAutocomplete(
         root.querySelector(".campo-input-matricola-ritirato"), root.querySelector(".campo-suggerimenti-studenti-ritirato"),
+        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?appello_id={{ md.appello.id }}&q=" + encodeURIComponent(q); },
+        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+        function (s) { return s.matricola; },
+        null,
+        function (s) { return s.stato; }
+      );
+    })();
+    </script>
+  </details>
+
+  <details class="card dettaglio-fisarmonica">
+    <summary><strong>Annulla compito</strong></summary>
+    <p class="muted" style="margin-top:0.75rem">
+      Per uno studente sorpreso a copiare o con il cellulare durante la prova. Nei risultati e nel file della
+      segreteria il compito conta come {{ 'ritirato' if corso.annullato_come == 'ritirato' else 'insufficiente' }}
+      (si cambia dalle impostazioni del corso), mentre nella carriera dello studente resta indicato come annullato.
+      Se lo studente ha già un esito per questo appello (es. compito già corretto), viene sostituito.
+    </p>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/annulla-compito" style="margin-top:0.75rem"
+          onsubmit="return confirm('Annullare il compito di questo studente?');">
+      <div class="form-grid">
+        <div style="position:relative">
+          <label class="campo-obbligatorio">Matricola o nome</label>
+          <input name="matricola" class="campo-input-matricola-annullato" autocomplete="off" required>
+          <div class="campo-suggerimenti-studenti-annullato sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+        </div>
+      </div>
+      <div style="margin-top:0.5rem">
+        <label>Nota di spiegazione</label>
+        <textarea name="nota" rows="2" placeholder="es. sorpreso con il cellulare durante la prova"></textarea>
+      </div>
+      <div style="margin-top:0.5rem">
+        <label style="display:inline-flex; align-items:center; gap:0.4rem">
+          <input type="checkbox" name="orale_obbligatorio" value="1" style="width:auto">
+          Rendi l'orale obbligatorio negli appelli successivi
+        </label>
+      </div>
+      <button type="submit" class="danger" style="margin-top:0.5rem">Annulla compito</button>
+    </form>
+    <script>
+    (function () {
+      var root = document.currentScript.closest(".tab-pane");
+      creaAutocomplete(
+        root.querySelector(".campo-input-matricola-annullato"), root.querySelector(".campo-suggerimenti-studenti-annullato"),
         function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?appello_id={{ md.appello.id }}&q=" + encodeURIComponent(q); },
         function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
         function (s) { return s.matricola; },

@@ -84,6 +84,12 @@
         <div class="stat-value">{{ riepilogo_home.ritirati }}</div>
         <div class="stat-label">Ritirati</div>
       </div>
+      {% if riepilogo_home.annullati %}
+      <div class="stat-tile">
+        <div class="stat-value">{{ riepilogo_home.annullati }}</div>
+        <div class="stat-label">Annullati</div>
+      </div>
+      {% endif %}
       <div class="stat-tile stat-ok">
         <div class="stat-value">{{ riepilogo_home.sufficienti }}</div>
         <div class="stat-label">Sufficienti</div>
@@ -251,6 +257,7 @@
         <td>{{ r.matricola }}</td>
         <td>
           {% if r.esito == 'rifiutato' %}<span class="badge badge-warn">rifiutato</span> <span class="muted">({{ r.voto }})</span>
+          {% elif r.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if r.annullamento_nota %} <span class="muted">— {{ r.annullamento_nota }}</span>{% endif %}
           {% elif r.esito != 'voto' %}{{ r.esito }}
           {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>

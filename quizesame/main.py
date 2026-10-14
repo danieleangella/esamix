@@ -636,7 +636,8 @@ def modifica_corso(
     orale_dopo_richiesta: str = Form(""), orale_soglia_attiva: str = Form(""),
     orale_soglia_n: str = Form(""), orale_soglia_voto: str = Form(""),
     orale_soglia_escludi_parziali: str = Form(""),
-    ritirato_conta_insufficiente: str = Form(""), domande_esame: list[str] = Form([]),
+    ritirato_conta_insufficiente: str = Form(""), annullato_come: str = Form("insufficiente"),
+    domande_esame: list[str] = Form([]),
 ):
     try:
         corsi_service.update_meta(
@@ -653,6 +654,7 @@ def modifica_corso(
             orale_soglia_n=orale_soglia_n.strip(), orale_soglia_voto=orale_soglia_voto.strip(),
             orale_soglia_escludi_parziali="1" if orale_soglia_escludi_parziali else "0",
             ritirato_conta_insufficiente="1" if ritirato_conta_insufficiente else "0",
+            annullato_come="ritirato" if annullato_come == "ritirato" else "insufficiente",
             **corsi_service.domande_esame_meta(domande_esame),
         )
     except Exception as e:
@@ -743,13 +745,14 @@ def _calcola_riepilogo_home(corso, appello, dati: dict) -> dict:
     compiti_totali = len(dati["compiti"])
     assenti = sum(1 for r in risultati if r["esito"] == "assente")
     ritirati = sum(1 for r in risultati if r["esito"] == "ritirato")
+    annullati = sum(1 for r in risultati if r["esito"] == "annullato")
     valutati = sum(1 for r in risultati if r["esito"] == "voto")
     sufficienti = sum(
         1 for r in risultati
         if r["esito"] == "voto" and r["voto"] is not None and r["voto"] >= dati["votomin_effettivo"]
     )
     presenti = (numero_iscritti - assenti) if numero_iscritti is not None else None
-    valutati_totale = valutati + assenti + ritirati
+    valutati_totale = valutati + assenti + ritirati + annullati
 
     # Le fasi di una singola prova, nell'ordine in cui si svolgono: ognuna sa in quale
     # scheda si completa e cosa c'è da fare (usato per il percorso e il "prossimo passo"
@@ -805,7 +808,8 @@ def _calcola_riepilogo_home(corso, appello, dati: dict) -> dict:
 
     return {
         "data": appello.data, "compiti_stampati": compiti_totali, "iscritti": numero_iscritti,
-        "presenti": presenti, "assenti": assenti, "ritirati": ritirati, "sufficienti": sufficienti,
+        "presenti": presenti, "assenti": assenti, "ritirati": ritirati, "annullati": annullati,
+        "sufficienti": sufficienti,
         "valutati": valutati, "fasi": fasi, "percentuale": percentuale,
     }
 
@@ -2111,6 +2115,28 @@ def segna_assenza(request: Request, tag: str, appello_id: int, matricola: str = 
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Studente segnato come {esito}", anchor=anchor)
 
 
+@app.post("/corsi/{tag}/appelli/{appello_id}/annulla-compito")
+def annulla_compito(
+    tag: str, appello_id: int, matricola: str = Form(...), nota: str = Form(""),
+    orale_obbligatorio: str = Form(""),
+):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "presenze")
+    errore_iscritto = _errore_non_iscritto(tag, appello_id, matricola)
+    if errore_iscritto:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", errore_iscritto, "error", anchor=anchor)
+    try:
+        correzione_service.annulla_compito(
+            tag, appello_id, matricola, nota=nota, rendi_orale_obbligatorio=bool(orale_obbligatorio),
+        )
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    msg = f"Compito di {matricola} annullato"
+    if orale_obbligatorio:
+        msg += ": l'orale sarà obbligatorio negli appelli successivi"
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
+
+
 @app.get("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}", response_class=HTMLResponse)
 def dettaglio_risultato(request: Request, tag: str, appello_id: int, matricola: str):
     corso = corsi_service.get_corso(tag)
@@ -3130,7 +3156,7 @@ def api_cerca_studenti_globale(q: str = ""):
 
 def _stato_iscritto(s: dict) -> Optional[str]:
     if s["bloccato"]:
-        return {"assente": "assente", "ritirato": "ritirato"}.get(s["esito"], "già valutato")
+        return {"assente": "assente", "ritirato": "ritirato", "annullato": "annullato"}.get(s["esito"], "già valutato")
     if s["presente"]:
         return "presente"
     return None

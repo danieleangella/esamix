@@ -127,6 +127,9 @@ def _applica_soglia_orale_automatica(conn, corso, matricola: str) -> None:
     params = [matricola, corso.orale_soglia_voto]
     if corso.ritirato_conta_insufficiente:
         query += " OR r.esito='ritirato'"
+    # un compito annullato conta come insufficiente, o come ritirato se così impostato nel corso
+    if corso.annullato_come == "insufficiente" or corso.ritirato_conta_insufficiente:
+        query += " OR r.esito='annullato'"
     query += ")"
     if corso.orale_soglia_escludi_parziali:
         # "prova parziale" = appello membro di un raggruppamento (es. il raggruppamento
@@ -568,6 +571,56 @@ def segna_esito_speciale(tag: str, appello_id: int, matricola: str, esito: str) 
         if esito == "ritirato":
             corso = corsi_service.get_corso(tag)
             _applica_soglia_orale_automatica(conn, corso, matricola)
+        conn.execute("DELETE FROM bozze_correzione WHERE appello_id=? AND matricola=?", (appello_id, matricola))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def annulla_compito(
+    tag: str, appello_id: int, matricola: str, nota: str = "", rendi_orale_obbligatorio: bool = False,
+) -> None:
+    """Annulla il compito di uno studente (es. sorpreso col cellulare durante la prova):
+    l'esito diventa 'annullato', con voto NULL e la nota di spiegazione del docente. Nei
+    risultati pubblicati e nel file della segreteria conta come insufficiente o come
+    ritirato secondo l'impostazione del corso (annullato_come), mentre nella carriera
+    dello studente resta indicato come annullato. A differenza di segna_esito_speciale,
+    sostituisce un eventuale esito già registrato e non verbalizzato (il compito può
+    essere già stato corretto quando ci si accorge del problema): codice e risposte
+    restano come riferimento. Se `rendi_orale_obbligatorio`, lo studente dovrà fare
+    l'orale in tutti gli appelli successivi."""
+    corsi_service.verifica_appello_aperto(tag, appello_id)
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    nota = (nota or "").strip()
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        if conn.execute("SELECT 1 FROM studenti WHERE matricola=?", (matricola,)).fetchone() is None:
+            raise StudenteNonTrovato(f"Matricola '{matricola}' non registrata in questo corso")
+        esistente = conn.execute(
+            "SELECT verbalizzato FROM risultati WHERE matricola=? AND appello_id=?", (matricola, appello_id)
+        ).fetchone()
+        if esistente and esistente["verbalizzato"]:
+            raise GiaVerbalizzato(
+                f"Lo studente {matricola} ha già un voto verbalizzato per questo appello: annulla prima la "
+                "verbalizzazione dalla scheda \"Voti verbalizzati\"."
+            )
+        conn.execute(
+            "INSERT INTO risultati (matricola, appello_id, esito, voto, voto_scritto, annullamento_nota) "
+            "VALUES (?,?,'annullato',NULL,NULL,?) "
+            "ON CONFLICT(matricola, appello_id) DO UPDATE SET esito='annullato', voto=NULL, voto_scritto=NULL, "
+            "annullamento_nota=excluded.annullamento_nota, insufficiente_per_obbligatorio=0, "
+            "punteggi_obbligatori=NULL, richiede_orale=0, orale_svolto=0, orale_motivazione=NULL, "
+            "esito_orale=NULL, valutazione_sospesa=0",
+            (matricola, appello_id, nota or None),
+        )
+        if rendi_orale_obbligatorio:
+            conn.execute(
+                "INSERT INTO orale_obbligatorio (matricola, motivazione, origine) VALUES (?,?,?) "
+                "ON CONFLICT(matricola) DO NOTHING",
+                (matricola, "compito annullato" + (f": {nota}" if nota else ""), appello.nome),
+            )
+        _applica_soglia_orale_automatica(conn, corso, matricola)
         conn.execute("DELETE FROM bozze_correzione WHERE appello_id=? AND matricola=?", (appello_id, matricola))
         conn.commit()
     finally:

@@ -19,11 +19,15 @@ def ctx_for(tag: str, corso, appello) -> LatexContext:
     )
 
 
-def _etichetta_esito(r, votomin: int) -> str:
+def _etichetta_esito(r, votomin: int, annullato_come: str = "insufficiente") -> str:
     if r["esito"] == "assente":
         return "assente"
     if r["esito"] == "ritirato":
         return "ritirato"
+    if r["esito"] == "annullato":
+        # nei risultati pubblicati non si dice che è stato annullato: conta come un
+        # insufficiente qualsiasi (o un ritirato, secondo l'impostazione del corso)
+        return "ritirato" if annullato_come == "ritirato" else celavoto(0, votomin)
     if r["esito"] == "rifiutato":
         return "rifiutato"
     if r["richiede_orale"] and not r["orale_svolto"]:
@@ -56,7 +60,7 @@ def stampa_risultati(tag: str, appello_id: int) -> str:
     votomin = corsi_service.effective_votomin(corso, appello)
     rows = _righe_risultati(tag, appello_id, votomin)
     # celamatr() è applicata da crea_tex_risultati stessa: qui la matricola resta in chiaro.
-    lista = [(r["matricola"], r["nome"], r["cognome"], _etichetta_esito(r, votomin)) for r in rows]
+    lista = [(r["matricola"], r["nome"], r["cognome"], _etichetta_esito(r, votomin, corso.annullato_come)) for r in rows]
     return crea_tex_risultati(ctx_for(tag, corso, appello), lista)
 
 
@@ -70,7 +74,7 @@ def lista_risultati_html(tag: str, appello_id: int) -> list[dict]:
     return [
         {
             "matricola": celamatr(r["matricola"]), "nome": r["nome"], "cognome": r["cognome"],
-            "etichetta": _etichetta_esito(r, votomin),
+            "etichetta": _etichetta_esito(r, votomin, corso.annullato_come),
         }
         for r in rows
     ]

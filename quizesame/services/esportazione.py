@@ -74,15 +74,18 @@ def _trova_intestazione(righe: list[list[str]]) -> int:
     return indice
 
 
-def _esito_per_export(risultato: Optional[dict], votomin: int) -> Optional[str]:
+def _esito_per_export(risultato: Optional[dict], votomin: int, annullato_come: str = "insufficiente") -> Optional[str]:
     """None significa "non scrivere nulla" (nessuna valutazione ancora completata o
-    confermata): lo studente resta come nel file caricato."""
+    confermata): lo studente resta come nel file caricato. Un compito annullato vale
+    insufficiente ("0") o ritirato ("RIT") secondo l'impostazione del corso."""
     if risultato is None:
         return None
     if risultato["esito"] == "assente":
         return "ASS"
     if risultato["esito"] == "ritirato":
         return "RIT"
+    if risultato["esito"] == "annullato":
+        return "RIT" if annullato_come == "ritirato" else "0"
     if risultato["esito"] != "voto":
         return None
     if risultato["valutazione_sospesa"]:
@@ -516,7 +519,7 @@ def compila_export_voti(
         matricole_nel_file.add(matricola)
 
         risultato = risultati.get(matricola)
-        esito = _esito_per_export(risultato, votomin)
+        esito = _esito_per_export(risultato, votomin, corso.annullato_come)
         if esito is None:
             continue
         riga[idx_esito] = esito
@@ -536,7 +539,7 @@ def compila_export_voti(
     for matricola, risultato in risultati.items():
         if matricola in matricole_nel_file:
             continue
-        esito = _esito_per_export(risultato, votomin)
+        esito = _esito_per_export(risultato, votomin, corso.annullato_come)
         if esito is None:
             continue
         extra.append({

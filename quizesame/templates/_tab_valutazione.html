@@ -90,7 +90,7 @@
           var match = dati.filter(function (s) { return s.matricola === valoreDigitato; })[0];
           if (!match) { imposta(nomeRisolto, valoreDigitato && /^\d+$/.test(valoreDigitato) ? "matricola non trovata nel corso" : "", valoreDigitato && /^\d+$/.test(valoreDigitato) ? "warn" : ""); return; }
           if (match.stato === "già valutato") imposta(nomeRisolto, "⚠ " + match.cognome + " " + match.nome + ": già valutato in questa prova", "err");
-          else if (match.stato === "assente" || match.stato === "ritirato") imposta(nomeRisolto, "⚠ " + match.cognome + " " + match.nome + ": segnato " + match.stato, "warn");
+          else if (match.stato === "assente" || match.stato === "ritirato" || match.stato === "annullato") imposta(nomeRisolto, "⚠ " + match.cognome + " " + match.nome + ": segnato " + match.stato, "warn");
           else imposta(nomeRisolto, "✓ " + match.cognome + " " + match.nome + (match.stato ? " (" + match.stato + ")" : ""), "ok");
         },
         function (s) { return s.stato; }
@@ -253,6 +253,7 @@
         <td>{{ r.matricola }}</td>
         <td>
           {% if r.esito == 'rifiutato' %}<span class="badge badge-warn">rifiutato</span> <span class="muted">({{ r.voto }})</span>
+          {% elif r.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if r.annullamento_nota %} <span class="muted">— {{ r.annullamento_nota }}</span>{% endif %}
           {% elif r.esito != 'voto' %}{{ r.esito }}
           {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>

@@ -88,6 +88,24 @@
     </div>
   </details>
 
+  <details class="card">
+    <summary><strong>Compiti annullati</strong></summary>
+    <p class="muted" style="margin-top:1rem">Un compito annullato durante la prova (es. studente sorpreso con il
+      cellulare) nei risultati pubblicati e nel file della segreteria conta come:</p>
+    <div style="display:flex; gap:1.5rem; flex-wrap:wrap">
+      <label style="display:inline-flex; align-items:center; gap:0.4rem">
+        <input type="radio" name="annullato_come" value="insufficiente" style="width:auto" {% if corso.annullato_come != 'ritirato' %}checked{% endif %}>
+        insufficiente
+      </label>
+      <label style="display:inline-flex; align-items:center; gap:0.4rem">
+        <input type="radio" name="annullato_come" value="ritirato" style="width:auto" {% if corso.annullato_come == 'ritirato' %}checked{% endif %}>
+        ritirato
+      </label>
+    </div>
+    <p class="muted" style="margin-top:0.5rem">Nella carriera dello studente resta comunque indicato come annullato,
+      con la nota di spiegazione.</p>
+  </details>
+
   <details class="card" {% if not corso.domande_esame_lista %}open{% endif %}>
     <summary><strong>Domande d'esame ({{ corso.domande_esame_lista|length }})</strong></summary>
     <p class="muted" style="margin-top:1rem">Testi da scrivere nella colonna "Domande d'esame" del file della

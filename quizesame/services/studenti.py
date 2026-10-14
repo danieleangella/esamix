@@ -105,7 +105,7 @@ def esporta_ammessi_csv(lista: list[dict]) -> bytes:
 
 
 def risultati_studente(tag: str, matricola: str) -> list[dict]:
-    """'superato': None se non è un voto numerico (assente/ritirato/rifiutato, o richiede
+    """'superato': None se non è un voto numerico (assente/ritirato/annullato/rifiutato, o richiede
     ancora l'orale), altrimenti se il voto raggiunge la soglia effettiva di quell'appello
     (quella dedicata alle prove di un raggruppamento, se questo appello ne fa parte) —
     usato per distinguere in un verbalizzato "superato" da uno "insufficiente" (possibile
@@ -115,7 +115,7 @@ def risultati_studente(tag: str, matricola: str) -> list[dict]:
     try:
         rows = conn.execute(
             "SELECT a.id AS appello_id, a.nome AS appello_nome, r.voto, r.esito, r.richiede_orale, "
-            "r.orale_svolto, r.esito_orale, r.verbalizzato, r.data_verbalizzazione, "
+            "r.orale_svolto, r.esito_orale, r.verbalizzato, r.data_verbalizzazione, r.annullamento_nota, "
             "EXISTS(SELECT 1 FROM raggruppamento_membri rm WHERE rm.appello_id = a.id) AS membro_raggruppamento "
             "FROM risultati r JOIN appelli a ON a.id = r.appello_id "
             "WHERE r.matricola=? ORDER BY a.data IS NULL, a.data, a.id",

@@ -75,6 +75,10 @@ class Corso:
     orale_soglia_voto: Optional[int] = None
     orale_soglia_escludi_parziali: bool = True
     ritirato_conta_insufficiente: bool = False
+    # come conta un compito annullato (es. studente sorpreso col cellulare) nei risultati
+    # e nel file della segreteria: "insufficiente" o "ritirato" (nella carriera dello
+    # studente resta comunque indicato come annullato)
+    annullato_come: str = "insufficiente"
     domande_esame: str = ""  # la prima di domande_esame_lista: quella proposta di default
     domande_esame_lista: list[str] = field(default_factory=list)
     importato_da_legacy: bool = False
@@ -225,7 +229,8 @@ _META_EREDITABILI = (
     "risposta_vuota", "punteggio_max_aperta", "domande_aperte_attive", "frase_consegna", "frase_regole",
     "frase_obbligatorio",
     "orale_dopo_richiesta", "orale_soglia_attiva", "orale_soglia_n", "orale_soglia_voto",
-    "orale_soglia_escludi_parziali", "ritirato_conta_insufficiente", "domande_esame", "domande_esame_lista",
+    "orale_soglia_escludi_parziali", "ritirato_conta_insufficiente", "annullato_come", "domande_esame",
+    "domande_esame_lista",
 )
 
 
@@ -426,6 +431,7 @@ def get_corso(tag: str) -> Corso:
         orale_soglia_voto=int(meta.get("orale_soglia_voto") or DEFAULT_ORALE_SOGLIA_VOTO),
         orale_soglia_escludi_parziali=meta.get("orale_soglia_escludi_parziali", "1") == "1",
         ritirato_conta_insufficiente=meta.get("ritirato_conta_insufficiente", "0") == "1",
+        annullato_come="ritirato" if meta.get("annullato_come") == "ritirato" else "insufficiente",
         domande_esame=(_domande_esame_da_meta(meta) or [""])[0],
         domande_esame_lista=_domande_esame_da_meta(meta),
         importato_da_legacy=meta.get("importato_da_legacy", "0") == "1",
