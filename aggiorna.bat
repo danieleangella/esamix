@@ -11,11 +11,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM solo i file del programma modificati bloccano l'aggiornamento: i file nuovi non
+REM tracciati (dati dei corsi, registro, file temporanei) non c'entrano
 set MODIFICHE=
-for /f "delims=" %%i in ('git status --porcelain') do set MODIFICHE=1
+for /f "delims=" %%i in ('git status --porcelain --untracked-files=no') do set MODIFICHE=1
 if defined MODIFICHE (
-    echo Ci sono modifiche non salvate nella cartella del programma ^(file del codice, non i tuoi corsi^):
-    git status --short
+    echo Ci sono modifiche non salvate in alcuni file del programma ^(non i tuoi corsi^):
+    git status --short --untracked-files=no
     echo.
     echo Aggiornamento annullato per non perderle. Se non ti servono, puoi scartarle con:
     echo   git checkout -- .
@@ -25,10 +27,12 @@ if defined MODIFICHE (
 )
 
 echo Scarico l'ultima versione...
-git pull
+git pull --ff-only
 if errorlevel 1 (
     echo.
     echo Aggiornamento non riuscito: git pull ha restituito un errore ^(vedi sopra^).
+    echo Se dice che i rami sono divergenti, la copia locale ha modifiche salvate con git che
+    echo non sono su GitHub: chiedi aiuto prima di procedere, per non perderle.
     pause
     exit /b 1
 )
@@ -49,5 +53,5 @@ if exist .venv\Scripts\activate.bat (
 )
 
 echo.
-echo Aggiornamento completato. Per avviare l'app esegui: esamix.bat
+echo Aggiornamento completato. Se EsaMiX era aperto, chiudilo e riavvialo con: esamix.bat
 pause

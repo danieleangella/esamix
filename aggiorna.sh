@@ -10,9 +10,11 @@ if ! command -v git >/dev/null 2>&1; then
     exit 1
 fi
 
-if [ -n "$(git status --porcelain)" ]; then
-    echo "Ci sono modifiche non salvate nella cartella del programma (file del codice, non i tuoi corsi):"
-    git status --short
+# solo i file del programma modificati bloccano l'aggiornamento: i file nuovi non tracciati
+# (dati dei corsi, registro, file temporanei, copie in conflitto di Dropbox) non c'entrano
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    echo "Ci sono modifiche non salvate in alcuni file del programma (non i tuoi corsi):"
+    git status --short --untracked-files=no
     echo ""
     echo "Aggiornamento annullato per non perderle. Se non ti servono, puoi scartarle con:"
     echo "  git checkout -- ."
@@ -21,15 +23,25 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 echo "Scarico l'ultima versione..."
-git pull
+if ! git pull --ff-only; then
+    echo ""
+    echo "Aggiornamento non riuscito: git pull ha restituito un errore (vedi sopra)."
+    echo "Se dice che i rami sono divergenti, la copia locale ha modifiche salvate con git che"
+    echo "non sono su GitHub: chiedi aiuto prima di procedere, per non perderle."
+    exit 1
+fi
 
 if [ -f .venv/bin/activate ]; then
     source .venv/bin/activate
-    pip install -e . --upgrade
+    if ! pip install -e . --upgrade; then
+        echo ""
+        echo "Aggiornamento non riuscito: la reinstallazione delle dipendenze ha dato un errore (vedi sopra)."
+        exit 1
+    fi
 else
     echo "Ambiente virtuale non trovato: esegui prima ./installa.sh"
     exit 1
 fi
 
 echo ""
-echo "Aggiornamento completato. Per avviare l'app esegui: ./esamix.sh"
+echo "Aggiornamento completato. Se EsaMiX era aperto, chiudilo (Ctrl+C) e riavvialo con: ./esamix.sh"

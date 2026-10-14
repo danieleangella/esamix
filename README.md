@@ -91,6 +91,12 @@ parte del codice scaricato con git). Se hai modificato a mano qualche file del p
 l'aggiornamento si ferma per non farti perdere quelle modifiche: te lo segnala e ti dice
 come procedere.
 
+Se una versione precedente dello script si ferma dicendo che ci sono "modifiche non
+salvate" e nell'elenco compare solo la cartella `corsi/` (o un file al suo interno), si
+tratta dei tuoi dati, non di modifiche al programma: esegui una volta a mano
+`git pull --ff-only` nella cartella del programma, poi di nuovo lo script (la versione
+aggiornata dello script non ha più questo problema).
+
 Dopo l'aggiornamento **riavvia EsaMiX** (Ctrl+C nel terminale, poi di nuovo l'avvio): finché
 non lo fai, ogni pagina mostra un avviso, perché il programma in esecuzione è ancora quello
 vecchio.

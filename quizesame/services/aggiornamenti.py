@@ -15,8 +15,12 @@ _cache: dict = {"controllato_il": None, "disponibile": False}
 
 
 def _git(*args: str, timeout: float = 4.0) -> str:
+    # GIT_TERMINAL_PROMPT=0: se git chiedesse credenziali, fallisce subito invece di restare
+    # in attesa di una risposta che dall'app non può arrivare
+    import os
     risultato = subprocess.run(
         ["git", *args], cwd=REPO_DIR, capture_output=True, text=True, timeout=timeout, check=True,
+        env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
     )
     return risultato.stdout.strip()
 
@@ -52,7 +56,8 @@ def _controlla() -> tuple[bool, Optional[str]]:
     disponibile = False
     errore = None
     try:
-        _git("fetch", "--quiet")
+        # il fetch passa dalla rete: con una connessione lenta 4 secondi non bastano
+        _git("fetch", "--quiet", timeout=30)
         dietro = int(_git("rev-list", "--count", "HEAD..origin/main") or "0")
         disponibile = dietro > 0
     except FileNotFoundError:
