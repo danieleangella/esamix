@@ -36,6 +36,7 @@ from quizesame.services import ia as ia_service
 from quizesame.services import documenti as documenti_service
 from quizesame.services import registro as registro_service
 from quizesame.services import verifiche_ia as verifiche_ia_service
+from quizesame.services import controllo_correzioni as controllo_service
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
@@ -105,6 +106,10 @@ templates.env.globals["codice_aggiornato"] = _codice_aggiornato
 templates.env.globals["problemi_risposte"] = esercizi_service.problemi_risposte
 templates.env.globals["stati_verifica"] = esercizi_service.stati_verifica
 templates.env.globals["ultima_verifica_ia"] = verifiche_ia_service.ultima
+templates.env.filters["accenti_tex"] = lambda t: re.sub(
+    r"\\([`'])\{?([aeiouAEIOU])\}?", lambda m: {"`": dict(zip("aeiouAEIOU", "àèìòùÀÈÌÒÙ")),
+                                                   "'": dict(zip("aeiouAEIOU", "áéíóúÁÉÍÓÚ"))}[m.group(1)][m.group(2)],
+    t or "")
 # contrassegno nei link ai documenti, diverso a ogni apertura della pagina: il browser scarica
 # sempre la versione attuale di un PDF rigenerato invece di mostrarne una copia conservata
 templates.env.globals["versione_link"] = lambda: str(int(__import__("time").time()))
@@ -604,6 +609,43 @@ def corso_detail(request: Request, tag: str):
         "corso": corso, "appelli": appelli, "raggruppamenti": raggruppamenti, "statistiche": statistiche,
         "raggruppamenti_appelli": raggruppamenti_appelli, "oggi": date.today().strftime("%d/%m/%Y"),
     })
+
+
+@app.get("/corsi/{tag}/controllo-correzioni", response_class=HTMLResponse)
+def controllo_correzioni(request: Request, tag: str):
+    """Ricalcola i voti delle correzioni già fatte e cerca le domande con una chiave sospetta."""
+    return templates.TemplateResponse(request, "controllo_correzioni.html", {
+        "corso": corsi_service.get_corso(tag), "esiti": controllo_service.controlla_corso(tag),
+        "cartella_legacy": migrazione_service.cartella_originale(tag),
+    })
+
+
+@app.get("/controllo-correzioni", response_class=HTMLResponse)
+def controllo_correzioni_tutti(request: Request):
+    return templates.TemplateResponse(request, "controllo_correzioni_tutti.html", {
+        "riepilogo": controllo_service.riepilogo_tutti_i_corsi(),
+    })
+
+
+@app.post("/corsi/{tag}/ripara-legacy")
+def ripara_legacy(tag: str, cartella: str = Form("")):
+    """Ricostruisce esercizi assegnati e dettaglio dei compiti di un corso importato
+    dalla vecchia CLI, dalla sua cartella originale."""
+    try:
+        esito = migrazione_service.ripara_da_cartella_legacy(tag, cartella.strip())
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/controllo-correzioni", str(e), "error")
+    sostituiti = sum(a["esercizi_sostituiti"] for a in esito["appelli"])
+    ricostruiti = sum(a["compiti_ricostruiti"] for a in esito["appelli"])
+    non_riconosciuti = sum(a["esercizi_non_riconosciuti"] for a in esito["appelli"])
+    avvisi = [f"{a['appello']}: {x}" for a in esito["appelli"] for x in a["avvisi"]]
+    msg = (f"Dalla cartella {esito['cartella']}: {sostituiti} esercizi riassegnati agli appelli, "
+           f"{ricostruiti} compiti ricostruiti")
+    if non_riconosciuti:
+        msg += f", {non_riconosciuti} domande stampate non riconosciute (esercizio modificato dopo la stampa?)"
+    if avvisi:
+        msg += ". " + "; ".join(avvisi)
+    return flash_redirect(f"/corsi/{tag}/controllo-correzioni", msg, "warning" if avvisi or non_riconosciuti else "success")
 
 
 @app.get("/corsi/{tag}/statistiche", response_class=HTMLResponse)

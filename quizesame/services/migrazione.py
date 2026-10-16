@@ -1,9 +1,11 @@
 """Migrazione da un db.sqlite legacy (schema a colonne fisse, vedi legacy/esami.py) al
 nuovo schema normalizzato. Non modifica né cancella mai i file legacy: legge in
 sola lettura e scrive esclusivamente nel nuovo corso di destinazione."""
+import re
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 from quizesame import config, db
 from quizesame.services import corsi as corsi_service
@@ -294,17 +296,22 @@ def migra_da_cartella(
 
     report = migra(tag, str(legacy_db_path), nome, facolta, universita, anno, docente)
 
-    n_esercizi_totale = 0
-    for appello in corsi_service.list_appelli(tag):
-        esercizi_dir = cartella / appello.slug / "esercizi"
-        if not (esercizi_dir / "testi.py").exists():
-            continue
-        try:
-            n = esercizi_service.importa_da_cartella_legacy(tag, str(esercizi_dir), appello.id)
-            n_esercizi_totale += n
-        except Exception as e:
-            report.warnings.append(f"Esercizi di '{appello.nome}' ({esercizi_dir}): errore nell'importazione — {e}")
-    report.dopo["esercizi_importati"] = n_esercizi_totale
+    # esercizi di ogni appello dalla sua cartella e dettaglio dei compiti stampati (quale
+    # esercizio in quale posizione, con quale ordine delle risposte) dai file
+    # testo-<appello>.tex: servono alle statistiche sugli esercizi e al controllo delle
+    # correzioni. Gli esercizi entrano così come sono stati stampati, anche se oggi la
+    # banca li rifiuterebbe (es. due risposte uguali in una variante).
+    try:
+        riparazione = ripara_da_cartella_legacy(tag, str(cartella))
+        report.dopo["esercizi_importati"] = sum(a["esercizi_sostituiti"] for a in riparazione["appelli"])
+        report.dopo["compiti_ricostruiti"] = sum(a["compiti_ricostruiti"] for a in riparazione["appelli"])
+        for a in riparazione["appelli"]:
+            report.warnings.extend(f"{a['appello']}: {x}" for x in a["avvisi"])
+            if a["esercizi_non_riconosciuti"]:
+                report.warnings.append(f"{a['appello']}: {a['esercizi_non_riconosciuti']} domande stampate non "
+                                       "riconosciute tra gli esercizi della cartella (modificati dopo la stampa?)")
+    except Exception as e:
+        report.warnings.append(f"Esercizi e dettaglio dei compiti non importati: {e}")
     return report
 
 
@@ -312,3 +319,174 @@ def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
     return conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
     ).fetchone() is not None
+
+
+# --- Riparazione dei corsi già importati: esercizi e compiti delle vecchie prove ---------
+
+def _normalizza_testo(s: str) -> str:
+    return re.sub(r"\s+", " ", s or "").strip()
+
+
+def leggi_compiti_tex(tex: str) -> list[tuple[str, list[tuple[str, list[str]]]]]:
+    """Dal file testo-<appello>.tex della vecchia CLI, che contiene tutti i compiti
+    stampati: per ogni compito il codice e, nell'ordine in cui erano stampati, il testo di
+    ogni esercizio con le sue risposte nell'ordine delle lettere A, B, C, ..."""
+    compiti = []
+    for blocco in re.split(r"\{\\it Codice:\}\\enspace\{\\bf\s*", tex)[1:]:
+        m = re.match(r"(\w+)\}", blocco)
+        if not m:
+            continue
+        fine = blocco.find("\\clearpage")
+        corpo = blocco[:fine] if fine >= 0 else blocco
+        esercizi = []
+        for e in re.finditer(r"\\begin\{ex\}(.*?)\\end\{ex\}", corpo, re.S):
+            x = e.group(1)
+            i = x.find("\\begin{description}")
+            testo = _normalizza_testo(x[:i] if i >= 0 else x)
+            risposte = [_normalizza_testo(r) for r in
+                        re.findall(r"\\item\[[A-Z]\](.*?)(?=\\item\[|\\end\{description\})", x, re.S)]
+            esercizi.append((testo, risposte))
+        compiti.append((m.group(1), esercizi))
+    return compiti
+
+
+def _cartella_originale(conn) -> Optional[Path]:
+    """La cartella principale del corso legacy da cui è stato importato, ricavata dalle
+    note "Importato da <cartella>/<appello>/esercizi" lasciate sugli esercizi."""
+    for (note,) in conn.execute("SELECT note FROM esercizi WHERE note LIKE 'Importato da %' ORDER BY id"):
+        p = Path(note[len("Importato da "):].strip())
+        if p.name == "esercizi" and p.parent.parent.is_dir():
+            return p.parent.parent
+    return None
+
+
+def cartella_originale(tag: str) -> Optional[str]:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        p = _cartella_originale(conn)
+        return str(p) if p else None
+    finally:
+        conn.close()
+
+
+def ripara_da_cartella_legacy(tag: str, cartella_principale: str = "") -> dict:
+    """Ripara un corso già importato dalla vecchia CLI, a partire dalla sua cartella:
+    - riassegna a ogni appello gli esercizi della sua cartella (le versioni precedenti
+      dell'importazione davano a tutti gli appelli quelli della prima cartella letta);
+    - ricostruisce dal file testo-<appello>.tex quale esercizio, in quale variante e con
+      quale ordine delle risposte c'era in ogni posizione di ogni compito stampato, così
+      le statistiche mostrano gli esercizi più sbagliati e le risposte sbagliate scelte.
+    Non tocca i compiti che hanno già questo dettaglio, né risultati e voti. Ritorna un
+    riepilogo per appello."""
+    import json
+
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        cartella = Path(cartella_principale).resolve() if cartella_principale else _cartella_originale(conn)
+        if cartella is None or not cartella.is_dir():
+            raise ValueError("Cartella originale del corso non trovata: indicala a mano")
+        appelli = conn.execute("SELECT id, slug, nome FROM appelli ORDER BY id").fetchall()
+        riepilogo = []
+        for a in appelli:
+            cartella_es = cartella / a["slug"] / "esercizi"
+            file_tex = cartella / a["slug"] / f"testo-{a['slug']}.tex"
+            if not (cartella_es / "testi.py").exists():
+                continue
+            voce = {"appello": a["nome"], "esercizi_sostituiti": 0, "compiti_ricostruiti": 0,
+                    "esercizi_non_riconosciuti": 0, "avvisi": []}
+            try:
+                originali = esercizi_service.carica_esercizi_da_cartella(str(cartella_es))
+            except Exception as e:
+                voce["avvisi"].append(f"esercizi non leggibili: {e}")
+                riepilogo.append(voce)
+                continue
+
+            # 1. esercizi assegnati: se non coincidono con quelli della cartella, li sostituisce
+            def firma(varianti):
+                return sorted(_normalizza_testo(t) for t, _ in varianti)
+            assegnati = conn.execute(
+                "SELECT e.id, e.note FROM appello_esercizi ae JOIN esercizi e ON e.id = ae.esercizio_id "
+                "WHERE ae.appello_id=? ORDER BY ae.ordine, ae.rowid", (a["id"],)
+            ).fetchall()
+            firme_assegnati = sorted(
+                firma([(v["testo"], None) for v in conn.execute(
+                    "SELECT testo FROM esercizio_varianti WHERE esercizio_id=?", (e["id"],))])
+                for e in assegnati
+            )
+            if firme_assegnati != sorted(firma(v) for v in originali):
+                for e in assegnati:
+                    conn.execute("DELETE FROM appello_esercizi WHERE appello_id=? AND esercizio_id=?", (a["id"], e["id"]))
+                    in_uso = conn.execute(
+                        "SELECT (SELECT count(*) FROM appello_esercizi WHERE esercizio_id=?) + "
+                        "(SELECT count(*) FROM compito_esercizi WHERE esercizio_id=?)", (e["id"], e["id"])
+                    ).fetchone()[0]
+                    # elimina solo le copie importate e mai usate altrove
+                    if not in_uso and (e["note"] or "").startswith("Importato da "):
+                        conn.execute("DELETE FROM esercizio_verifiche WHERE esercizio_id=?", (e["id"],))
+                        conn.execute("DELETE FROM esercizio_varianti WHERE esercizio_id=?", (e["id"],))
+                        conn.execute("DELETE FROM esercizi WHERE id=?", (e["id"],))
+                for ordine, varianti in enumerate(originali, start=1):
+                    cur = conn.execute("INSERT INTO esercizi (nome, note) VALUES (?,?)",
+                                       (None, f"Importato da {cartella_es}"))
+                    for testo, risposte in varianti:
+                        conn.execute("INSERT INTO esercizio_varianti (esercizio_id, testo, risposte_json) VALUES (?,?,?)",
+                                     (cur.lastrowid, testo.strip(), json.dumps(list(risposte))))
+                    conn.execute("INSERT INTO appello_esercizi (appello_id, esercizio_id, ordine) VALUES (?,?,?)",
+                                 (a["id"], cur.lastrowid, ordine))
+                voce["esercizi_sostituiti"] = len(originali)
+
+            # 2. dettaglio dei compiti stampati, dal .tex
+            if not file_tex.exists():
+                voce["avvisi"].append(f"manca {file_tex.name}: compiti non ricostruiti")
+                riepilogo.append(voce)
+                continue
+            varianti_per_testo = {}
+            for r in conn.execute(
+                "SELECT ev.id, ev.esercizio_id, ev.testo, ev.risposte_json FROM esercizio_varianti ev "
+                "JOIN appello_esercizi ae ON ae.esercizio_id = ev.esercizio_id WHERE ae.appello_id=?", (a["id"],)
+            ):
+                # più varianti possono avere la stessa domanda e risposte diverse
+                varianti_per_testo.setdefault(_normalizza_testo(r["testo"]), []).append(r)
+            compiti_db = {r["codice"]: r for r in conn.execute(
+                "SELECT c.id, c.codice, c.soluzioni FROM compiti c WHERE c.appello_id=? AND NOT EXISTS "
+                "(SELECT 1 FROM compito_esercizi ce WHERE ce.compito_id = c.id)", (a["id"],))}
+            for codice, stampati in leggi_compiti_tex(file_tex.read_text(encoding="utf-8", errors="replace")):
+                compito = compiti_db.get(codice)
+                if compito is None:
+                    continue
+                righe = []
+                for posizione, (testo, risposte_stampate) in enumerate(stampati):
+                    stampate = set(risposte_stampate)
+                    v = max(varianti_per_testo.get(testo, []), default=None, key=lambda r: len(
+                        stampate & {_normalizza_testo(x) for x in json.loads(r["risposte_json"])}))
+                    if v is None:
+                        voce["esercizi_non_riconosciuti"] += 1
+                        continue
+                    originali_v = json.loads(v["risposte_json"])
+                    per_testo = {_normalizza_testo(r): r for r in originali_v}
+                    mischiate = [per_testo.get(r, r) for r in risposte_stampate]
+                    # la risposta corretta (la prima tra le originali) deve stare alla
+                    # lettera indicata nelle soluzioni del compito: altrimenti l'abbinamento
+                    # non è affidabile e la posizione resta senza dettaglio
+                    lettera = compito["soluzioni"][posizione:posizione + 1].upper()
+                    if (not lettera or not originali_v or originali_v[0] not in mischiate
+                            or "ABCDEFGHIJ"[mischiate.index(originali_v[0])] != lettera):
+                        voce["esercizi_non_riconosciuti"] += 1
+                        continue
+                    righe.append((compito["id"], posizione, v["esercizio_id"], json.dumps(mischiate)))
+                # variante_id resta vuoto: i compiti della vecchia CLI non vanno rigenerati,
+                # e così le varianti dell'esercizio restano modificabili
+                conn.executemany(
+                    "INSERT INTO compito_esercizi (compito_id, posizione, esercizio_id, risposte_mischiate) VALUES (?,?,?,?)",
+                    righe,
+                )
+                if righe:
+                    voce["compiti_ricostruiti"] += 1
+            riepilogo.append(voce)
+        conn.commit()
+        return {"cartella": str(cartella), "appelli": riepilogo}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()

@@ -96,11 +96,11 @@
     {% for e in stat.esercizi %}
     <tr>
       <td>
-        <span class="esercizio-nome-hover" title="{{ e.varianti_testo|join(' /// ') }}" style="cursor:help; text-decoration:underline dotted">{{ e.nome }}</span>
+        <span class="esercizio-nome-hover" title="{{ e.varianti_testo|join(' /// ')|accenti_tex }}" style="cursor:help; text-decoration:underline dotted">{{ e.nome }}</span>
         {% if e.varianti_testo %}
         <button type="button" class="secondary btn-mostra-testo" data-target="testo-es-{{ stat_id }}-{{ loop.index }}" style="margin-left:0.3rem; padding:0.1rem 0.4rem; font-size:0.75rem">testo</button>
         <div id="testo-es-{{ stat_id }}-{{ loop.index }}" class="muted" style="display:none; margin-top:0.3rem; white-space:pre-wrap">
-          {% for t in e.varianti_testo %}<div style="margin-top:0.2rem">{{ t }}</div>{% endfor %}
+          {% for t in e.varianti_testo %}<div style="margin-top:0.2rem">{{ t | accenti_tex }}</div>{% endfor %}
         </div>
         {% endif %}
       </td>
@@ -109,7 +109,7 @@
       <td>{{ e.percentuale_sbagliate }}%</td>
       <td>
         {% for rs in e.risposte_sbagliate %}
-        <div>{{ rs.testo }}: {{ rs.percentuale }}% ({{ rs.conteggio }})</div>
+        <div>{{ rs.testo | accenti_tex }}: {{ rs.percentuale }}% ({{ rs.conteggio }})</div>
         {% else %}
         <span class="muted">-</span>
         {% endfor %}

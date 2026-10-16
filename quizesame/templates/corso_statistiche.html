@@ -6,11 +6,9 @@
 {% block content %}
 {% set sezione_corso = "statistiche" %}
 {% include "_intestazione_corso.html" %}
-{% if corso.importato_da_legacy %}
-<p class="muted">Corso importato da una migrazione dati legacy: se alcuni compiti storici
-  non hanno un collegamento esercizio-posizione completo, le statistiche sugli esercizi
-  potrebbero risultare meno complete di quelle di un corso gestito interamente qui.</p>
-{% endif %}
+<p class="muted"><a href="/corsi/{{ corso.tag }}/controllo-correzioni">Controllo delle correzioni</a> — ricalcola i voti
+  già assegnati e cerca le domande con una soluzione sospetta{% if corso.importato_da_legacy %}; da lì puoi anche ricostruire
+  il dettaglio dei compiti importati, necessario per le statistiche sugli esercizi{% endif %}.</p>
 
 <details class="card" open>
   <summary><strong>Riepilogo di tutti gli appelli</strong></summary>

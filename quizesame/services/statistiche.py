@@ -76,6 +76,18 @@ def _distribuzione_e_gaussiana(voti: list[int]) -> dict:
     }
 
 
+def _anteprima(testo: str, lunghezza: int = 70) -> str:
+    """L'inizio del testo di un esercizio senza nome, come etichetta leggibile: le formule
+    diventano "…" (troncate a metà non si potrebbero mostrare)."""
+    t = re.sub(r"\$\$.*?\$\$|\$.*?\$", "…", testo or "", flags=re.S)
+    t = re.sub(r"\\`\{?([aeiou])\}?", lambda m: dict(zip("aeiou", "àèìòù"))[m.group(1)], t)
+    t = re.sub(r"\\'\{?e\}?", "é", t)
+    t = re.sub(r"\{\\bfseries.*?\}|\\[a-zA-Z]+\*?|[{}]", " ", t)
+    t = re.sub(r"\s+", " ", t).strip(" …")
+    t = re.sub(r"…[.,;:]?(\s*…[.,;:]?)+", "…", t)
+    return t if len(t) <= lunghezza else t[:lunghezza].rsplit(" ", 1)[0].rstrip(" .,;:…") + "…"
+
+
 def _statistiche_esercizi(tag: str, conn, risultati: list[dict]) -> list[dict]:
     per_esercizio = defaultdict(lambda: {"nome": "", "corrette": 0, "sbagliate": 0, "risposte_sbagliate": Counter()})
     for r in risultati:
@@ -99,7 +111,7 @@ def _statistiche_esercizi(tag: str, conn, risultati: list[dict]) -> list[dict]:
             lettera_data = risposte[i].upper()
             lettera_corretta = soluzioni[i].upper()
             stat = per_esercizio[pos["esercizio_id"]]
-            stat["nome"] = pos["nome"] or f"Esercizio #{pos['esercizio_id']}"
+            stat["nome"] = pos["nome"]
             if lettera_data == lettera_corretta:
                 stat["corrette"] += 1
             else:
@@ -126,7 +138,7 @@ def _statistiche_esercizi(tag: str, conn, risultati: list[dict]) -> list[dict]:
         esercizio = esercizi_service.get_esercizio_su_connessione(conn, esercizio_id)
         varianti_testo = [v.testo for v in esercizio.varianti] if esercizio else []
         elenco.append({
-            "nome": stat["nome"], "corrette": stat["corrette"], "sbagliate": stat["sbagliate"],
+            "nome": stat["nome"] or _anteprima(varianti_testo[0] if varianti_testo else "") or f"Esercizio #{esercizio_id}", "corrette": stat["corrette"], "sbagliate": stat["sbagliate"],
             "percentuale_sbagliate": round(100 * stat["sbagliate"] / totale) if totale else 0,
             "risposte_sbagliate": risposte_sbagliate, "varianti_testo": varianti_testo,
         })

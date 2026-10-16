@@ -765,6 +765,11 @@ def carica_esercizi_da_cartella(esercizi_dir: str):
     module_name = f"quizesame_esercizi_{uuid.uuid4().hex}"
     spec = importlib.util.spec_from_file_location(module_name, path)
     module = importlib.util.module_from_spec(spec)
+    # testi.py importa testo1, testo2, ... per nome: senza toglierli da sys.modules, prima
+    # e dopo, ogni cartella riceverebbe i testoN della prima cartella letta nel processo
+    locali = {p.stem for p in Path(esercizi_dir).glob("*.py")}
+    for nome in locali:
+        sys.modules.pop(nome, None)
     sys.path.insert(0, str(Path(esercizi_dir).resolve()))
     try:
         spec.loader.exec_module(module)
@@ -773,6 +778,8 @@ def carica_esercizi_da_cartella(esercizi_dir: str):
             sys.path.remove(str(Path(esercizi_dir).resolve()))
         except ValueError:
             pass
+        for nome in locali:
+            sys.modules.pop(nome, None)
     return module.esercizi
 
 

@@ -243,6 +243,9 @@
 
 {% if raggruppamento %}
 <div class="tab-pane" data-pane="risultati" style="display:none">
+<p class="muted">Qui i voti combinati del raggruppamento. Risultati delle singole prove:
+  {% for m in raggruppamento.membri %}<a href="#valutazione-{{ m.id }}" data-tab="valutazione-{{ m.id }}">{{ m.nome }}</a>{{ ' · ' if not loop.last }}{% endfor %}
+  {% if statistiche %}— statistiche ed esercizi più sbagliati di ogni prova nella scheda <a href="#statistiche" data-tab="statistiche">Statistiche</a>{% endif %}.</p>
 {% include "_verbalizzazione_idonei.html" %}
 
   <details class="card" open>

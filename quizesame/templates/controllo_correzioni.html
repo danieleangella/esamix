@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Controllo delle correzioni · {{ corso.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
+<a href="/corsi/{{ corso.tag }}/statistiche">Statistiche</a> <span class="sep">›</span> <span class="current">Controllo delle correzioni</span>
+{% endblock %}
+{% block katex %}
+<link rel="stylesheet" href="/static/katex/katex.min.css">
+<script defer src="/static/katex/katex.min.js"></script>
+<script defer src="/static/katex/contrib/auto-render.min.js"></script>
+{% endblock %}
+{% block content %}
+{% set sezione_corso = "statistiche" %}
+{% include "_intestazione_corso.html" %}
+
+{% set n_anomalie = esiti | map(attribute="anomalie") | map("length") | sum %}
+{% set n_sospette = esiti | map(attribute="domande_sospette") | map("length") | sum %}
+{% set n_controllati = esiti | sum(attribute="controllati") %}
+{% set n_senza_dettaglio = esiti | sum(attribute="compiti_senza_dettaglio") %}
+
+<div class="card">
+  <h2 style="margin-top:0">Controllo delle correzioni</h2>
+  <p class="muted">Ogni voto scritto viene ricalcolato dalle risposte registrate e dalle soluzioni del compito, e confrontato
+    con quello salvato. Vengono anche cercate le domande in cui una risposta sbagliata è stata scelta da più studenti di
+    quella indicata come corretta: spesso è la soluzione a essere sbagliata. Non viene modificato nulla.</p>
+  <div class="stats-grid">
+    <div class="stat-tile"><div class="stat-value">{{ n_controllati }}</div><div class="stat-label">compiti ricontrollati</div></div>
+    <div class="stat-tile {{ 'stat-danger' if n_anomalie else 'stat-ok' }}"><div class="stat-value">{{ n_anomalie }}</div><div class="stat-label">voti da ricontrollare</div></div>
+    <div class="stat-tile {{ 'stat-warn' if n_sospette else 'stat-ok' }}"><div class="stat-value">{{ n_sospette }}</div><div class="stat-label">domande con soluzione sospetta</div></div>
+  </div>
+  {% if n_senza_dettaglio %}
+  <div class="flash flash-warning" style="margin-bottom:0">
+    {{ n_senza_dettaglio }} compiti corretti non hanno il dettaglio di quale esercizio c'era in ogni posizione (compiti
+    importati dalla vecchia versione): per loro non si possono cercare le domande sospette, né calcolare gli esercizi più
+    sbagliati nelle statistiche.
+    {% if cartella_legacy %}
+    <form method="post" action="/corsi/{{ corso.tag }}/ripara-legacy" style="margin-top:0.5rem"
+          onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Ricostruzione in corso…';">
+      <input type="hidden" name="cartella" value="{{ cartella_legacy }}">
+      <button type="submit" style="margin:0">Ricostruiscili dalla cartella originale</button>
+      <span class="muted">— {{ cartella_legacy }}: dal file .tex di ogni prova; riassegna anche a ogni appello i suoi esercizi.</span>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% for e in esiti %}
+<details class="card" {% if e.anomalie or e.domande_sospette %}open{% endif %}>
+  <summary><strong>{{ e.appello.nome }}</strong>{% if e.appello.data %} <span class="muted">{{ e.appello.data }}</span>{% endif %}
+    <span class="muted">— {{ e.controllati }} compiti</span>
+    {% if e.anomalie %}<span class="badge badge-err">{{ e.anomalie|length }} voti da ricontrollare</span>{% endif %}
+    {% if e.domande_sospette %}<span class="badge badge-warn">{{ e.domande_sospette|length }} domande sospette</span>{% endif %}
+    {% if not e.anomalie and not e.domande_sospette %}<span class="badge badge-ok">tutto torna</span>{% endif %}</summary>
+
+  {% if e.anomalie %}
+  <h3>Voti che non tornano</h3>
+  <div style="overflow-x:auto">
+  <table>
+    <tr><th>Studente</th><th>Compito</th><th>Risposte / soluzioni</th><th>Registrato</th><th>Ricalcolato</th><th>Possibile causa</th></tr>
+    {% for a in e.anomalie %}
+    <tr>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ e.appello.id }}/risultati/{{ a.matricola }}">{{ a.cognome }} {{ a.nome }}</a>
+        <div class="muted">{{ a.matricola }}</div></td>
+      <td>{{ a.codice }}</td>
+      <td style="font-family:monospace; white-space:nowrap">
+        {% for i in range([a.risposte|length, a.soluzioni|length]|max) %}{% set r = a.risposte[i:i+1] %}{% set s = a.soluzioni[i:i+1] %}<span title="Domanda {{ i + 1 }}: data {{ r or '—' }}, corretta {{ s or '—' }}" style="{% if r.upper() == 'X' %}opacity:0.5{% elif r.upper() != s.upper() %}color:var(--err-text){% endif %}">{{ r or '·' }}</span>{% endfor %}<br>
+        <span class="muted">{{ a.soluzioni }}</span></td>
+      <td>{{ a.registrato if a.registrato is not none else '-' }}</td>
+      <td>{{ a.ricalcolato if a.ricalcolato is not none else '-' }}</td>
+      <td style="max-width:28rem">{{ a.spiegazione }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% endif %}
+
+  {% if e.domande_sospette %}
+  <h3>Domande con soluzione sospetta</h3>
+  <p class="muted" style="margin-top:0">Una stessa risposta sbagliata è stata scelta da più studenti di quella indicata come corretta.
+    Può essere solo una domanda difficile, ma vale la pena ricontrollare la soluzione, anche con la verifica con l'IA.</p>
+  {% for d in e.domande_sospette %}
+  <div class="variante-verificata domanda-sospetta">
+    {% if d.testo %}<div>{{ d.testo | accenti_tex }}</div>{% elif d.nome %}<div><strong>{{ d.nome }}</strong></div>{% endif %}
+    <div>Indicata come corretta: <strong>{{ d.corretta | accenti_tex }}</strong> <span class="muted">({{ d.n_corretta }} su {{ d.risposte }})</span></div>
+    <div>Scelta più spesso: <strong>{{ d.sbagliata | accenti_tex }}</strong> <span class="badge badge-warn">{{ d.n_sbagliata }} su {{ d.risposte }}</span></div>
+    <div><a href="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/ia/verifica">Verifica l'esercizio con l'IA</a></div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if not e.anomalie and not e.domande_sospette %}
+  <p class="muted">Tutti i voti corrispondono al ricalcolo{% if e.compiti_senza_dettaglio %} (domande sospette non cercate: compiti senza dettaglio){% endif %}.</p>
+  {% endif %}
+</details>
+{% else %}
+<div class="card"><p class="muted">Nessun compito corretto in questo corso.</p></div>
+{% endfor %}
+
+<p class="muted"><a href="/controllo-correzioni">Riepilogo del controllo in tutti i corsi</a></p>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () { renderizzaLatex(document.getElementById("contenuto")); });
+</script>
+{% endblock %}

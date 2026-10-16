@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Controllo delle correzioni{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/statistiche-generali">Statistiche generali</a> <span class="sep">›</span> <span class="current">Controllo delle correzioni</span>
+{% endblock %}
+{% block content %}
+<header class="intestazione-pagina">
+  <div class="intestazione-livello">Tutti i corsi</div>
+  <h1>Controllo delle correzioni</h1>
+</header>
+<div class="card">
+  <p class="muted" style="margin-top:0">Per ogni corso: quanti voti scritti non corrispondono al ricalcolo dalle risposte
+    registrate, e quante domande hanno una soluzione sospetta (una risposta sbagliata scelta più di quella corretta).
+    Apri un corso per vedere i dettagli.</p>
+  <table>
+    <tr><th>Corso</th><th>Compiti ricontrollati</th><th>Voti da ricontrollare</th><th>Domande sospette</th></tr>
+    {% for r in riepilogo %}
+    <tr>
+      <td><a href="/corsi/{{ r.corso.tag }}/controllo-correzioni">{{ r.corso.nome }}</a> <span class="muted">{{ r.corso.anno }}</span></td>
+      <td>{{ r.controllati }}</td>
+      <td>{% if r.anomalie %}<span class="badge badge-err">{{ r.anomalie }}</span>{% else %}<span class="muted">0</span>{% endif %}</td>
+      <td>{% if r.domande_sospette %}<span class="badge badge-warn">{{ r.domande_sospette }}</span>{% else %}<span class="muted">0</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}
