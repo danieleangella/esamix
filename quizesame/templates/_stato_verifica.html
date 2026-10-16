@@ -7,7 +7,7 @@
 <span class="badge badge-ok" title="Verificato il {{ st.quando[:16] }}{% if st.origine == 'manuale' %} (a mano){% elif st.origine == 'correzione' %} (corretto con l'IA){% endif %}">✓ verificato</span>
 {%- elif st.stato in ('errore', 'dubbio') -%}
 <a class="badge {{ 'badge-err' if st.stato == 'errore' else 'badge-warn' }}" href="/corsi/{{ tag }}/esercizi/{{ e.id }}/ia/correggi?torna={{ torna|urlencode }}"
-   title="La verifica con l'IA ha segnalato {{ 'un errore' if st.stato == 'errore' else 'un dubbio' }}: apri per vederlo e correggerlo">{{ '✗ errore' if st.stato == 'errore' else '? da controllare' }}</a>
+   title="{% if st.origine == 'sospetto' %}Soluzione sospetta: nelle risposte degli studenti una risposta sbagliata è stata scelta più di quella corretta. Apri per vederlo e correggerlo, oppure verificalo{% else %}La verifica con l'IA ha segnalato {{ 'un errore' if st.stato == 'errore' else 'un dubbio' }}: apri per vederlo e correggerlo{% endif %}">{{ '✗ errore' if st.stato == 'errore' else ('? sospetto' if st.origine == 'sospetto' else '? da controllare') }}</a>
 {%- elif st.stato == 'modificato' -%}
 <a class="badge badge-warn" href="/corsi/{{ tag }}/esercizi/{{ e.id }}/ia/verifica" title="Modificato dopo l'ultima verifica: verificalo di nuovo">modificato</a>
 {%- else -%}

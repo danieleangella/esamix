@@ -614,8 +614,10 @@ def corso_detail(request: Request, tag: str):
 @app.get("/corsi/{tag}/controllo-correzioni", response_class=HTMLResponse)
 def controllo_correzioni(request: Request, tag: str):
     """Ricalcola i voti delle correzioni già fatte e cerca le domande con una chiave sospetta."""
+    controllo_service.segnala_sospette_corso(tag)
     return templates.TemplateResponse(request, "controllo_correzioni.html", {
         "corso": corsi_service.get_corso(tag), "esiti": controllo_service.controlla_corso(tag),
+        "segnalazioni": controllo_service.stato_sospette(tag),
         "cartella_legacy": migrazione_service.cartella_originale(tag),
     })
 
@@ -1087,11 +1089,20 @@ def concludi_correzione_scritto(tag: str, appello_id: int):
     anchor = _anchor_correzione(appello)
     corsi_service.concludi_correzione_scritti(tag, appello_id)
     _genera_risultati_cache(tag, appello_id)
-    return flash_redirect(
-        f"/corsi/{tag}/appelli/{appello_id}",
-        "Correzione scritta conclusa: elenco risultati generato, nessuna nuova correzione è possibile finché non riapri",
-        anchor=anchor,
-    )
+    msg = "Correzione scritta conclusa: elenco risultati generato, nessuna nuova correzione è possibile finché non riapri"
+    try:
+        sospette = controllo_service.segnala_sospette(tag, appello_id)
+    except Exception:
+        sospette = []
+    if sospette:
+        n = len(sospette)
+        return flash_redirect(
+            f"/corsi/{tag}/controllo-correzioni", msg + f". Attenzione: {n} domand{'a' if n == 1 else 'e'} con una soluzione "
+            "sospetta (una risposta sbagliata scelta più di quella corretta): ricontrolla"
+            f"{'la' if n == 1 else 'le'} qui sotto, anche con la verifica con l'IA",
+            "warning", anchor=f"appello-{appello_id}",
+        )
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/riapri-correzione-scritto")

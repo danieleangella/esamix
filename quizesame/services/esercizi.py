@@ -91,6 +91,12 @@ def registra_verifica(tag: str, esercizio: "Esercizio", esito: str, dettaglio: O
             (esercizio.id, firma_contenuto(esercizio), esito, origine,
              json.dumps(dettaglio, ensure_ascii=False) if dettaglio else None),
         )
+        if esito == "ok":
+            # confermato corretto: le domande sospette dalle risposte degli studenti sono chiarite
+            conn.execute(
+                "UPDATE esercizio_sospetti SET risolta_il=datetime('now','localtime') "
+                "WHERE esercizio_id=? AND risolta_il IS NULL", (esercizio.id,),
+            )
         conn.commit()
     finally:
         conn.close()
@@ -364,6 +370,7 @@ def elimina_esercizio(tag: str, esercizio_id: int) -> None:
         if in_compiti:
             raise ValueError("Questo esercizio compare in compiti già generati: non può essere eliminato")
         conn.execute("DELETE FROM esercizio_verifiche WHERE esercizio_id=?", (esercizio_id,))
+        conn.execute("DELETE FROM esercizio_sospetti WHERE esercizio_id=?", (esercizio_id,))
         conn.execute("DELETE FROM esercizio_varianti WHERE esercizio_id=?", (esercizio_id,))
         conn.execute("DELETE FROM esercizi WHERE id=?", (esercizio_id,))
         conn.commit()

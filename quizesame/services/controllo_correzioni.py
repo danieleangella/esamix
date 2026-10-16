@@ -166,3 +166,84 @@ def riepilogo_tutti_i_corsi() -> list[dict]:
             "domande_sospette": sum(len(e["domande_sospette"]) for e in esiti),
         })
     return riepilogo
+
+
+def segnala_sospette(tag: str, appello_id: int) -> list[dict]:
+    """Registra le domande sospette di un appello: ognuna una volta sola (una segnalazione
+    già chiarita da una verifica non torna). Per le nuove, l'esercizio diventa "da
+    controllare" nelle verifiche, con il motivo, così compare nella banca esercizi e
+    nell'appello finché una verifica con l'IA o a mano non lo conferma. Ritorna le
+    segnalazioni ancora aperte dell'appello."""
+    from quizesame.services import esercizi as esercizi_service
+
+    appello = corsi_service.get_appello(tag, appello_id)
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        nuove = []
+        for d in _domande_sospette(conn, appello_id):
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO esercizio_sospetti (esercizio_id, appello_id, corretta, n_corretta, sbagliata, "
+                "n_sbagliata, risposte) VALUES (?,?,?,?,?,?,?)",
+                (d["esercizio_id"], appello_id, d["corretta"], d["n_corretta"], d["sbagliata"], d["n_sbagliata"], d["risposte"]),
+            )
+            if cur.rowcount:
+                nuove.append(d)
+        conn.commit()
+    finally:
+        conn.close()
+
+    for d in nuove:
+        e = esercizi_service.get_esercizio(tag, d["esercizio_id"])
+        if e is None:
+            continue
+        stato = esercizi_service.stati_verifica(tag, [e])[e.id]
+        if stato["stato"] == "errore":
+            continue  # già segnalato come sbagliato: resta così, è più grave
+        numero = next((i for i, v in enumerate(e.varianti, start=1) if v.risposte and v.risposte[0] == d["corretta"]), None)
+        commento = (f"Nelle risposte degli studenti a «{appello.nome}» la risposta indicata come corretta "
+                    f"«{d['corretta']}» è stata scelta {d['n_corretta']} volte, mentre «{d['sbagliata']}» "
+                    f"{d['n_sbagliata']} volte (su {d['risposte']}): controlla che la soluzione sia giusta.")
+        precedente = stato.get("dettaglio") if stato["stato"] == "dubbio" else None
+        dettaglio = dict(precedente or {"esito": "dubbio", "commento": "", "varianti": [],
+                                        "soluzione": {"esito": "assente", "commento": ""}})
+        dettaglio["commento"] = "\n".join(x for x in (dettaglio.get("commento"), commento) if x)
+        if numero:
+            dettaglio["varianti"] = list(dettaglio.get("varianti") or []) + [{
+                "numero": numero, "testo": e.varianti[numero - 1].testo, "indicata": d["corretta"], "esito": "dubbio",
+                "risposta_calcolata": "", "commento": f"scelta più spesso dagli studenti: «{d['sbagliata']}»",
+            }]
+        esercizi_service.registra_verifica(tag, e, "dubbio", dettaglio, origine="sospetto")
+    return sospette_aperte(tag, appello_id)
+
+
+def sospette_aperte(tag: str, appello_id: int = None) -> list[dict]:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        query = "SELECT * FROM esercizio_sospetti WHERE risolta_il IS NULL"
+        args = ()
+        if appello_id is not None:
+            query += " AND appello_id=?"
+            args = (appello_id,)
+        return [dict(r) for r in conn.execute(query, args)]
+    finally:
+        conn.close()
+
+
+def stato_sospette(tag: str) -> dict[tuple, dict]:
+    """(esercizio_id, appello_id, corretta) -> segnalazione, per mostrarne lo stato."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        return {(r["esercizio_id"], r["appello_id"], r["corretta"]): dict(r)
+                for r in conn.execute("SELECT * FROM esercizio_sospetti")}
+    finally:
+        conn.close()
+
+
+def segnala_sospette_corso(tag: str) -> int:
+    """Segnala le domande sospette degli appelli del corso con la correzione conclusa (o
+    chiusi): finché si corregge, le risposte sono ancora parziali. Ritorna quante
+    segnalazioni sono ancora aperte."""
+    for appello in corsi_service.list_appelli(tag):
+        if appello.correzione_scritti_conclusa or appello.chiuso:
+            segnala_sospette(tag, appello.id)
+    return len(sospette_aperte(tag))

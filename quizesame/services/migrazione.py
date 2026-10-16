@@ -423,6 +423,7 @@ def ripara_da_cartella_legacy(tag: str, cartella_principale: str = "") -> dict:
                     # elimina solo le copie importate e mai usate altrove
                     if not in_uso and (e["note"] or "").startswith("Importato da "):
                         conn.execute("DELETE FROM esercizio_verifiche WHERE esercizio_id=?", (e["id"],))
+                        conn.execute("DELETE FROM esercizio_sospetti WHERE esercizio_id=?", (e["id"],))
                         conn.execute("DELETE FROM esercizio_varianti WHERE esercizio_id=?", (e["id"],))
                         conn.execute("DELETE FROM esercizi WHERE id=?", (e["id"],))
                 for ordine, varianti in enumerate(originali, start=1):

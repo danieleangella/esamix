@@ -101,7 +101,7 @@
     <tr>
       <td>{{ e.nome or ('#' ~ e.id) }}</td>
       <td>{{ stato_verifica(corso.tag, e, st, url) }}
-        {% if st.quando %}<span class="muted" style="font-size:0.8rem">{{ st.quando[:16] }}{% if st.origine == 'manuale' %} · a mano{% elif st.origine == 'correzione' %} · corretto con l'IA{% endif %}</span>{% endif %}</td>
+        {% if st.quando %}<span class="muted" style="font-size:0.8rem">{{ st.quando[:16] }}{% if st.origine == 'manuale' %} · a mano{% elif st.origine == 'correzione' %} · corretto con l'IA{% elif st.origine == 'sospetto' %} · sospetto dalle risposte degli studenti{% endif %}</span>{% endif %}</td>
       <td style="text-align:right"><a href="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/ia/verifica">verifica solo questo</a></td>
     </tr>
     {% endfor %}

@@ -14,7 +14,7 @@
 {% include "_intestazione_corso.html" %}
 
 {% set n_anomalie = esiti | map(attribute="anomalie") | map("length") | sum %}
-{% set n_sospette = esiti | map(attribute="domande_sospette") | map("length") | sum %}
+{% set n_sospette = segnalazioni.values() | rejectattr("risolta_il") | list | length %}
 {% set n_controllati = esiti | sum(attribute="controllati") %}
 {% set n_senza_dettaglio = esiti | sum(attribute="compiti_senza_dettaglio") %}
 
@@ -26,7 +26,7 @@
   <div class="stats-grid">
     <div class="stat-tile"><div class="stat-value">{{ n_controllati }}</div><div class="stat-label">compiti ricontrollati</div></div>
     <div class="stat-tile {{ 'stat-danger' if n_anomalie else 'stat-ok' }}"><div class="stat-value">{{ n_anomalie }}</div><div class="stat-label">voti da ricontrollare</div></div>
-    <div class="stat-tile {{ 'stat-warn' if n_sospette else 'stat-ok' }}"><div class="stat-value">{{ n_sospette }}</div><div class="stat-label">domande con soluzione sospetta</div></div>
+    <div class="stat-tile {{ 'stat-warn' if n_sospette else 'stat-ok' }}"><div class="stat-value">{{ n_sospette }}</div><div class="stat-label">domande sospette da verificare</div></div>
   </div>
   {% if n_senza_dettaglio %}
   <div class="flash flash-warning" style="margin-bottom:0">
@@ -46,7 +46,7 @@
 </div>
 
 {% for e in esiti %}
-<details class="card" {% if e.anomalie or e.domande_sospette %}open{% endif %}>
+<details class="card" id="appello-{{ e.appello.id }}" {% if e.anomalie or e.domande_sospette %}open{% endif %}>
   <summary><strong>{{ e.appello.nome }}</strong>{% if e.appello.data %} <span class="muted">{{ e.appello.data }}</span>{% endif %}
     <span class="muted">— {{ e.controllati }} compiti</span>
     {% if e.anomalie %}<span class="badge badge-err">{{ e.anomalie|length }} voti da ricontrollare</span>{% endif %}
@@ -80,11 +80,25 @@
   <p class="muted" style="margin-top:0">Una stessa risposta sbagliata è stata scelta da più studenti di quella indicata come corretta.
     Può essere solo una domanda difficile, ma vale la pena ricontrollare la soluzione, anche con la verifica con l'IA.</p>
   {% for d in e.domande_sospette %}
+  {% set seg = segnalazioni.get((d.esercizio_id, e.appello.id, d.corretta)) %}
   <div class="variante-verificata domanda-sospetta">
+    <div>{% if seg and seg.risolta_il %}<span class="badge badge-ok">✓ verificata il {{ seg.risolta_il[:16] }}</span>
+      <span class="muted">la soluzione è stata confermata: non è più sospetta</span>
+      {% else %}<span class="badge badge-warn">da verificare</span>
+      <span class="muted">segnalata{% if seg %} il {{ seg.segnalato_il[:16] }}{% endif %}; nella banca esercizi risulta "da controllare"</span>{% endif %}</div>
     {% if d.testo %}<div>{{ d.testo | accenti_tex }}</div>{% elif d.nome %}<div><strong>{{ d.nome }}</strong></div>{% endif %}
     <div>Indicata come corretta: <strong>{{ d.corretta | accenti_tex }}</strong> <span class="muted">({{ d.n_corretta }} su {{ d.risposte }})</span></div>
     <div>Scelta più spesso: <strong>{{ d.sbagliata | accenti_tex }}</strong> <span class="badge badge-warn">{{ d.n_sbagliata }} su {{ d.risposte }}</span></div>
-    <div><a href="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/ia/verifica">Verifica l'esercizio con l'IA</a></div>
+    {% if not (seg and seg.risolta_il) %}
+    <div class="azioni-rapide" style="margin-top:0.4rem">
+      <a class="button" href="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/ia/verifica">Verifica con l'IA</a>
+      <a class="button secondary" href="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/ia/correggi?torna={{ ('/corsi/' ~ corso.tag ~ '/controllo-correzioni')|urlencode }}">Correggi l'esercizio</a>
+      <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/verificato">
+        <input type="hidden" name="torna" value="/corsi/{{ corso.tag }}/controllo-correzioni#appello-{{ e.appello.id }}">
+        <button type="submit" class="secondary" style="margin:0" title="Hai ricontrollato tu: la soluzione è giusta">Segna come corretta</button>
+      </form>
+    </div>
+    {% endif %}
   </div>
   {% endfor %}
   {% endif %}

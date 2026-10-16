@@ -187,6 +187,25 @@ CREATE TABLE IF NOT EXISTS esercizio_verifiche (
     verificato_il TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Domande sospette trovate nelle risposte degli studenti a un appello (una stessa
+-- risposta sbagliata scelta più di quella indicata come corretta), una riga per
+-- esercizio, appello e variante (riconosciuta dalla risposta corretta). Segnalate una
+-- volta sola: alla segnalazione l'esercizio diventa "da controllare" nelle verifiche;
+-- risolta_il si riempie quando una verifica (con l'IA o a mano) lo conferma corretto, e
+-- da allora la stessa segnalazione non torna più.
+CREATE TABLE IF NOT EXISTS esercizio_sospetti (
+    esercizio_id INTEGER NOT NULL REFERENCES esercizi(id),
+    appello_id INTEGER NOT NULL REFERENCES appelli(id),
+    corretta TEXT NOT NULL,
+    n_corretta INTEGER NOT NULL,
+    sbagliata TEXT NOT NULL,
+    n_sbagliata INTEGER NOT NULL,
+    risposte INTEGER NOT NULL,
+    segnalato_il TEXT DEFAULT (datetime('now', 'localtime')),
+    risolta_il TEXT,
+    PRIMARY KEY (esercizio_id, appello_id, corretta)
+);
+
 CREATE TABLE IF NOT EXISTS appello_eccezioni_matricola (
     appello_id INTEGER NOT NULL REFERENCES appelli(id),
     matricola TEXT NOT NULL,
