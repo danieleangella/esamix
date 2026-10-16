@@ -1,6 +1,7 @@
 import csv
 import io
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Optional
 
 from quizesame import config, db
@@ -114,7 +115,7 @@ def risultati_studente(tag: str, matricola: str) -> list[dict]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         rows = conn.execute(
-            "SELECT a.id AS appello_id, a.nome AS appello_nome, r.voto, r.esito, r.richiede_orale, "
+            "SELECT a.id AS appello_id, a.nome AS appello_nome, a.data AS appello_data, r.voto, r.esito, r.richiede_orale, "
             "r.orale_svolto, r.esito_orale, r.verbalizzato, r.data_verbalizzazione, r.annullamento_nota, "
             "EXISTS(SELECT 1 FROM raggruppamento_membri rm WHERE rm.appello_id = a.id) AS membro_raggruppamento "
             "FROM risultati r JOIN appelli a ON a.id = r.appello_id "
@@ -261,6 +262,34 @@ def cerca_in_tutti_i_corsi(query: str) -> list[dict]:
     return risultati
 
 
+def _dal_piu_recente(risultati: list[dict]) -> list[dict]:
+    """Risultati di un corso dal più recente: per data dell'appello (gg/mm/aaaa), e per
+    ordine di creazione quando manca (corsi importati, prove di un raggruppamento), dove
+    un appello senza data si colloca subito dopo il precedente che ce l'ha."""
+    ultima = date.min
+    chiavi = {}
+    for r in sorted(risultati, key=lambda r: r["appello_id"]):
+        try:
+            ultima = datetime.strptime(r.get("appello_data") or "", "%d/%m/%Y").date()
+        except ValueError:
+            pass
+        chiavi[r["appello_id"]] = (ultima, r["appello_id"])
+    return sorted(risultati, key=lambda r: chiavi[r["appello_id"]], reverse=True)
+
+
+def storico_altri_corsi(tag: str, matricola: str) -> list[dict]:
+    """Gli altri corsi (anni accademici) in cui compare questa matricola, dal più recente,
+    ciascuno con i risultati dello studente dal più recente: per vedere dalla pagina dello
+    studente in un corso anche la sua storia negli altri."""
+    matricola = _clean(matricola)
+    altri = []
+    for corso in corsi_service.list_corsi():
+        if corso.tag == tag or get_studente(corso.tag, matricola) is None:
+            continue
+        altri.append({"corso": corso, "risultati": _dal_piu_recente(risultati_studente(corso.tag, matricola))})
+    return altri
+
+
 def dettaglio_studente_corso(tag: str, matricola: str) -> Optional[dict]:
     """Studente e il suo storico completo in questo corso (voto/assente/ritirato/rifiutato
     ed eventuale richiesta di orale per ogni appello), per la sua pagina dedicata
@@ -276,7 +305,7 @@ def dettaglio_studente_corso(tag: str, matricola: str) -> Optional[dict]:
     finally:
         conn.close()
     return {
-        "studente": studente, "storico": risultati_studente(tag, matricola),
+        "studente": studente, "storico": _dal_piu_recente(risultati_studente(tag, matricola)),
         "orale_obbligatorio": dict(orale_obb) if orale_obb else None,
     }
 

@@ -196,6 +196,20 @@ def get_esercizio(tag: str, esercizio_id: int) -> Optional[Esercizio]:
         conn.close()
 
 
+def esercizi_per_id(tag: str, esercizio_ids: list[int]) -> dict[int, Esercizio]:
+    """Gli esercizi ancora esistenti tra quelli indicati, per id."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        trovati = {}
+        for eid in dict.fromkeys(esercizio_ids):
+            e = get_esercizio_su_connessione(conn, eid)
+            if e is not None:
+                trovati[eid] = e
+        return trovati
+    finally:
+        conn.close()
+
+
 def trova_duplicati(tag: str) -> list[list[Esercizio]]:
     """Raggruppa gli esercizi della banca del corso che hanno esattamente lo stesso testo
     e le stesse risposte in ogni variante: gruppi con più di un esercizio sono probabili

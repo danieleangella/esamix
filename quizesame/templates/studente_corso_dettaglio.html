@@ -19,14 +19,13 @@
   {% endif %}
 </div>
 
-<div class="card">
-  <h2>Storico in questo corso</h2>
-  {% if storico %}
+{% macro tabella_risultati(tag, risultati) %}
   <table>
-    <tr><th>Appello</th><th>Esito</th><th>Orale</th><th>Verbalizzato</th><th></th></tr>
-    {% for r in storico %}
+    <tr><th>Appello</th><th>Data</th><th>Esito</th><th>Orale</th><th>Verbalizzato</th><th></th></tr>
+    {% for r in risultati %}
     <tr>
       <td>{{ r.appello_nome }}</td>
+      <td class="muted" style="white-space:nowrap">{{ r.appello_data or '-' }}</td>
       <td>
         {% if r.esito == 'rifiutato' %}rifiutato <span class="muted">({{ r.voto }})</span>
         {% elif r.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if r.annullamento_nota %} <span class="muted">— {{ r.annullamento_nota }}</span>{% endif %}
@@ -51,12 +50,63 @@
         {% endif %}
         {% else %}-{% endif %}
       </td>
-      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ r.appello_id }}/risultati/{{ studente.matricola }}">Dettaglio</a></td>
+      <td><a href="/corsi/{{ tag }}/appelli/{{ r.appello_id }}/risultati/{{ studente.matricola }}">Dettaglio</a></td>
     </tr>
     {% endfor %}
   </table>
+{% endmacro %}
+
+{# titolo di ogni sezione, uguale per tutti i corsi: nome e anno accademico, poi in
+   piccolo quante prove e l'eventuale verbalizzazione #}
+{% macro titolo_sezione(c, risultati, attuale=false) -%}
+{%- set verb = risultati | selectattr("verbalizzato") | selectattr("superato", "ne", false) | list -%}
+<span class="titolo-sezione-studente">
+  <strong>{{ c.nome }}</strong> <span class="muted">{{ c.anno }}</span>
+  {% if attuale %}<span class="badge badge-info">corso attuale</span>{% endif %}
+</span>
+<span class="muted" style="font-size:0.9rem">
+  — {% if not risultati %}nessuna prova{% else %}{{ risultati|length }} {{ 'prova' if risultati|length == 1 else 'prove' }}{% endif %}{% if verb %} · verbalizzato{% if verb[0].data_verbalizzazione %} il {{ verb[0].data_verbalizzazione }}{% endif %}{% endif %}
+</span>
+{%- endmacro %}
+
+<div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin:1rem 0 0.5rem">
+  <h2 style="margin:0">Esami sostenuti</h2>
+  <span class="muted">— prima il corso attuale, poi gli altri dal più recente</span>
+  {% if altri_corsi %}
+  <span style="margin-left:auto; display:flex; gap:0.5rem">
+    <button type="button" class="secondary btn-sezioni-studente" data-apri="1" style="margin:0">Espandi tutto</button>
+    <button type="button" class="secondary btn-sezioni-studente" data-apri="" style="margin:0">Comprimi tutto</button>
+  </span>
+  {% endif %}
+</div>
+
+<details class="card sezione-studente" open>
+  <summary>{{ titolo_sezione(corso, storico, attuale=true) }}</summary>
+  {% if storico %}
+  {{ tabella_risultati(corso.tag, storico) }}
   {% else %}
   <p class="muted">Nessun risultato ancora registrato in questo corso.</p>
   {% endif %}
-</div>
+</details>
+
+{% if altri_corsi %}
+{% for c in altri_corsi %}
+<details class="card sezione-studente" open>
+  <summary>{{ titolo_sezione(c.corso, c.risultati) }}</summary>
+  {% if c.risultati %}
+  {{ tabella_risultati(c.corso.tag, c.risultati) }}
+  {% else %}
+  <p class="muted">Registrato nel corso, ma senza risultati.</p>
+  {% endif %}
+  <p class="muted" style="margin-bottom:0"><a href="/corsi/{{ c.corso.tag }}/studenti/{{ studente.matricola }}">Apri la scheda dello studente in questo corso</a></p>
+</details>
+{% endfor %}
+<script>
+document.querySelectorAll(".btn-sezioni-studente").forEach(function (b) {
+  b.addEventListener("click", function () {
+    document.querySelectorAll(".sezione-studente").forEach(function (d) { d.open = !!b.dataset.apri; });
+  });
+});
+</script>
+{% endif %}
 {% endblock %}

@@ -24,6 +24,30 @@
                     'errore': ('badge-err', 'errore'), 'modificato': ('badge-warn', 'modificato dopo la verifica'),
                     'mai': ('', 'mai verificato'), 'assente': ('', 'nessuna soluzione')} %}
 
+{% set qui = ('/corsi/' ~ corso.tag ~ '/ia/verifiche/' ~ salvata_id) if salvata else url %}
+
+{% macro elenco_salvate(voci) %}
+<details class="card" id="verifiche-salvate" {% if voci and not risultati %}open{% endif %}>
+  <summary><strong>Verifiche salvate ({{ voci|length }})</strong></summary>
+  {% if voci %}
+  <table class="tabella-elenco">
+    {% for v in voci %}
+    <tr>
+      <td><a href="/corsi/{{ corso.tag }}/ia/verifiche/{{ v.id }}">{{ v.quando[:16]|replace('T', ' ') }}</a></td>
+      <td>{{ v.titolo }} <span class="muted">· {{ v.n_esercizi }} esercizi · {{ v.conf.nome }}</span></td>
+      <td>{% if v.conteggi.errore %}<span class="badge badge-err">{{ v.conteggi.errore }} errori</span>{% endif %}
+        {% if v.conteggi.dubbio %}<span class="badge badge-warn">{{ v.conteggi.dubbio }} dubbi</span>{% endif %}
+        {% if not v.conteggi.errore and not v.conteggi.dubbio %}<span class="badge badge-ok">tutti corretti</span>{% endif %}</td>
+      <td style="text-align:right; white-space:nowrap"><a href="/corsi/{{ corso.tag }}/ia/verifiche/{{ v.id }}.json" title="Scarica il file della verifica">.json</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nessuna verifica salvata finora: ogni verifica completata viene salvata qui in automatico.</p>
+  {% endif %}
+</details>
+{% endmacro %}
+
 {% if not risultati %}
 <div class="card">
   <p style="margin-top:0">
@@ -85,6 +109,8 @@
 </details>
 {% endif %}
 
+{{ elenco_salvate(verifiche_salvate) }}
+
 {% else %}
 <div class="card riepilogo-verifica">
   <div class="stats-grid" style="margin-top:0">
@@ -92,16 +118,34 @@
     <div class="stat-tile stat-warn"><div class="stat-value">{{ conteggi.dubbio }}</div><div class="stat-label">dubbi da controllare</div></div>
     <div class="stat-tile stat-danger"><div class="stat-value">{{ conteggi.errore }}</div><div class="stat-label">errori trovati</div></div>
   </div>
+  {% if salvata %}
+  <p class="muted" style="margin-bottom:0">Verifica salvata del <strong>{{ salvata.quando[:16]|replace('T', ' ') }}</strong>,
+    fatta con {{ conf_usata.nome }} ({{ conf_usata.modello }}). Mostra gli esercizi com'erano allora; accanto a ciascuno il suo stato attuale.
+    <a href="{{ url }}">Nuova verifica</a> · <a href="{{ torna }}">torna a {{ torna_etichetta }}</a>
+    · <a href="{{ qui }}.json">scarica il file</a></p>
+  <form class="inline" method="post" action="{{ qui }}/elimina" onsubmit="return confirm('Eliminare questa verifica salvata? Gli esiti degli esercizi restano.')">
+    <input type="hidden" name="torna" value="{{ url }}">
+    <button type="submit" class="secondary" style="margin:0.5rem 0 0">Elimina questa verifica salvata</button>
+  </form>
+  {% else %}
   <p class="muted" style="margin-bottom:0">Verifica fatta con {{ conf_usata.nome }} ({{ conf_usata.modello }}); esiti salvati.
     Anche il modello può sbagliare: ricontrolla i casi segnalati, poi chiedi una correzione o segnali come corretti.
-    <a href="{{ url }}">Nuova verifica</a> · <a href="{{ torna }}">torna a {{ torna_etichetta }}</a></p>
+    <a href="{{ url }}">Nuova verifica</a> · <a href="{{ torna }}">torna a {{ torna_etichetta }}</a>
+    {% if salvata_id %}· <a href="/corsi/{{ corso.tag }}/ia/verifiche/{{ salvata_id }}">verifica salvata</a>
+    (<a href="/corsi/{{ corso.tag }}/ia/verifiche/{{ salvata_id }}.json">scarica il file</a>){% endif %}</p>
+  {% endif %}
 </div>
 
 {% for r in risultati %}
+{# in una verifica salvata le azioni restano solo se l'esercizio ha ancora quel problema #}
+{% set attuale = stati_attuali.get(r.esercizio.id) if salvata else None %}
+{% set da_sistemare = r.esito != 'ok' and (not salvata or (attuale and attuale.stato in ('errore', 'dubbio'))) %}
 <details class="card esito-{{ r.esito }}" {% if r.esito != 'ok' %}open{% endif %}>
   <summary><strong>{{ r.numero }}. {{ r.esercizio.nome or ('Esercizio #' ~ r.esercizio.id) }}</strong>
     <span class="badge {{ etichette[r.esito][0] }}">{{ etichette[r.esito][1] }}</span>
-    {% if r.esito != 'ok' %}<a class="icona-azione" style="margin-left:auto" href="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi?torna={{ (url ~ '')|urlencode }}&amp;auto=1">Correggi con l'IA</a>{% endif %}</summary>
+    {% if salvata %}<span class="muted" style="font-size:0.85rem">ora:</span>
+      {% if attuale %}{{ stato_verifica(corso.tag, r.esercizio, attuale, qui) }}{% else %}<span class="badge">eliminato</span>{% endif %}{% endif %}
+    {% if da_sistemare %}<a class="icona-azione" style="margin-left:auto" href="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi?torna={{ (qui ~ '')|urlencode }}&amp;auto=1">Correggi con l'IA</a>{% endif %}</summary>
   {% if r.commento %}<p style="margin-top:0.25rem">{{ r.commento }}</p>{% endif %}
   {% for v in r.varianti %}
   <div class="variante-verificata">
@@ -117,25 +161,26 @@
   <div class="variante-verificata"><strong>Soluzione</strong> <span class="badge {{ etichette[r.soluzione.esito][0] }}">{{ etichette[r.soluzione.esito][1] }}</span>
     {% if r.soluzione.commento %}<div>{{ r.soluzione.commento }}</div>{% endif %}</div>
   {% endif %}
-  {% if r.esito != 'ok' %}
+  {% if da_sistemare %}
   <div class="azioni-rapide" style="border-top:1px solid var(--border); padding-top:0.6rem">
     {% if fornitore_ia %}
     <form class="inline form-proponi" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi">
-      <input type="hidden" name="torna" value="{{ url }}">
+      <input type="hidden" name="torna" value="{{ qui }}">
       <input type="hidden" name="profilo" value="{{ fornitore_ia.id }}">
       <button type="submit" style="margin:0">Proponi una correzione con l'IA</button>
     </form>
     {% else %}
-    <a class="button" href="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi?torna={{ (url ~ '')|urlencode }}">Proponi una correzione (con claude.ai)</a>
+    <a class="button" href="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi?torna={{ (qui ~ '')|urlencode }}">Proponi una correzione (con claude.ai)</a>
     {% endif %}
     <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/verificato">
-      <input type="hidden" name="torna" value="{{ url }}">
+      <input type="hidden" name="torna" value="{{ qui }}">
       <button type="submit" class="secondary" style="margin:0" title="Hai ricontrollato tu: il dubbio era infondato">Segna come corretto</button>
     </form>
   </div>
   {% endif %}
 </details>
 {% endfor %}
+{% if not salvata %}{{ elenco_salvate(verifiche_salvate) }}{% endif %}
 {% endif %}
 
 <script>

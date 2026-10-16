@@ -1,0 +1,22 @@
+{# Avviso, nelle schede Testo e Compiti d'esame, se la verifica con l'IA ha segnalato
+   errori o dubbi ancora aperti negli esercizi di questo appello (cioè non corretti né
+   segnati come corretti né modificati da allora), con il link all'ultima verifica salvata. #}
+{% if md.esercizi_assegnati %}
+{% set _stati = stati_verifica(corso.tag, md.esercizi_assegnati) %}
+{% set _ns = namespace(errori=[], dubbi=[]) %}
+{% for e in md.esercizi_assegnati %}
+{% if _stati[e.id].stato == 'errore' %}{% set _ns.errori = _ns.errori + [e] %}{% elif _stati[e.id].stato == 'dubbio' %}{% set _ns.dubbi = _ns.dubbi + [e] %}{% endif %}
+{% endfor %}
+{% set _errori, _dubbi = _ns.errori, _ns.dubbi %}
+{% if _errori or _dubbi %}
+{% set _url_appello = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
+{% set _ultima = ultima_verifica_ia(corso.tag, md.appello.id) %}
+<div class="flash {{ 'flash-error' if _errori else 'flash-warning' }} avviso-verifica-ia">
+  <strong>Verifica con l'IA:</strong>
+  {% if _errori %}{{ _errori|length }} esercizi{{ 'o' if _errori|length == 1 else '' }} con errori{% endif %}{% if _errori and _dubbi %} e {% endif %}{% if _dubbi %}{{ _dubbi|length }} da controllare{% endif %}
+  —
+  {% for e in _errori + _dubbi %}<a href="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/ia/correggi?torna={{ _url_appello|urlencode }}">{{ e.nome or ('#' ~ e.id) }}</a>{{ ', ' if not loop.last }}{% endfor %}.
+  {% if _ultima %}<a href="/corsi/{{ corso.tag }}/ia/verifiche/{{ _ultima.id }}">Vedi la verifica del {{ _ultima.quando[:16]|replace('T', ' ') }}</a>{% else %}<a href="{{ _url_appello }}/ia/verifica">Vai alla verifica</a>{% endif %}
+</div>
+{% endif %}
+{% endif %}

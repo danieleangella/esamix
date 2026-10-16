@@ -35,6 +35,7 @@ from quizesame.services import presenze as presenze_service
 from quizesame.services import ia as ia_service
 from quizesame.services import documenti as documenti_service
 from quizesame.services import registro as registro_service
+from quizesame.services import verifiche_ia as verifiche_ia_service
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
@@ -103,6 +104,7 @@ templates.env.globals["codice_aggiornato"] = _codice_aggiornato
 # segnalazione degli esercizi con risposte ripetute in una variante (vedi esercizi_service)
 templates.env.globals["problemi_risposte"] = esercizi_service.problemi_risposte
 templates.env.globals["stati_verifica"] = esercizi_service.stati_verifica
+templates.env.globals["ultima_verifica_ia"] = verifiche_ia_service.ultima
 # contrassegno nei link ai documenti, diverso a ogni apertura della pagina: il browser scarica
 # sempre la versione attuale di un PDF rigenerato invece di mostrarne una copia conservata
 templates.env.globals["versione_link"] = lambda: str(int(__import__("time").time()))
@@ -1662,17 +1664,19 @@ def _ambito_verifica(tag: str, appello_id: Optional[int] = None, esercizio_id: O
             raise ValueError("Esercizio non trovato")
         return {"esercizi": [e], "titolo": f"Esercizio «{e.nome or '#' + str(e.id)}»",
                 "contesto": "Banca esercizi del corso", "url": f"/corsi/{tag}/esercizi/{esercizio_id}/ia/verifica",
-                "torna": f"/corsi/{tag}/esercizi", "torna_etichetta": "Banca esercizi", "corso": corso, "appello": None}
+                "torna": f"/corsi/{tag}/esercizi", "torna_etichetta": "Banca esercizi", "corso": corso, "appello": None,
+                "filtro_salvate": {"esercizio_id": esercizio_id}}
     if appello_id is not None:
         appello = corsi_service.get_appello(tag, appello_id)
         return {"esercizi": esercizi_service.list_esercizi_appello(tag, appello_id), "titolo": f"Compito: {appello.nome}",
                 "contesto": f"Prova: {appello.nome}" + (f" del {appello.data}" if appello.data else ""),
                 "url": f"/corsi/{tag}/appelli/{appello_id}/ia/verifica",
                 "torna": f"/corsi/{tag}/appelli/{appello_id}#{_anchor_membro(appello, 'creazione')}",
-                "torna_etichetta": appello.nome, "corso": corso, "appello": appello}
+                "torna_etichetta": appello.nome, "corso": corso, "appello": appello, "filtro_salvate": {"appello_id": appello_id}}
     return {"esercizi": esercizi_service.list_esercizi(tag), "titolo": "Banca esercizi del corso",
             "contesto": "Banca esercizi del corso", "url": f"/corsi/{tag}/esercizi/ia/verifica",
-            "torna": f"/corsi/{tag}/esercizi", "torna_etichetta": "Banca esercizi", "corso": corso, "appello": None}
+            "torna": f"/corsi/{tag}/esercizi", "torna_etichetta": "Banca esercizi", "corso": corso, "appello": None,
+            "filtro_salvate": {}}
 
 
 def _da_verificare(tag: str, esercizi: list, stati: dict) -> list:
@@ -1685,7 +1689,7 @@ def _pagina_verifica_ia(request: Request, tag: str, ambito: dict, **extra):
     return templates.TemplateResponse(request, "verifica_ia.html", {
         **ambito, "stati": stati, "da_verificare": _da_verificare(tag, ambito["esercizi"], stati),
         "fornitore_ia": ia_service.fornitore(extra.pop("profilo", "")), "profili_ia": ia_service.profili(),
-        "tag": tag, **extra,
+        "verifiche_salvate": verifiche_ia_service.elenco(tag, **ambito["filtro_salvate"]), "tag": tag, **extra,
     })
 
 
@@ -1710,11 +1714,54 @@ def _esegui_verifica(request: Request, tag: str, ambito: dict, profilo: str, ris
     for r in risultati:
         esercizi_service.registra_verifica(tag, r["esercizio"], r["esito"], ia_service.risultato_serializzabile(r))
     conteggi = {k: sum(1 for r in risultati if r["esito"] == k) for k in ia_service.ESITI_VERIFICA}
+    try:
+        salvata = verifiche_ia_service.salva(tag, ambito, risultati, conf, conteggi)
+    except OSError:
+        salvata = None
     registro_service.registra(
         "ia", f"Verifica con l'IA: {ambito['titolo']}", tag=tag, appello_id=ambito["appello"].id if ambito["appello"] else None,
         esito=f"{len(risultati)} esercizi: {conteggi['ok']} corretti, {conteggi['dubbio']} dubbi, {conteggi['errore']} errori ({conf['nome']})",
     )
-    return _pagina_verifica_ia(request, tag, ambito, risultati=risultati, conf_usata=conf, conteggi=conteggi, profilo=profilo)
+    return _pagina_verifica_ia(request, tag, ambito, risultati=risultati, conf_usata=conf, conteggi=conteggi, profilo=profilo,
+                               salvata_id=salvata)
+
+
+@app.get("/corsi/{tag}/ia/verifiche/{verifica_id}", response_class=HTMLResponse)
+def verifica_ia_salvata(request: Request, tag: str, verifica_id: str):
+    """Una verifica salvata, com'era al momento, con accanto lo stato attuale di ogni
+    esercizio (corretto nel frattempo, modificato, eliminato)."""
+    dati = verifiche_ia_service.carica(tag, verifica_id)
+    if dati is None:
+        return flash_redirect(f"/corsi/{tag}/esercizi", "Verifica salvata non trovata", "error")
+    esistenti = esercizi_service.esercizi_per_id(tag, [r["esercizio"]["id"] for r in dati["risultati"]])
+    stati = esercizi_service.stati_verifica(tag, list(esistenti.values()))
+    corso = corsi_service.get_corso(tag)
+    return templates.TemplateResponse(request, "verifica_ia.html", {
+        "corso": corso, "appello": None, "tag": tag, "titolo": dati["titolo"], "contesto": dati["contesto"],
+        "url": dati["url"], "torna": dati["torna"], "torna_etichetta": dati["torna_etichetta"],
+        "risultati": dati["risultati"], "conf_usata": dati["conf"], "conteggi": dati["conteggi"],
+        "salvata": dati, "salvata_id": verifica_id, "stati_attuali": stati,
+        "fornitore_ia": ia_service.fornitore(), "profili_ia": ia_service.profili(),
+        "verifiche_salvate": [], "stati": {}, "esercizi": [], "da_verificare": [],
+    })
+
+
+@app.get("/corsi/{tag}/ia/verifiche/{verifica_id}.json")
+def scarica_verifica_ia(tag: str, verifica_id: str):
+    contenuto = verifiche_ia_service.contenuto_file(tag, verifica_id)
+    if contenuto is None:
+        return PlainTextResponse("Verifica salvata non trovata", status_code=404)
+    return Response(contenuto, media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="verifica-ia-{tag}-{verifica_id}.json"'})
+
+
+@app.post("/corsi/{tag}/ia/verifiche/{verifica_id}/elimina")
+def elimina_verifica_ia(tag: str, verifica_id: str, torna: str = Form("")):
+    dati = verifiche_ia_service.carica(tag, verifica_id)
+    torna = torna or (dati["url"] if dati else f"/corsi/{tag}/esercizi")
+    if not verifiche_ia_service.elimina(tag, verifica_id):
+        return flash_redirect(torna, "Verifica salvata non trovata", "error")
+    return flash_redirect(torna, "Verifica salvata eliminata (gli esiti degli esercizi restano)")
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/ia/verifica", response_class=HTMLResponse)
@@ -2763,11 +2810,9 @@ def scarica_ammessi_pdf(tag: str, appello_id: int):
     return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
 
 
-@app.get("/corsi/{tag}/studenti", response_class=HTMLResponse)
-def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro: str = "", dsa: str = "", mai_sostenuto: str = ""):
-    corso = corsi_service.get_corso(tag)
-    lista = studenti_service.list_studenti(tag, q or None)
-    stato_esame = verbalizzazione_service.stato_esame_studenti(tag)
+def _filtra_studenti(lista: list, stato_esame: dict, filtro: str, dsa: str) -> list:
+    """Filtri dell'elenco studenti, combinabili: `filtro` sullo stato dell'esame e `dsa`
+    ("1" = DSA o L104, "DSA", "L104", "no" = nessuno dei due)."""
     if filtro == "fatto":
         lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") == "verbalizzato"]
     elif filtro == "da_verbalizzare":
@@ -2776,6 +2821,19 @@ def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro:
         lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") not in ("verbalizzato", "da_verbalizzare")]
     if dsa == "1":
         lista = [s for s in lista if s.dsa]
+    elif dsa in ("DSA", "L104"):
+        lista = [s for s in lista if s.dsa and (s.dsa_tipo or "DSA") == dsa]
+    elif dsa == "no":
+        lista = [s for s in lista if not s.dsa]
+    return lista
+
+
+@app.get("/corsi/{tag}/studenti", response_class=HTMLResponse)
+def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro: str = "", dsa: str = "", mai_sostenuto: str = ""):
+    corso = corsi_service.get_corso(tag)
+    lista = studenti_service.list_studenti(tag, q or None)
+    stato_esame = verbalizzazione_service.stato_esame_studenti(tag)
+    lista = _filtra_studenti(lista, stato_esame, filtro, dsa)
     tutti_corsi = corsi_service.list_corsi()
     corsi_suggeriti = corsi_service.corsi_simili(corso, tutti_corsi)
     altri_corsi = [c for c in tutti_corsi if c.tag != tag]
@@ -2794,15 +2852,10 @@ def studenti_list(request: Request, tag: str, q: str = "", da: str = "", filtro:
 
 
 @app.get("/corsi/{tag}/studenti/esporta.csv")
-def esporta_studenti(tag: str, q: str = "", filtro: str = ""):
+def esporta_studenti(tag: str, q: str = "", filtro: str = "", dsa: str = ""):
     lista = studenti_service.list_studenti(tag, q or None)
     stato_esame = verbalizzazione_service.stato_esame_studenti(tag)
-    if filtro == "fatto":
-        lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") == "verbalizzato"]
-    elif filtro == "da_verbalizzare":
-        lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") == "da_verbalizzare"]
-    elif filtro == "da_fare":
-        lista = [s for s in lista if stato_esame.get(s.matricola, {}).get("stato") not in ("verbalizzato", "da_verbalizzare")]
+    lista = _filtra_studenti(lista, stato_esame, filtro, dsa)
     dati = studenti_service.esporta_csv(lista, stato_esame)
     return Response(
         dati, media_type="text/csv",
@@ -2819,6 +2872,7 @@ def studente_dettaglio_corso(request: Request, tag: str, matricola: str):
     return templates.TemplateResponse(request, "studente_corso_dettaglio.html", {
         "corso": corso, "studente": dettaglio["studente"], "storico": dettaglio["storico"],
         "orale_obbligatorio": dettaglio["orale_obbligatorio"],
+        "altri_corsi": studenti_service.storico_altri_corsi(tag, matricola),
     })
 
 

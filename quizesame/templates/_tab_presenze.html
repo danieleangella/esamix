@@ -69,8 +69,13 @@
           {% endif %}
         </td>
         <td>{{ s.matricola }}</td>
+        {% if s.registrato %}
+        <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
+        <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
+        {% else %}
         <td>{{ s.cognome }}</td>
         <td>{{ s.nome }}</td>
+        {% endif %}
         <td>
           {% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}
           {% if not s.registrato %}

@@ -25,16 +25,25 @@
           <option value="da_fare" {% if filtro == 'da_fare' %}selected{% endif %}>Deve ancora sostenerlo</option>
         </select>
       </div>
+      <div>
+        <label>DSA / disabilità</label>
+        <select name="dsa" onchange="this.form.requestSubmit()">
+          <option value="" {% if not dsa %}selected{% endif %}>Tutti</option>
+          <option value="1" {% if dsa == '1' %}selected{% endif %}>DSA o L104</option>
+          <option value="DSA" {% if dsa == 'DSA' %}selected{% endif %}>Solo DSA (L. 170/2010)</option>
+          <option value="L104" {% if dsa == 'L104' %}selected{% endif %}>Solo L104 (disabilità)</option>
+          <option value="no" {% if dsa == 'no' %}selected{% endif %}>Né DSA né L104</option>
+        </select>
+      </div>
     </div>
-    <input type="hidden" name="dsa" value="{{ dsa }}">
   </form>
-  {% if dsa == '1' %}
+  {% if filtro or dsa %}
   <p class="muted" style="margin-top:0.5rem">
-    Solo studenti DSA o L104 — <a href="/corsi/{{ corso.tag }}/studenti?q={{ q }}&filtro={{ filtro }}">rimuovi filtro</a>
+    Elenco filtrato: {{ studenti|length }} studenti — <a href="/corsi/{{ corso.tag }}/studenti?q={{ q|urlencode }}">rimuovi i filtri</a>
   </p>
   {% endif %}
   <p class="muted" style="margin-top:0.5rem">
-    <a href="/corsi/{{ corso.tag }}/studenti/esporta.csv?q={{ q }}&filtro={{ filtro }}&dsa={{ dsa }}">Esporta questo elenco in CSV</a>
+    <a href="/corsi/{{ corso.tag }}/studenti/esporta.csv?q={{ q|urlencode }}&amp;filtro={{ filtro }}&amp;dsa={{ dsa }}">Esporta questo elenco in CSV</a>
   </p>
   <script>
   creaAutocomplete(
@@ -49,7 +58,7 @@
   });
   </script>
   <table style="margin-top:0.75rem">
-    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th><a href="/corsi/{{ corso.tag }}/studenti?q={{ q }}&amp;filtro={{ filtro }}&amp;dsa={{ '' if dsa == '1' else '1' }}" title="{{ 'Rimuovi il filtro DSA/L104' if dsa == '1' else 'Mostra solo studenti DSA o L104' }}">DSA/L104{% if dsa == '1' %} &#9660;{% endif %}</a></th><th>Risultato</th><th></th></tr>
+    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Risultato</th><th></th></tr>
     {% for s in studenti %}
     {% set st = stato_esame.get(s.matricola) %}
     <tr>

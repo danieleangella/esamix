@@ -6,6 +6,8 @@
 </div>
 {% endif %}
 
+{% include "_avviso_verifica.html" %}
+
 {% set iscritti_fatti = md.numero_iscritti is not none %}
 <details class="card sezione-flusso" data-sezione="iscritti-{{ md.appello.id }}" data-fatta="{{ 1 if iscritti_fatti else 0 }}"{% if not iscritti_fatti %} open{% endif %}>
   <summary><strong>Iscritti{% if md.numero_iscritti is not none %} ({{ md.numero_iscritti }}){% endif %}</strong>{% if iscritti_fatti %} <span class="badge badge-ok">✓ completato</span>{% endif %}</summary>
@@ -96,8 +98,8 @@
       {% for s in md.iscritti_manuali %}
       <tr>
         <td>{{ s.matricola }}</td>
-        <td>{{ s.cognome }}</td>
-        <td>{{ s.nome }}</td>
+        <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
+        <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
         <td>
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale/{{ s.matricola }}/rimuovi">
             <button type="submit" class="secondary" style="margin-top:0">Rimuovi</button>
@@ -143,7 +145,7 @@
   <table style="margin-top:0.5rem">
     <tr><th>Matricola</th><th>Cognome</th><th>Nome</th></tr>
     {% for s in md.iscritti_manuali %}
-    <tr><td>{{ s.matricola }}</td><td>{{ s.cognome }}</td><td>{{ s.nome }}</td></tr>
+    <tr><td>{{ s.matricola }}</td><td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td><td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td></tr>
     {% endfor %}
   </table>
   {% endif %}

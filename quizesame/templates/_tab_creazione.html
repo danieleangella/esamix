@@ -7,6 +7,8 @@
 </div>
 {% endif %}
 
+{% include "_avviso_verifica.html" %}
+
 {# sezione richiusa quando la fase è completata (vedi .sezione-flusso in app.js), così
    risalta il passo successivo del percorso: creare i compiti #}
 {% set fase = md.riepilogo_home.fasi|selectattr("scheda", "equalto", "creazione")|first %}

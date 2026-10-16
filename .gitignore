@@ -6,6 +6,7 @@ __pycache__/
 # dati reali di corsi/studenti: mai committare database o output generati
 corsi/*/db.sqlite
 corsi/*/output/
+corsi/*/verifiche_ia/
 corsi/app_settings.json
 corsi/registro.jsonl
 *.sqlite
