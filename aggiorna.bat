@@ -37,9 +37,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if exist .venv\Scripts\activate.bat (
-    call .venv\Scripts\activate.bat
-    pip install -e . --upgrade
+REM il Python dell'ambiente per percorso, senza "activate": funziona anche da PowerShell
+if exist .venv\Scripts\python.exe (
+    .venv\Scripts\python.exe -m pip install -e . --upgrade
     if errorlevel 1 (
         echo.
         echo Aggiornamento non riuscito: la reinstallazione delle dipendenze ha dato un errore ^(vedi sopra^).

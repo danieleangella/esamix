@@ -63,15 +63,26 @@ GitHub e estraendolo in una cartella), poi:
 
 Lo script crea un ambiente virtuale Python isolato (cartella `.venv/`) e vi installa
 l'app: non modifica nulla al di fuori della cartella del progetto. Va eseguito una sola
-volta (o di nuovo solo dopo aver scaricato un aggiornamento del codice).
+volta (o di nuovo solo dopo aver scaricato un aggiornamento del codice). Su Windows
+trova Python anche se non è stato aggiunto al PATH (tramite il lanciatore `py`), e se
+un'installazione precedente si era interrotta basta rilanciarlo.
 
 Se si preferisce non usare lo script, i passaggi equivalenti manuali sono:
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate        # su Windows: .venv\Scripts\activate
-pip install -e .
+.venv/bin/python -m pip install -e .
 ```
+
+Su Windows (sia nel Prompt dei comandi sia in PowerShell):
+
+```
+py -m venv .venv
+.venv\Scripts\python -m pip install -e .
+```
+
+Se poi Windows dice che `quizesame` non è riconosciuto come comando, l'app è stata
+installata fuori dall'ambiente virtuale: rilanciare `installa.bat`.
 
 ## Aggiornamento
 
