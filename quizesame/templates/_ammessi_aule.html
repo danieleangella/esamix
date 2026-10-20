@@ -1,0 +1,84 @@
+{# frammento di _tab_compiti.html, ridisegnato da solo dopo ogni modifica (vedi _risposta_ammessi_aule).
+   Qui si assegnano gli studenti alle aule; le aule stesse si definiscono nella scheda
+   Impostazioni (_aule.html). #}
+{% from "_formati.html" import formati %}
+{% from "_icone.html" import icona %}
+{% from "_info.html" import info %}
+{% set url = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
+{% set posti = md.aule|sum(attribute="capienza") %}
+{% set aula_dsa = md.aule|selectattr("dsa")|first %}
+  <summary><strong>Studenti ammessi e aule ({{ md.ammessi|length }})</strong></summary>
+  {% if messaggio %}<div class="flash flash-{{ tipo or 'success' }}" style="margin:0.75rem 0 0">{{ messaggio }}</div>{% endif %}
+  <div class="barra-strumenti" style="margin-top:0.75rem">
+    <span>{{ icona("stampa", 14) }} Elenco ammessi</span>
+    {{ formati(url ~ "/ammessi", pdf=True, html=True, tex=True, csv=True) }}
+  </div>
+  <div class="barra-strumenti">
+    {% if md.aule %}
+    <span>{{ md.aule|length }} aul{{ 'a' if md.aule|length == 1 else 'e' }}, {{ posti }} posti{% if aula_dsa %} · aula DSA: <strong>{{ aula_dsa.nome }}</strong>{% endif %}</span>
+    {% else %}
+    <span class="muted">Nessuna aula per questa prova.</span>
+    {% endif %}
+    <a class="icona-azione icona-sola" href="#impostazioni" data-info="{{ 'Gestisci le aule (nome, posti, aula DSA) nella scheda Impostazioni' if md.aule else 'Aggiungi le aule di questa prova nella scheda Impostazioni' }}"
+       aria-label="{{ 'Gestisci le aule' if md.aule else 'Aggiungi le aule' }}">{{ icona("ingranaggio", 14) }}</a>
+    {% if md.aule and not md.appello.chiuso %}
+    <form class="inline" method="post" action="{{ url }}/aule/assegna">
+      <button type="submit" class="pulsante-piccolo">Assegna automaticamente</button>
+    </form>
+    {{ info("Distribuisce in ordine di cognome, in proporzione ai posti di ciascuna aula, gli ammessi che non hai già spostato a mano (quelli restano dove li hai messi). Se c'è un'aula DSA, tutti i DSA/L104 vanno lì e gli altri nelle aule restanti.") }}
+    {% endif %}
+  </div>
+  {% if md.aule and md.ammessi and md.ammessi|length * 100 > posti * corso.soglia_occupazione_aule %}
+  <div class="flash flash-warning" style="margin:0.25rem 0 0">
+    {{ md.ammessi|length }} ammessi su {{ posti }} posti: oltre il {{ corso.soglia_occupazione_aule }}% dei posti disponibili.
+    Aggiungi un'aula nelle Impostazioni.
+  </div>
+  {% endif %}
+
+  <details style="margin-top:0.5rem" data-chiave="elenco">
+    <summary>Elenco dettagliato e assegnazione alle aule</summary>
+    <table style="margin-top:0.5rem">
+      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Aula</th><th></th></tr>
+      {% for s in md.ammessi %}
+      <tr>
+        <td>{{ s.matricola }}</td>
+        <td>{{ s.cognome }}</td>
+        <td>{{ s.nome }}</td>
+        <td>{% if s.dsa %}<span class="badge badge-info">{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
+        <td>
+          {% if md.aule %}
+          <form class="inline" method="post" action="{{ url }}/aule/{{ s.matricola }}/assegna-manuale">
+            <select name="aula_id" style="width:auto" onchange="this.form.requestSubmit()" aria-label="Aula di {{ s.cognome }} {{ s.nome }}">
+              <option value="">non assegnata</option>
+              {% for a in md.aule %}<option value="{{ a.id }}" {% if s.aula_id == a.id %}selected{% endif %}>{{ a.nome }}{% if a.dsa %} (DSA){% endif %}</option>{% endfor %}
+            </select>
+          </form>
+          {% else %}
+          <span class="muted">{{ s.aula_nome or '—' }}</span>
+          {% endif %}
+        </td>
+        <td class="cella-azioni">
+          {% if s.in_deroga %}
+          <span class="badge badge-warn" data-info="Aggiunto a mano: non soddisfa i requisiti automatici di ammissione">in deroga</span>
+          <form class="inline" method="post" action="{{ url }}/ammessi/{{ s.matricola }}/rimuovi"
+                data-conferma="{{ 'Rimuovere ' ~ s.cognome ~ ' ' ~ s.nome ~ ' dagli ammessi a questa prova?' }}">
+            <button type="submit" class="pulsante-icona" data-info="Togli dagli ammessi" aria-label="Togli {{ s.cognome }} {{ s.nome }} dagli ammessi">{{ icona("cestino") }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    {% if not md.appello.chiuso %}
+    <form class="barra-aggiungi" method="post" action="{{ url }}/ammessi/aggiungi" autocomplete="off" style="margin-top:0.75rem">
+      <div style="position:relative; flex:1; min-width:14rem">
+        <input name="matricola" class="campo-input-matricola-ammesso" placeholder="Ammetti in deroga: matricola o cognome"
+               aria-label="Ammetti in deroga: matricola o cognome" autocomplete="off" required>
+        <div class="campo-suggerimenti-studenti-ammesso sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+      </div>
+      <button type="submit" class="secondary" style="margin:0">{{ icona("piu") }} Ammetti</button>
+      {{ info("Per le eccezioni: lo studente compare tra gli ammessi con l'avviso \"in deroga\" (anche negli elenchi stampati) pur non avendo superato la prova precedente o non rispettando la soglia di matricola. Si può togliere in qualsiasi momento.") }}
+    </form>
+    {% endif %}
+  </details>

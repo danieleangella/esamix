@@ -9,6 +9,7 @@
 <script defer src="/static/katex/contrib/auto-render.min.js"></script>
 {% endblock %}
 {% block content %}
+{% from "_info.html" import info %}
 <header class="intestazione-pagina">
   <div class="intestazione-livello">{{ 'Raggruppamento di prove' if raggruppamento else 'Appello' }} ·
     <a href="/corsi/{{ corso.tag }}">{{ corso.nome }} ({{ corso.anno }})</a></div>
@@ -16,22 +17,20 @@
     {% if appello.chiuso %}<span class="badge">chiuso</span>{% endif %}</h1>
 </header>
 
-{% if appello.chiuso %}
-<div class="flash flash-warning">Questo appello è chiuso: non sono più possibili modifiche. Puoi riaprirlo dalla scheda Impostazioni.</div>
-{% endif %}
 
 <div id="tabs-appello">
   {# il percorso è la navigazione principale tra le fasi; qui sotto restano solo le
      schede di consultazione e servizio, che non sono un passo del flusso #}
   {% include "_percorso.html" %}
+  {% from "_icone.html" import icona %}
   <div class="tabs tabs-servizio" aria-label="Altre schede">
-    <a href="#home" data-tab="home">Riepilogo</a>
+    <a href="#home" data-tab="home" data-info="Situazione dell'appello: numeri principali e cosa resta da fare">{{ icona("casa", 14) }} Riepilogo</a>
     {% if raggruppamento %}
-    <a href="#risultati" data-tab="risultati">Risultati</a>
-    <a href="#verbalizzati" data-tab="verbalizzati">Voti verbalizzati</a>
+    <a href="#risultati" data-tab="risultati" data-info="Voti combinati delle prove ed esportazione per la segreteria">{{ icona("elenco", 14) }} Risultati</a>
+    <a href="#verbalizzati" data-tab="verbalizzati" data-info="Studenti il cui voto è già stato verbalizzato">{{ icona("verbale", 14) }} Verbalizzati</a>
     {% endif %}
-    {% if statistiche %}<a href="#statistiche" data-tab="statistiche">Statistiche</a>{% endif %}
-    <a href="#impostazioni" data-tab="impostazioni">Impostazioni</a>
+    {% if statistiche %}<a href="#statistiche" data-tab="statistiche" data-info="Distribuzione dei voti ed esercizi più sbagliati">{{ icona("grafico", 14) }} Statistiche</a>{% endif %}
+    <a href="#impostazioni" data-tab="impostazioni" data-info="Nome, data, orale{% if raggruppamento %}, aule delle prove, ammissione{% endif %}, chiusura ed eliminazione">{{ icona("ingranaggio", 14) }} Impostazioni</a>
   </div>
 </div>
 
@@ -101,115 +100,121 @@
 </div>
 
 <div class="tab-pane" data-pane="impostazioni" style="display:none">
-  <details class="card" open>
-    <summary><strong>Impostazioni</strong></summary>
-    <p class="muted">
-      Voto minimo: <strong>{{ votomin_effettivo }}</strong>
-      ({{ 'soglia raggruppamento del corso' if appello.membro_raggruppamento else 'soglia standard del corso' }}) ·
-      Esercizi obbligatori: <strong>{{ consegna_effettivo }}</strong> ·
-      Punti risposta corretta/sbagliata/vuota: <strong>{{ corso.risposta_corretta }}/{{ corso.risposta_sbagliata }}/{{ corso.risposta_vuota }}</strong>
-      (impostazioni del corso, valide per tutti gli appelli — si cambiano dalla
-      <a href="/corsi/{{ corso.tag }}/impostazioni">pagina Impostazioni</a>, non qui).
-    </p>
+<div class="griglia-impostazioni">
+  <section class="card riquadro-impostazioni">
+    <h2>{{ 'Raggruppamento' if raggruppamento else 'Appello' }}</h2>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/modifica">
       <div class="form-grid">
         <div><label class="campo-obbligatorio">Nome</label><input name="nome" value="{{ appello.nome }}" required></div>
         <div><label>Data</label><input type="date" name="data" value="{{ appello.data | data_iso }}" min="2001-01-01" max="2099-12-31"></div>
+        <div><label>Data orale {{ info("Data, ora e aula dell'orale vengono mostrate in testa al foglio dei risultati, se qualcuno è in attesa di orale.") }}</label><input type="date" name="orale_data" value="{{ appello.orale_data | data_iso }}" min="2001-01-01" max="2099-12-31"></div>
+        <div><label>Ora orale</label><input name="orale_ora" value="{{ appello.orale_ora or '' }}" placeholder="es. 9:00"></div>
+        <div class="campo-largo"><label>Aula orale</label><input name="orale_aula" value="{{ appello.orale_aula or '' }}"></div>
       </div>
-      <p class="muted" style="margin-top:0.75rem">Orale (mostrato in testa al foglio dei risultati se qualcuno è in attesa):</p>
-      <div class="form-grid">
-        <div><label>Data orale</label><input type="date" name="orale_data" value="{{ appello.orale_data | data_iso }}" min="2001-01-01" max="2099-12-31"></div>
-        <div><label>Ora</label><input name="orale_ora" value="{{ appello.orale_ora or '' }}" placeholder="es. 9:00"></div>
-        <div><label>Aula</label><input name="orale_aula" value="{{ appello.orale_aula or '' }}"></div>
+      <div class="barra-pulsanti">
+        <button type="submit">Salva</button>
+        <button type="button" class="secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate">Annulla</button>
       </div>
-      <button type="submit">Salva impostazioni</button>
     </form>
-  </details>
-
-  <details class="card" {% if prossimo_passo and prossimo_passo.nome == 'Chiusura' %}open{% endif %}>
-    <summary><strong>Chiusura appello</strong></summary>
-    {% if appello.chiuso %}
-    <p class="muted" style="margin-top:0.75rem">Appello chiuso: correzioni, verbalizzazioni ed esercizi assegnati non sono più modificabili.</p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riapri">
-      <button type="submit" class="warning">Riapri appello</button>
-    </form>
-    {% else %}
-    <p class="muted" style="margin-top:0.75rem">Quando tutti gli idonei sono stati verbalizzati o hanno rifiutato il voto, e non ci sono più orali
-      da svolgere, puoi chiudere l'appello per evitare ulteriori modifiche accidentali.
-      {% if raggruppamento %}Chiudere il raggruppamento chiude anche tutte le sue prove membro.{% endif %}</p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/chiudi"
-          onsubmit="return confirm({{ ('Chiudere l\'appello ' ~ appello.nome ~ '? Non sarà più possibile correggere, verbalizzare o modificare gli esercizi assegnati finché non lo riapri.')|js }});">
-      <button type="submit" class="secondary">Chiudi appello</button>
-    </form>
-    {% endif %}
-  </details>
-
-  <details class="card">
-    <summary><strong>Elimina appello</strong></summary>
-    {% if risultati %}
-    <p class="muted" style="margin-top:0.75rem">Attenzione: ha già <strong>{{ risultati|length }}</strong> risultati registrati, che verranno eliminati insieme all'appello.
-      Per confermare, scrivi <strong>{{ appello.nome }}</strong> qui sotto.</p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/elimina" id="form-elimina-appello">
-      <input class="campo-conferma-testo" data-frase-attesa="{{ appello.nome }}" autocomplete="off" style="max-width:20rem">
-      <button type="submit" class="danger btn-conferma-testo" disabled style="margin-top:0.75rem">Elimina questo appello</button>
-    </form>
-    <script>attivaConfermaTestuale(document.getElementById("form-elimina-appello"));</script>
-    {% else %}
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/elimina"
-          style="margin-top:0.75rem"
-          onsubmit="return confirm({{ ('Eliminare definitivamente l\'appello ' ~ appello.nome ~ ' (esercizi assegnati, blocchi e compiti compresi)?')|js }});">
-      <button type="submit" class="danger">Elimina questo appello</button>
-    </form>
-    {% endif %}
-  </details>
+    <p class="muted" style="margin:0.75rem 0 0; font-size:0.85rem">
+      Dal corso: voto minimo <strong>{{ votomin_effettivo }}</strong> · obbligatori <strong>{{ consegna_effettivo }}</strong> ·
+      punti <strong>{{ corso.risposta_corretta }}/{{ corso.risposta_sbagliata }}/{{ corso.risposta_vuota }}</strong>
+      {{ info("Voto minimo, esercizi obbligatori e punti per risposta corretta/sbagliata/vuota sono impostazioni del corso, valide per tutti gli appelli (" ~ ('soglia delle prove di un raggruppamento' if appello.membro_raggruppamento else 'soglia standard') ~ "): si cambiano nella pagina Impostazioni del corso.") }}
+      <a class="icona-azione icona-sola" href="/corsi/{{ corso.tag }}/impostazioni" data-info="Cambia nelle impostazioni del corso" aria-label="Impostazioni del corso">{{ icona("ingranaggio", 13) }}</a>
+    </p>
+  </section>
 
   {% if raggruppamento %}
-  <details class="card">
-    <summary><strong>Raggruppamento</strong></summary>
-    <p class="muted" style="margin-top:0.75rem">Media dei voti di: {{ raggruppamento.membri | map(attribute='nome') | join(', ') }}.
-      Conta solo chi ha superato la soglia di ciascuna prova; la media è considerata
-      sufficiente se supera il voto minimo del corso ({{ corso.votomin }}).</p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/calcola-raggruppamento">
-      <input type="hidden" name="raggruppamento_id" value="{{ raggruppamento.id }}">
-      <button type="submit">Calcola voti combinati</button>
-    </form>
-
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/raggruppamento/modifica" style="margin-top:1rem">
-      <label>Chi è ammesso alla prima prova</label>
-      <div><label style="display:inline-flex; align-items:center; gap:0.4rem">
-        <input type="radio" name="fonte_ammessi" value="corso" style="width:auto" {% if raggruppamento.fonte_ammessi != 'iscritti' %}checked{% endif %}>
-        tutti gli studenti registrati nel corso</label></div>
-      <div><label style="display:inline-flex; align-items:center; gap:0.4rem">
-        <input type="radio" name="fonte_ammessi" value="iscritti" style="width:auto" {% if raggruppamento.fonte_ammessi == 'iscritti' %}checked{% endif %}>
-        solo gli iscritti alla prima prova (file della segreteria o aggiunti a mano, scheda "Compiti d'esame" della prova)</label></div>
-      <div class="form-grid" style="margin-top:0.5rem">
-        <div>
-          <label>…e solo con matricola &ge; (facoltativo)</label>
-          <input type="number" name="matricola_minima_prima_prova" value="{{ raggruppamento.matricola_minima_prima_prova or '' }}" placeholder="es. 7100000 (vuoto = nessun limite)">
-        </div>
+  <section class="card riquadro-impostazioni">
+    <h2>Ammissione e media {{ info("La media combina i voti di: " ~ (raggruppamento.membri | map(attribute='nome') | join(', ')) ~ ". Conta solo chi ha superato la soglia di ciascuna prova; la media è sufficiente se supera il voto minimo del corso (" ~ corso.votomin ~ "). Alle prove successive alla prima è ammesso chi ha superato la precedente; singoli studenti si ammettono a mano (in deroga) dalla scheda Compiti d'esame della prova.") }}</h2>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/raggruppamento/modifica">
+      <label>Alla prima prova sono ammessi</label>
+      <label class="riga-opzione"><input type="radio" name="fonte_ammessi" value="iscritti" {% if raggruppamento.fonte_ammessi != 'corso' %}checked{% endif %}>
+        solo gli iscritti {{ info("Quelli dell'elenco iscritti della prima prova (file della segreteria, Moodle o aggiunti a mano, nella sua scheda Compiti d'esame): nessuno finché non ne aggiungi.") }}</label>
+      <label class="riga-opzione"><input type="radio" name="fonte_ammessi" value="corso" {% if raggruppamento.fonte_ammessi == 'corso' %}checked{% endif %}>
+        tutti gli studenti del corso</label>
+      <div class="riga-opzione">
+        <span>e solo con matricola &ge;</span>
+        <input type="number" name="matricola_minima_prima_prova" value="{{ raggruppamento.matricola_minima_prima_prova or '' }}" placeholder="nessun limite" style="width:9rem">
       </div>
-      <p class="muted" style="margin-top:0.25rem">Alle prove successive è ammesso chi ha superato la prova precedente; singoli
-        studenti si possono comunque aggiungere a mano (in deroga) dall'elenco ammessi di ciascuna prova.</p>
-      <button type="submit" class="secondary">Salva ammissione</button>
+      <div class="barra-pulsanti">
+        <button type="submit" class="secondary">Salva</button>
+        <button type="button" class="secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate">Annulla</button>
+      </div>
     </form>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/calcola-raggruppamento" style="margin-top:0.75rem">
+      <input type="hidden" name="raggruppamento_id" value="{{ raggruppamento.id }}">
+      <button type="submit" class="icona-azione">{{ icona("grafico", 14) }} Calcola i voti combinati</button>
+    </form>
+  </section>
 
+  {# le aule si definiscono qui, una serie per ogni prova; l'assegnazione degli studenti
+     resta nella scheda Compiti d'esame della prova #}
+  {% for md in membri_dati %}
+  <section class="card riquadro-impostazioni blocco-aule" data-appello="{{ md.appello.id }}">
+    <h2>Aule · {{ md.appello.nome }}</h2>
+    <div class="contenitore-aule">{% include "_aule.html" %}</div>
+  </section>
+  {% endfor %}
+  <script>
+  document.querySelectorAll(".blocco-aule .contenitore-aule").forEach(function (c) { attivaAule(c, "{{ corso.tag }}"); });
+  </script>
+  {% endif %}
+
+  <section class="card riquadro-impostazioni{% if prossimo_passo and prossimo_passo.nome == 'Chiusura' %} riquadro-evidenziato{% endif %}">
+    <h2>Chiusura ed eliminazione</h2>
+    <div class="elenco-operazioni">
+      <div>
+        {% if appello.chiuso %}
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riapri">
+          <button type="submit" class="icona-azione">{{ icona("lucchetto", 14) }} Riapri l'appello</button>
+        </form>
+        {{ info("Appello chiuso: correzioni, verbalizzazioni ed esercizi assegnati non sono modificabili finché non lo riapri.") }}
+        {% else %}
+        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/chiudi"
+              onsubmit="return confirm({{ ('Chiudere l\'appello ' ~ appello.nome ~ '? Non sarà più possibile correggere, verbalizzare o modificare gli esercizi assegnati finché non lo riapri.')|js }});">
+          <button type="submit" class="icona-azione">{{ icona("lucchetto", 14) }} Chiudi l'appello</button>
+        </form>
+        {{ info("Quando tutti gli idonei sono stati verbalizzati o hanno rifiutato il voto, e non ci sono più orali da svolgere, chiudi l'appello per evitare modifiche accidentali: correzioni, verbalizzazioni ed esercizi assegnati non sono più modificabili finché non lo riapri." ~ (" Chiudere il raggruppamento chiude anche tutte le sue prove." if raggruppamento else "")) }}
+        {% endif %}
+      </div>
+    </div>
+    {% if raggruppamento %}
     <table style="margin-top:0.75rem">
       <tr><th>Prova</th><th>Data</th><th></th></tr>
       {% for m in raggruppamento.membri %}
       <tr>
         <td>{{ m.nome }}</td>
         <td>{{ m.data or '-' }}</td>
-        <td>
+        <td class="cella-azioni">
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ m.id }}/elimina"
                 onsubmit="return confirm({{ ('Eliminare la prova ' ~ m.nome ~ ' da questo raggruppamento? Le altre prove e il raggruppamento restano intatti.')|js }});">
-            <button type="submit" class="danger">Elimina questa prova</button>
+            <button type="submit" class="pulsante-icona" data-info="Elimina questa prova (le altre restano)" aria-label="Elimina la prova {{ m.nome }}">{{ icona("cestino") }}</button>
           </form>
         </td>
       </tr>
       {% endfor %}
     </table>
-  </details>
-  {% endif %}
+    {% endif %}
+    <details class="dettaglio-fisarmonica" style="margin-top:0.75rem">
+      <summary class="testo-pericolo">Elimina {{ 'il raggruppamento' if raggruppamento else "l'appello" }}</summary>
+      {% if risultati %}
+      <p class="muted" style="margin-top:0.5rem">Ha già <strong>{{ risultati|length }}</strong> risultati registrati, che verranno eliminati insieme.
+        Per confermare, scrivi <strong>{{ appello.nome }}</strong> qui sotto.</p>
+      <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/elimina" id="form-elimina-appello">
+        <input class="campo-conferma-testo" data-frase-attesa="{{ appello.nome }}" autocomplete="off" style="max-width:20rem">
+        <button type="submit" class="danger btn-conferma-testo" disabled style="margin-top:0.75rem">Elimina definitivamente</button>
+      </form>
+      <script>attivaConfermaTestuale(document.getElementById("form-elimina-appello"));</script>
+      {% else %}
+      <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/elimina" style="margin-top:0.5rem"
+            onsubmit="return confirm({{ ('Eliminare definitivamente l\'appello ' ~ appello.nome ~ ' (esercizi assegnati, blocchi e compiti compresi)?')|js }});">
+        <button type="submit" class="danger">Elimina definitivamente</button>
+      </form>
+      {% endif %}
+    </details>
+  </section>
+</div>
 </div>
 
 {% if raggruppamento %}
@@ -267,26 +272,28 @@
           {% else %}{{ r.voto }}{% if r.richiede_orale and r.orale_svolto %} <span class="badge badge-ok">orale svolto</span>{% endif %}{% endif %}
           {% if r.verbalizzato %}
           {% if r.esito == 'voto' and r.voto is not none %}
-          <span class="badge {{ 'badge-ok' if r.voto >= votomin_effettivo else 'badge-err' }}">{{ 'superato' if r.voto >= votomin_effettivo else 'insufficiente' }} verbalizzato {{ r.data_verbalizzazione }}</span>
+          <span class="badge {{ 'badge-ok' if r.voto >= votomin_effettivo else 'badge-err' }}">{{ 'superato' if r.voto >= votomin_effettivo else 'insufficiente' }} verbalizzato {{ r.data_verbalizzazione or "" }}</span>
           {% else %}
-          <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>
+          <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione or "" }}</span>
           {% endif %}
           {% endif %}
         </td>
         <td style="white-space:nowrap; text-align:right">
           {% if appello.chiuso %}
-          <span class="muted">appello chiuso</span>
+          <span class="muted" data-info="Appello chiuso: riaprilo dalle Impostazioni per modificare">{{ icona("lucchetto", 14) }}</span>
           {% elif not r.verbalizzato %}
-          {% if r.esito in ('voto', 'rifiutato') %}
-          <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica"
-             class="button {{ 'warning' if r.valutazione_sospesa else 'secondary' }}" style="margin-top:0">{{ 'Completa valutazione' if r.valutazione_sospesa else 'Modifica' }}</a>
+          {% if r.valutazione_sospesa %}
+          <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica" class="button warning pulsante-piccolo" style="margin:0">Completa valutazione</a>
+          {% elif r.esito in ('voto', 'rifiutato') %}
+          <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica" class="pulsante-icona" style="display:inline-flex"
+             data-info="Modifica la correzione" aria-label="Modifica il risultato di {{ r.cognome }} {{ r.nome }}">{{ icona("matita") }}</a>
           {% endif %}
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/elimina"
                 onsubmit="return confirm({{ ('Eliminare il risultato di ' ~ r.cognome ~ ' ' ~ r.nome ~ ' per questo appello?')|js }});">
-            <button type="submit" class="danger">Elimina</button>
+            <button type="submit" class="pulsante-icona" data-info="Elimina il risultato" aria-label="Elimina il risultato di {{ r.cognome }} {{ r.nome }}">{{ icona("cestino") }}</button>
           </form>
           {% else %}
-          <span class="muted">non modificabile</span>
+          <span class="muted" data-info="Voto già verbalizzato: non si può più modificare">{{ icona("lucchetto", 14) }}</span>
           {% endif %}
         </td>
       </tr>
@@ -297,32 +304,29 @@
     </table>
   </details>
 
-  <details class="card">
-    <summary><strong>Concludi correzione scritto</strong></summary>
+  {# chiusura della correzione del raggruppamento: attiva quando ogni prova ha chiuso la sua #}
+  {% from "_formati.html" import formati %}
+  {% set prove_aperte = membri_dati|rejectattr("appello.correzione_scritti_conclusa")|list %}
+  <div class="card barra-conclusione">
     {% if appello.correzione_scritti_conclusa %}
-    <p class="muted" style="margin-top:0.75rem">
-      Correzione scritta conclusa: nessuna nuova correzione è possibile per le prove di questo raggruppamento finché non riapri.
-    </p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riapri-correzione-scritto" style="margin-top:0.5rem">
-      <button type="submit" class="secondary">Riapri correzione scritto</button>
-    </form>
-    {% else %}
-    <p class="muted" style="margin-top:0.75rem">
-      Quando tutte le prove membro sono state corrette, concludi: genera l'elenco risultati
-      combinato (.html/.tex/.pdf) e blocca nuove correzioni (puoi comunque riaprire in qualsiasi momento).
-    </p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/concludi-correzione-scritto" style="margin-top:0.5rem">
-      <button type="submit">Concludi correzione scritto</button>
-    </form>
-    {% endif %}
+    <span><span class="badge badge-ok">✓ correzione conclusa</span></span>
     {% if risultati_tex_esiste or risultati_pdf_esiste %}
-    <p style="margin-top:0.75rem">
-      {% from "_formati.html" import formati %}
-      Elenco risultati da pubblicare:
-      {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/risultati", pdf=risultati_pdf_esiste, html=True, tex=risultati_tex_esiste, md=True) }}
-    </p>
+    <span>Risultati da pubblicare {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/risultati", pdf=risultati_pdf_esiste, html=True, tex=risultati_tex_esiste, md=True) }}</span>
     {% endif %}
-  </details>
+    {% if not appello.chiuso %}
+    <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riapri-correzione-scritto" style="margin-left:auto">
+      <button type="submit" class="secondary pulsante-piccolo">Riapri la correzione</button>
+    </form>
+    {% endif %}
+    {% elif not appello.chiuso %}
+    <span class="muted">{% if prove_aperte %}Correzione ancora aperta in: {{ prove_aperte|map(attribute="appello.nome")|join(", ") }}.
+      {% else %}Tutte le prove hanno chiuso la correzione.{% endif %}</span>
+    <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/concludi-correzione-scritto" style="margin-left:auto">
+      <button type="submit" {% if prove_aperte %}disabled{% endif %}
+              data-info="{{ 'Si attiva quando ogni prova ha chiuso la sua correzione' if prove_aperte else 'Genera l\'elenco dei risultati combinato e blocca nuove correzioni (si può riaprire)' }}">Chiudi la correzione</button>
+    </form>
+    {% endif %}
+  </div>
   <script>
   (function () {
     document.querySelectorAll(".btn-dettaglio-risultato-globale").forEach(function (btn) {
@@ -344,14 +348,9 @@
   </script>
 
   <details class="card dettaglio-fisarmonica">
-    <summary>Esporta voti per la segreteria</summary>
+    <summary>Esporta voti per la segreteria {{ info("Nel file \"Lista Studenti Esame\" della segreteria, per ogni studente con una valutazione completata e confermata, si compilano la colonna Esito (voto, ASS, RIT o 0 per insufficiente) e la colonna Domande d'esame (testo salvato nelle impostazioni del corso). Il file si carica una volta sola; prima di scaricare quello compilato viene chiesto se verbalizzare subito gli studenti trovati.") }}</summary>
     {% if segreteria_csv %}
-    <p class="muted" style="margin-top:1rem">
-      Per ogni studente con una valutazione già completata e confermata viene compilata la colonna Esito
-      (voto, ASS, RIT o 0 per insufficiente) e la colonna Domande d'esame, nel file
-      "{{ segreteria_csv.nome_file }}" caricato il {{ segreteria_csv.caricato_il }}. Prima di scaricare il
-      file viene chiesto se verbalizzare subito gli studenti trovati.
-    </p>
+    <p class="muted" style="margin-top:0.75rem">File: <strong>{{ segreteria_csv.nome_file }}</strong> (caricato il {{ segreteria_csv.caricato_il }})</p>
     {% set url_esporta = "/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/esporta-voti" %}
     {% include "_esporta_voti_bottone.html" %}
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/segreteria-csv/elimina" style="margin-top:0.5rem"
@@ -359,12 +358,7 @@
       <button type="submit" class="secondary">Rimuovi file caricato</button>
     </form>
     {% else %}
-    <p class="muted" style="margin-top:1rem">
-      Carica il file "Lista Studenti Esame" scaricato dalla segreteria: per ogni studente con una
-      valutazione già completata e confermata viene compilata la colonna Esito (voto, ASS, RIT o 0 per
-      insufficiente) e la colonna Domande d'esame (testo salvato nelle impostazioni del corso). Si carica
-      una volta sola: dopo potrai riscaricare il file compilato senza doverlo ricaricare ogni volta.
-    </p>
+    <p class="muted" style="margin-top:0.75rem">Carica il file "Lista Studenti Esame" scaricato dalla segreteria.</p>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/segreteria-csv" enctype="multipart/form-data">
       <input type="file" name="file" accept=".csv,.xls,.xlsx" required>
       <button type="submit">Carica</button>
@@ -393,11 +387,11 @@
         <td>
           {% if r.richiede_orale %}<span class="badge badge-ok">orale svolto</span>{% else %}<span class="muted">non richiesto</span>{% endif %}
         </td>
-        <td class="muted">{{ r.data_verbalizzazione }}</td>
+        <td class="muted">{{ r.data_verbalizzazione or "" }}</td>
         <td style="text-align:right">
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/verbalizza/{{ r.matricola }}/annulla"
                 onsubmit="return confirm({{ ('Annullare la verbalizzazione di ' ~ r.cognome ~ ' ' ~ r.nome ~ '? Tornerà tra gli idonei non ancora verbalizzati.')|js }});">
-            <button type="submit" class="secondary">Annulla verbalizzazione</button>
+            <button type="submit" class="pulsante-icona" data-info="Annulla la verbalizzazione: lo studente torna tra gli idonei" aria-label="Annulla la verbalizzazione di {{ r.cognome }} {{ r.nome }}">↶</button>
           </form>
         </td>
       </tr>

@@ -20,14 +20,14 @@
 {% macro mostra(varianti, soluzione, aperta) %}
   {% for v in varianti %}
   <div class="rif-variante" style="margin-top:0.25rem">{% if varianti|length > 1 %}Variante {{ loop.index }}{% else %}Testo{% endif %}</div>
-  <div class="rif-testo">{{ v.testo }}</div>
+  <div class="rif-testo">{{ v.testo | testo_web }}</div>
   {% if not aperta %}
   <ol class="rif-risposte" type="A">
-    {% for r in v.risposte %}<li{% if loop.first %} class="corretta"{% endif %}>{{ r }}{% if loop.first %} <span class="badge badge-ok">✓</span>{% endif %}</li>{% endfor %}
+    {% for r in v.risposte %}<li{% if loop.first %} class="corretta"{% endif %}>{{ r | testo_web }}{% if loop.first %} <span class="badge badge-ok">✓</span>{% endif %}</li>{% endfor %}
   </ol>
   {% endif %}
   {% endfor %}
-  {% if soluzione %}<div class="rif-soluzione"><strong>Soluzione.</strong> {{ soluzione }}</div>{% endif %}
+  {% if soluzione %}<div class="rif-soluzione"><strong>Soluzione.</strong> {{ soluzione | testo_web }}</div>{% endif %}
 {% endmacro %}
 
 {% set problemi = stato.dettaglio if stato.dettaglio else None %}

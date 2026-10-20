@@ -23,16 +23,27 @@
   </p>
   <p>
     In cima alla homepage, il riquadro <strong>Accesso rapido</strong> elenca gli appelli
-    non ancora chiusi dei corsi dell'anno accademico in corso, con i pulsanti per andare
-    direttamente al Testo, ai Compiti d'esame e alla Correzione (e, per un raggruppamento
-    di prove, ai Risultati).
+    non ancora chiusi dei corsi dell'anno accademico in corso, con una fila di icone per
+    andare direttamente al Testo, ai Compiti d'esame, alle Presenze e alla Correzione (e, per
+    un raggruppamento di prove, ai Risultati): passando il mouse su un'icona compare il suo nome.
+  </p>
+  <p>
+    In tutta l'app le spiegazioni che servono solo ogni tanto stanno in una piccola icona
+    <strong>i</strong> accanto al titolo o al campo: passandoci sopra con il mouse (o
+    selezionandola con la tastiera) compare la nota. Allo stesso modo, i pulsanti a icona
+    (matita per modificare, cestino per eliminare o togliere, e così via) mostrano al passaggio
+    del mouse cosa fanno. Le azioni più frequenti — aggiungere o togliere iscritti, esercizi e
+    aule, assegnare le aule, rendere obbligatorio un esercizio, eliminare un esercizio dalla
+    banca — si salvano senza ricaricare la pagina.
   </p>
   <p>
     Dalla scheda Impostazioni si scarica anche un <strong>backup</strong> (zip con
     database e tutti i file generati) del singolo corso, oppure — dalle Impostazioni
-    dell'app — un backup completo con tutti i corsi insieme. Ogni riquadro delle
-    Impostazioni ha il proprio pulsante Salva, così si può salvare una singola sezione
-    senza dover compilare anche le altre.
+    dell'app — un backup completo con tutti i corsi insieme. Le pagine di impostazioni
+    (dell'app, del corso e di ogni appello) sono divise in riquadri compatti, tutti visibili:
+    "Salva" registra le modifiche, "Annulla" (attivo solo se c'è qualcosa di modificato) le scarta
+    e riporta i campi ai valori salvati. Le operazioni rare o irreversibili (backup, chiusura,
+    eliminazione) stanno in fondo, con l'eliminazione dietro una conferma.
   </p>
   <p>
     Creando un corso con lo stesso nome di uno già esistente (es. l'edizione dell'anno
@@ -81,7 +92,8 @@
     probabilità uniforme, e le risposte vengono mescolate.
   </p>
   <p>
-    Un esercizio assegnato a un appello può essere marcato <strong>obbligatorio</strong>:
+    Un esercizio assegnato a un appello può essere marcato <strong>obbligatorio</strong>
+    (colonna "Obbl." della scheda Testo: un clic su Sì/No lo cambia):
     richiede sia la risposta a scelta multipla sia lo svolgimento scritto. Un esercizio
     può anche essere una <strong>domanda aperta</strong> (nessuna risposta a scelta
     multipla): in correzione il punteggio va sempre assegnato a mano dal docente. Se un
@@ -102,16 +114,22 @@
   </p>
   <p>
     Ogni corso ha la sua banca esercizi, separata dalle altre. Per riusare in un compito un
-    esercizio di un anno precedente o di un altro corso: scheda Testo dell'appello, pannello
-    <strong>Importa da altri corsi o anni precedenti</strong> (filtrabile per nome del corso,
+    esercizio di un anno precedente o di un altro corso: scheda Testo dell'appello, pulsante
+    <strong>Da altri corsi</strong> (filtrabile per nome del corso,
     corso specifico, argomento e testo). L'esercizio scelto viene copiato nella banca del corso
     (se ce n'è già uno identico si riusa quello) e aggiunto al compito. La pagina
     <a href="/esercizi">Tutti gli esercizi</a> (menu in alto) mostra invece gli esercizi di tutti i
     corsi insieme, con gli stessi filtri, solo da consultare.
   </p>
   <p>
-    Rimuovendo un esercizio dal compito viene chiesto anche se eliminarlo dalla banca dati del
-    corso, oppure lasciarvelo per riusarlo in futuro.
+    Nella scheda Testo, sotto l'elenco degli esercizi assegnati, una barra di pulsanti apre un
+    pannello alla volta: <strong>Nuovo esercizio</strong>, <strong>Dalla banca</strong> (gli
+    esercizi del corso non ancora assegnati, da selezionare e assegnare),
+    <strong>Da altri corsi</strong>, <strong>Genera con l'IA</strong>, <strong>Importa da
+    file</strong> ed <strong>Esporta</strong>. Su ogni esercizio, la matita apre il modulo di
+    modifica e il cestino lo toglie dal compito: viene chiesto anche se eliminarlo dalla banca
+    dati del corso, oppure lasciarvelo per riusarlo in futuro. Tutto questo aggiorna solo
+    l'elenco, senza ricaricare la pagina.
   </p>
   <p>
     Nella scheda Testo, l'icona <strong>Anteprima</strong> nel titolo di "Esercizi assegnati"
@@ -277,16 +295,22 @@ COMPITO DA CONVERTIRE
     In cima alla pagina di un appello c'è il <strong>percorso</strong>: tutte le fasi
     nell'ordine in cui si svolgono — <strong>Testo</strong> (esercizi assegnati),
     <strong>Compiti d'esame</strong> (iscritti e generazione dei blocchi, vedi sotto),
-    <strong>Presenze</strong> (facoltativo), <strong>Correzione</strong>, eventuali
+    <strong>Presenze</strong>, <strong>Correzione</strong>, eventuali
     <strong>Orali</strong>, <strong>Verbalizzazione</strong> e <strong>Chiusura</strong> —
-    ognuna con il suo stato (✓ completata, numero se ancora da fare) e un breve dettaglio.
+    in una riga compatta di pulsanti con icona. Lo stato si riconosce dal colore: verde con ✓
+    completata, arancione in corso, bordo blu il prossimo passo, grigio da fare; passando il
+    mouse su una fase compaiono stato e dettagli (es. "0 compiti generati"), e l'icona
+    <strong>i</strong> in fondo al percorso riassume il significato dei colori.
     Per un raggruppamento di prove le prime quattro fasi si ripetono per ciascuna prova.
     Cliccando una fase si apre la scheda in cui completarla.
   </p>
   <p>
     Sotto il percorso, il riquadro <strong>Prossimo passo</strong> dice cosa fare adesso
-    e porta direttamente alla scheda giusta. Le fasi facoltative (come il registro
-    presenze) vengono saltate se nel frattempo si è già andati avanti. La scheda
+    e porta direttamente alla scheda giusta (per un appello chiuso non propone nulla). Se la
+    correzione è iniziata senza usare il registro presenze, le Presenze restano "in corso" e il
+    prossimo passo è finire le correzioni, poi segnare gli assenti. Le presenze si completano chiudendo il registro
+    il giorno della prova oppure, finite le correzioni, con "Segna assenti tutti i non
+    corretti" (scheda Presenze): chi non ha un compito corretto risulta assente. La scheda
     <strong>Riepilogo</strong> mostra i numeri principali (compiti, iscritti, presenti,
     ritirati, sufficienti); <strong>Statistiche</strong> e <strong>Impostazioni</strong>
     restano sempre disponibili. Le schede non ancora utilizzabili sono in grigio: passandoci
@@ -297,23 +321,24 @@ COMPITO DA CONVERTIRE
 <details class="card dettaglio-fisarmonica">
   <summary>Iscritti e generazione dei compiti</summary>
   <p>
-    Nella scheda <strong>Compiti d'esame</strong> si indicano gli iscritti a un appello,
-    in uno di questi modi: caricando una volta sola il file "Lista Studenti Esame" scaricato
-    dalla segreteria (da cui si ricava anche l'elenco per fare l'appello e, più avanti, il
-    file compilato da restituire), importando le prenotazioni esportate da Moodle
-    (l'<em>ID number</em> è usato come matricola, chi non è ancora nel corso viene
-    registrato; l'icona "?" accanto al campo spiega come ottenere il file), aggiungendoli
-    singolarmente a mano per nome o matricola (dietro una tendina apribile), oppure — più
-    rapidamente ma senza un elenco nominale — indicando solo un numero. Il file della
-    segreteria, quando caricato, ha sempre la precedenza sugli altri.
+    Nella scheda <strong>Compiti d'esame</strong>, la sezione <strong>Iscritti</strong> mostra un
+    unico elenco degli iscritti all'appello. Si aggiunge uno studente scrivendone matricola o
+    cognome nel campo in alto (scegliendolo dai suggerimenti viene aggiunto subito) e lo si
+    toglie con il cestino in fondo alla riga; l'elenco si aggiorna senza ricaricare la pagina.
+    I pulsanti sotto il campo servono a riempirlo in un colpo solo: <em>File della
+    segreteria</em> (il "Lista Studenti Esame", da cui più avanti si compila anche il file da
+    restituire), <em>Prenotazioni Moodle</em> (l'<em>ID number</em> è usato come matricola, chi
+    non è ancora nel corso viene registrato; prima di importare si sceglie chi aggiungere),
+    <em>Tutto il corso</em> (eventualmente solo dalle matricole di una certa soglia in su) e,
+    finché non c'è un elenco, <em>Solo il numero</em> (senza nomi). A destra, l'elenco stampabile.
+    Gli aggiunti a mano si sommano a quelli del file; togliere uno studente del file non
+    modifica il file salvato, che torna intero alla segreteria (caricandone uno nuovo, chi era
+    stato tolto ricompare).
   </p>
   <p>
-    Per ammettere l'intero corso senza un file, "Ammetti tutti gli studenti del corso"
-    aggiunge in un colpo solo tutti gli studenti registrati (eventualmente solo quelli con
-    matricola maggiore o uguale a una soglia). Con "Filtra gli iscritti per matricola" si
-    tengono solo le matricole da una certa soglia in su, sia dal file sia dall'elenco a mano
-    (es. per una prova riservata al primo anno): il file restituito alla segreteria resta
-    comunque intero. Sotto il filtro compare l'elenco degli iscritti esclusi, con
+    Con <em>Filtro matricola</em> si tengono solo le matricole da una certa soglia in su (es.
+    per una prova riservata al primo anno): il file restituito alla segreteria resta
+    comunque intero. Sotto l'elenco compaiono allora gli iscritti esclusi, con
     l'indicazione DSA/L104: per ciascuno si conferma l'esclusione oppure lo si ammette
     comunque come eccezione (con una conferma esplicita). Finché non si decide restano
     esclusi, e la sezione segnala quanti sono ancora da confermare.
@@ -361,7 +386,10 @@ COMPITO DA CONVERTIRE
     per riga si salvano subito, senza ricaricare la pagina. Chi ha già un voto o un
     esito per l'appello risulta presente automaticamente e non è più modificabile da
     qui. "Chiudi registro" segna assenti tutti gli iscritti non spuntati (e senza già un
-    esito): un'operazione da fare una volta sola, a fine appello.
+    esito): un'operazione da fare una volta sola, a fine appello. Le presenze sono una fase
+    obbligatoria del percorso: se il registro non si usa il giorno della prova, finite le
+    correzioni si completano con <strong>"Segna assenti tutti i non corretti"</strong>
+    (in questa stessa scheda), che segna assente chi non ha un compito corretto.
   </p>
   <p>
     Dalla stessa scheda si <strong>registra al volo uno studente non censito</strong>
@@ -450,14 +478,17 @@ COMPITO DA CONVERTIRE
     singolo esito si può comunque correggere a mano in seguito.
   </p>
   <p>
-    "Concludi correzione scritto" — indipendente dalla chiusura dell'intero appello, che
-    di solito arriva più tardi (dopo orali e verbalizzazioni) — blocca nuove correzioni
+    In fondo alla scheda Correzione, il pulsante <strong>"Chiudi la correzione"</strong> si
+    attiva quando tutti gli attesi hanno un esito registrato e non restano bozze (accanto è
+    indicato cosa manca). Chiudere la correzione — indipendente dalla chiusura dell'intero
+    appello, che di solito arriva più tardi (dopo orali e verbalizzazioni) — blocca nuove correzioni
     per questa prova (si può sempre riaprire) e genera l'elenco risultati in
     <code>.html</code>, <code>.tex</code> e <code>.pdf</code> (matricola oscurata): non a
     ogni download, per non ricompilare inutilmente il PDF a ogni click mentre le
     correzioni sono ancora in corso. Restano comunque consultabili anche dopo. Per un
-    raggruppamento, si conclude separatamente per ciascuna prova membro (dalla sua
-    scheda Correzione) o per il voto combinato (dalla scheda Risultati).
+    raggruppamento, si chiude separatamente per ciascuna prova membro (dalla sua
+    scheda Correzione) e poi per il voto combinato (in fondo alla scheda Risultati, attivo
+    quando tutte le prove hanno chiuso la loro).
   </p>
 </details>
 
@@ -480,7 +511,7 @@ COMPITO DA CONVERTIRE
   <summary>Verbalizzazione e statistiche</summary>
   <p>
     Gli studenti idonei non ancora verbalizzati compaiono in cima alla scheda
-    <strong>Voti verbalizzati</strong>, con un pulsante "Verbalizza" per ciascuno (oltre a quello per
+    <strong>Verbalizzazione</strong> (per un raggruppamento: Risultati), con un pulsante "Verbalizza" per ciascuno (oltre a quello per
     verbalizzarli tutti insieme) e uno per rifiutare il voto; una volta verbalizzato, un
     esito non è più modificabile o eliminabile. Chi ha sostenuto l'orale è segnalato come
     tale sia tra i risultati inseriti sia tra i voti verbalizzati.
@@ -569,20 +600,20 @@ COMPITO DA CONVERTIRE
   <p>
     Una prova membro non ha più una pagina propria: tutto vive nella pagina del
     raggruppamento, con una riga di tab per ciascuna prova (nell'ordine, col nome vero
-    della prova seguito dai pulsanti "Testo"/"Compiti d'esame"/"Presenze e ritirati"/
-    "Correzione") e delle
+    della prova seguito dalle sue fasi Testo, Compiti, Presenze e Correzione) e delle
     schede globali — <strong>Risultati</strong> (elenco combinato, verbalizzazione ed
     esportazione .tex/.pdf/segreteria), <strong>Orali</strong> (l'orale è unico per il
     raggruppamento: se richiesto durante la correzione di una prova, il suo voto
-    sostituisce la media delle prove parziali una volta svolto), <strong>Voti
-    verbalizzati</strong>, <strong>Statistiche</strong> (per prova e combinate) e
+    sostituisce la media delle prove parziali una volta svolto), <strong>Verbalizzati</strong>, <strong>Statistiche</strong> (per prova e combinate) e
     <strong>Impostazioni</strong>.
   </p>
   <p>
     Alla seconda prova (e successive) può partecipare solo chi ha superato la prova
     precedente con il voto minimo delle prove parziali. Per la prima prova, in Impostazioni
-    si sceglie se ammettere <strong>tutti gli studenti del corso</strong> oppure solo gli
-    <strong>iscritti</strong> della prova (file della segreteria o aggiunti a mano), e in
+    si sceglie se ammettere solo gli <strong>iscritti</strong> della prova (file della
+    segreteria o aggiunti a mano: è la scelta predefinita, e finché non si aggiunge nessun
+    iscritto l'elenco degli ammessi resta vuoto) oppure <strong>tutti gli studenti del
+    corso</strong>, e in
     entrambi i casi si può fissare una <strong>matricola minima</strong> (es. per ammettere
     solo il primo anno). Il numero di compiti suggerito per ciascuna prova si
     basa proprio su questo elenco di ammessi, non sugli iscritti generali del
@@ -594,10 +625,14 @@ COMPITO DA CONVERTIRE
     studenti ammessi — con eventuali note DSA/in deroga — esportabile in .csv e .pdf
     (quest'ultimo pensato per fare l'appello in aula, con una riga di separazione tra uno
     studente e l'altro e la casella di presenza come prima colonna), insieme alla
-    gestione delle <strong>aule</strong>: si possono definire più aule con una capienza,
-    e assegnare automaticamente gli ammessi in ordine di cognome, proporzionalmente alla
-    capienza di ciascuna (le assegnazioni fatte a mano non vengono mai toccate da un
-    successivo ricalcolo automatico). Uno studente che non soddisfa i requisiti si può
+    assegnazione alle <strong>aule</strong>. Le aule di ciascuna prova (nome e posti) si
+    definiscono nella scheda <strong>Impostazioni</strong> del raggruppamento; una sola per prova
+    si può riservare agli studenti <strong>DSA/L104</strong> con il pulsante con l'icona
+    accanto all'aula. "Assegna automaticamente" distribuisce gli ammessi in ordine di cognome,
+    proporzionalmente ai posti di ciascuna aula (le assegnazioni fatte a mano non vengono mai
+    toccate); se c'è un'aula DSA, tutti i DSA/L104 vanno lì e gli altri nelle aule restanti.
+    Se gli studenti attesi superano una certa quota dei posti (50% di default, si cambia nelle
+    Impostazioni del corso, sezione Aule) compare un avviso. Uno studente che non soddisfa i requisiti si può
     comunque aggiungere a mano all'elenco ammessi di una prova: comparirà con l'avviso
     "in deroga" (anche nell'export csv/pdf), e si può togliere di nuovo in qualsiasi
     momento.
@@ -605,7 +640,7 @@ COMPITO DA CONVERTIRE
   <p>
     L'esportazione voti per la segreteria, dalla scheda Risultati, chiede conferma prima
     di verbalizzare: si può scegliere quali studenti compilati verbalizzare subito
-    (torneranno tra i "Voti verbalizzati") e quali lasciare solo nel file scaricato. Se
+    (compariranno tra i verbalizzati) e quali lasciare solo nel file scaricato. Se
     qualche studente ha una valutazione da esportare ma la sua matricola non compare nel
     file caricato, compare un avviso con l'elenco pronto da copiare e incollare, per
     aggiungerlo a mano sul sistema della segreteria.

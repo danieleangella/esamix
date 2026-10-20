@@ -6,10 +6,9 @@
 {% block content %}
 <header class="intestazione-pagina">
   <div class="intestazione-livello">Registro</div>
-  <h1>Azioni svolte e aggiornamenti</h1>
+  {% from "_info.html" import info %}
+  <h1>Azioni svolte e aggiornamenti {{ info("Ogni modulo inviato e ogni documento aperto o scaricato, con l'esito, più gli aggiornamenti dell'app installati (file registro.jsonl accanto ai corsi).") }}</h1>
 </header>
-<p class="muted" style="margin-top:0">Ogni modulo inviato e ogni documento aperto o scaricato, con l'esito, più gli
-  aggiornamenti dell'app installati (file <code>registro.jsonl</code> accanto ai corsi).</p>
 
 <form method="get" class="filtri-registro">
   <select name="corso" aria-label="Corso"><option value="">Tutti i corsi</option>

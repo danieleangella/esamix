@@ -4,11 +4,15 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <span class="current">Studenti</span>
 {% endblock %}
 {% block content %}
+{% from "_icone.html" import icona %}
+{% from "_info.html" import info %}
 {% set sezione_corso = "studenti" %}
 {% include "_intestazione_corso.html" %}
 
 <div class="card">
-  <h2>Studenti ({{ studenti|length }})</h2>
+  <h2 style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap">Studenti ({{ studenti|length }})
+    <a class="icona-azione" style="margin-left:auto; font-size:0.85rem; font-weight:500" href="/corsi/{{ corso.tag }}/studenti/esporta.csv?q={{ q|urlencode }}&amp;filtro={{ filtro }}&amp;dsa={{ dsa }}"
+       data-info="Scarica in CSV l'elenco qui sotto, con i filtri applicati">{{ icona("scarica", 14) }} CSV</a></h2>
   <form method="get" action="/corsi/{{ corso.tag }}/studenti">
     <div class="form-grid">
       <div style="position:relative">
@@ -42,9 +46,6 @@
     Elenco filtrato: {{ studenti|length }} studenti — <a href="/corsi/{{ corso.tag }}/studenti?q={{ q|urlencode }}">rimuovi i filtri</a>
   </p>
   {% endif %}
-  <p class="muted" style="margin-top:0.5rem">
-    <a href="/corsi/{{ corso.tag }}/studenti/esporta.csv?q={{ q|urlencode }}&amp;filtro={{ filtro }}&amp;dsa={{ dsa }}">Esporta questo elenco in CSV</a>
-  </p>
   <script>
   creaAutocomplete(
     document.getElementById("input-cerca-studenti"), document.getElementById("suggerimenti-cerca-studenti"),
@@ -58,22 +59,22 @@
   });
   </script>
   <table style="margin-top:0.75rem">
-    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Risultato</th><th></th></tr>
+    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Risultato {{ info("Il voto migliore dello studente in questo corso: verde se verbalizzato, arancione se ancora da verbalizzare, rosso se insufficiente.") }}</th><th></th></tr>
     {% for s in studenti %}
     {% set st = stato_esame.get(s.matricola) %}
     <tr>
       <td>{{ s.matricola }}</td>
       <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
       <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
-      <td>{% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
+      <td>{% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}data-info="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
       <td>
         {% if not st %}<span class="muted">mai sostenuto</span>
-        {% elif st.stato == 'verbalizzato' %}<span class="badge badge-ok">{{ st.voto }}</span>
-        {% elif st.stato == 'da_verbalizzare' %}<span class="badge badge-warn">{{ st.voto }}</span>
-        {% elif st.stato == 'insufficiente' %}<span class="badge badge-err">{{ st.voto }}</span>
+        {% elif st.stato == 'verbalizzato' %}<span class="badge badge-ok" data-info="Verbalizzato">{{ st.voto }}</span>
+        {% elif st.stato == 'da_verbalizzare' %}<span class="badge badge-warn" data-info="Da verbalizzare">{{ st.voto }}</span>
+        {% elif st.stato == 'insufficiente' %}<span class="badge badge-err" data-info="Insufficiente">{{ st.voto }}</span>
         {% endif %}
       </td>
-      <td style="white-space:nowrap"><button type="button" class="secondary btn-modifica-studente" data-matricola="{{ s.matricola }}">Modifica</button></td>
+      <td class="cella-azioni"><button type="button" class="pulsante-icona btn-modifica-studente" data-matricola="{{ s.matricola }}" data-info="Modifica o elimina lo studente" aria-label="Modifica {{ s.cognome }} {{ s.nome }}">{{ icona("matita") }}</button></td>
     </tr>
     <tr class="riga-modifica-studente" data-matricola="{{ s.matricola }}" style="display:none">
       <td colspan="6">
@@ -91,7 +92,7 @@
         </form>
         <form method="post" action="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/elimina" class="inline"
               onsubmit="return confirm({{ ('Eliminare ' ~ s.cognome ~ ' ' ~ s.nome ~ ' (' ~ s.matricola ~ ')? Possibile solo se non ha risultati registrati.')|js }});" style="margin-top:0.5rem">
-          <button type="submit" class="danger">Elimina studente</button>
+          <button type="submit" class="danger pulsante-piccolo">{{ icona("cestino", 13) }} Elimina studente</button>
         </form>
       </td>
     </tr>
@@ -120,8 +121,7 @@
 </details>
 
 <details class="card collassabile pannello-azione">
-  <summary>Importa da CSV</summary>
-  <p class="muted" style="margin-top:1rem">Una riga per studente. Le colonne possono essere in qualsiasi ordine e averne anche di superflue: nel passo successivo si sceglie quale colonna usare per matricola, nome e cognome, con un'anteprima e la conferma prima di scrivere davvero i dati.</p>
+  <summary>Importa da CSV {{ info("Una riga per studente. Le colonne possono essere in qualsiasi ordine e averne anche di superflue: nel passo successivo si sceglie quale colonna usare per matricola, nome e cognome, con un'anteprima e la conferma prima di scrivere davvero i dati.") }}</summary>
   <form method="post" action="/corsi/{{ corso.tag }}/studenti/importa-csv" enctype="multipart/form-data">
     <input type="file" name="file" accept=".csv" required>
     <button type="submit">Importa</button>

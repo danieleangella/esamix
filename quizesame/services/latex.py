@@ -331,11 +331,16 @@ def mischia(esercizi_struct: list[dict]) -> list[dict]:
 
 def _box_soluzione(soluzione: str) -> str:
     """Soluzione sotto un esercizio dei fogli di riferimento: blocco con un filetto a
-    sinistra (ambiente leftbar di framed), che a differenza di un riquadro a larghezza
-    fissa segue la colonna e si spezza tra due pagine se serve."""
+    sinistra, largo quanto la colonna. Non si usa leftbar (framed): dentro multicols non sa
+    quanto spazio resta nella colonna, così una soluzione che non ci stava finiva nella
+    pagina dopo, lasciando la colonna accanto vuota e quella dell'esercizio stirata a tutta
+    altezza (un enorme spazio bianco tra testo e risposte). Il blocco non si spezza: se non
+    sta nella colonna passa alla successiva, che con \\raggedcolumns non stira nulla."""
     return (
-        "\\begin{leftbar}\n\\small{\\bfseries Soluzione / suggerimento.} "
-        f"{soluzione}\n\\end{{leftbar}}\n\n"
+        "\\par\\smallskip\\noindent\\hbox{\\vrule width 3pt\\hspace{10pt}"
+        "\\begin{minipage}[t]{\\dimexpr\\linewidth-13pt\\relax}\\small\\raggedright"
+        "{\\bfseries Soluzione / suggerimento.} "
+        f"{soluzione}\n\\end{{minipage}}}}\\par\\medskip\n\n"
     )
 
 
@@ -379,7 +384,9 @@ def crea_file_riferimento(ctx: LatexContext, esercizi_struct: list[dict], con_so
             + (f"\\quad{{\\normalsize\\mdseries (variante {indice_compito + 1} di ogni esercizio)}}" if n_varianti_max > 1 else "")
             + "}}\n\\vspace{0.4cm}\n\n"
         )
-        tex += "\\begin{multicols}{2}\n\\raggedright\n\\setcounter{ex}{0}\n"
+        # \\raggedcolumns: a fine colonna resta spazio libero in fondo, invece di
+        # distribuirlo tra le righe (che aprirebbe buchi dentro un esercizio)
+        tex += "\\begin{multicols}{2}\n\\raggedcolumns\n\\raggedright\n\\setcounter{ex}{0}\n"
         for es in esercizi_struct:
             varianti = es["varianti"]
             variante = varianti[indice_compito % len(varianti)]

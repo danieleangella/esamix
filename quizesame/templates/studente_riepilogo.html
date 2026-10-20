@@ -33,9 +33,9 @@
       <td>
         {% if r.verbalizzato %}
         {% if r.superato is not none %}
-        <span class="badge {{ 'badge-ok' if r.superato else 'badge-err' }}">{{ 'superato' if r.superato else 'insufficiente' }} {{ r.data_verbalizzazione }}</span>
+        <span class="badge {{ 'badge-ok' if r.superato else 'badge-err' }}">{{ 'superato' if r.superato else 'insufficiente' }} {{ r.data_verbalizzazione or "" }}</span>
         {% else %}
-        <span class="badge badge-ok">{{ r.data_verbalizzazione }}</span>
+        <span class="badge badge-ok">{{ r.data_verbalizzazione or "" }}</span>
         {% endif %}
         {% else %}-{% endif %}
       </td>

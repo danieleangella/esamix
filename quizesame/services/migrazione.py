@@ -106,6 +106,8 @@ def migra(
             corsi_service.create_raggruppamento(
                 tag, nome="Prove parziali (media)", membro_ids=membri_ids,
                 appello_id=appello_id_by_col["proveparziali"],
+                # prove già svolte, senza elenco iscritti: si ricostruisce chi poteva sostenerle
+                fonte_ammessi="corso",
             )
         else:
             report.warnings.append(

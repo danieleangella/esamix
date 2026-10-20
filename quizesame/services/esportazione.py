@@ -132,6 +132,8 @@ def carica_csv_segreteria(tag: str, appello_id: int, nome_file: str, contenuto: 
             "codifica=excluded.codifica, caricato_il=CURRENT_TIMESTAMP",
             (appello_id, nome_file, testo, codifica),
         )
+        # un file nuovo è un elenco nuovo: chi era stato tolto dal precedente vi ricompare
+        conn.execute("DELETE FROM appello_iscritti_rimossi WHERE appello_id=?", (appello_id,))
         conn.commit()
     finally:
         conn.close()
@@ -153,14 +155,15 @@ def elimina_segreteria_csv(tag: str, appello_id: int) -> None:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         conn.execute("DELETE FROM appello_segreteria_csv WHERE appello_id=?", (appello_id,))
+        conn.execute("DELETE FROM appello_iscritti_rimossi WHERE appello_id=?", (appello_id,))
         conn.commit()
     finally:
         conn.close()
 
 
 def list_iscritti_manuali(tag: str, appello_id: int) -> list[dict]:
-    """Iscritti aggiunti a mano uno per uno (quando non è stato caricato un file della
-    segreteria): stessa forma dell'elenco derivato dal CSV."""
+    """Iscritti aggiunti a mano uno per uno (da soli, o in aggiunta a quelli del file
+    della segreteria): stessa forma dell'elenco derivato dal CSV."""
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         rows = conn.execute(
@@ -192,6 +195,8 @@ def aggiungi_iscritto_manuale(tag: str, appello_id: int, matricola: str) -> None
             "ON CONFLICT(matricola, appello_id) DO NOTHING",
             (matricola, appello_id),
         )
+        # se era stato tolto dall'elenco del file della segreteria, ci torna
+        conn.execute("DELETE FROM appello_iscritti_rimossi WHERE appello_id=? AND matricola=?", (appello_id, matricola))
         conn.commit()
     finally:
         conn.close()
@@ -330,12 +335,20 @@ def iscrivi_tutti_gli_studenti(tag: str, appello_id: int, matricola_minima: str 
         conn.close()
 
 
-def rimuovi_iscritto_manuale(tag: str, appello_id: int, matricola: str) -> None:
+def rimuovi_iscritto(tag: str, appello_id: int, matricola: str) -> None:
+    """Toglie uno studente dall'elenco iscritti, comunque ci sia entrato: se aggiunto a
+    mano lo si cancella, se viene dal file della segreteria lo si segna come tolto (il
+    file salvato resta intero)."""
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         conn.execute(
             "DELETE FROM appello_iscritti_manuali WHERE matricola=? AND appello_id=?", (matricola, appello_id)
         )
+        if conn.execute("SELECT 1 FROM appello_segreteria_csv WHERE appello_id=?", (appello_id,)).fetchone():
+            conn.execute(
+                "INSERT OR IGNORE INTO appello_iscritti_rimossi (appello_id, matricola) VALUES (?,?)",
+                (appello_id, matricola),
+            )
         conn.commit()
     finally:
         conn.close()
@@ -421,9 +434,11 @@ def decidi_eccezione_filtro(tag: str, appello_id: int, matricola: str, decisione
 
 
 def _list_iscritti_senza_filtro(tag: str, appello_id: int) -> Optional[list[dict]]:
+    """Gli iscritti del file della segreteria (tolti quelli rimossi a mano) più quelli
+    aggiunti a mano, questi ultimi con "aggiunto": True; senza file, solo quelli a mano."""
     riga_csv = get_segreteria_csv(tag, appello_id)
+    manuali = [{**s, "aggiunto": True} for s in list_iscritti_manuali(tag, appello_id)]
     if riga_csv is None:
-        manuali = list_iscritti_manuali(tag, appello_id)
         return manuali or None
     righe = list(csv.reader(io.StringIO(riga_csv["contenuto"])))
     indice_intestazione = _trova_intestazione(righe)
@@ -437,11 +452,14 @@ def _list_iscritti_senza_filtro(tag: str, appello_id: int) -> Optional[list[dict
         anagrafica = {
             r["matricola"]: r for r in conn.execute("SELECT matricola, nome, cognome, dsa, dsa_tipo, dsa_note FROM studenti")
         }
+        rimossi = {r["matricola"] for r in conn.execute(
+            "SELECT matricola FROM appello_iscritti_rimossi WHERE appello_id=?", (appello_id,)
+        )}
     finally:
         conn.close()
 
     iscritti = []
-    matricole_viste = set()
+    matricole_viste = set(rimossi)
     for r in righe[indice_intestazione + 1:]:
         if len(r) <= idx_matricola or not r[idx_matricola].strip():
             continue
@@ -463,6 +481,8 @@ def _list_iscritti_senza_filtro(tag: str, appello_id: int) -> Optional[list[dict
                 "nome": r[idx_nome].strip() if idx_nome is not None and len(r) > idx_nome else "",
                 "dsa": False, "dsa_tipo": "", "dsa_note": "", "registrato": False,
             })
+    nel_file = {s["matricola"] for s in iscritti}
+    iscritti += [s for s in manuali if s["matricola"] not in nel_file]
     iscritti.sort(key=lambda s: (s["cognome"], s["nome"]))
     return iscritti
 

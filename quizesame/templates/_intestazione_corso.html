@@ -7,11 +7,15 @@
     {% if corso.importato_da_legacy %}<span class="badge badge-warn" title="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
   </h1>
 </header>
+{% from "_icone.html" import icona %}
 <nav class="schede-sezione" aria-label="Sezioni del corso">
-  {% for chiave, url, etichetta in [
-    ("appelli", "", "Appelli"), ("studenti", "/studenti", "Studenti"), ("esercizi", "/esercizi", "Esercizi"),
-    ("statistiche", "/statistiche", "Statistiche"), ("impostazioni", "/impostazioni", "Impostazioni"),
+  {% for chiave, url, etichetta, ic, spiegazione in [
+    ("appelli", "", "Appelli", "elenco", "Appelli e prove parziali del corso, con il prossimo passo di ciascuno"),
+    ("studenti", "/studenti", "Studenti", "persone", "Studenti registrati, DSA/L104 e carriera di ciascuno"),
+    ("esercizi", "/esercizi", "Esercizi", "banca", "Banca degli esercizi del corso"),
+    ("statistiche", "/statistiche", "Statistiche", "grafico", "Andamento dei voti e degli esercizi in tutti gli appelli"),
+    ("impostazioni", "/impostazioni", "Impostazioni", "ingranaggio", "Voti, punteggi, orale, aule, frasi del compito, backup"),
   ] %}
-  <a href="/corsi/{{ corso.tag }}{{ url }}"{% if chiave == sezione_corso %} class="active" aria-current="page"{% endif %}>{{ etichetta }}</a>
+  <a href="/corsi/{{ corso.tag }}{{ url }}" data-info="{{ spiegazione }}"{% if chiave == sezione_corso %} class="active" aria-current="page"{% endif %}>{{ icona(ic, 14) }} {{ etichetta }}</a>
   {% endfor %}
 </nav>

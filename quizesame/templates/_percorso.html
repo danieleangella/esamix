@@ -1,41 +1,47 @@
-{# Percorso dell'appello, sempre visibile sopra le schede: tutte le fasi nell'ordine, con
-   il loro stato, e il prossimo passo da fare ben in evidenza. Ogni fase porta alla scheda
-   in cui si completa. #}
+{# Percorso dell'appello, sempre visibile sopra le schede: tutte le fasi nell'ordine, una riga
+   compatta per prova, con il loro stato (segno sull'icona e colore) e, al passaggio del
+   mouse, stato e dettagli per esteso. Ogni fase porta alla scheda in cui si completa. #}
+{% from "_icone.html" import icona %}
+{% from "_info.html" import info %}
+{% set icone_fasi = {"creazione": "testo", "compiti": "stampa", "presenze": "presenze", "valutazione": "correzione",
+                     "orali": "orale", "verbalizzati": "verbale", "risultati": "verbale", "impostazioni": "lucchetto"} %}
+{% set nomi_brevi = {"Compiti d'esame": "Compiti"} %}
+{% set stati = {"fatta": "Completata", "saltata": "Non usata", "in_corso": "In corso", "da_fare": "Da fare"} %}
 <nav class="percorso" aria-label="Fasi dell'appello">
-  {% set ns = namespace(prova=None, n=0) %}
+  {% set ns = namespace(prova=None) %}
   {% for p in percorso %}
-  {% if p.prova != ns.prova %}
-  {% if not loop.first %}</ol>{% endif %}
+  {% if p.prova != ns.prova or loop.first %}
+  {% if not loop.first %}</ol></div>{% endif %}
   {% set ns.prova = p.prova %}
+  <div class="percorso-riga">
   {% if p.prova %}<div class="percorso-gruppo">{{ p.prova }}</div>{% elif not loop.first %}<div class="percorso-gruppo">Conclusione</div>{% endif %}
   <ol class="percorso-passi">
   {% endif %}
-  {% set ns.n = ns.n + 1 %}
+    {% set base = p.scheda.split("-")[0] %}
     <li class="passo passo-{{ p.stato }}{% if p.prossimo %} passo-prossimo{% endif %}">
-      <a href="#{{ p.scheda }}" data-tab="{{ p.scheda }}" title="{{ p.dettaglio }}"{% if p.prossimo %} aria-current="step"{% endif %}>
-        <span class="passo-icona" aria-hidden="true">{% if p.stato == 'fatta' %}✓{% elif p.stato == 'saltata' %}–{% else %}{{ ns.n }}{% endif %}</span>
-        <span class="passo-testo">
-          <span class="passo-nome">{{ p.nome }}{% if p.facoltativa %} <span class="passo-facoltativo">(facoltativo)</span>{% endif %}</span>
-          {% if p.prossimo %}<span class="passo-etichetta-prossimo" aria-hidden="true">prossimo</span>{% endif %}
-          <span class="passo-dettaglio">{{ p.dettaglio }}</span>
-        </span>
-        <span class="sr-only">— {{ {'fatta': 'completata', 'saltata': 'non usata', 'in_corso': 'in corso', 'da_fare': 'da fare'}[p.stato] }}{% if p.prossimo %}, prossimo passo{% endif %}</span>
+      <a href="#{{ p.scheda }}" data-tab="{{ p.scheda }}"{% if p.prossimo %} aria-current="step"{% endif %}
+         data-info="{{ p.nome }}{% if p.facoltativa %} (facoltativa){% endif %} — {{ stati[p.stato] }}{% if p.prossimo %}, è il prossimo passo{% endif %}{% if p.dettaglio %}: {{ p.dettaglio }}{% endif %}">
+        <span class="passo-icona" aria-hidden="true">{{ icona(icone_fasi.get(base, "spunta"), 14) }}
+          {%- if p.stato == 'fatta' %}<span class="passo-segno">✓</span>{% elif p.stato == 'in_corso' %}<span class="passo-segno">•</span>{% endif %}</span>
+        <span class="passo-nome">{{ nomi_brevi.get(p.nome, p.nome) }}</span>
+        <span class="sr-only">— {{ stati[p.stato]|lower }}{% if p.prossimo %}, prossimo passo{% endif %}</span>
       </a>
     </li>
-  {% if loop.last %}</ol>{% endif %}
+  {% if loop.last %}</ol>
+  {{ info("Ogni fase porta alla sua scheda. Verde con ✓: completata; arancione: in corso; bordo blu: è il prossimo passo; grigio: da fare; sbiadita: non usata. Passa sopra a una fase per i dettagli.") }}
+  </div>{% endif %}
   {% endfor %}
 </nav>
 
 {% if prossimo_passo %}
 <div class="prossimo-passo" data-scheda="{{ prossimo_passo.scheda }}">
-  <div>
-    <div class="prossimo-passo-etichetta">Prossimo passo{% if prossimo_passo.prova %} · {{ prossimo_passo.prova }}{% endif %}</div>
-    <div class="prossimo-passo-azione">{{ prossimo_passo.azione }}</div>
-  </div>
+  <span class="prossimo-passo-etichetta">Prossimo passo{% if prossimo_passo.prova %} · {{ prossimo_passo.prova }}{% endif %}</span>
+  <span class="prossimo-passo-azione">{{ prossimo_passo.azione }}</span>
   <a class="button" href="#{{ prossimo_passo.scheda }}">Vai a {{ prossimo_passo.nome }} &rarr;</a>
 </div>
 {% elif appello.chiuso %}
 <div class="prossimo-passo prossimo-passo-fatto">
-  <div><div class="prossimo-passo-azione">Appello completato e chiuso.</div></div>
+  <span class="prossimo-passo-azione">{{ icona("lucchetto", 14) }} Appello chiuso: non sono più possibili modifiche.</span>
+  <a class="icona-azione" href="#impostazioni" data-info="Per modificare qualcosa riapri l'appello dalla scheda Impostazioni">Riapri…</a>
 </div>
 {% endif %}

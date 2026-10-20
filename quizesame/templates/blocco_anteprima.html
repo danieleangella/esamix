@@ -16,12 +16,12 @@
 {% set lettere = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] %}
 {% for r in righe %}
 <div class="card">
-  <p style="white-space:pre-wrap; margin:0">{{ loop.index }}. {{ r.testo }}</p>
+  <p style="white-space:pre-wrap; margin:0">{{ loop.index }}. {{ r.testo | testo_web }}</p>
   {% if r.aperta %}
   <p class="muted" style="margin:0.5rem 0 0">Domanda aperta: nessuna risposta a scelta multipla.</p>
   {% else %}
   {% for s in r.risposte %}
-  <p style="margin:0.2rem 0">{{ lettere[loop.index0] }}. {{ s }}</p>
+  <p style="margin:0.2rem 0">{{ lettere[loop.index0] }}. {{ s | testo_web }}</p>
   {% endfor %}
   {% endif %}
   {% if r.obbligatorio %}<p class="muted" style="margin-top:0.5rem">Obbligatorio.</p>{% endif %}

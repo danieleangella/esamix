@@ -22,6 +22,9 @@ DEFAULT_RISPOSTA_CORRETTA = 3
 DEFAULT_RISPOSTA_SBAGLIATA = -1
 DEFAULT_RISPOSTA_VUOTA = 0
 DEFAULT_PUNTEGGIO_MAX_APERTA = 3
+# oltre questa percentuale dei posti delle aule occupati dagli ammessi compare un avviso
+# (agli esami si lascia di solito un posto libero accanto a ogni studente)
+DEFAULT_SOGLIA_OCCUPAZIONE_AULE = 50
 DEFAULT_ORALE_SOGLIA_N = 3
 DEFAULT_ORALE_SOGLIA_VOTO = 10
 
@@ -79,6 +82,7 @@ class Corso:
     # e nel file della segreteria: "insufficiente" o "ritirato" (nella carriera dello
     # studente resta comunque indicato come annullato)
     annullato_come: str = "insufficiente"
+    soglia_occupazione_aule: int = DEFAULT_SOGLIA_OCCUPAZIONE_AULE
     domande_esame: str = ""  # la prima di domande_esame_lista: quella proposta di default
     domande_esame_lista: list[str] = field(default_factory=list)
     importato_da_legacy: bool = False
@@ -112,10 +116,11 @@ class Raggruppamento:
     nome: str
     membri: list = field(default_factory=list)  # list[Appello]
     matricola_minima_prima_prova: Optional[str] = None
-    # chi è ammesso alla prima prova: "corso" = tutti gli studenti del corso, "iscritti" =
-    # l'elenco iscritti della prima prova (file della segreteria o aggiunti a mano);
-    # in entrambi i casi filtrati da matricola_minima_prima_prova
-    fonte_ammessi: str = "corso"
+    # chi è ammesso alla prima prova: "iscritti" = l'elenco iscritti della prima prova (file
+    # della segreteria o aggiunti a mano: vuoto finché non se ne aggiunge nessuno), "corso" =
+    # tutti gli studenti del corso, solo se scelto esplicitamente; in entrambi i casi
+    # filtrati da matricola_minima_prima_prova
+    fonte_ammessi: str = "iscritti"
 
 
 def effective_votomin(corso: Corso, appello: Appello) -> int:
@@ -230,7 +235,7 @@ _META_EREDITABILI = (
     "frase_obbligatorio",
     "orale_dopo_richiesta", "orale_soglia_attiva", "orale_soglia_n", "orale_soglia_voto",
     "orale_soglia_escludi_parziali", "ritirato_conta_insufficiente", "annullato_come", "domande_esame",
-    "domande_esame_lista",
+    "domande_esame_lista", "soglia_occupazione_aule",
 )
 
 
@@ -432,6 +437,7 @@ def get_corso(tag: str) -> Corso:
         orale_soglia_escludi_parziali=meta.get("orale_soglia_escludi_parziali", "1") == "1",
         ritirato_conta_insufficiente=meta.get("ritirato_conta_insufficiente", "0") == "1",
         annullato_come="ritirato" if meta.get("annullato_come") == "ritirato" else "insufficiente",
+        soglia_occupazione_aule=int(meta.get("soglia_occupazione_aule") or DEFAULT_SOGLIA_OCCUPAZIONE_AULE),
         domande_esame=(_domande_esame_da_meta(meta) or [""])[0],
         domande_esame_lista=_domande_esame_da_meta(meta),
         importato_da_legacy=meta.get("importato_da_legacy", "0") == "1",
@@ -575,6 +581,7 @@ def elimina_appello(tag: str, appello_id: int) -> None:
         conn.execute("DELETE FROM blocchi WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM appello_esercizi WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM appello_eccezioni_matricola WHERE appello_id=?", (appello_id,))
+        conn.execute("DELETE FROM appello_iscritti_rimossi WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM esercizio_sospetti WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM raggruppamento_membri WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM raggruppamenti WHERE appello_id=?", (appello_id,))
@@ -742,7 +749,7 @@ def get_raggruppamento_by_membro(tag: str, appello_id: int) -> Optional[Raggrupp
 
 
 def update_raggruppamento_soglia(
-    tag: str, raggruppamento_id: int, matricola_minima_prima_prova: Optional[str], fonte_ammessi: str = "corso",
+    tag: str, raggruppamento_id: int, matricola_minima_prima_prova: Optional[str], fonte_ammessi: str = "iscritti",
 ) -> None:
     if fonte_ammessi not in ("corso", "iscritti"):
         raise ValueError("Fonte degli ammessi non valida")
@@ -775,8 +782,8 @@ def matricola_ammessa(matricola: str, soglia: Optional[str]) -> bool:
 
 def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) -> list[dict]:
     """Studenti ammessi a sostenere la prova `raggruppamento.membri[indice]`: per la prima
-    prova (indice 0), tutti gli studenti del corso — oppure, se fonte_ammessi è
-    "iscritti", quelli dell'elenco iscritti della prima prova — con matricola >= l'eventuale soglia
+    prova (indice 0), quelli dell'elenco iscritti della prima prova (nessuno se l'elenco è
+    vuoto) — oppure, se fonte_ammessi è "corso", tutti gli studenti del corso — con matricola >= l'eventuale soglia
     impostata sul raggruppamento (chi ha una matricola non numerica, o se la soglia non è
     impostata/non è un numero valido, resta ammesso: non si filtrano casi ambigui); per le
     successive, solo chi ha superato (voto >= voto minimo delle prove parziali) la prova
@@ -873,11 +880,13 @@ def rimuovi_ammissione_manuale(tag: str, appello_id: int, matricola: str) -> Non
 
 
 def create_raggruppamento(
-    tag: str, nome: str, membro_ids: list[int], appello_id: Optional[int] = None
+    tag: str, nome: str, membro_ids: list[int], appello_id: Optional[int] = None, fonte_ammessi: str = "iscritti",
 ) -> Raggruppamento:
     """Crea un raggruppamento (es. media di due prove parziali). Se appello_id non è
     indicato, crea automaticamente l'appello 'virtuale' che ospiterà il voto combinato
-    (usato dalla migrazione, che invece riusa un appello già esistente)."""
+    (usato dalla migrazione, che invece riusa un appello già esistente). Alla prima prova
+    è ammesso solo chi vi è iscritto: nessuno, finché il docente non aggiunge gli iscritti
+    o non sceglie esplicitamente di ammettere tutto il corso."""
     if len(membro_ids) < 2:
         raise ValueError("Un raggruppamento deve avere almeno due appelli membri")
     if appello_id is None:
@@ -886,7 +895,8 @@ def create_raggruppamento(
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         cur = conn.execute(
-            "INSERT INTO raggruppamenti (appello_id, nome) VALUES (?, ?)", (appello_id, nome)
+            "INSERT INTO raggruppamenti (appello_id, nome, fonte_ammessi) VALUES (?, ?, ?)",
+            (appello_id, nome, fonte_ammessi),
         )
         raggruppamento_id = cur.lastrowid
         for membro_id in membro_ids:

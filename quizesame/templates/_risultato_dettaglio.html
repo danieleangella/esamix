@@ -20,9 +20,9 @@
     {% if risultato.verbalizzato %}
     ·
     {% if risultato.superato is not none %}
-    <span class="badge {{ 'badge-ok' if risultato.superato else 'badge-err' }}">{{ 'superato' if risultato.superato else 'insufficiente' }} verbalizzato {{ risultato.data_verbalizzazione }}</span>
+    <span class="badge {{ 'badge-ok' if risultato.superato else 'badge-err' }}">{{ 'superato' if risultato.superato else 'insufficiente' }} verbalizzato {{ risultato.data_verbalizzazione or "" }}</span>
     {% else %}
-    <span class="badge badge-ok">verbalizzato {{ risultato.data_verbalizzazione }}</span>
+    <span class="badge badge-ok">verbalizzato {{ risultato.data_verbalizzazione or "" }}</span>
     {% endif %}
     {% endif %}
     {% if risultato.insufficiente_per_obbligatorio %} · <span class="badge badge-warn">insufficiente per obbligatorio non svolto</span>{% endif %}

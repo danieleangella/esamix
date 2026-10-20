@@ -9,7 +9,9 @@
 <script defer src="/static/katex/contrib/auto-render.min.js"></script>
 {% endblock %}
 {% block content %}
-<h1>Tutti gli esercizi <span class="muted">({{ righe_esercizi|length }})</span></h1>
+{% from "_info.html" import info %}
+<h1>Tutti gli esercizi <span class="muted">({{ righe_esercizi|length }})</span>
+  {{ info("Gli esercizi di tutti i corsi, in un unico elenco da filtrare per nome del corso (tutte le sue edizioni), corso specifico, argomento o testo. Ogni corso ha la sua banca separata: per usare uno di questi esercizi in un compito, apri l'appello, scheda Testo, pulsante \"Da altri corsi\".") }}</h1>
 {% if verifiche_corsi %}
 {% set tot_da = verifiche_corsi | sum(attribute="da_verificare") %}
 <details class="card" id="verifica-ia" {% if tot_da %}open{% endif %}>
@@ -30,8 +32,7 @@
   <form method="post" action="/esercizi/ia/verifica" class="form-verifica-tutti" style="margin-top:0.75rem">
     {% if profili_ia|length > 1 %}{% set appello = {'id': 't'} %}{% include "_scelta_profilo_ia.html" %}{% endif %}
     <button type="submit" {% if not tot_da %}disabled{% endif %}>Verifica tutti i {{ tot_da }} esercizi da verificare</button>
-    <p class="muted" style="margin-bottom:0">Un corso alla volta; può richiedere parecchi minuti. Gli esercizi già verificati e non
-      modificati vengono saltati. Per la verifica con claude.ai, usa il link "verifica" di ogni corso.</p>
+    {{ info("Un corso alla volta; può richiedere parecchi minuti. Gli esercizi già verificati e non modificati vengono saltati. Per la verifica con claude.ai, usa il link \"verifica\" di ogni corso.") }}
   </form>
   <script>
   document.querySelector(".form-verifica-tutti").addEventListener("submit", function (ev) {
@@ -45,10 +46,6 @@
 </details>
 {% endif %}
 <div class="card">
-  <p class="muted" style="margin-top:0">Gli esercizi di tutti i corsi, in un unico elenco da filtrare per nome del corso
-    (tutte le sue edizioni), corso specifico, argomento o testo. Ogni corso ha la sua banca separata: per usare uno di
-    questi esercizi in un compito, apri l'appello, scheda <em>Testo</em>, pannello
-    <em>Importa da altri corsi o anni precedenti</em>.</p>
   {% include "_elenco_esercizi_corsi.html" %}
 </div>
 <script>attivaElencoEsercizi(document.querySelector(".elenco-esercizi-corsi"));</script>

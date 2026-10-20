@@ -125,6 +125,33 @@ source .venv/bin/activate        # se non è già attivo; su Windows: .venv\Scri
 quizesame
 ```
 
+## Uso
+
+Dalla homepage si apre un corso, e da lì i suoi appelli (o un raggruppamento di prove
+parziali). In cima alla pagina di un appello il **percorso** mostra le fasi nell'ordine —
+Testo, Compiti d'esame, Presenze, Correzione, Verbalizzazione, Chiusura — con lo stato di
+ciascuna (verde completata, arancione in corso, bordo blu prossimo passo) e porta alla
+scheda in cui completarla; il riquadro "Prossimo passo" dice cosa fare adesso.
+
+- **Testo**: esercizi del compito, aggiunti dalla banca del corso, da altri corsi, creati da
+  zero, generati con l'IA o importati da un file; obbligatorio sì/no con un clic.
+- **Compiti d'esame**: elenco iscritti (file della segreteria, prenotazioni Moodle, aggiunte
+  una per una, cestino per togliere), generazione e stampa dei compiti; per le prove
+  parziali anche gli ammessi e l'assegnazione alle aule.
+- **Presenze**: registro del giorno della prova; in alternativa, finite le correzioni,
+  "Segna assenti tutti i non corretti".
+- **Correzione**: inserimento delle risposte di ogni compito; in fondo "Chiudi la correzione",
+  attivo quando tutti hanno un esito.
+- **Impostazioni** dell'appello: nome, data, orale e, per le prove parziali, le aule (una può
+  essere riservata agli studenti DSA/L104; un avviso segnala quando gli studenti superano la
+  quota di posti impostata nel corso, 50% di default).
+
+Le azioni più frequenti (iscritti, esercizi, aule) si salvano senza ricaricare la pagina. Le
+spiegazioni meno usate sono nelle icone **i**, e i pulsanti a icona mostrano cosa fanno al
+passaggio del mouse. La voce **Guida** del menu descrive tutto nel dettaglio.
+
+Dopo un aggiornamento del codice va riavviata l'app (l'app stessa lo segnala con un avviso).
+
 ## Dati
 
 Ogni corso è una cartella dentro `corsi/`, con il proprio database (`db.sqlite`) e i

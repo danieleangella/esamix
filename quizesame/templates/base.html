@@ -13,7 +13,7 @@
      formule, es. Impostazioni) dipendente da una richiesta di rete esterna bloccante. #}
   {% block katex %}{% endblock %}
   <script>
-  // Renderizza le formule LaTeX (delimitate da $...$ o $$...$$) dentro un elemento: usata
+  // Renderizza le formule LaTeX (delimitate da $...$, $$...$$, \[...\] o \(...\)) dentro un elemento: usata
   // per le anteprime di testo/risposte degli esercizi, definita qui in <head> per lo
   // stesso motivo di creaAutocomplete (va chiamata da script nel blocco contenuto, che nel
   // DOM finale vengono prima degli script in fondo a base.html).
@@ -22,7 +22,9 @@
       renderMathInElement(radice, {
         delimiters: [
           {left: "$$", right: "$$", display: true},
+          {left: "\\[", right: "\\]", display: true},
           {left: "$", right: "$", display: false},
+          {left: "\\(", right: "\\)", display: false},
         ],
         throwOnError: false,
       });

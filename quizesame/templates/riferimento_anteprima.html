@@ -31,20 +31,20 @@
 <ol class="foglio-riferimento">
 {% for r in righe %}
   <li class="card">
-    <div class="rif-titolo"><strong>Esercizio {{ loop.index }}</strong> <span class="muted">· {{ r.esercizio_nome }}</span>
+    <div class="rif-titolo"><strong>Esercizio {{ loop.index }}</strong> <span class="muted">· {{ r.esercizio_nome | accenti_tex }}</span>
       {% if r.obbligatorio %}<span class="badge badge-warn">obbligatorio</span>{% endif %}
       {% if r.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
       {% if r.n_varianti > 1 %}<span class="badge" title="Qui è mostrata la prima">{{ r.n_varianti }} varianti</span>{% endif %}</div>
     {% for v in (r.varianti if tutte else [{'testo': r.testo, 'risposte': r.risposte}]) %}
     {% if tutte and r.varianti|length > 1 %}<div class="rif-variante">Variante {{ loop.index }} di {{ r.varianti|length }}</div>{% endif %}
-    <div class="rif-testo">{{ v.testo }}</div>
+    <div class="rif-testo">{{ v.testo | testo_web }}</div>
     {% if not r.aperta %}
     <ol class="rif-risposte" type="A">
-      {% for s in v.risposte %}<li{% if loop.first %} class="corretta"{% endif %}>{{ s }}{% if loop.first %} <span class="badge badge-ok">✓ corretta</span>{% endif %}</li>{% endfor %}
+      {% for s in v.risposte %}<li{% if loop.first %} class="corretta"{% endif %}>{{ s | testo_web }}{% if loop.first %} <span class="badge badge-ok">✓ corretta</span>{% endif %}</li>{% endfor %}
     </ol>
     {% endif %}
     {% endfor %}
-    {% if r.soluzione %}<div class="rif-soluzione" {% if not soluzioni %}hidden{% endif %}><strong>Soluzione / suggerimento.</strong> {{ r.soluzione }}</div>{% endif %}
+    {% if r.soluzione %}<div class="rif-soluzione" {% if not soluzioni %}hidden{% endif %}><strong>Soluzione / suggerimento.</strong> {{ r.soluzione | testo_web }}</div>{% endif %}
   </li>
 {% else %}
   <p class="muted">Nessun esercizio assegnato a questo appello.</p>

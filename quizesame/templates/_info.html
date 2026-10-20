@@ -1,0 +1,6 @@
+{# Piccola icona "i" che mostra una spiegazione al passaggio del mouse (o col focus da
+   tastiera): per le note che servono solo ogni tanto, invece di un paragrafo sempre visibile.
+   Uso: {% from "_info.html" import info %} {{ info("testo della spiegazione") }} #}
+{% macro info(testo) -%}
+<span class="aiuto info" tabindex="0" role="button" aria-label="Informazioni">i<span class="aiuto-testo" role="tooltip">{{ testo }}</span></span>
+{%- endmacro %}

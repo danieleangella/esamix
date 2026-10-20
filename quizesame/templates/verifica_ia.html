@@ -150,7 +150,7 @@
   {% for v in r.varianti %}
   <div class="variante-verificata">
     <div>{% if r.varianti|length > 1 %}<strong>Variante {{ v.numero }}</strong> {% endif %}<span class="badge {{ etichette[v.esito][0] }}">{{ etichette[v.esito][1] }}</span></div>
-    <div class="muted" style="white-space:pre-wrap">{{ v.testo }}</div>
+    <div class="muted" style="white-space:pre-wrap">{{ v.testo | testo_web }}</div>
     {% if not r.esercizio.aperta %}
     <div>Indicata come corretta: <strong>{{ v.indicata }}</strong>{% if v.risposta_calcolata %} · secondo l'IA: <strong>{{ v.risposta_calcolata }}</strong>{% endif %}</div>
     {% endif %}

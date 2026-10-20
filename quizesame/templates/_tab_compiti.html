@@ -1,3 +1,4 @@
+{% from "_info.html" import info %}
 <div class="tab-pane" data-pane="compiti{{ pane_suffix }}" style="display:none">
 
 {% if md.appello.chiuso %}
@@ -10,251 +11,10 @@
 
 {% set iscritti_fatti = md.numero_iscritti is not none %}
 <details class="card sezione-flusso" data-sezione="iscritti-{{ md.appello.id }}" data-fatta="{{ 1 if iscritti_fatti else 0 }}"{% if not iscritti_fatti %} open{% endif %}>
-  <summary><strong>Iscritti{% if md.numero_iscritti is not none %} ({{ md.numero_iscritti }}){% endif %}</strong>{% if iscritti_fatti %} <span class="badge badge-ok">✓ completato</span>{% endif %}</summary>
-  {% if md.segreteria_csv %}
-  <p class="muted" style="margin-top:0.75rem">
-    File caricato: <strong>{{ md.segreteria_csv.nome_file }}</strong> (il {{ md.segreteria_csv.caricato_il }}) —
-    <strong>{{ md.iscritti|length }}</strong> iscritti trovati. Questo numero ha sempre la precedenza su un
-    eventuale numero inserito a mano.
-  </p>
-  <p class="muted">
-    {% from "_formati.html" import formati %}
-    Elenco stampabile per fare l'appello:
-    {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/iscritti", pdf=True, html=True, tex=True, csv=True) }}
-  </p>
-  {% set non_registrati = md.iscritti | rejectattr('registrato') | list %}
-  {% if non_registrati %}
-  <div class="card" style="margin-top:0.75rem">
-    <p class="muted" style="margin-top:0">
-      <strong>{{ non_registrati|length }}</strong> student{{ 'e' if non_registrati|length == 1 else 'i' }}
-      nell'elenco della segreteria non risult{{ 'a' if non_registrati|length == 1 else 'ano' }} ancora
-      registrat{{ 'o' if non_registrati|length == 1 else 'i' }} in questo corso: non potr{{ 'à' if non_registrati|length == 1 else 'anno' }}
-      ricevere un voto o un esito finché non l{{ 'o/la' if non_registrati|length == 1 else 'i' }} registri.
-    </p>
-    <table style="margin-top:0.5rem">
-      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
-      {% for s in non_registrati %}
-      <tr>
-        <td>{{ s.matricola }}</td>
-        <td>{{ s.cognome }}</td>
-        <td>{{ s.nome }}</td>
-        <td>
-          <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" class="inline">
-            <input type="hidden" name="matricola" value="{{ s.matricola }}">
-            <input type="hidden" name="cognome" value="{{ s.cognome }}">
-            <input type="hidden" name="nome" value="{{ s.nome }}">
-            <input type="hidden" name="next" value="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}#compiti">
-            <button type="submit" class="secondary">Registra come studente</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-  </div>
-  {% endif %}
-  {% if not md.appello.chiuso %}
-  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/segreteria-csv/elimina"
-        onsubmit="return confirm('Rimuovere il file caricato? Il numero di iscritti tornerà a quello eventualmente inserito a mano, e non sarà più possibile compilare il file per la segreteria finché non ne carichi uno nuovo.');">
-    <button type="submit" class="secondary">Rimuovi file caricato</button>
-  </form>
-  {% endif %}
-  {% else %}
-  <p class="muted" style="margin-top:0">
-    Nessun file della segreteria ancora caricato: se non lo carichi, puoi aggiungere qui gli iscritti uno per
-    uno (usato per l'elenco stampabile e per il numero suggerito di compiti da generare qui sotto).
-  </p>
-  {% if not md.appello.chiuso %}
-  <details class="dettaglio-fisarmonica" style="margin-top:0.5rem">
-    <summary>Importa le prenotazioni da Moodle</summary>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-moodle" enctype="multipart/form-data" style="margin-top:0.75rem">
-      <label style="display:flex; align-items:center; gap:0.4rem">
-        File delle prenotazioni esportato da Moodle (.csv, .xlsx)
-        <span class="aiuto" tabindex="0" role="button" aria-label="Come esportare il file da Moodle" aria-describedby="aiuto-moodle-{{ md.appello.id }}">?
-          <span class="aiuto-testo" role="tooltip" id="aiuto-moodle-{{ md.appello.id }}">
-            <strong>Come ottenere il file da Moodle</strong>
-            <ol>
-              <li>Apri su Moodle l'attività con cui gli studenti si prenotano alla prova (es. "Iscrizione primo parziale").</li>
-              <li>Vai all'elenco delle prenotazioni / dei partecipanti dell'attività.</li>
-              <li>Usa <em>Scarica</em> (o <em>Esporta</em>) e scegli il formato <em>CSV</em> (va bene anche Excel).</li>
-              <li>Carica qui il file così com'è.</li>
-            </ol>
-            Il file deve avere le colonne <em>ID number</em> (la matricola), <em>First name</em> e
-            <em>Last name</em> (o le corrispondenti italiane <em>Codice identificativo</em>, <em>Nome</em>,
-            <em>Cognome</em>). Se manca la colonna <em>ID number</em>, va attivata tra i campi
-            identificativi mostrati da Moodle (chiedi all'amministratore della piattaforma).
-            Prima di importare vedrai l'elenco, per scegliere chi aggiungere.
-          </span>
-        </span>
-      </label>
-      <input type="file" name="file" accept=".csv,.xlsx,.xls,text/csv" required>
-      <button type="submit" class="secondary">Carica e controlla</button>
-    </form>
-  </details>
-  <details class="dettaglio-fisarmonica" style="margin-top:0.5rem" {% if not md.iscritti_manuali %}open{% endif %}>
-    <summary>Aggiungi iscritti manualmente{% if md.iscritti_manuali %} ({{ md.iscritti_manuali|length }}){% endif %}</summary>
-    {% if md.iscritti_manuali %}
-    <table style="margin-top:0.75rem">
-      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th></tr>
-      {% for s in md.iscritti_manuali %}
-      <tr>
-        <td>{{ s.matricola }}</td>
-        <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
-        <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
-        <td>
-          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale/{{ s.matricola }}/rimuovi">
-            <button type="submit" class="secondary" style="margin-top:0">Rimuovi</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-    {% endif %}
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale/aggiungi" style="margin-top:0.75rem; margin-bottom:0.75rem" autocomplete="off">
-      <div class="form-grid">
-        <div style="position:relative">
-          <label class="campo-obbligatorio">Aggiungi iscritto (matricola o nome)</label>
-          <input name="matricola" class="campo-input-matricola-iscritto" autocomplete="off" required>
-          <div class="campo-suggerimenti-studenti-iscritto sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-        </div>
-      </div>
-      <button type="submit" class="secondary">Aggiungi</button>
-    </form>
-    <script>
-    (function () {
-      var root = document.currentScript.closest(".tab-pane");
-      creaAutocomplete(
-        root.querySelector(".campo-input-matricola-iscritto"), root.querySelector(".campo-suggerimenti-studenti-iscritto"),
-        function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
-        function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
-        function (s) { return s.matricola; }
-      );
-    })();
-    </script>
-  </details>
-  <details class="dettaglio-fisarmonica" style="margin-top:0.5rem">
-    <summary>In alternativa, indica solo un numero (senza elenco nominale)</summary>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale" style="margin-top:1rem">
-      <div class="form-grid">
-        <div><label>Numero di iscritti (facoltativo)</label><input type="number" name="iscritti_manuale" min="0" value="{{ md.appello.iscritti_manuale or '' }}"></div>
-      </div>
-      <p class="muted" style="margin-top:0.5rem">Usato solo se non hai aggiunto nessuno studente nell'elenco qui sopra.</p>
-      <button type="submit" class="secondary">Salva</button>
-    </form>
-  </details>
-  {% elif md.iscritti_manuali %}
-  <table style="margin-top:0.5rem">
-    <tr><th>Matricola</th><th>Cognome</th><th>Nome</th></tr>
-    {% for s in md.iscritti_manuali %}
-    <tr><td>{{ s.matricola }}</td><td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td><td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td></tr>
-    {% endfor %}
-  </table>
-  {% endif %}
-  {% endif %}
-
-  {% if not md.appello.chiuso %}
-  {% if not md.segreteria_csv %}
-  <details class="dettaglio-fisarmonica" style="margin-top:0.75rem">
-    <summary>Ammetti tutti gli studenti del corso</summary>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-manuale/tutti" style="margin-top:1rem">
-      <div class="form-grid">
-        <div><label>Solo con matricola &ge; (facoltativo)</label>
-          <input type="number" name="matricola_minima" placeholder="es. 7100000 (vuoto = tutti)"></div>
-      </div>
-      <p class="muted" style="margin-top:0.5rem">Aggiunge all'elenco iscritti tutti gli studenti registrati nel corso
-        (o solo quelli con matricola maggiore o uguale a quella indicata, ad es. per ammettere solo il primo anno).
-        Poi puoi togliere o aggiungere singoli studenti dall'elenco qui sopra.</p>
-      <button type="submit" class="secondary">Aggiungi tutti</button>
-    </form>
-  </details>
-  {% endif %}
-  {% set da_confermare = md.esclusi_filtro|selectattr("decisione", "none")|list %}
-  <details class="dettaglio-fisarmonica" style="margin-top:0.75rem" {% if md.appello.matricola_minima_iscritti %}open{% endif %}>
-    <summary>Filtra gli iscritti per matricola{% if md.appello.matricola_minima_iscritti %} (attivo: &ge; {{ md.appello.matricola_minima_iscritti }}){% endif %}
-      {% if da_confermare %}<span class="badge badge-warn">{{ da_confermare|length }} esclusi da confermare</span>{% endif %}</summary>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/iscritti-filtro" style="margin-top:1rem">
-      <div class="form-grid">
-        <div><label>Ammetti solo matricole &ge;</label>
-          <input type="number" name="matricola_minima" value="{{ md.appello.matricola_minima_iscritti or '' }}" placeholder="vuoto = nessun filtro"></div>
-      </div>
-      <p class="muted" style="margin-top:0.5rem">Vale per l'elenco iscritti di questo appello, sia dal file della segreteria
-        sia aggiunti a mano: chi ha una matricola inferiore non compare nell'elenco, nel registro presenze e non può
-        essere corretto (ad es. per una prova riservata al primo anno). Il file restituito alla segreteria resta intero.</p>
-      <button type="submit" class="secondary">Salva filtro</button>
-    </form>
-    {% if md.esclusi_filtro %}
-    <h3 style="margin:1rem 0 0.25rem">Iscritti esclusi dal filtro ({{ md.esclusi_filtro|length }})</h3>
-    <p class="muted" style="margin-top:0">
-      Hanno una matricola inferiore a {{ md.appello.matricola_minima_iscritti }}: conferma l'esclusione per ciascuno,
-      oppure ammettilo comunque come eccezione (es. studenti DSA o con disabilità L104, o casi particolari).
-      Finché non decidi restano esclusi.
-    </p>
-    <table>
-      <thead><tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Decisione</th><th></th></tr></thead>
-      {% for s in md.esclusi_filtro %}
-      <tr>
-        <td>{{ s.matricola }}</td>
-        <td>{{ s.cognome }}</td>
-        <td>{{ s.nome }}</td>
-        <td>{% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% if s.dsa_note %} <span class="muted">{{ s.dsa_note }}</span>{% endif %}{% endif %}</td>
-        <td>
-          {% if s.decisione == 'ammesso' %}<span class="badge badge-ok">ammesso in deroga</span>
-          {% elif s.decisione == 'escluso' %}<span class="badge">esclusione confermata</span>
-          {% else %}<span class="badge badge-warn">da confermare</span>{% endif %}
-        </td>
-        <td style="white-space:nowrap">
-          {% if not md.appello.chiuso %}
-          {% set url_decisione = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/iscritti-filtro/" ~ s.matricola %}
-          {% if s.decisione != 'ammesso' %}
-          <form class="inline form-eccezione-filtro" method="post" action="{{ url_decisione }}"
-                data-conferma="{{ 'Ammettere comunque ' ~ s.cognome ~ ' ' ~ s.nome ~ ' (' ~ s.matricola ~ ')' ~ (' — ' ~ (s.dsa_tipo or 'DSA') if s.dsa else '') ~ ' in deroga al filtro sulla matricola?' }}">
-            <input type="hidden" name="decisione" value="ammesso">
-            <button type="submit" style="margin-top:0">Ammetti comunque</button>
-          </form>
-          {% endif %}
-          {% if s.decisione != 'escluso' %}
-          <form class="inline" method="post" action="{{ url_decisione }}">
-            <input type="hidden" name="decisione" value="escluso">
-            <button type="submit" class="secondary" style="margin-top:0">Conferma esclusione</button>
-          </form>
-          {% endif %}
-          {% if s.decisione %}
-          <form class="inline" method="post" action="{{ url_decisione }}">
-            <input type="hidden" name="decisione" value="">
-            <button type="submit" class="link-simile" style="margin-top:0">annulla</button>
-          </form>
-          {% endif %}
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-    <script>
-    (function () {
-      // ammettere in deroga va confermato esplicitamente, studente per studente
-      document.currentScript.closest("details").querySelectorAll(".form-eccezione-filtro").forEach(function (form) {
-        form.addEventListener("submit", function (ev) {
-          if (!window.confirm(form.dataset.conferma)) ev.preventDefault();
-        });
-      });
-    })();
-    </script>
-    {% endif %}
-  </details>
-  <details class="dettaglio-fisarmonica" style="margin-top:0.75rem" {% if not md.segreteria_csv %}open{% endif %}>
-    <summary>{{ 'Aggiorna' if md.segreteria_csv else 'Carica' }} il file della segreteria ("Lista Studenti Esame")</summary>
-    <p class="muted" style="margin-top:1rem">
-      Caricalo qui una volta sola: da questo file si ricava sia il numero di iscritti (con priorità su quello
-      inserito a mano) sia l'elenco per fare l'appello. Servirà anche per compilare il file da restituire alla
-      segreteria, dalla scheda Valutazione scritti — se è presente questo elenco, correggere o segnare
-      assente/ritirato uno studente che non vi compare non è consentito.
-    </p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/segreteria-csv" enctype="multipart/form-data">
-      <input type="file" name="file" accept=".csv,.xls,.xlsx" required>
-      <button type="submit">Carica</button>
-    </form>
-  </details>
-  {% endif %}
+  <summary><strong>Iscritti <span class="conteggio-iscritti">{% if md.numero_iscritti is not none %}({{ md.numero_iscritti }}){% endif %}</span></strong>{% if iscritti_fatti %} <span class="badge badge-ok">✓ completato</span>{% endif %}</summary>
+  <div class="contenitore-iscritti">{% include "_iscritti.html" %}</div>
 </details>
+<script>attivaIscritti(document.currentScript.previousElementSibling.querySelector(".contenitore-iscritti"), "{{ corso.tag }}");</script>
 
 {% set fase = md.riepilogo_home.fasi|selectattr("scheda", "equalto", "compiti")|first %}
 <details class="card sezione-flusso" data-sezione="compiti-{{ md.appello.id }}" data-fatta="{{ 1 if fase.fatta else 0 }}"{% if not fase.fatta %} open{% endif %}>
@@ -279,13 +39,8 @@
       <div><label class="campo-obbligatorio">Numero studenti</label><input type="number" name="numero_studenti" value="{{ md.numero_studenti_suggerito }}" min="0" required></div>
     </div>
     <button type="submit" {% if not md.esercizi_assegnati %}disabled{% endif %}>Genera nuovo blocco di compiti</button>
+    {{ info("Ogni generazione crea un nuovo blocco, con un proprio PDF dei compiti e uno con la griglia delle soluzioni; il foglio di riferimento con le risposte corrette è comune a tutti i blocchi. Il numero suggerito porta il totale dei compiti un po' sopra (+10%) il numero di iscritti.") }}
   </form>
-  <p class="muted" style="margin-top:0.5rem">
-    Ogni generazione crea un nuovo blocco (un proprio file PDF con i compiti e uno con la
-    griglia delle soluzioni); il foglio di riferimento con le risposte corrette è comune a
-    tutti i blocchi e viene creato solo la prima volta. Il numero suggerito qui sopra genera un
-    totale di compiti leggermente superiore (+10%) al numero di iscritti.
-  </p>
   <script>
   (function () {
     var root = document.currentScript.closest(".tab-pane");
@@ -317,9 +72,7 @@
   {% if md.esercizi_assegnati %}
   <form method="post" action="{{ url_appello }}/ricompila-pdf" class="barra-rigenera">
     <button type="submit" class="secondary pulsante-piccolo" style="margin:0">↻ Rigenera tutti i documenti</button>
-    <span class="muted">compiti, griglie, fogli da pubblicare (con e senza soluzioni), anteprima, elenchi e risultati: PDF e altri
-      formati con gli esercizi e la grafica attuali{% if md.blocchi %}; stessi codici e stesso ordine di esercizi e risposte, quindi
-      i compiti già stampati restano validi{% endif %}. I file qui sotto vengono sostituiti dalla versione rigenerata.</span>
+    {{ info("Ricrea compiti, griglie, fogli da pubblicare (con e senza soluzioni), anteprima, elenchi e risultati, in PDF e negli altri formati, con gli esercizi e la grafica attuali" ~ ("; stessi codici e stesso ordine di esercizi e risposte, quindi i compiti già stampati restano validi" if md.blocchi else "") ~ ". I file qui sotto vengono sostituiti dalla versione rigenerata.") }}
   </form>
   {% endif %}
   {% if md.blocchi %}
@@ -371,112 +124,12 @@
 {% endif %}
 
 {% if md.ammessi is defined %}
-<details class="card" open>
-  <summary><strong>Studenti ammessi e aule ({{ md.ammessi|length }})</strong></summary>
-  <p class="muted" style="margin-top:0.75rem">
-    {% from "_formati.html" import formati %}
-    Elenco ammessi: {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/ammessi", pdf=True, html=True, tex=True, csv=True) }}
-  </p>
-
-  <details style="margin-top:0.5rem">
-    <summary>Elenco dettagliato e assegnazione aule</summary>
-    <p class="muted" style="margin-top:1rem">
-      Scarica anche in <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi.csv">.csv</a>
-    </p>
-    <table>
-      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Aula</th><th></th></tr>
-      {% for s in md.ammessi %}
-      <tr>
-        <td>{{ s.matricola }}</td>
-        <td>{{ s.cognome }}</td>
-        <td>{{ s.nome }}</td>
-        <td>{% if s.dsa %}<span class="badge badge-info">{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
-        <td>
-          {% if md.aule %}
-          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/{{ s.matricola }}/assegna-manuale">
-            <select name="aula_id" style="width:auto" onchange="this.form.requestSubmit()">
-              <option value="">non assegnata</option>
-              {% for a in md.aule %}<option value="{{ a.id }}" {% if s.aula_id == a.id %}selected{% endif %}>{{ a.nome }}</option>{% endfor %}
-            </select>
-          </form>
-          {% else %}
-          <span class="muted">{{ s.aula_nome or 'nessuna aula configurata' }}</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if s.in_deroga %}
-          <span class="badge badge-warn" title="Aggiunto a mano: non soddisfa i requisiti automatici di ammissione">in deroga</span>
-          <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi/{{ s.matricola }}/rimuovi"
-                onsubmit="return confirm({{ ('Rimuovere ' ~ s.cognome ~ ' ' ~ s.nome ~ ' dagli ammessi a questa prova?')|js }});">
-            <button type="submit" class="secondary" style="margin-top:0">Rimuovi</button>
-          </form>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
-
-    <details class="dettaglio-fisarmonica" style="margin-top:0.75rem">
-      <summary>Aggiungi manualmente uno studente (anche se non soddisfa i requisiti)</summary>
-      <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi/aggiungi" style="margin-top:1rem" autocomplete="off">
-        <div class="form-grid">
-          <div style="position:relative">
-            <label class="campo-obbligatorio">Matricola o nome</label>
-            <input name="matricola" class="campo-input-matricola-ammesso" autocomplete="off" required>
-            <div class="campo-suggerimenti-studenti-ammesso sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-          </div>
-        </div>
-        <p class="muted" style="margin-top:0.5rem">Uno studente aggiunto così comparirà nell'elenco ammessi con l'avviso "in deroga", anche se
-          non ha superato la prova precedente (o non rispetta la soglia di matricola sulla prima prova).</p>
-        <button type="submit" class="secondary">Aggiungi</button>
-      </form>
-      <script>
-      (function () {
-        var root = document.currentScript.closest(".tab-pane");
-        creaAutocomplete(
-          root.querySelector(".campo-input-matricola-ammesso"), root.querySelector(".campo-suggerimenti-studenti-ammesso"),
-          function (q) { return "/corsi/{{ corso.tag }}/api/studenti/cerca?q=" + encodeURIComponent(q); },
-          function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
-          function (s) { return s.matricola; }
-        );
-      })();
-      </script>
-    </details>
-
-    <h3 style="margin-top:1.5rem">Aule di questa prova</h3>
-  {% if md.aule %}
-  <table>
-    <tr><th>Nome</th><th>Capienza</th><th></th></tr>
-    {% for a in md.aule %}
-    <tr>
-      <td>{{ a.nome }}</td>
-      <td>{{ a.capienza }}</td>
-      <td>
-        <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/{{ a.id }}/elimina"
-              onsubmit="return confirm({{ ('Eliminare l\'aula ' ~ a.nome ~ '? Gli studenti già assegnati resteranno senza aula.')|js }});">
-          <button type="submit" class="danger">Elimina</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% else %}
-  <p class="muted">Nessuna aula ancora configurata per questa prova.</p>
-  {% endif %}
-  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/nuova" style="margin-top:0.75rem">
-    <div class="form-grid">
-      <div><label class="campo-obbligatorio">Nome aula</label><input name="nome" required></div>
-      <div><label class="campo-obbligatorio">Capienza</label><input type="number" name="capienza" min="1" required></div>
-    </div>
-    <button type="submit" class="secondary">Aggiungi aula</button>
-  </form>
-  {% if md.aule %}
-  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/aule/assegna" style="margin-top:0.75rem">
-    <button type="submit">Assegna automaticamente gli ammessi non ancora fissati a mano</button>
-  </form>
-  {% endif %}
-  </details>
+{# aggiunte/eliminazioni di aule, assegnazioni e ammissioni in deroga aggiornano solo questo
+   riquadro (vedi attivaAmmessiAule in app.js), senza ricaricare l'intera pagina #}
+<details class="card blocco-ammessi-aule" open>
+{% include "_ammessi_aule.html" %}
 </details>
+<script>attivaAmmessiAule(document.currentScript.previousElementSibling, "{{ corso.tag }}");</script>
 {% endif %}
 
 </div>

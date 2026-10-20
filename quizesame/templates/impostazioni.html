@@ -4,191 +4,167 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <span class="current">Impostazioni</span>
 {% endblock %}
 {% block content %}
+{% from "_info.html" import info %}
+{% from "_icone.html" import icona %}
 {% set sezione_corso = "impostazioni" %}
 {% include "_intestazione_corso.html" %}
 
-<form method="post" action="/corsi/{{ corso.tag }}/impostazioni" id="form-impostazioni-corso">
+<form method="post" action="/corsi/{{ corso.tag }}/impostazioni" id="form-impostazioni-corso" data-annulla="ricarica">
+<div class="griglia-impostazioni">
 
-  <details class="card">
-    <summary><strong>Dati del corso</strong></summary>
-    <div class="form-grid" style="margin-top:1rem">
-      <div><label class="campo-obbligatorio">Nome corso</label><input name="nome" value="{{ corso.nome }}" required></div>
+  <section class="card riquadro-impostazioni">
+    <h2>Dati del corso</h2>
+    <div class="form-grid">
+      <div class="campo-largo"><label class="campo-obbligatorio">Nome corso</label><input name="nome" value="{{ corso.nome }}" required></div>
       <div><label>Corso di studi</label><input name="facolta" value="{{ corso.facolta }}"></div>
       <div><label>Università</label><input name="universita" value="{{ corso.universita }}"></div>
       <div><label>Anno accademico</label><input name="anno" value="{{ corso.anno }}"></div>
       <div><label>Docente</label><input name="docente" value="{{ corso.docente }}"></div>
     </div>
-  </details>
+  </section>
 
-  <details class="card" open>
-    <summary><strong>Voti e punteggi</strong></summary>
-    <p class="muted" style="margin-top:0">Valgono per tutti gli appelli del corso.</p>
-    <div class="form-grid">
-      <div><label class="campo-obbligatorio">Voto minimo (appelli normali) <code class="muted">{votomin}</code></label><input type="number" name="votomin" value="{{ corso.votomin }}" required></div>
-      <div><label class="campo-obbligatorio">Voto minimo (prove di un raggruppamento)</label><input type="number" name="votomin_raggruppamento" value="{{ corso.votomin_raggruppamento }}" required></div>
-      <div><label class="campo-obbligatorio">N. esercizi obbligatori <code class="muted">{consegna}</code></label><input type="number" name="consegna" value="{{ corso.consegna }}" required></div>
+  <section class="card riquadro-impostazioni">
+    <h2>Voti e punteggi {{ info("Valgono per tutti gli appelli del corso. I codici tra graffe (es. {votomin}) si possono usare nei testi del compito: vengono sostituiti con il valore di ciascun appello.") }}</h2>
+    <div class="form-grid griglia-numeri">
+      <div><label class="campo-obbligatorio">Voto minimo <code class="muted">{votomin}</code></label><input type="number" name="votomin" value="{{ corso.votomin }}" required></div>
+      <div><label class="campo-obbligatorio">Voto minimo prove parziali {{ info("Soglia delle prove che fanno parte di un raggruppamento (es. prove parziali): chi la supera in ciascuna prova entra nella media.") }}</label><input type="number" name="votomin_raggruppamento" value="{{ corso.votomin_raggruppamento }}" required></div>
+      <div><label class="campo-obbligatorio">Esercizi obbligatori <code class="muted">{consegna}</code></label><input type="number" name="consegna" value="{{ corso.consegna }}" required></div>
+      <div><label class="campo-obbligatorio">Risposta corretta <code class="muted">{corretta}</code></label><input type="number" name="risposta_corretta" value="{{ corso.risposta_corretta }}" required></div>
+      <div><label class="campo-obbligatorio">Risposta sbagliata <code class="muted">{sbagliata}</code></label><input type="number" name="risposta_sbagliata" value="{{ corso.risposta_sbagliata }}" required></div>
+      <div><label class="campo-obbligatorio">Risposta vuota <code class="muted">{vuota}</code></label><input type="number" name="risposta_vuota" value="{{ corso.risposta_vuota }}" required></div>
     </div>
-    <div class="form-grid" style="margin-top:0.75rem">
-      <div><label class="campo-obbligatorio">Punti risposta corretta <code class="muted">{corretta}</code></label><input type="number" name="risposta_corretta" value="{{ corso.risposta_corretta }}" required></div>
-      <div><label class="campo-obbligatorio">Punti risposta sbagliata <code class="muted">{sbagliata}</code></label><input type="number" name="risposta_sbagliata" value="{{ corso.risposta_sbagliata }}" required></div>
-      <div><label class="campo-obbligatorio">Punti risposta vuota <code class="muted">{vuota}</code></label><input type="number" name="risposta_vuota" value="{{ corso.risposta_vuota }}" required></div>
+    <label class="riga-opzione">
+      <input type="checkbox" name="domande_aperte_attive" id="check-domande-aperte" {% if corso.domande_aperte_attive %}checked{% endif %}>
+      Usa anche domande aperte
+      {{ info("Domande senza risposte a scelta multipla, con punteggio assegnato a mano in correzione. Se disattivato, l'opzione \"Domanda aperta\" sparisce dai moduli degli esercizi e non se ne possono creare o importare di nuove.") }}
+    </label>
+    <div class="riga-opzione rientro" id="blocco-domande-aperte">
+      <span>punteggio massimo</span>
+      <input type="number" name="punteggio_max_aperta" value="{{ corso.punteggio_max_aperta }}" required class="campo-corto">
+      {{ info("Punteggio massimo assegnabile in correzione a una domanda aperta: può essere maggiore dei punti di una risposta corretta.") }}
     </div>
-    <div style="margin-top:0.75rem">
-      <label style="display:inline-flex; align-items:center; gap:0.4rem">
-        <input type="checkbox" name="domande_aperte_attive" id="check-domande-aperte" style="width:auto" {% if corso.domande_aperte_attive %}checked{% endif %}>
-        Questo corso usa anche domande aperte (con punteggio assegnato a mano in correzione)
-      </label>
-      <p class="muted" style="margin:0.25rem 0 0 1.7rem">Se disattivato, l'opzione "Domanda aperta" sparisce dai moduli
-        degli esercizi e non se ne possono creare o importare di nuove.</p>
-    </div>
-    <div class="form-grid" style="margin-top:0.75rem" id="blocco-domande-aperte">
-      <div>
-        <label class="campo-obbligatorio">Punteggio massimo domanda aperta</label>
-        <input type="number" name="punteggio_max_aperta" value="{{ corso.punteggio_max_aperta }}" required>
-        <p class="muted" style="margin-top:0.25rem">Punteggio massimo assegnabile in correzione a una domanda
-          aperta (senza risposta a scelta multipla): può essere maggiore dei punti di una risposta corretta.</p>
+  </section>
+
+  <section class="card riquadro-impostazioni">
+    <h2>Orale</h2>
+    <label class="riga-opzione">
+      <input type="checkbox" name="orale_dopo_richiesta" {% if corso.orale_dopo_richiesta %}checked{% endif %}>
+      Obbligatorio negli appelli successivi, una volta richiesto
+      {{ info("Se in un appello si richiede l'orale a uno studente, lo dovrà sostenere anche in tutti gli appelli successivi.") }}
+    </label>
+    <label class="riga-opzione">
+      <input type="checkbox" name="orale_soglia_attiva" id="check-soglia-orale" {% if corso.orale_soglia_attiva %}checked{% endif %}>
+      Obbligatorio dopo troppi compiti insufficienti
+    </label>
+    <div id="blocco-soglia-orale" class="rientro">
+      <div class="riga-opzione">
+        <span>dopo</span>
+        <input type="number" name="orale_soglia_n" value="{{ corso.orale_soglia_n }}" min="1" class="campo-corto">
+        <span>compiti con voto sotto</span>
+        <input type="number" name="orale_soglia_voto" value="{{ corso.orale_soglia_voto }}" class="campo-corto">
+        {{ info("I compiti non devono essere consecutivi.") }}
       </div>
-    </div>
-  </details>
-
-  <details class="card">
-    <summary><strong>Orale</strong></summary>
-    <div>
-      <label style="display:inline-flex; align-items:center; gap:0.4rem">
-        <input type="checkbox" name="orale_dopo_richiesta" style="width:auto" {% if corso.orale_dopo_richiesta %}checked{% endif %}>
-        Rendi l'orale obbligatorio per lo studente in tutti gli appelli successivi al primo in cui viene richiesto
+      <label class="riga-opzione">
+        <input type="checkbox" name="ritirato_conta_insufficiente" {% if corso.ritirato_conta_insufficiente %}checked{% endif %}>
+        conta anche "ritirato" come insufficiente
+      </label>
+      <label class="riga-opzione">
+        <input type="checkbox" name="orale_soglia_escludi_parziali" {% if corso.orale_soglia_escludi_parziali %}checked{% endif %}>
+        escludi le prove parziali dal conteggio
       </label>
     </div>
+  </section>
 
-    <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border)">
-      <label style="display:inline-flex; align-items:center; gap:0.4rem">
-        <input type="checkbox" name="orale_soglia_attiva" id="check-soglia-orale" style="width:auto" {% if corso.orale_soglia_attiva %}checked{% endif %}>
-        Rendi l'orale obbligatorio dopo un certo numero di compiti insufficienti
-      </label>
-      <div id="blocco-soglia-orale" style="margin-top:0.75rem; margin-left:1.7rem">
-        <div style="display:flex; align-items:center; flex-wrap:wrap; gap:0.5rem">
-          <span class="muted">dopo</span>
-          <input type="number" name="orale_soglia_n" value="{{ corso.orale_soglia_n }}" min="1" style="width:4.5rem">
-          <span class="muted">compiti (non necessariamente consecutivi) con voto inferiore a</span>
-          <input type="number" name="orale_soglia_voto" value="{{ corso.orale_soglia_voto }}" style="width:4.5rem">
-        </div>
-        <div style="margin-top:0.5rem">
-          <label style="display:inline-flex; align-items:center; gap:0.4rem">
-            <input type="checkbox" name="ritirato_conta_insufficiente" style="width:auto" {% if corso.ritirato_conta_insufficiente %}checked{% endif %}>
-            conta anche "ritirato" come insufficiente
-          </label>
-        </div>
-        <div style="margin-top:0.5rem">
-          <label style="display:inline-flex; align-items:center; gap:0.4rem">
-            <input type="checkbox" name="orale_soglia_escludi_parziali" style="width:auto" {% if corso.orale_soglia_escludi_parziali %}checked{% endif %}>
-            escludi le prove parziali dal conteggio
-          </label>
-        </div>
-      </div>
+  <section class="card riquadro-impostazioni">
+    <h2>Aule e compiti annullati</h2>
+    <div class="riga-opzione">
+      <span>Avvisa se gli studenti superano il</span>
+      <input type="number" name="soglia_occupazione_aule" min="1" max="100" value="{{ corso.soglia_occupazione_aule }}" required class="campo-corto">
+      <span>% dei posti</span>
+      {{ info("Nelle impostazioni di ogni prova, sotto le aule, compare un avviso quando gli studenti attesi superano questa quota dei posti disponibili (con il 50% resta un posto libero accanto a ognuno).") }}
     </div>
-  </details>
-
-  <details class="card">
-    <summary><strong>Compiti annullati</strong></summary>
-    <p class="muted" style="margin-top:1rem">Un compito annullato durante la prova (es. studente sorpreso con il
-      cellulare) nei risultati pubblicati e nel file della segreteria conta come:</p>
-    <div style="display:flex; gap:1.5rem; flex-wrap:wrap">
-      <label style="display:inline-flex; align-items:center; gap:0.4rem">
-        <input type="radio" name="annullato_come" value="insufficiente" style="width:auto" {% if corso.annullato_come != 'ritirato' %}checked{% endif %}>
-        insufficiente
-      </label>
-      <label style="display:inline-flex; align-items:center; gap:0.4rem">
-        <input type="radio" name="annullato_come" value="ritirato" style="width:auto" {% if corso.annullato_come == 'ritirato' %}checked{% endif %}>
-        ritirato
-      </label>
+    <div class="riga-opzione">
+      <span>Un compito annullato conta come</span>
+      <label class="riga-opzione"><input type="radio" name="annullato_come" value="insufficiente" {% if corso.annullato_come != 'ritirato' %}checked{% endif %}> insufficiente</label>
+      <label class="riga-opzione"><input type="radio" name="annullato_come" value="ritirato" {% if corso.annullato_come == 'ritirato' %}checked{% endif %}> ritirato</label>
+      {{ info("Un compito annullato durante la prova (es. studente sorpreso con il cellulare) conta così nei risultati e nel file della segreteria; nella carriera dello studente resta comunque indicato come annullato, con la nota di spiegazione.") }}
     </div>
-    <p class="muted" style="margin-top:0.5rem">Nella carriera dello studente resta comunque indicato come annullato,
-      con la nota di spiegazione.</p>
-  </details>
+  </section>
 
-  <details class="card" {% if not corso.domande_esame_lista %}open{% endif %}>
-    <summary><strong>Domande d'esame ({{ corso.domande_esame_lista|length }})</strong></summary>
-    <p class="muted" style="margin-top:1rem">Testi da scrivere nella colonna "Domande d'esame" del file della
-      segreteria quando esporti i voti. Puoi inserirne più di uno (es. uno per lo scritto, uno per scritto + orale):
-      al momento dell'esportazione scegli quale usare. Il primo è quello proposto di default.</p>
+  <section class="card riquadro-impostazioni campo-largo">
+    <h2>Domande d'esame ({{ corso.domande_esame_lista|length }}) {{ info("Testi da scrivere nella colonna \"Domande d'esame\" del file della segreteria quando esporti i voti. Puoi inserirne più di uno (es. uno per lo scritto, uno per scritto + orale): al momento dell'esportazione scegli quale usare. Il primo è quello proposto di default.") }}</h2>
     <div id="elenco-domande-esame">
       {% for d in corso.domande_esame_lista or [''] %}
-      <div class="riga-domanda-esame" style="display:flex; gap:0.5rem; align-items:flex-start; margin-top:0.5rem">
-        <textarea name="domande_esame" rows="2" style="flex:1">{{ d }}</textarea>
-        <button type="button" class="secondary btn-rimuovi-domanda" title="Rimuovi">&times;</button>
+      <div class="riga-domanda-esame">
+        <textarea name="domande_esame" rows="2">{{ d }}</textarea>
+        <button type="button" class="pulsante-icona btn-rimuovi-domanda" data-info="Togli questo testo" aria-label="Togli questo testo">{{ icona("cestino") }}</button>
       </div>
       {% endfor %}
     </div>
-    <button type="button" class="secondary" id="btn-aggiungi-domanda" style="margin-top:0.5rem">+ Aggiungi domanda d'esame</button>
-  </details>
+    <button type="button" class="icona-azione" id="btn-aggiungi-domanda" style="margin-top:0.5rem">{{ icona("piu", 14) }} Aggiungi un testo</button>
+  </section>
 
-  <details class="card">
-    <summary><strong>Testo del compito</strong></summary>
-    <p class="muted" style="margin-top:1rem">
-      I placeholder tra parentesi graffe (vedi sopra) vengono sostituiti con i valori
-      effettivi di ciascun appello al momento della generazione del testo.
-    </p>
-    <label>Frase sulla consegna (in testa al compito e nelle regole)</label>
-    <textarea name="frase_consegna" id="frase-consegna" rows="2">{{ corso.frase_consegna }}</textarea>
-    <button type="button" class="secondary btn-reset-default" data-target="frase-consegna" data-default-tpl="tpl-default-frase-consegna">Reimposta default</button>
+  <details class="card riquadro-impostazioni campo-largo">
+    <summary><strong>Testo del compito</strong> {{ info("Le frasi stampate su ogni compito. I codici tra parentesi graffe (es. {consegna}, {votomin}, indicati accanto ai campi di Voti e punteggi) vengono sostituiti con i valori di ciascun appello quando si genera il testo.") }}</summary>
+    {% for nome, etichetta, righe in [
+      ("frase_consegna", "Consegna (in testa al compito e nelle regole)", 2),
+      ("frase_obbligatorio", "Esercizi obbligatori (in grassetto prima del testo di ciascuno)", 2),
+      ("frase_regole", "Valutazione (punteggi e voto minimo)", 3),
+    ] %}
+    <div class="riga-frase">
+      <label for="{{ nome|replace('_', '-') }}">{{ etichetta }}</label>
+      <button type="button" class="pulsante-icona btn-reset-default" data-target="{{ nome|replace('_', '-') }}" data-default-tpl="tpl-default-{{ nome|replace('_', '-') }}"
+              data-info="Rimetti il testo predefinito" aria-label="Rimetti il testo predefinito">↺</button>
+    </div>
+    <textarea name="{{ nome }}" id="{{ nome|replace('_', '-') }}" rows="{{ righe }}">{{ corso[nome] }}</textarea>
+    {% endfor %}
     <template id="tpl-default-frase-consegna">{{ default_frase_consegna }}</template>
-
-    <label style="margin-top:0.75rem">Frase sugli esercizi obbligatori (in grassetto prima del testo di ciascuno)</label>
-    <textarea name="frase_obbligatorio" id="frase-obbligatorio" rows="2">{{ corso.frase_obbligatorio }}</textarea>
-    <button type="button" class="secondary btn-reset-default" data-target="frase-obbligatorio" data-default-tpl="tpl-default-frase-obbligatorio">Reimposta default</button>
     <template id="tpl-default-frase-obbligatorio">{{ default_frase_obbligatorio }}</template>
-
-    <label style="margin-top:0.75rem">Frase di valutazione (punteggi e voto minimo)</label>
-    <textarea name="frase_regole" id="frase-regole" rows="3">{{ corso.frase_regole }}</textarea>
-    <button type="button" class="secondary btn-reset-default" data-target="frase-regole" data-default-tpl="tpl-default-frase-regole">Reimposta default</button>
     <template id="tpl-default-frase-regole">{{ default_frase_regole }}</template>
   </details>
+</div>
 
   <div class="barra-salva">
-    <button type="submit" style="margin-top:0">Salva tutte le impostazioni</button>
-    <span class="muted stato-impostazioni">Salva insieme le modifiche di tutte le sezioni qui sopra.</span>
+    <button type="submit" style="margin:0">Salva</button>
+    <button type="button" class="secondary btn-annulla" style="margin:0" disabled data-info="Scarta le modifiche non salvate">Annulla</button>
+    <span class="muted stato-impostazioni">Nessuna modifica.</span>
   </div>
 </form>
 
-<details class="card" style="margin-top:2rem">
-  <summary><strong>Backup</strong></summary>
-  <p class="muted" style="margin-top:1rem">Scarica un archivio zip con il database e tutti i file generati (PDF/tex) di questo
-    corso: utile prima di modifiche importanti, o semplicemente come copia di sicurezza periodica.</p>
-  <a href="/corsi/{{ corso.tag }}/backup.zip" class="button">Scarica backup di questo corso</a>
-</details>
-
-<details class="card">
-  <summary><strong>Chiudi corso</strong></summary>
-  <p class="muted" style="margin-top:1rem">Chiude in un colpo solo tutti gli appelli di questo corso non ancora
-    chiusi (comodo a fine anno accademico): non saranno più possibili correzioni, verbalizzazioni o modifiche,
-    finché non si riapre singolarmente l'appello interessato dalla sua scheda Impostazioni.</p>
-  <form method="post" action="/corsi/{{ corso.tag }}/chiudi"
-        onsubmit="return confirm('Chiudere tutti gli appelli di questo corso non ancora chiusi? Si possono comunque riaprire singolarmente più tardi.');">
-    <button type="submit" class="secondary" style="margin-top:0.5rem">Chiudi tutti gli appelli</button>
-  </form>
-</details>
-
-<details class="card">
-  <summary><strong>Elimina corso</strong></summary>
-  <p class="muted" style="margin-top:1rem">Elimina definitivamente il corso "{{ corso.nome }}" ({{ corso.tag }}): studenti,
-    esercizi, appelli e tutti i risultati registrati. Azione irreversibile, non c'è un backup.</p>
-  <form method="post" action="/corsi/{{ corso.tag }}/elimina" id="form-elimina-corso">
+<section class="card riquadro-impostazioni" style="margin-top:1.5rem">
+  <h2>Altre operazioni</h2>
+  <div class="elenco-operazioni">
     <div>
+      <a href="/corsi/{{ corso.tag }}/backup.zip" class="icona-azione">{{ icona("scarica", 14) }} Scarica il backup</a>
+      {{ info("Un archivio zip con il database e tutti i file generati (PDF/tex) di questo corso: utile prima di modifiche importanti, o come copia di sicurezza periodica.") }}
+    </div>
+    <div>
+      <form class="inline" method="post" action="/corsi/{{ corso.tag }}/chiudi"
+            onsubmit="return confirm('Chiudere tutti gli appelli di questo corso non ancora chiusi? Si possono comunque riaprire singolarmente più tardi.');">
+        <button type="submit" class="icona-azione">{{ icona("lucchetto", 14) }} Chiudi tutti gli appelli</button>
+      </form>
+      {{ info("Chiude in un colpo solo tutti gli appelli di questo corso non ancora chiusi (comodo a fine anno accademico): non saranno più possibili correzioni, verbalizzazioni o modifiche, finché non si riapre singolarmente l'appello dalla sua scheda Impostazioni.") }}
+    </div>
+  </div>
+  <details class="dettaglio-fisarmonica" style="margin-top:0.75rem">
+    <summary class="testo-pericolo">Elimina il corso</summary>
+    <p class="muted" style="margin-top:0.5rem">Elimina definitivamente il corso "{{ corso.nome }}" ({{ corso.tag }}): studenti,
+      esercizi, appelli e tutti i risultati registrati. Azione irreversibile, non c'è un backup.</p>
+    <form method="post" action="/corsi/{{ corso.tag }}/elimina" id="form-elimina-corso">
       <label>Per confermare, scrivi <strong>{{ corso.tag }}</strong> qui sotto</label>
       <input class="campo-conferma-testo" data-frase-attesa="{{ corso.tag }}" autocomplete="off" style="max-width:20rem">
-    </div>
-    <button type="submit" class="danger btn-conferma-testo" disabled style="margin-top:0.75rem">Elimina questo corso</button>
-  </form>
-</details>
+      <button type="submit" class="danger btn-conferma-testo" disabled style="margin-top:0.75rem">Elimina questo corso</button>
+    </form>
+  </details>
+</section>
 <script>document.getElementById("form-elimina-corso") && attivaConfermaTestuale(document.getElementById("form-elimina-corso"));</script>
 <script>
 (function () {
   var checkSoglia = document.getElementById("check-soglia-orale");
   var blocco = document.getElementById("blocco-soglia-orale");
   function aggiorna() {
-    var attivo = checkSoglia.checked;
-    blocco.style.opacity = attivo ? "1" : "0.45";
-    blocco.querySelectorAll("input").forEach(function (el) { el.disabled = !attivo; });
+    blocco.hidden = !checkSoglia.checked;
+    blocco.querySelectorAll("input").forEach(function (el) { el.disabled = !checkSoglia.checked; });
   }
   checkSoglia.addEventListener("change", aggiorna);
   aggiorna();
@@ -230,7 +206,12 @@
   function segnaModificato() {
     barra.classList.add("modificata");
     stato.textContent = "Ci sono modifiche non salvate.";
+    barra.querySelector(".btn-annulla").disabled = false;
   }
+  form.addEventListener("annullato", function () {
+    barra.classList.remove("modificata");
+    stato.textContent = "Nessuna modifica.";
+  });
   form.addEventListener("input", segnaModificato);
   form.addEventListener("change", segnaModificato);
   form.addEventListener("click", function (ev) {
@@ -238,7 +219,7 @@
   });
   form.addEventListener("submit", function () { inviato = true; });
   window.addEventListener("beforeunload", function (ev) {
-    if (barra.classList.contains("modificata") && !inviato) { ev.preventDefault(); ev.returnValue = ""; }
+    if (barra.classList.contains("modificata") && !inviato && !form.dataset.scartato) { ev.preventDefault(); ev.returnValue = ""; }
   });
 })();
 

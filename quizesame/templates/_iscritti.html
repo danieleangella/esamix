@@ -1,0 +1,220 @@
+{# Elenco iscritti di un appello: frammento di _tab_compiti.html, ridisegnato da solo dopo
+   ogni modifica fatta dai moduli con class="form-frammento" (vedi _risposta_iscritti e
+   attivaRiquadro in app.js). Un solo elenco, comunque sia nato (file della segreteria,
+   Moodle, aggiunti a mano): ogni riga si toglie col cestino, e si aggiunge dal campo in alto. #}
+{% from "_icone.html" import icona %}
+{% from "_formati.html" import formati %}
+{% set url = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
+{% set modificabile = not md.appello.chiuso %}
+{% set da_confermare = md.esclusi_filtro|selectattr("decisione", "none")|list %}
+<div class="riquadro-iscritti" data-numero="{{ md.numero_iscritti if md.numero_iscritti is not none else '' }}"
+     data-suggerito="{{ md.numero_studenti_suggerito }}">
+  {% if messaggio %}<div class="flash flash-{{ tipo or 'success' }}" style="margin:0.5rem 0">{{ messaggio }}</div>{% endif %}
+
+  <p class="muted" style="margin:0.5rem 0">
+    {% if md.segreteria_csv %}
+    {{ icona("file", 14) }} Dal file della segreteria <strong>{{ md.segreteria_csv.nome_file }}</strong>
+    (caricato il {{ md.segreteria_csv.caricato_il }}){% set aggiunti = md.iscritti|selectattr("aggiunto")|list %}{% if aggiunti %},
+    più {{ aggiunti|length }} aggiunt{{ 'o' if aggiunti|length == 1 else 'i' }} a mano{% endif %}.
+    {% elif md.iscritti %}
+    Elenco inserito a mano.
+    {% elif md.appello.iscritti_manuale %}
+    Indicato solo il numero: <strong>{{ md.appello.iscritti_manuale }}</strong> iscritti, senza elenco nominale.
+    {% else %}
+    Nessun iscritto: aggiungili uno alla volta qui sotto, oppure importa un elenco.
+    {% endif %}
+    {% if md.appello.matricola_minima_iscritti %}<span class="badge">solo matricole &ge; {{ md.appello.matricola_minima_iscritti }}</span>{% endif %}
+  </p>
+
+  {% if modificabile %}
+  <form class="form-frammento barra-aggiungi" method="post" action="{{ url }}/iscritti-manuale/aggiungi" autocomplete="off">
+    <div style="position:relative; flex:1; min-width:14rem">
+      <input name="matricola" class="campo-input-matricola-iscritto" placeholder="Aggiungi un iscritto: matricola o cognome"
+             aria-label="Aggiungi un iscritto: matricola o cognome" autocomplete="off" required>
+      <div class="campo-suggerimenti-studenti-iscritto sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+    </div>
+    <button type="submit" style="margin:0">{{ icona("piu") }} Aggiungi</button>
+  </form>
+
+  <div class="barra-strumenti">
+    <details class="strumento" data-chiave="segreteria">
+      <summary class="icona-azione">{{ icona("carica") }} File della segreteria</summary>
+      <div class="pannello-strumento">
+        <p class="muted" style="margin-top:0">Il file "Lista Studenti Esame" (.csv, .xls, .xlsx). Serve anche, dalla scheda
+          Valutazione, a compilare il file da restituire alla segreteria.
+          {% if md.segreteria_csv %}Caricarne uno nuovo sostituisce l'attuale.{% endif %}</p>
+        <form class="form-frammento" method="post" action="{{ url }}/segreteria-csv" enctype="multipart/form-data">
+          <input type="file" name="file" accept=".csv,.xls,.xlsx" required>
+          <button type="submit">{{ icona("carica") }} Carica</button>
+        </form>
+        {% if md.segreteria_csv %}
+        <form class="form-frammento" method="post" action="{{ url }}/segreteria-csv/elimina"
+              data-conferma="Rimuovere il file della segreteria? Restano solo gli iscritti aggiunti a mano, e non sarà più possibile compilare il file per la segreteria finché non ne carichi uno nuovo.">
+          <button type="submit" class="danger">{{ icona("cestino") }} Rimuovi il file</button>
+        </form>
+        {% endif %}
+      </div>
+    </details>
+
+    <details class="strumento" data-chiave="moodle">
+      <summary class="icona-azione">{{ icona("carica") }} Prenotazioni Moodle</summary>
+      <div class="pannello-strumento">
+        <p class="muted" style="margin-top:0">
+          Esporta da Moodle l'elenco delle prenotazioni dell'attività (Scarica → CSV o Excel) e caricalo qui così com'è.
+          Servono le colonne <em>ID number</em> (la matricola), <em>First name</em> e <em>Last name</em>
+          (o <em>Codice identificativo</em>, <em>Nome</em>, <em>Cognome</em>). Prima di importare vedrai l'elenco,
+          per scegliere chi aggiungere.</p>
+        <form method="post" action="{{ url }}/iscritti-moodle" enctype="multipart/form-data">
+          <input type="file" name="file" accept=".csv,.xlsx,.xls,text/csv" required>
+          <button type="submit">Carica e controlla</button>
+        </form>
+      </div>
+    </details>
+
+    <details class="strumento" data-chiave="tutti">
+      <summary class="icona-azione">{{ icona("persone") }} Tutto il corso</summary>
+      <div class="pannello-strumento">
+        <form class="form-frammento" method="post" action="{{ url }}/iscritti-manuale/tutti">
+          <label>Solo con matricola &ge; (facoltativo)</label>
+          <input type="number" name="matricola_minima" placeholder="vuoto = tutti">
+          <p class="muted" style="margin:0.5rem 0 0">Aggiunge all'elenco tutti gli studenti registrati nel corso; poi puoi
+            togliere quelli che non servono.</p>
+          <button type="submit">{{ icona("persone") }} Aggiungi tutti</button>
+        </form>
+      </div>
+    </details>
+
+    <details class="strumento" data-chiave="filtro">
+      <summary class="icona-azione">{{ icona("filtro") }} Filtro matricola{% if md.appello.matricola_minima_iscritti %} &ge; {{ md.appello.matricola_minima_iscritti }}{% endif %}</summary>
+      <div class="pannello-strumento">
+        <form class="form-frammento" method="post" action="{{ url }}/iscritti-filtro">
+          <label>Tieni solo le matricole &ge;</label>
+          <input type="number" name="matricola_minima" value="{{ md.appello.matricola_minima_iscritti or '' }}" placeholder="vuoto = nessun filtro">
+          <p class="muted" style="margin:0.5rem 0 0">Es. per una prova riservata al primo anno: chi ha una matricola inferiore
+            non compare nell'elenco, nel registro presenze e non può essere corretto. Il file restituito alla segreteria resta intero.</p>
+          <button type="submit">Salva filtro</button>
+        </form>
+      </div>
+    </details>
+
+    {% if not md.iscritti %}
+    <details class="strumento" data-chiave="numero">
+      <summary class="icona-azione">{{ icona("numero") }} Solo il numero</summary>
+      <div class="pannello-strumento">
+        <form class="form-frammento" method="post" action="{{ url }}/iscritti-manuale">
+          <label>Numero di iscritti</label>
+          <input type="number" name="iscritti_manuale" min="0" value="{{ md.appello.iscritti_manuale or '' }}">
+          <p class="muted" style="margin:0.5rem 0 0">Senza elenco nominale: serve solo a suggerire quanti compiti generare.</p>
+          <button type="submit">Salva</button>
+        </form>
+      </div>
+    </details>
+    {% endif %}
+
+    {% if md.iscritti %}
+    <span class="barra-strumenti-fine">{{ icona("stampa", 14) }} {{ formati(url ~ "/iscritti", pdf=True, html=True, tex=True, csv=True) }}</span>
+    {% endif %}
+  </div>
+  {% elif md.iscritti %}
+  <p>{{ icona("stampa", 14) }} {{ formati(url ~ "/iscritti", pdf=True, html=True, tex=True, csv=True) }}</p>
+  {% endif %}
+
+  {% if md.esclusi_filtro %}
+  <div class="card" style="margin-top:0.75rem">
+    <strong>Esclusi dal filtro sulla matricola ({{ md.esclusi_filtro|length }})</strong>
+    {% if da_confermare %}<span class="badge badge-warn">{{ da_confermare|length }} da confermare</span>{% endif %}
+    <p class="muted" style="margin:0.25rem 0 0.5rem">Matricola inferiore a {{ md.appello.matricola_minima_iscritti }}: conferma
+      l'esclusione, oppure ammetti comunque (es. DSA, L104, casi particolari). Finché non decidi restano esclusi.</p>
+    <table>
+      <thead><tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Decisione</th><th></th></tr></thead>
+      {% for s in md.esclusi_filtro %}
+      <tr>
+        <td>{{ s.matricola }}</td>
+        <td>{{ s.cognome }}</td>
+        <td>{{ s.nome }}</td>
+        <td>{% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% if s.dsa_note %} <span class="muted">{{ s.dsa_note }}</span>{% endif %}{% endif %}</td>
+        <td>
+          {% if s.decisione == 'ammesso' %}<span class="badge badge-ok">ammesso in deroga</span>
+          {% elif s.decisione == 'escluso' %}<span class="badge">esclusione confermata</span>
+          {% else %}<span class="badge badge-warn">da confermare</span>{% endif %}
+        </td>
+        <td style="white-space:nowrap">
+          {% if modificabile %}
+          {% set url_decisione = url ~ "/iscritti-filtro/" ~ s.matricola %}
+          {% if s.decisione != 'ammesso' %}
+          <form class="inline form-frammento" method="post" action="{{ url_decisione }}"
+                data-conferma="{{ 'Ammettere comunque ' ~ s.cognome ~ ' ' ~ s.nome ~ ' (' ~ s.matricola ~ ')' ~ (' — ' ~ (s.dsa_tipo or 'DSA') if s.dsa else '') ~ ' in deroga al filtro sulla matricola?' }}">
+            <input type="hidden" name="decisione" value="ammesso">
+            <button type="submit" class="pulsante-piccolo">Ammetti comunque</button>
+          </form>
+          {% endif %}
+          {% if s.decisione != 'escluso' %}
+          <form class="inline form-frammento" method="post" action="{{ url_decisione }}">
+            <input type="hidden" name="decisione" value="escluso">
+            <button type="submit" class="secondary pulsante-piccolo">Conferma esclusione</button>
+          </form>
+          {% endif %}
+          {% if s.decisione %}
+          <form class="inline form-frammento" method="post" action="{{ url_decisione }}">
+            <input type="hidden" name="decisione" value="">
+            <button type="submit" class="link-simile">annulla</button>
+          </form>
+          {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  {% if md.iscritti %}
+  {% set non_registrati = md.iscritti|rejectattr('registrato')|list %}
+  {% if non_registrati %}
+  <p class="flash flash-warning" style="margin:0.75rem 0 0">
+    {{ non_registrati|length }} iscritt{{ 'o' if non_registrati|length == 1 else 'i' }} del file non
+    {{ 'è' if non_registrati|length == 1 else 'sono' }} ancora registrat{{ 'o' if non_registrati|length == 1 else 'i' }}
+    nel corso: finché non l{{ 'o' if non_registrati|length == 1 else 'i' }} registri non potr{{ 'à' if non_registrati|length == 1 else 'anno' }}
+    ricevere un voto (pulsante "Registra" nella riga).
+  </p>
+  {% endif %}
+  <table class="tabella-iscritti" style="margin-top:0.75rem">
+    <thead><tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th></th><th></th></tr></thead>
+    {% for s in md.iscritti %}
+    <tr>
+      <td>{{ s.matricola }}</td>
+      {% if s.registrato %}
+      <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
+      <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
+      {% else %}
+      <td>{{ s.cognome }}</td><td>{{ s.nome }}</td>
+      {% endif %}
+      <td>
+        {% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}
+        {% if md.segreteria_csv and s.aggiunto %}<span class="badge" title="Non è nel file della segreteria">aggiunto a mano</span>{% endif %}
+        {% if not s.registrato %}
+        <span class="badge badge-warn">non registrato</span>
+        {% if modificabile %}
+        <form method="post" action="/corsi/{{ corso.tag }}/studenti/nuovo" class="inline">
+          <input type="hidden" name="matricola" value="{{ s.matricola }}">
+          <input type="hidden" name="cognome" value="{{ s.cognome }}">
+          <input type="hidden" name="nome" value="{{ s.nome }}">
+          <input type="hidden" name="next" value="{{ url }}#compiti">
+          <button type="submit" class="secondary pulsante-piccolo">{{ icona("utente-piu", 13) }} Registra</button>
+        </form>
+        {% endif %}
+        {% endif %}
+      </td>
+      <td class="cella-azioni">
+        {% if modificabile %}
+        <form class="inline form-frammento" method="post" action="{{ url }}/iscritti-manuale/{{ s.matricola }}/rimuovi"
+              data-conferma="{{ 'Togliere ' ~ s.cognome ~ ' ' ~ s.nome ~ ' (' ~ s.matricola ~ ') dagli iscritti?' }}">
+          <button type="submit" class="pulsante-icona" title="Togli dagli iscritti" aria-label="Togli {{ s.cognome }} {{ s.nome }} dagli iscritti">{{ icona("cestino") }}</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>

@@ -170,6 +170,14 @@ CREATE TABLE IF NOT EXISTS appello_iscritti_manuali (
     PRIMARY KEY (matricola, appello_id)
 );
 
+-- Studenti tolti a mano dall'elenco iscritti ricavato dal file della segreteria (es. una
+-- prenotazione annullata): il file salvato resta intero, per restituirlo alla segreteria.
+CREATE TABLE IF NOT EXISTS appello_iscritti_rimossi (
+    appello_id INTEGER NOT NULL REFERENCES appelli(id),
+    matricola TEXT NOT NULL,
+    PRIMARY KEY (appello_id, matricola)
+);
+
 -- Decisioni del docente sugli iscritti esclusi dal filtro "matricola >= soglia" di un
 -- appello: ammesso=1 lo tiene comunque nell'elenco (eccezione), ammesso=0 conferma
 -- l'esclusione. Senza riga, l'esclusione è ancora da confermare. Nessun vincolo su
@@ -306,6 +314,10 @@ ADDITIVE_COLUMNS = {
     "compito_esercizi": [
         ("risposte_mischiate", "TEXT"),
         ("aperta", "BOOLEAN NOT NULL DEFAULT 0"),
+    ],
+    "appello_aule": [
+        # aula riservata agli studenti DSA/L104 (vedi aule.assegna_automatica)
+        ("dsa", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
     "appelli": [
         ("orale_data", "TEXT"),

@@ -210,6 +210,128 @@ function attivaPannelloIA(radice) {
   });
 }
 
+// Riquadro di una pagina che si aggiorna da solo: i moduli al suo interno che corrispondono
+// a `selettore` vengono inviati in background (con l'intestazione X-Frammento) e il server
+// risponde con il riquadro ridisegnato, che sostituisce il contenuto di `contenitore`. Così
+// non si ricarica l'intera pagina dell'appello a ogni aula aggiunta o iscritto tolto. Le
+// tendine con data-chiave restano aperte/chiuse com'erano; data-conferma su un modulo
+// chiede conferma prima dell'invio; `dopo(contenitore)` riattiva quel che serve (es. i
+// suggerimenti dei campi), anche la prima volta.
+function attivaRiquadro(contenitore, selettore, dopo) {
+  contenitore.addEventListener("submit", function (ev) {
+    var form = ev.target;
+    if (ev.defaultPrevented || !form.matches(selettore)) return;
+    ev.preventDefault();
+    if (form.dataset.conferma && !window.confirm(form.dataset.conferma)) return;
+    var aperti = {};
+    contenitore.querySelectorAll("details[data-chiave]").forEach(function (d) { aperti[d.dataset.chiave] = d.open; });
+    var focus = document.activeElement && document.activeElement.name;
+    var dati = new FormData(form);  // prima di disabilitare: i campi disabilitati non vengono inviati
+    form.querySelectorAll("button, select").forEach(function (el) { el.disabled = true; });
+    fetch(form.action, { method: "POST", body: dati, headers: { "X-Frammento": "1" } })
+      .then(function (r) {
+        if (!r.ok) throw new Error("errore " + r.status);
+        return r.text();
+      })
+      .then(function (html) {
+        contenitore.innerHTML = html;
+        contenitore.querySelectorAll("details[data-chiave]").forEach(function (d) {
+          if (aperti[d.dataset.chiave] !== undefined) d.open = aperti[d.dataset.chiave];
+        });
+        if (dopo) dopo(contenitore);
+        // il cursore torna sul campo appena usato (o sul primo campo di testo del riquadro),
+        // pronto per il prossimo inserimento
+        var campo = (focus && contenitore.querySelector('input[name="' + focus + '"]:not([type=hidden])'))
+          || contenitore.querySelector('input[name="matricola"]:not([type=hidden])');
+        if (campo) campo.focus({ preventScroll: true });
+      })
+      .catch(function (err) {
+        form.querySelectorAll("button, select").forEach(function (el) { el.disabled = false; });
+        alert("Non sono riuscito a salvare: " + err.message);
+      });
+  });
+  if (dopo) dopo(contenitore);
+}
+
+// Suggerimenti di studenti del corso per un campo matricola: scegliere un nome dalla
+// lista invia subito il modulo (un clic invece di due).
+function _autocompleteStudenti(campo, suggerimenti, tag) {
+  if (!campo) return;
+  suggerimenti.addEventListener("click", function (ev) {
+    if (ev.target.closest(".sfoglia-voce") && campo.form) campo.form.requestSubmit();
+  });
+  creaAutocomplete(
+    campo, suggerimenti,
+    function (q) { return "/corsi/" + tag + "/api/studenti/cerca?q=" + encodeURIComponent(q); },
+    function (s) { return s.cognome + " " + s.nome + " (" + s.matricola + ")"; },
+    function (s) { return s.matricola; }
+  );
+}
+
+// Riquadro "Studenti ammessi e aule" di una prova (_ammessi_aule.html): tutti i suoi moduli.
+function attivaAmmessiAule(riquadro, tag) {
+  attivaRiquadro(riquadro, "form", function (r) {
+    r.open = true;
+    _autocompleteStudenti(r.querySelector(".campo-input-matricola-ammesso"), r.querySelector(".campo-suggerimenti-studenti-ammesso"), tag);
+  });
+}
+
+// Ridisegna il riquadro "Studenti ammessi e aule" di una prova (url dell'appello senza
+// barra finale) quando cambia qualcosa da cui dipende: gli iscritti o le aule.
+function ridisegnaAmmessi(riquadro, urlAppello, tag) {
+  if (!riquadro) return;
+  fetch(urlAppello + "/ammessi-aule", { headers: { "X-Frammento": "1" } })
+    .then(function (r) { return r.ok ? r.text() : null; })
+    .then(function (html) {
+      if (html === null) return;
+      var aperti = {};
+      riquadro.querySelectorAll("details[data-chiave]").forEach(function (d) { aperti[d.dataset.chiave] = d.open; });
+      riquadro.innerHTML = html;
+      riquadro.querySelectorAll("details[data-chiave]").forEach(function (d) {
+        if (aperti[d.dataset.chiave] !== undefined) d.open = aperti[d.dataset.chiave];
+      });
+      _autocompleteStudenti(riquadro.querySelector(".campo-input-matricola-ammesso"), riquadro.querySelector(".campo-suggerimenti-studenti-ammesso"), tag);
+    });
+}
+
+// Aule di una prova nella scheda Impostazioni (_aule.html): dopo ogni modifica si aggiorna
+// anche il riquadro degli ammessi della stessa prova, nella scheda Compiti d'esame.
+function attivaAule(contenitore, tag) {
+  var primaVolta = true;
+  attivaRiquadro(contenitore, "form", function (c) {
+    if (primaVolta) { primaVolta = false; return; }
+    var id = c.closest(".blocco-aule").dataset.appello;
+    ridisegnaAmmessi(document.querySelector('.tab-pane[data-pane="compiti-' + id + '"] .blocco-ammessi-aule'),
+      "/corsi/" + tag + "/appelli/" + id, tag);
+  });
+}
+
+// Elenco iscritti di un appello (_iscritti.html). Dopo ogni modifica aggiorna anche ciò
+// che ne dipende nella stessa scheda: il conteggio nel titolo, il numero di compiti
+// suggerito e, per una prova di un raggruppamento, il riquadro degli ammessi.
+function attivaIscritti(contenitore, tag) {
+  var primaVolta = true;
+  // una sola tendina di strumenti aperta alla volta
+  contenitore.addEventListener("click", function (ev) {
+    var summary = ev.target.closest("details.strumento > summary");
+    if (!summary) return;
+    contenitore.querySelectorAll("details.strumento[open]").forEach(function (d) { if (d !== summary.parentElement) d.open = false; });
+  });
+  attivaRiquadro(contenitore, ".form-frammento", function (c) {
+    _autocompleteStudenti(c.querySelector(".campo-input-matricola-iscritto"), c.querySelector(".campo-suggerimenti-studenti-iscritto"), tag);
+    if (primaVolta) { primaVolta = false; return; }
+    var dati = c.querySelector(".riquadro-iscritti").dataset;
+    var sezione = c.closest("details");
+    var conteggio = sezione && sezione.querySelector(".conteggio-iscritti");
+    if (conteggio) conteggio.textContent = dati.numero ? "(" + dati.numero + ")" : "";
+    var scheda = c.closest(".tab-pane") || document;
+    var numero = scheda.querySelector('.form-genera-compiti input[name="numero_studenti"]');
+    if (numero && dati.suggerito) numero.value = dati.suggerito;
+    var form = c.querySelector(".barra-aggiungi");
+    if (form) ridisegnaAmmessi(scheda.querySelector(".blocco-ammessi-aule"), form.action.replace(/\/iscritti-manuale\/aggiungi$/, ""), tag);
+  });
+}
+
 // Sezioni del flusso di lavoro di un appello (<details class="sezione-flusso">): il
 // template le apre se la fase è ancora da fare e le richiude se è completata, così
 // risaltano i passaggi che mancano. Se il docente apre o chiude a mano una sezione, la
@@ -238,4 +360,317 @@ document.addEventListener("DOMContentLoaded", function () {
       barra.scrollLeft = attiva.offsetLeft - (barra.clientWidth - attiva.offsetWidth) / 2;
     }
   });
+});
+
+// Le icone "i" (_info.html) stanno spesso nel titolo di una sezione a scomparsa: cliccarle
+// mostra la nota, senza aprire o chiudere la sezione.
+document.addEventListener("click", function (ev) {
+  var icona = ev.target.closest && ev.target.closest("summary .aiuto");
+  if (icona) { ev.preventDefault(); icona.focus(); }
+});
+
+// --- Scheda Testo di un appello (_tab_creazione.html / _testo_esercizi.html) -----------
+// Le azioni sugli esercizi assegnati (assegna dalla banca, togli, obbligatorio, crea,
+// modifica, importa da altri corsi) vengono inviate in background: il server risponde con
+// il riquadro ridisegnato (X-Frammento), senza ricaricare tutta la pagina dell'appello.
+// Importa da file e Genera con l'IA portano invece a una pagina di conferma, come prima.
+var _AZIONI_TESTO_IN_BACKGROUND = ["/obbligatorio", "/rimuovi", "/esercizi/assegna", "/esercizi/nuovo", "/modifica", "/importa-da-altri-corsi"];
+var _AZIONI_TESTO_RIGENERANO = _AZIONI_TESTO_IN_BACKGROUND.concat(["/importa-json", "/ia/genera"]);
+
+function attivaTesto(sezione) {
+  var tag = sezione.dataset.tag;
+  function dati() { return sezione.querySelector(".dati-testo").dataset; }
+
+  sezione.addEventListener("submit", function (ev) {
+    var form = ev.target;
+    if (ev.defaultPrevented) return;
+    var action = form.getAttribute("action") || "";
+    var fine = function (suffissi) { return suffissi.some(function (s) { return action.endsWith(s); }); };
+    if (form.classList.contains("form-rimuovi-esercizio")) {
+      var nome = form.dataset.nome;
+      if (!window.confirm("Togliere l'esercizio " + nome + " da questo compito?")) { ev.preventDefault(); return; }
+      var elimina = window.confirm(
+        "Eliminare l'esercizio " + nome + " anche dalla banca dati del corso?\n\n" +
+        "OK = elimina definitivamente anche dalla banca\n" +
+        "Annulla = lo tolgo solo da questo compito (resta nella banca, riusabile)");
+      form.querySelector('[name="elimina_dalla_banca"]').value = elimina ? "1" : "";
+    }
+    var blocchi = Number(dati().blocchi);
+    // il modulo di modifica chiede già lui conferma (data-avvisa-rigenerazione)
+    if (blocchi && fine(_AZIONI_TESTO_RIGENERANO) && !action.endsWith("/modifica") && !window.confirm(
+      "Sono già stati generati " + blocchi + " blocco/i di compiti per questo appello. Modificare gli esercizi " +
+      "assegnati rigenererà il file di riferimento e tutti i blocchi già generati, eliminando i vecchi codici " +
+      "(non è possibile se qualche blocco ha già risultati registrati). Procedere comunque?")) {
+      ev.preventDefault(); return;
+    }
+    if (!fine(_AZIONI_TESTO_IN_BACKGROUND)) return;  // invio normale (pagina di conferma)
+    ev.preventDefault();
+    var corpo = new FormData(form);
+    form.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
+    fetch(form.action, { method: "POST", body: corpo, headers: { "X-Frammento": "1", "X-Appello": sezione.dataset.appello } })
+      .then(function (r) { if (!r.ok) throw new Error("errore " + r.status); return r.text(); })
+      .then(function (html) {
+        var aperto = sezione.dataset.pannelloAperto;
+        // dopo aver creato un esercizio il modulo si richiude; dopo un'assegnazione resta la banca
+        if (action.endsWith("/esercizi/nuovo")) aperto = "";
+        sezione.innerHTML = html;
+        sezione.open = true;
+        _inizializzaTesto(sezione, tag, aperto);
+        _aggiornaDopoTesto(sezione);
+        var flash = sezione.querySelector(".flash");
+        if (flash && flash.getBoundingClientRect().top < 0) flash.scrollIntoView({ block: "center" });
+      })
+      .catch(function (err) {
+        form.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
+        alert("Non sono riuscito a salvare: " + err.message);
+      });
+  });
+  _inizializzaTesto(sezione, tag, "");
+}
+
+// Ciò che nella pagina dipende dagli esercizi assegnati, fuori dal riquadro: la fase Testo
+// del percorso e il pulsante "Genera" della scheda Compiti d'esame.
+function _aggiornaDopoTesto(sezione) {
+  var d = sezione.querySelector(".dati-testo").dataset;
+  var n = Number(d.n);
+  var passo = document.querySelector('.passo a[data-tab="' + sezione.dataset.scheda + '"]');
+  if (passo) {
+    var li = passo.parentElement;
+    li.classList.toggle("passo-fatta", n > 0);
+    li.classList.toggle("passo-da_fare", n === 0);
+    var icona = passo.querySelector(".passo-icona");
+    var segno = icona.querySelector(".passo-segno");
+    if (n > 0 && !segno) icona.insertAdjacentHTML("beforeend", '<span class="passo-segno">✓</span>');
+    if (n === 0 && segno) segno.remove();
+    passo.dataset.info = "Testo — " + (n > 0 ? "Completata" : "Da fare") + ": " + n + " esercizi assegnati";
+  }
+  var scheda = document.querySelector('.tab-pane[data-pane="' + sezione.dataset.scheda.replace("creazione", "compiti") + '"]');
+  var genera = scheda && scheda.querySelector(".form-genera-compiti");
+  if (genera) {
+    genera.dataset.obbligatoriAssegnati = d.obbligatori;
+    genera.querySelector('button[type="submit"]').disabled = n === 0;
+  }
+}
+
+function _inizializzaTesto(sezione, tag, pannelloAperto) {
+  // barra degli strumenti: un pannello alla volta, quelli pesanti caricati alla prima apertura
+  function apri(nome) {
+    sezione.dataset.pannelloAperto = nome || "";
+    sezione.querySelectorAll(".pannello-testo").forEach(function (p) {
+      var questo = p.dataset.pannello === nome;
+      p.hidden = !questo;
+      if (questo && p.dataset.url && !p.dataset.caricato) {
+        p.dataset.caricato = "1";
+        fetch(p.dataset.url).then(function (r) { return r.text(); }).then(function (html) {
+          p.innerHTML = html;
+          if (p.dataset.pannello === "ia") attivaPannelloIA(p);
+          else attivaElencoEsercizi(p.querySelector(".elenco-esercizi-corsi"));
+        });
+      }
+    });
+    sezione.querySelectorAll("[data-apri]").forEach(function (b) {
+      var attivo = b.dataset.apri === nome;
+      b.classList.toggle("attivo", attivo);
+      b.setAttribute("aria-expanded", attivo ? "true" : "false");
+    });
+  }
+  sezione.querySelectorAll("[data-apri]").forEach(function (b) {
+    b.addEventListener("click", function () { apri(sezione.dataset.pannelloAperto === b.dataset.apri ? "" : b.dataset.apri); });
+  });
+  if (pannelloAperto && sezione.querySelector('[data-apri="' + pannelloAperto + '"]')) apri(pannelloAperto);
+  inizializzaFormEsercizi(sezione);
+
+  // anteprima/modifica di un esercizio assegnato, in una riga sotto
+  function chiudiRighe(eccetto) {
+    sezione.querySelectorAll(".riga-anteprima-assegnato, .riga-modifica-assegnato").forEach(function (r) {
+      if (r !== eccetto) r.style.display = "none";
+    });
+  }
+  function caricaAnteprima(riga, id) {
+    if (riga.dataset.caricata) { renderizzaLatex(riga); return; }
+    fetch("/corsi/" + tag + "/esercizi/" + id + "/anteprima").then(function (r) { return r.text(); }).then(function (html) {
+      riga.querySelector("td").innerHTML = html;
+      riga.dataset.caricata = "1";
+      renderizzaLatex(riga);
+    });
+  }
+  sezione.querySelectorAll(".btn-anteprima-assegnato").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var riga = sezione.querySelector('.riga-anteprima-assegnato[data-esercizio="' + btn.dataset.esercizio + '"]');
+      var giaAperta = riga.style.display !== "none";
+      chiudiRighe(giaAperta ? null : riga);
+      riga.style.display = giaAperta ? "none" : "";
+      if (!giaAperta) caricaAnteprima(riga, btn.dataset.esercizio);
+    });
+  });
+  sezione.querySelectorAll(".btn-modifica-assegnato").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var riga = sezione.querySelector('.riga-modifica-assegnato[data-esercizio="' + btn.dataset.esercizio + '"]');
+      var giaAperta = riga.style.display !== "none";
+      chiudiRighe(giaAperta ? null : riga);
+      riga.style.display = giaAperta ? "none" : "";
+      if (!giaAperta) caricaInRiga(riga, riga.querySelector("td").dataset.url, inizializzaFormEsercizi);
+    });
+  });
+
+  // banca del corso: filtri e anteprima
+  var ricerca = sezione.querySelector(".filtro-ricerca");
+  if (ricerca) {
+    var argomento = sezione.querySelector(".filtro-argomento");
+    var righe = sezione.querySelectorAll(".tabella-disponibili tr[data-nome]");
+    var applica = function () {
+      var testo = ricerca.value.trim().toLowerCase();
+      var arg = argomento.value;
+      righe.forEach(function (riga) {
+        var ok = (!testo || riga.dataset.nome.includes(testo) || riga.dataset.testo.includes(testo)) && (!arg || riga.dataset.argomento === arg);
+        riga.style.display = ok ? "" : "none";
+        var anteprima = riga.nextElementSibling;
+        if (!ok && anteprima) anteprima.style.display = "none";
+      });
+    };
+    ricerca.addEventListener("input", applica);
+    argomento.addEventListener("change", applica);
+    sezione.querySelectorAll(".btn-anteprima-disponibile").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var riga = sezione.querySelector('.riga-anteprima-disponibile[data-esercizio="' + btn.dataset.esercizio + '"]');
+        var giaAperta = riga.style.display !== "none";
+        riga.style.display = giaAperta ? "none" : "";
+        if (!giaAperta) caricaAnteprima(riga, btn.dataset.esercizio);
+      });
+    });
+  }
+
+  _attivaRiordinoEsercizi(sezione);
+}
+
+// Riordino degli esercizi assegnati: ogni esercizio è un <tbody> (la riga principale più
+// quelle, nascoste, di anteprima e modifica), che si sposta tutto insieme. Ogni modifica
+// salva subito l'ordine completo, senza ricaricare la pagina.
+function _attivaRiordinoEsercizi(sezione) {
+  var tabella = sezione.querySelector(".tabella-esercizi-assegnati");
+  if (!tabella || !tabella.querySelector(".maniglia-ordine")) return;
+  var stato = sezione.querySelector(".stato-ordine");
+  function voci() { return Array.prototype.slice.call(tabella.querySelectorAll("tbody.esercizio-assegnato")); }
+  function aggiornaNumeri() {
+    var tutte = voci();
+    tutte.forEach(function (tb, i) {
+      tb.querySelector(".posizione-ordine").value = i + 1;
+      tb.querySelector(".btn-ordine-su").disabled = i === 0;
+      tb.querySelector(".btn-ordine-giu").disabled = i === tutte.length - 1;
+    });
+  }
+  var timer = null;
+  function salva() {
+    aggiornaNumeri();
+    stato.textContent = "Salvataggio…";
+    clearTimeout(timer);
+    // più spostamenti ravvicinati (es. frecce premute di seguito) diventano un solo salvataggio
+    timer = setTimeout(function () {
+      fetch(tabella.dataset.urlOrdine, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ordine: voci().map(function (tb) { return Number(tb.dataset.esercizio); }) }),
+      }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) { stato.textContent = res.ok ? "Ordine salvato ✓" : "Errore: " + res.d.errore; })
+        .catch(function () { stato.textContent = "Errore: ordine non salvato"; });
+    }, 400);
+  }
+  function sposta(tb, posizione) {
+    var tutte = voci().filter(function (x) { return x !== tb; });
+    posizione = Math.max(0, Math.min(tutte.length, posizione));
+    tabella.insertBefore(tb, tutte[posizione] || null);
+    salva();
+  }
+  voci().forEach(function (tb) {
+    tb.querySelector(".btn-ordine-su").addEventListener("click", function () { sposta(tb, voci().indexOf(tb) - 1); });
+    tb.querySelector(".btn-ordine-giu").addEventListener("click", function () { sposta(tb, voci().indexOf(tb) + 1); });
+    var campo = tb.querySelector(".posizione-ordine");
+    function applica() {
+      var n = parseInt(campo.value, 10);
+      if (isNaN(n) || n - 1 === voci().indexOf(tb)) { aggiornaNumeri(); return; }
+      sposta(tb, n - 1);
+    }
+    campo.addEventListener("change", applica);
+    campo.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); applica(); } });
+    var maniglia = tb.querySelector(".maniglia-ordine");
+    maniglia.addEventListener("dragstart", function (ev) {
+      ev.dataTransfer.effectAllowed = "move";
+      ev.dataTransfer.setData("text/plain", tb.dataset.esercizio);
+      tabella.dataset.trascinato = tb.dataset.esercizio;
+      tb.classList.add("trascinato");
+    });
+    maniglia.addEventListener("dragend", function () {
+      tb.classList.remove("trascinato");
+      delete tabella.dataset.trascinato;
+    });
+    tb.addEventListener("dragover", function (ev) {
+      var id = tabella.dataset.trascinato;
+      if (!id || id === tb.dataset.esercizio) return;
+      ev.preventDefault();
+      var trascinato = tabella.querySelector('tbody.esercizio-assegnato[data-esercizio="' + id + '"]');
+      // sopra o sotto a seconda di quale metà della riga ha il puntatore
+      var r = tb.getBoundingClientRect();
+      tabella.insertBefore(trascinato, ev.clientY < r.top + r.height / 2 ? tb : tb.nextSibling);
+    });
+    tb.addEventListener("drop", function (ev) { ev.preventDefault(); salva(); });
+  });
+  var ordinaPer = sezione.querySelector(".ordina-per");
+  ordinaPer.addEventListener("change", function () {
+    var criterio = ordinaPer.value;
+    ordinaPer.value = "";
+    if (!criterio) return;
+    var tutte = voci();
+    if (criterio === "inverti") {
+      tutte.reverse();
+    } else {
+      var chiave = {
+        nome: function (tb) { return [tb.dataset.nome]; },
+        argomento: function (tb) { return [tb.dataset.argomento || "￿", tb.dataset.nome]; },
+        difficolta: function (tb) { return [Number(tb.dataset.difficolta) || 99]; },
+        obbligatorio: function (tb) { return [1 - Number(tb.dataset.obbligatorio)]; },
+        aperta: function (tb) { return [Number(tb.dataset.aperta)]; },
+      }[criterio];
+      tutte.sort(function (a, b) {
+        var ka = chiave(a), kb = chiave(b);
+        for (var i = 0; i < ka.length; i++) {
+          if (ka[i] === kb[i]) continue;
+          return typeof ka[i] === "number" ? ka[i] - kb[i] : ka[i].localeCompare(kb[i], "it", { numeric: true });
+        }
+        return 0;
+      });  // stabile: a parità resta l'ordine attuale
+    }
+    tutte.forEach(function (tb) { tabella.appendChild(tb); });
+    salva();
+  });
+  aggiornaNumeri();
+}
+
+// Pulsante "Annulla" accanto a "Salva" (class="btn-annulla" dentro un modulo): attivo solo
+// quando il modulo ha modifiche non salvate, le scarta riportando i campi ai valori salvati.
+// Con data-annulla="ricarica" sul modulo (es. righe aggiunte via JavaScript, che reset()
+// non toglierebbe) ricarica invece la pagina.
+document.addEventListener("input", _segnaModuloModificato, true);
+document.addEventListener("change", _segnaModuloModificato, true);
+function _segnaModuloModificato(ev) {
+  var form = ev.target && ev.target.form;
+  if (!form || form.dataset.annullando) return;
+  form.querySelectorAll(".btn-annulla").forEach(function (b) { b.disabled = false; });
+}
+document.addEventListener("click", function (ev) {
+  var btn = ev.target.closest && ev.target.closest(".btn-annulla");
+  if (!btn || !btn.form) return;
+  var form = btn.form;
+  if (form.dataset.annulla === "ricarica") {
+    form.dataset.scartato = "1";
+    location.reload();
+    return;
+  }
+  form.dataset.annullando = "1";
+  form.reset();
+  // i campi che mostrano o nascondono altre parti del modulo si aggiornano di conseguenza
+  form.querySelectorAll("input[type=checkbox], input[type=radio], select").forEach(function (el) {
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  delete form.dataset.annullando;
+  form.querySelectorAll(".btn-annulla").forEach(function (b) { b.disabled = true; });
+  form.dispatchEvent(new CustomEvent("annullato"));
 });

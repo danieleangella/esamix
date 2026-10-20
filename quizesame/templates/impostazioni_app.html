@@ -4,40 +4,60 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <span class="current">Impostazioni</span>
 {% endblock %}
 {% block content %}
-<h1>Impostazioni dell'app</h1>
-<p class="muted">Valgono per l'intera installazione, non per un singolo corso.</p>
+{% from "_info.html" import info %}
+{% from "_icone.html" import icona %}
+<h1>Impostazioni dell'app {{ info("Valgono per l'intera installazione, non per un singolo corso: le impostazioni di ogni corso sono nella sua scheda Impostazioni.") }}</h1>
 
-<div class="card">
+<div class="griglia-impostazioni">
+<section class="card riquadro-impostazioni">
+  <h2>Generali</h2>
   <form method="post" action="/impostazioni">
-    <div class="form-grid">
-      <div>
-        <label>Nome del docente</label>
-        <input name="docente" value="{{ app_settings.docente }}" placeholder="es. Prof. Rossi">
-      </div>
+    <label>Nome del docente {{ info("Appare tra parentesi accanto al titolo \"EsaMiX\" nel menu in alto.") }}</label>
+    <input name="docente" value="{{ app_settings.docente }}" placeholder="es. Prof. Rossi">
+    <label class="riga-opzione">
+      <input type="checkbox" name="mostra_riepilogo_home" {% if app_settings.mostra_riepilogo_home %}checked{% endif %}>
+      Riepilogo generale in homepage
+      {{ info("Il riquadro con il numero di esami svolti e di sufficienze in tutti i corsi.") }}
+    </label>
+    <div class="barra-pulsanti">
+      <button type="submit">Salva</button>
+      <button type="button" class="secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate">Annulla</button>
     </div>
-    <p class="muted" style="margin-top:0.25rem">Appare tra parentesi accanto al titolo "EsaMiX" nel menu in alto.</p>
-
-    <div style="margin-top:1rem">
-      <label style="display:inline-flex; align-items:center; gap:0.4rem">
-        <input type="checkbox" name="mostra_riepilogo_home" style="width:auto" {% if app_settings.mostra_riepilogo_home %}checked{% endif %}>
-        Mostra il riquadro di riepilogo generale (esami svolti, sufficienze) in homepage
-      </label>
-    </div>
-
-    <button type="submit">Salva impostazioni</button>
   </form>
+</section>
+
+<section class="card riquadro-impostazioni">
+  <h2>Manutenzione</h2>
+  <div class="elenco-operazioni">
+    <div>
+      <form class="inline" method="post" action="/impostazioni/controlla-aggiornamenti">
+        <button type="submit" class="icona-azione">{{ icona("scarica", 14) }} Controlla aggiornamenti</button>
+      </form>
+      {{ info("L'app controlla da sola ogni poche ore se su GitHub c'è una versione più recente, e lo segnala in homepage; qui puoi controllare subito. Per installarla: su Linux/macOS esegui ./aggiorna.sh dalla cartella del programma, su Windows fai doppio clic su aggiorna.bat, poi riavvia EsaMiX. Dettagli nella Guida.") }}
+    </div>
+    <div>
+      <a href="/backup-tutti.zip" class="icona-azione">{{ icona("scarica", 14) }} Backup di tutti i corsi</a>
+      {{ info("Un archivio zip con il database e tutti i file generati (PDF/tex) di ogni corso: utile prima di modifiche importanti, o come copia di sicurezza periodica.") }}
+    </div>
+    <div>
+      <a href="/migrazione" class="icona-azione">{{ icona("carica", 14) }} Migrazione dati legacy</a>
+      {{ info("Importa una tantum i dati di un corso gestito con la vecchia versione (cartelle con file Python e CSV).") }}
+    </div>
+  </div>
+  <form method="post" action="/ripristina-backup" enctype="multipart/form-data" style="margin-top:0.75rem">
+    <label>Ripristina un backup {{ info("Carica uno zip scaricato da qui (di un singolo corso o di tutti insieme): nella pagina successiva scegli quali corsi ripristinare, con un avviso per quelli che esistono già e verrebbero sovrascritti.") }}</label>
+    <div class="barra-aggiungi" style="margin:0">
+      <input type="file" name="file" accept=".zip" required style="flex:1; min-width:12rem">
+      <button type="submit" class="secondary" style="margin:0">{{ icona("carica", 14) }} Carica</button>
+    </div>
+  </form>
+</section>
 </div>
 
 <details class="card" id="ia" {% if not ia_attivo %}open{% endif %}>
   <summary><strong>Intelligenza artificiale</strong>
+    {{ info("Serve per generare esercizi e per verificare le soluzioni di un compito (scheda Testo di un appello). Puoi salvare più configurazioni (chiavi diverse, fornitori diversi, un tuo server) e scegliere ogni volta quale usare. Vengono inviati solo testi di esercizi e impostazioni del corso, mai dati degli studenti, e solo quando premi il pulsante. Senza nessuna configurazione puoi comunque copiare i prompt in claude.ai.") }}
     {% if ia_attivo %}<span class="badge badge-ok">predefinita: {{ ia_attivo.nome }}</span>{% endif %}</summary>
-  <p class="muted" style="margin-top:0.75rem">
-    Serve per <strong>generare esercizi</strong> e per <strong>verificare le soluzioni</strong> di un compito
-    (scheda Testo di un appello). Puoi salvare più configurazioni — chiavi diverse, fornitori diversi, un tuo
-    server — e scegliere ogni volta quale usare. Vengono inviati solo testi di esercizi e impostazioni del corso,
-    mai dati degli studenti, e solo quando premi il pulsante. Senza nessuna configurazione puoi comunque copiare
-    i prompt in claude.ai.
-  </p>
 
   {% if ia_profili %}
   <ul class="elenco-documenti">
@@ -52,13 +72,13 @@
       <span class="formati">
         {% if not (ia_attivo and ia_attivo.id == p.id) %}
         <form class="inline" method="post" action="/impostazioni/ia/profili/{{ p.id }}/predefinito">
-          <button type="submit" class="secondary pulsante-piccolo">Usa come predefinita</button>
+          <button type="submit" class="secondary pulsante-piccolo" data-info="Usala quando non ne scegli un'altra">{{ icona("spunta", 13) }} Predefinita</button>
         </form>
         {% endif %}
         {% if not p.da_ambiente %}
         <form class="inline" method="post" action="/impostazioni/ia/profili/{{ p.id }}/elimina"
               onsubmit="return confirm({{ ('Eliminare la configurazione «' ~ p.nome ~ '» e la sua chiave?')|js }});">
-          <button type="submit" class="danger pulsante-piccolo">Elimina</button>
+          <button type="submit" class="pulsante-icona" data-info="Elimina la configurazione e la sua chiave" aria-label="Elimina {{ p.nome }}">{{ icona("cestino") }}</button>
         </form>
         {% else %}<span class="muted">dalla variabile d'ambiente</span>{% endif %}
       </span>
@@ -120,7 +140,10 @@
         <input type="checkbox" name="predefinito" value="1" style="width:auto" {% if not ia_profili %}checked{% endif %}>
         Usala come predefinita
       </label><br>
-      <button type="submit">Salva configurazione</button>
+      <div class="barra-pulsanti">
+        <button type="submit">Salva configurazione</button>
+        <button type="button" class="secondary btn-annulla" disabled data-info="Svuota il modulo">Annulla</button>
+      </div>
     </form>
   </details>
 </details>
@@ -163,46 +186,8 @@
 })();
 </script>
 
-<details class="card" open>
-  <summary><strong>Aggiornamenti</strong></summary>
-  <p class="muted" style="margin-top:0.75rem">Controlla subito se è disponibile una versione più recente del codice su GitHub
-    (l'app lo fa anche automaticamente ogni poche ore, mostrando un avviso in homepage).</p>
-  <form method="post" action="/impostazioni/controlla-aggiornamenti">
-    <button type="submit" class="secondary">Controlla aggiornamenti</button>
-  </form>
-  <p class="muted" style="margin-top:0.75rem">Per installare un aggiornamento disponibile: su
-    <strong>Linux/macOS</strong> esegui <code>./aggiorna.sh</code> dalla cartella del programma; su
-    <strong>Windows</strong> fai doppio clic su <code>aggiorna.bat</code>.
-    <a href="/help#aggiornamento">Dettagli nella guida</a>.</p>
-</details>
-
-<details class="card" open>
-  <summary><strong>Backup</strong></summary>
-  <p class="muted" style="margin-top:0.75rem">Scarica un archivio zip con il database e tutti i file generati (PDF/tex) di
-    ogni corso: utile prima di modifiche importanti, o come copia di sicurezza periodica.</p>
-  <a href="/backup-tutti.zip" class="button">Scarica un backup completo di tutti i corsi</a>
-</details>
-
 <details class="card">
-  <summary><strong>Ripristina backup</strong></summary>
-  <p class="muted" style="margin-top:0.75rem">Carica uno zip scaricato da qui (di un singolo corso o di tutti insieme): nella
-    pagina successiva scegli quali corsi ripristinare, con un avviso per quelli che esistono già e
-    verrebbero sovrascritti.</p>
-  <form method="post" action="/ripristina-backup" enctype="multipart/form-data">
-    <input type="file" name="file" accept=".zip" required>
-    <button type="submit" class="secondary">Carica e scegli cosa ripristinare</button>
-  </form>
-</details>
-
-<details class="card">
-  <summary><strong>Migrazione dati legacy</strong></summary>
-  <p class="muted" style="margin-top:1rem">Importa una tantum i dati di un corso gestito con la vecchia versione
-    (cartelle con file Python e CSV).</p>
-  <a href="/migrazione" class="button secondary">Apri la migrazione dati legacy</a>
-</details>
-
-<details class="card">
-  <summary><strong>Elimina tutti i dati</strong></summary>
+  <summary class="testo-pericolo"><strong>Elimina tutti i dati</strong></summary>
   <p class="muted" style="margin-top:0.75rem">Elimina definitivamente <strong>tutti i {{ numero_corsi }} corsi</strong> di questa
     installazione: studenti, esercizi, appelli e tutti i risultati registrati, in ogni corso. Azione
     irreversibile, senza backup automatico: scaricane uno da qui sopra prima di procedere, se non l'hai

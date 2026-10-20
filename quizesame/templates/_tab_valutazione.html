@@ -1,3 +1,5 @@
+{% from "_info.html" import info %}
+{% from "_icone.html" import icona %}
 <div class="tab-pane" data-pane="valutazione{{ pane_suffix }}" style="display:none">
   {% if md.appello.chiuso %}
   <div class="card">
@@ -24,10 +26,7 @@
     {% if md.valutazioni_sospese %}<span class="badge badge-warn">{{ md.valutazioni_sospese|length }} valutazioni in sospeso</span>{% endif %}
   </div>
   <details class="card card-correzione" open>
-    <summary><strong>Correggi un compito</strong></summary>
-    <p class="muted" style="margin:0.5rem 0 0">Dal foglio dello studente: matricola, codice (in alto a destra) e le
-      lettere della griglia nell'ordine, <code>X</code> per una risposta non data e <code>-</code> per le domande aperte.
-      <kbd>Invio</kbd> passa al campo successivo; nel campo risposte apre il riepilogo.</p>
+    <summary><strong>Correggi un compito</strong> {{ info("Dal foglio dello studente: matricola, codice (in alto a destra) e le lettere della griglia nell'ordine, X per una risposta non data e - per le domande aperte. Invio passa al campo successivo; nel campo risposte apre il riepilogo.") }}</summary>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi" autocomplete="off" style="margin-top:0.75rem" class="form-correzione">
       <div class="form-grid">
         <div style="position:relative">
@@ -200,11 +199,7 @@
 
   {% if md.bozze_correzione %}
   <details class="card" open>
-    <summary><strong>Bozze salvate ({{ md.bozze_correzione|length }})</strong></summary>
-    <p class="muted" style="margin-top:0.75rem">
-      Correzioni iniziate e messe da parte, senza nessun esito registrato: riprendile da
-      dove le avevi lasciate, o eliminale se non servono più.
-    </p>
+    <summary><strong>Bozze salvate ({{ md.bozze_correzione|length }})</strong> {{ info("Correzioni iniziate e messe da parte, senza nessun esito registrato: riprendile da dove le avevi lasciate, o eliminale se non servono più.") }}</summary>
     <table style="margin-top:0.75rem">
       <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Codice</th><th></th></tr>
       {% for b in md.bozze_correzione %}
@@ -218,11 +213,11 @@
             <input type="hidden" name="matricola" value="{{ b.matricola }}">
             <input type="hidden" name="codice" value="{{ b.codice }}">
             <input type="hidden" name="risposte" value="{{ b.risposte }}">
-            <button type="submit" class="secondary" style="margin-top:0">Riprendi</button>
+            <button type="submit" class="secondary pulsante-piccolo">{{ icona("correzione", 13) }} Riprendi</button>
           </form>
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi/bozza/{{ b.matricola }}/elimina"
                 onsubmit="return confirm({{ ('Eliminare la bozza di ' ~ b.cognome ~ ' ' ~ b.nome ~ '?')|js }});">
-            <button type="submit" class="danger" style="margin-top:0">Elimina</button>
+            <button type="submit" class="pulsante-icona" data-info="Elimina la bozza" aria-label="Elimina la bozza di {{ b.cognome }} {{ b.nome }}">{{ icona("cestino") }}</button>
           </form>
         </td>
       </tr>
@@ -260,26 +255,28 @@
           {% else %}{{ r.voto }}{% if r.richiede_orale and r.orale_svolto %} <span class="badge badge-ok">orale svolto</span>{% endif %}{% endif %}
           {% if r.verbalizzato %}
           {% if r.esito == 'voto' and r.voto is not none %}
-          <span class="badge {{ 'badge-ok' if r.voto >= md.votomin_effettivo else 'badge-err' }}">{{ 'superato' if r.voto >= md.votomin_effettivo else 'insufficiente' }} verbalizzato {{ r.data_verbalizzazione }}</span>
+          <span class="badge {{ 'badge-ok' if r.voto >= md.votomin_effettivo else 'badge-err' }}">{{ 'superato' if r.voto >= md.votomin_effettivo else 'insufficiente' }} verbalizzato {{ r.data_verbalizzazione or "" }}</span>
           {% else %}
-          <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione }}</span>
+          <span class="badge badge-ok">verbalizzato {{ r.data_verbalizzazione or "" }}</span>
           {% endif %}
           {% endif %}
         </td>
         <td style="white-space:nowrap; text-align:right">
           {% if md.appello.chiuso %}
-          <span class="muted">appello chiuso</span>
+          <span class="muted" data-info="Appello chiuso: riaprilo dalle Impostazioni per modificare">{{ icona("lucchetto", 14) }}</span>
           {% elif not r.verbalizzato %}
-          {% if r.esito in ('voto', 'rifiutato') %}
-          <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/modifica"
-             class="button {{ 'warning' if r.valutazione_sospesa else 'secondary' }}" style="margin-top:0">{{ 'Completa valutazione' if r.valutazione_sospesa else 'Modifica' }}</a>
+          {% if r.valutazione_sospesa %}
+          <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/modifica" class="button warning pulsante-piccolo" style="margin:0">Completa valutazione</a>
+          {% elif r.esito in ('voto', 'rifiutato') %}
+          <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/modifica" class="pulsante-icona" style="display:inline-flex"
+             data-info="Modifica la correzione" aria-label="Modifica il risultato di {{ r.cognome }} {{ r.nome }}">{{ icona("matita") }}</a>
           {% endif %}
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/elimina"
                 onsubmit="return confirm({{ ('Eliminare il risultato di ' ~ r.cognome ~ ' ' ~ r.nome ~ ' per questo appello?')|js }});">
-            <button type="submit" class="danger">Elimina</button>
+            <button type="submit" class="pulsante-icona" data-info="Elimina il risultato" aria-label="Elimina il risultato di {{ r.cognome }} {{ r.nome }}">{{ icona("cestino") }}</button>
           </form>
           {% else %}
-          <span class="muted">non modificabile</span>
+          <span class="muted" data-info="Voto già verbalizzato: non si può più modificare">{{ icona("lucchetto", 14) }}</span>
           {% endif %}
         </td>
       </tr>
@@ -290,62 +287,11 @@
     </table>
   </details>
 
-  {# aperta solo quando sembra il momento di concludere: risultati presenti e nessun
-     presente o bozza ancora da correggere #}
-  <details class="card" {% if md.risultati and not md.bozze_correzione and not presenti_da_correggere and not md.appello.correzione_scritti_conclusa %}open{% endif %}>
-    <summary><strong>Concludi correzione scritto</strong></summary>
-    {% if md.appello.correzione_scritti_conclusa %}
-    <p class="muted" style="margin-top:0.75rem">
-      Correzione scritta conclusa: nessuna nuova correzione è possibile per questa prova finché non riapri.
-    </p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riapri-correzione-scritto" style="margin-top:0.5rem">
-      <button type="submit" class="secondary">Riapri correzione scritto</button>
-    </form>
-    {% else %}
-    {% if md.non_valutati %}
-    <div style="margin-top:0.75rem; padding-bottom:0.75rem; border-bottom:1px solid var(--border)">
-      <p class="muted" style="margin:0">
-        <strong>{{ md.non_valutati|length }}</strong> studenti attesi non hanno ancora nessun risultato
-        (né voto, né assente, né ritirato). Se hai corretto tutti i compiti consegnati, segnali come assenti
-        in un colpo solo (chi ha una correzione in bozza non viene toccato).
-      </p>
-      <details style="margin-top:0.4rem">
-        <summary class="muted">Mostra chi sono</summary>
-        <p class="muted" style="margin:0.4rem 0 0">{% for st in md.non_valutati %}{{ st.cognome or '' }} {{ st.nome or '' }} ({{ st.matricola }}){% if not loop.last %}, {% endif %}{% endfor %}</p>
-      </details>
-      <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/segna-assenti-non-valutati" style="margin-top:0.5rem"
-            onsubmit="return confirm({{ ('Segnare come ASSENTI i ' ~ (md.non_valutati|length) ~ ' studenti non ancora valutati? Puoi comunque correggere a mano un singolo esito in seguito.')|js }});">
-        <button type="submit" class="warning">Segna come assenti i {{ md.non_valutati|length }} non valutati</button>
-      </form>
-    </div>
-    {% endif %}
-    <p class="muted" style="margin-top:0.75rem">
-      Quando tutti i compiti scritti sono stati corretti, concludi: genera l'elenco risultati
-      (.html/.tex/.pdf) e blocca nuove correzioni per questa prova (puoi comunque riaprire in
-      qualsiasi momento).
-    </p>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/concludi-correzione-scritto" style="margin-top:0.5rem">
-      <button type="submit">Concludi correzione scritto</button>
-    </form>
-    {% endif %}
-    {% if md.risultati_tex_esiste or md.risultati_pdf_esiste %}
-    <p style="margin-top:0.75rem">
-      {% from "_formati.html" import formati %}
-      Elenco risultati da pubblicare:
-      {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/risultati", pdf=md.risultati_pdf_esiste, html=True, tex=md.risultati_tex_esiste, md=True) }}
-    </p>
-    {% endif %}
-  </details>
-
   {% if not raggruppamento %}
   <details class="card dettaglio-fisarmonica">
-    <summary>Esporta voti per la segreteria</summary>
+    <summary>Esporta voti per la segreteria {{ info("Nel file della segreteria caricato nella scheda Compiti d'esame, per ogni studente con una valutazione completata e confermata, si compilano la colonna Esito (voto, ASS, RIT o 0 per insufficiente) e la colonna Domande d'esame (uno dei testi salvati nelle impostazioni del corso).") }}</summary>
     {% if md.segreteria_csv %}
-    <p class="muted" style="margin-top:1rem">
-      Per ogni studente con una valutazione già completata e confermata viene compilata la colonna Esito
-      (voto, ASS, RIT o 0 per insufficiente) e la colonna Domande d'esame (uno dei testi salvati nelle
-      impostazioni del corso), nel file "{{ md.segreteria_csv.nome_file }}" caricato dalla scheda "Compiti d'esame".
-    </p>
+    <p class="muted" style="margin-top:0.75rem">File: <strong>{{ md.segreteria_csv.nome_file }}</strong></p>
     {% set url_esporta = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/esporta-voti" %}
     {% include "_esporta_voti_bottone.html" %}
     {% else %}
@@ -420,11 +366,7 @@
 
   {% if md.valutazioni_sospese %}
   <details class="card" open>
-    <summary><strong>Valutazioni in sospeso ({{ md.valutazioni_sospese|length }})</strong></summary>
-    <p class="muted" style="margin-top:0.75rem">Compiti con esercizi obbligatori o domande aperte la cui
-      valutazione è stata rimandata: il voto mostrato è provvisorio (calcolato assumendo il punteggio
-      massimo per le posizioni ancora da giudicare) e lo studente non compare tra i verbalizzabili
-      finché non si completa la valutazione.</p>
+    <summary><strong>Valutazioni in sospeso ({{ md.valutazioni_sospese|length }})</strong> {{ info("Compiti con esercizi obbligatori o domande aperte la cui valutazione è stata rimandata: il voto mostrato è provvisorio (calcolato col punteggio massimo per le parti ancora da giudicare) e lo studente non compare tra i verbalizzabili finché non completi la valutazione.") }}</summary>
     <table>
       <tr><th>Studente</th><th>Matricola</th><th>Voto provvisorio</th><th></th></tr>
       {% for r in md.valutazioni_sospese %}
@@ -442,4 +384,35 @@
     </table>
   </details>
   {% endif %}
+
+  {# chiusura della correzione: un solo pulsante in fondo, attivo quando tutti gli attesi
+     hanno un esito registrato e non restano bozze #}
+  {% from "_formati.html" import formati %}
+  {% set mancano = md.non_valutati|length if md.non_valutati else 0 %}
+  {% set pronta = md.risultati and not mancano and not md.bozze_correzione %}
+  <div class="card barra-conclusione">
+    {% if md.appello.correzione_scritti_conclusa %}
+    <span><span class="badge badge-ok">✓ correzione conclusa</span></span>
+    {% if md.risultati_tex_esiste or md.risultati_pdf_esiste %}
+    <span>Risultati da pubblicare {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/risultati", pdf=md.risultati_pdf_esiste, html=True, tex=md.risultati_tex_esiste, md=True) }}</span>
+    {% endif %}
+    {% if not md.appello.chiuso %}
+    <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riapri-correzione-scritto" style="margin-left:auto">
+      <button type="submit" class="secondary pulsante-piccolo">Riapri la correzione</button>
+    </form>
+    {% endif %}
+    {% elif not md.appello.chiuso %}
+    <span class="muted">
+      {% if not md.risultati %}Nessun compito ancora registrato.
+      {% elif mancano %}{{ mancano }} iscritt{{ 'o' if mancano == 1 else 'i' }} ancora senza esito —
+        <a href="#presenze{{ pane_suffix }}">segnali assenti</a> nella scheda Presenze, o correggili.
+      {% elif md.bozze_correzione %}{{ md.bozze_correzione|length }} bozz{{ 'a' if md.bozze_correzione|length == 1 else 'e' }} da completare.
+      {% else %}Tutti gli attesi hanno un esito.{% endif %}
+    </span>
+    <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/concludi-correzione-scritto" style="margin-left:auto">
+      <button type="submit" {% if not pronta %}disabled{% endif %}
+              data-info="{{ 'Genera l\'elenco dei risultati e blocca nuove correzioni (si può riaprire)' if pronta else 'Si attiva quando tutti gli attesi hanno un esito registrato e non restano bozze' }}">Chiudi la correzione</button>
+    </form>
+    {% endif %}
+  </div>
 </div>

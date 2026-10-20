@@ -1,3 +1,4 @@
+{% from "_info.html" import info %}
 <div class="tab-pane" data-pane="presenze{{ pane_suffix }}" style="display:none">
   {% if md.appello.chiuso %}
   <div class="card">
@@ -6,7 +7,7 @@
   {% else %}
   {% set riepilogo = md.riepilogo_presenze %}
   <details class="card sezione-flusso" data-sezione="presenze-{{ md.appello.id }}" data-fatta="{{ 1 if md.appello.presenze_chiuse else 0 }}"{% if not md.appello.presenze_chiuse %} open{% endif %}>
-    <summary><strong>Presenze</strong>{% if md.appello.presenze_chiuse %} <span class="badge badge-ok">✓ completato</span> <span class="muted">— registro chiuso</span>{% endif %}</summary>
+    <summary><strong>Presenze</strong> {{ info("Premi \"Presente\" man mano che gli studenti si presentano in aula, o \"Assente\" per chi risulta assente prima ancora di chiudere il registro. Chi ha già un voto o un esito per questo appello risulta presente (o assente/ritirato) automaticamente e non è più modificabile da qui.") }}{% if md.appello.presenze_chiuse %} <span class="badge badge-ok">✓ completato</span> <span class="muted">— registro chiuso</span>{% endif %}</summary>
     {% if riepilogo is none %}
     <p class="muted" style="margin-top:0.75rem">
       Nessun elenco iscritti caricato per questo appello: carica il file della segreteria, oppure aggiungi gli
@@ -32,12 +33,6 @@
         {% endif %}
       </div>
     </div>
-
-    <p class="muted" style="margin-top:1rem">
-      Premi "Presente" man mano che gli studenti si presentano in aula, o "Assente" per chi risulta assente
-      prima ancora di chiudere il registro. Chi ha già un voto o un esito per questo appello risulta presente
-      (o assente/ritirato) automaticamente e non è più modificabile da qui.
-    </p>
 
     <table style="margin-top:1rem" class="tabella-presenze">
       <tr><th>Presente</th><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Note</th></tr>
@@ -159,6 +154,25 @@
     {% endif %}
   </details>
 
+  {% if md.non_valutati and (md.risultati or md.appello.presenze_chiuse) %}
+  {# dopo le correzioni: chi non ha consegnato un compito risulta assente, e la fase Presenze si completa #}
+  <div class="card">
+    <div class="barra-strumenti" style="margin:0">
+      <span><strong>{{ md.non_valutati|length }}</strong> iscritt{{ 'o' if md.non_valutati|length == 1 else 'i' }} ancora senza esito
+        {{ info("Finite le correzioni, chi non ha un compito corretto (né assente, né ritirato) non si è presentato: segnali tutti assenti in un colpo solo per completare le presenze prima della chiusura. Chi ha una correzione in bozza non viene toccato; un singolo esito si può sempre correggere a mano.") }}</span>
+      <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/segna-assenti-non-valutati"
+            onsubmit="return confirm({{ ('Segnare come ASSENTI i ' ~ (md.non_valutati|length) ~ ' iscritti ancora senza esito?')|js }});">
+        <input type="hidden" name="torna" value="presenze">
+        <button type="submit" class="warning pulsante-piccolo">Segna assenti tutti i non corretti</button>
+      </form>
+    </div>
+    <details style="margin-top:0.4rem">
+      <summary class="muted">Mostra chi sono</summary>
+      <p class="muted" style="margin:0.4rem 0 0">{% for st in md.non_valutati %}{{ st.cognome or '' }} {{ st.nome or '' }} ({{ st.matricola }}){% if not loop.last %}, {% endif %}{% endfor %}</p>
+    </details>
+  </div>
+  {% endif %}
+
   {% set matricola_da_registrare = request.query_params.get('matricola_da_registrare', '') %}
   <details class="card dettaglio-fisarmonica" {% if matricola_da_registrare %}open{% endif %}>
     <summary><strong>Registra un nuovo studente</strong></summary>
@@ -182,10 +196,7 @@
   </details>
 
   <details class="card dettaglio-fisarmonica">
-    <summary><strong>Segna ritirato</strong></summary>
-    <p class="muted" style="margin-top:0.75rem">
-      Per uno studente che ha iniziato ma non ha completato (o consegnato in bianco) il compito scritto.
-    </p>
+    <summary><strong>Segna ritirato</strong> {{ info("Per uno studente che ha iniziato ma non ha completato (o ha consegnato in bianco) il compito scritto.") }}</summary>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/assenze/segna" style="margin-top:0.75rem">
       <input type="hidden" name="esito" value="ritirato">
       <div class="form-grid">
@@ -213,13 +224,7 @@
   </details>
 
   <details class="card dettaglio-fisarmonica">
-    <summary><strong>Annulla compito</strong></summary>
-    <p class="muted" style="margin-top:0.75rem">
-      Per uno studente sorpreso a copiare o con il cellulare durante la prova. Nei risultati e nel file della
-      segreteria il compito conta come {{ 'ritirato' if corso.annullato_come == 'ritirato' else 'insufficiente' }}
-      (si cambia dalle impostazioni del corso), mentre nella carriera dello studente resta indicato come annullato.
-      Se lo studente ha già un esito per questo appello (es. compito già corretto), viene sostituito.
-    </p>
+    <summary><strong>Annulla compito</strong> {{ info("Per uno studente sorpreso a copiare o con il cellulare durante la prova. Nei risultati e nel file della segreteria il compito conta come " ~ ('ritirato' if corso.annullato_come == 'ritirato' else 'insufficiente') ~ " (si cambia dalle impostazioni del corso), mentre nella carriera dello studente resta indicato come annullato. Se lo studente ha già un esito per questo appello (es. compito già corretto), viene sostituito.") }}</summary>
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/annulla-compito" style="margin-top:0.75rem"
           onsubmit="return confirm('Annullare il compito di questo studente?');">
       <div class="form-grid">

@@ -1,0 +1,60 @@
+{# Aule di una prova, nella scheda Impostazioni: frammento ridisegnato da solo dopo ogni
+   modifica (vedi _risposta_aule e attivaAule in app.js). L'assegnazione degli studenti alle
+   aule resta nella scheda Compiti d'esame (_ammessi_aule.html). #}
+{% from "_icone.html" import icona %}
+{% from "_info.html" import info %}
+{% set url = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
+{% set posti = md.aule|sum(attribute="capienza") %}
+{% set attesi = md.ammessi|length %}
+{% set soglia = corso.soglia_occupazione_aule %}
+<div class="riquadro-aule">
+  {% if messaggio %}<div class="flash flash-{{ tipo or 'success' }}" style="margin:0.5rem 0">{{ messaggio }}</div>{% endif %}
+  {% if md.aule %}
+  <table style="margin-top:0.5rem">
+    <thead><tr><th>Aula</th><th>Posti</th><th>DSA/L104 {{ info("Un'aula sola per prova può essere riservata agli studenti DSA/L104: nell'assegnazione automatica vanno tutti lì, e gli altri studenti nelle aule restanti. Clicca l'icona per riservare l'aula, o per togliere la riserva.") }}</th><th></th></tr></thead>
+    {% for a in md.aule %}
+    <tr>
+      <td>{{ a.nome }}</td>
+      <td>{{ a.capienza }}</td>
+      <td>
+        <form class="inline" method="post" action="{{ url }}/aule/{{ a.id }}/dsa">
+          <input type="hidden" name="dsa" value="{{ '' if a.dsa else '1' }}">
+          {% if a.dsa %}
+          <button type="submit" class="pulsante-dsa attivo" data-info="Aula riservata ai DSA/L104: clicca per togliere la riserva"
+                  aria-pressed="true">{{ icona("accessibile") }} Aula DSA</button>
+          {% else %}
+          <button type="submit" class="pulsante-dsa" data-info="Riserva quest'aula agli studenti DSA/L104"
+                  aria-pressed="false" aria-label="Riserva {{ a.nome }} agli studenti DSA/L104">{{ icona("accessibile") }}</button>
+          {% endif %}
+        </form>
+      </td>
+      <td class="cella-azioni">
+        <form class="inline" method="post" action="{{ url }}/aule/{{ a.id }}/elimina"
+              data-conferma="{{ 'Eliminare l\'aula ' ~ a.nome ~ '? Gli studenti già assegnati resteranno senza aula.' }}">
+          <button type="submit" class="pulsante-icona" data-info="Elimina l'aula" aria-label="Elimina {{ a.nome }}">{{ icona("cestino") }}</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    <tr><td><strong>Totale</strong></td><td><strong>{{ posti }}</strong></td><td colspan="2"></td></tr>
+  </table>
+  {% if attesi and posti and attesi * 100 > posti * soglia %}
+  <div class="flash flash-warning" style="margin:0.5rem 0 0">
+    {{ attesi }} studenti attesi su {{ posti }} posti: è il {{ (attesi * 100 / posti)|round|int }}%, oltre il {{ soglia }}%
+    impostato per il corso. Aggiungi un'aula, o una più grande.
+    {{ info("La soglia si cambia nelle Impostazioni del corso (sezione Aule). Con il 50% resta un posto libero accanto a ogni studente.") }}
+  </div>
+  {% elif posti %}
+  <p class="muted" style="margin:0.4rem 0 0">{{ attesi }} studenti attesi su {{ posti }} posti{% if attesi %} ({{ (attesi * 100 / posti)|round|int }}%, soglia {{ soglia }}%){% endif %}.</p>
+  {% endif %}
+  {% else %}
+  <p class="muted" style="margin:0.5rem 0">Nessuna aula ancora: aggiungine una qui sotto.</p>
+  {% endif %}
+  {% if not md.appello.chiuso %}
+  <form class="barra-aggiungi" method="post" action="{{ url }}/aule/nuova" style="margin-top:0.75rem">
+    <input name="nome" placeholder="Nome dell'aula" aria-label="Nome dell'aula" required style="flex:2; min-width:10rem">
+    <input type="number" name="capienza" min="1" placeholder="Posti" aria-label="Posti" required style="flex:1; min-width:6rem">
+    <button type="submit" style="margin:0">{{ icona("piu") }} Aggiungi aula</button>
+  </form>
+  {% endif %}
+</div>

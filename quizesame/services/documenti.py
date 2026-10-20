@@ -5,6 +5,7 @@ from quizesame.services import compiti as compiti_service
 from quizesame.services import corsi as corsi_service
 from quizesame.services import risultati as risultati_service
 from quizesame.services.latex import LETTERE
+from quizesame.services.testo_web import testo_md
 
 
 def _intestazione(corso, appello, titolo: str) -> list[str]:
@@ -34,13 +35,16 @@ def riferimento_md(tag: str, appello_id: int, con_soluzioni: bool = False) -> st
             v = e["varianti"][k % len(e["varianti"])]
             etichette = [t for t, si in (("obbligatorio", e["obbligatorio"]), ("domanda aperta", e["aperta"])) if si]
             righe.append(f"### Esercizio {i}" + (f" ({', '.join(etichette)})" if etichette else ""))
-            righe += ["", v["testo"].strip(), ""]
+            righe += ["", testo_md(v["testo"]).strip(), ""]
             for j, r in enumerate(v["risposte"]):
-                righe.append(f"- **{LETTERE.get(j, j + 1)}.** {r}" + (" ✓" if j == 0 else ""))
+                righe.append(f"- **{LETTERE.get(j, j + 1)}.** {testo_md(r)}" + (" ✓" if j == 0 else ""))
             if v["risposte"]:
                 righe.append("")
             if con_soluzioni and e.get("soluzione"):
-                righe += [f"> **Soluzione / suggerimento.** {e['soluzione'].strip()}", ""]
+                # ogni riga col suo ">": altrimenti le righe successive escono dal riquadro
+                # (o vi si fondono in un'unica riga, a seconda del lettore Markdown)
+                soluzione = f"**Soluzione / suggerimento.** {testo_md(e['soluzione']).strip()}"
+                righe += [f"> {r}".rstrip() for r in soluzione.splitlines()] + [""]
     return "\n".join(righe).rstrip() + "\n"
 
 

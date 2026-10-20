@@ -1,0 +1,179 @@
+{# Esercizi assegnati a un appello (scheda Testo): frammento ridisegnato da solo dopo ogni
+   modifica (assegna, togli, obbligatorio, crea, modifica, importa da altri corsi), vedi
+   _esito_testo e attivaTesto in app.js. Va dentro il <details class="blocco-testo"> di
+   _tab_creazione.html. #}
+{% from "_info.html" import info %}
+{% from "_icone.html" import icona %}
+{% from "_stato_verifica.html" import stato_verifica %}
+{% set url = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
+{% set chiuso = md.appello.chiuso %}
+{% set n_obbligatori = md.esercizi_assegnati|selectattr("obbligatorio")|list|length %}
+  <summary><strong>Esercizi assegnati ({{ md.esercizi_assegnati|length }})</strong>{% if md.esercizi_assegnati %} <span class="badge badge-ok">✓ completato</span>{% endif %}
+    {% if md.esercizi_assegnati %}
+    {# anteprima di controllo sempre raggiungibile, anche a sezione chiusa #}
+    <span class="barra-anteprima">
+      <a class="icona-azione" href="{{ url }}/anteprima.pdf" target="_blank" rel="noopener" aria-label="Apri l'anteprima di controllo in PDF"
+         data-info="Anteprima di controllo: tutti gli esercizi con tutte le varianti, la risposta corretta e la soluzione (non crea compiti né codici)">{{ icona("occhio", 14) }} Anteprima</a>
+      <a class="icona-azione" href="{{ url }}/anteprima.tex" data-info="Sorgente LaTeX dell'anteprima">.tex</a>
+      <a class="icona-azione" href="{{ url }}/ia/verifica"
+         data-info="Fai ricontrollare all'IA risposte corrette e soluzioni di tutti gli esercizi">{{ icona("spunta", 14) }} Verifica con l'IA</a>
+    </span>
+    {% endif %}</summary>
+  <span class="dati-testo" hidden data-n="{{ md.esercizi_assegnati|length }}" data-obbligatori="{{ n_obbligatori }}" data-blocchi="{{ md.blocchi|length }}"></span>
+  {% if messaggio %}<div class="flash flash-{{ tipo or 'success' }}" style="margin:0.5rem 0">{{ messaggio }}</div>{% endif %}
+
+  {% if md.esercizi_assegnati %}
+  {% set riordinabile = not chiuso and md.esercizi_assegnati|length > 1 %}
+  {% set stati_v = stati_verifica(corso.tag, md.esercizi_assegnati) %}
+  <table class="tabella-esercizi-assegnati" data-url-ordine="{{ url }}/esercizi/ordine">
+    <thead><tr>
+      <th>#{% if riordinabile %} {{ info("Per cambiare l'ordine trascina la maniglia ⠿, usa le frecce o scrivi la posizione. L'ordine non incide sul compito dello studente (gli esercizi vengono comunque rimescolati), solo sul foglio di riferimento.") }}{% endif %}</th>
+      <th>Esercizio</th><th>Varianti</th>
+      <th>Obbl. {{ info("Un esercizio obbligatorio richiede consegna e svolgimento scritto: se non è svolto il compito risulta insufficiente; se è svolto, in correzione viene chiesto di confermare se lo svolgimento è corretto. Clicca Sì/No per cambiarlo.") }}</th>
+      <th class="cella-azioni">
+        {% if riordinabile %}
+        <select class="ordina-per" aria-label="Ordina gli esercizi" style="width:auto; margin:0; padding:0.15rem 0.3rem; font-size:0.8rem">
+          <option value="">Ordina per…</option>
+          <option value="nome">nome</option>
+          <option value="argomento">argomento</option>
+          <option value="difficolta">difficoltà</option>
+          <option value="obbligatorio">obbligatori prima</option>
+          <option value="aperta">domande aperte in fondo</option>
+          <option value="inverti">inverti l'ordine</option>
+        </select>
+        <span class="stato-ordine muted" aria-live="polite"></span>
+        {% endif %}
+      </th>
+    </tr></thead>
+    {% for e in md.esercizi_assegnati %}
+    <tbody class="esercizio-assegnato" data-esercizio="{{ e.id }}" data-nome="{{ (e.nome or ('#' ~ e.id))|lower }}"
+           data-argomento="{{ (e.argomento or '')|lower }}" data-difficolta="{{ e.difficolta or 0 }}"
+           data-obbligatorio="{{ 1 if e.obbligatorio else 0 }}" data-aperta="{{ 1 if e.aperta else 0 }}">
+    <tr>
+      <td style="white-space:nowrap">
+        {% if riordinabile %}
+        <span class="maniglia-ordine" draggable="true" data-info="Trascina per spostare">&#10303;</span>
+        <input type="number" class="posizione-ordine" min="1" max="{{ md.esercizi_assegnati|length }}" value="{{ loop.index }}"
+               aria-label="Posizione (scrivi un numero e premi Invio)" style="width:3.2em; margin:0; padding:0.15rem 0.3rem">
+        <button type="button" class="pulsante-icona btn-ordine-su" aria-label="Sposta su">{{ icona("su", 14) }}</button><button type="button" class="pulsante-icona btn-ordine-giu" aria-label="Sposta giù">{{ icona("giu", 14) }}</button>
+        {% else %}
+        <span class="muted">{{ loop.index }}</span>
+        {% endif %}
+      </td>
+      <td>
+        <button type="button" class="link-simile btn-anteprima-assegnato" data-esercizio="{{ e.id }}" data-info="Mostra testo, varianti e soluzione">{{ (e.nome or ('#' ~ e.id))|accenti_tex }}</button>
+        {% if e.difficolta %}<span class="muted" data-info="Difficoltà {{ e.difficolta }} su 3">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
+        {% if e.aperta %}<span class="badge badge-info">aperta</span>{% endif %}
+        {% set problemi = problemi_risposte(e) %}{% if problemi %}<span class="badge badge-err" data-info="{{ problemi|join('; ') }}">⚠ risposte uguali</span>{% endif %}
+        {{ stato_verifica(corso.tag, e, stati_v[e.id], url) }}
+      </td>
+      <td>{{ e.varianti|length }}</td>
+      <td>
+        {% if e.aperta %}
+        <span class="muted" data-info="Le domande aperte non possono essere obbligatorie">—</span>
+        {% elif chiuso %}
+        {{ 'Sì' if e.obbligatorio else 'No' }}
+        {% else %}
+        <form class="inline" method="post" action="{{ url }}/esercizi/{{ e.id }}/obbligatorio">
+          <input type="hidden" name="obbligatorio" value="{{ '' if e.obbligatorio else 'on' }}">
+          <button type="submit" class="pulsante-sino{% if e.obbligatorio %} attivo{% endif %}" aria-pressed="{{ 'true' if e.obbligatorio else 'false' }}"
+                  data-info="{{ 'Obbligatorio: consegna e svolgimento richiesti. Clicca per renderlo facoltativo' if e.obbligatorio else 'Facoltativo: clicca per renderlo obbligatorio' }}">{{ 'Sì' if e.obbligatorio else 'No' }}</button>
+        </form>
+        {% endif %}
+      </td>
+      <td class="cella-azioni">
+        <button type="button" class="pulsante-icona btn-modifica-assegnato" data-esercizio="{{ e.id }}" data-info="Modifica l'esercizio" aria-label="Modifica {{ e.nome or ('#' ~ e.id) }}">{{ icona("matita") }}</button>
+        {% if not chiuso %}
+        <form class="inline form-rimuovi-esercizio" method="post" action="{{ url }}/esercizi/{{ e.id }}/rimuovi" data-nome="{{ e.nome or ('#' ~ e.id) }}">
+          <input type="hidden" name="elimina_dalla_banca" value="">
+          <button type="submit" class="pulsante-icona" data-info="Togli dal compito" aria-label="Togli {{ e.nome or ('#' ~ e.id) }} dal compito">{{ icona("cestino") }}</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    <tr class="riga-anteprima-assegnato" data-esercizio="{{ e.id }}" style="display:none">
+      <td colspan="5"></td>
+    </tr>
+    <tr class="riga-modifica-assegnato" data-esercizio="{{ e.id }}" style="display:none">
+      {% set _redirect = "/corsi/" ~ corso.tag ~ "/appelli/" ~ (raggruppamento.appello_id if raggruppamento else md.appello.id) %}
+      <td colspan="5" data-url="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/form?redirect_to={{ _redirect | urlencode }}&amp;redirect_anchor={{ ('creazione' ~ pane_suffix) | urlencode }}"></td>
+    </tr>
+    </tbody>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nessun esercizio ancora assegnato: aggiungine dalla banca, da altri corsi, creane uno nuovo o generalo con l'IA.</p>
+  {% endif %}
+
+  {% if not chiuso %}
+  <div class="barra-strumenti barra-testo">
+    <button type="button" class="icona-azione" data-apri="nuovo">{{ icona("piu", 14) }} Nuovo esercizio</button>
+    {% if md.esercizi_disponibili %}
+    <button type="button" class="icona-azione" data-apri="banca" data-info="Esercizi della banca di questo corso non ancora assegnati">{{ icona("banca", 14) }} Dalla banca ({{ md.esercizi_disponibili|length }})</button>
+    {% endif %}
+    <button type="button" class="icona-azione" data-apri="altri" data-info="Esercizi di altri corsi o degli anni precedenti">{{ icona("copia", 14) }} Da altri corsi</button>
+    <button type="button" class="icona-azione" data-apri="ia" data-info="Nuovi esercizi sul modello delle prove analoghe degli anni precedenti">{{ icona("scintille", 14) }} Genera con l'IA</button>
+    <button type="button" class="icona-azione" data-apri="file" data-info="Un compito intero da un unico file (es. la risposta di claude.ai o un .json esportato)">{{ icona("carica", 14) }} Importa da file</button>
+    {% if md.esercizi_assegnati %}
+    <a class="icona-azione barra-strumenti-fine" href="{{ url }}/esercizi/esporta" data-info="Scarica gli esercizi di questo appello (testo e varianti) in un file .json, da importare altrove">{{ icona("scarica", 14) }} Esporta</a>
+    {% endif %}
+  </div>
+
+  <div class="pannello-testo" data-pannello="nuovo" hidden>
+    {% set action = url ~ "/esercizi/nuovo" %}
+    {% set argomenti = md.argomenti %}
+    {% include "_esercizio_form.html" %}
+  </div>
+
+  {% if md.esercizi_disponibili %}
+  <div class="pannello-testo" data-pannello="banca" hidden>
+    <form method="post" action="{{ url }}/esercizi/assegna">
+      <div class="barra-aggiungi">
+        <input type="text" class="filtro-ricerca" placeholder="Cerca per nome o testo" aria-label="Cerca per nome o testo" style="flex:2; min-width:12rem">
+        <select class="filtro-argomento" aria-label="Argomento" style="flex:1; min-width:10rem">
+          <option value="">Tutti gli argomenti</option>
+          {% for a in md.argomenti %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
+        </select>
+      </div>
+      <table class="tabella-disponibili" style="margin-top:0.5rem">
+        <tr><th></th><th>Nome</th><th>Argomento</th><th>Varianti</th><th>Inizio del testo</th></tr>
+        {% for e in md.esercizi_disponibili %}
+        <tr data-nome="{{ (e.nome or '') | lower }}" data-testo="{{ (e.varianti | map(attribute='testo') | join(' ')) | lower }}" data-argomento="{{ e.argomento or '' }}">
+          <td><input type="checkbox" name="esercizio_ids" value="{{ e.id }}" style="width:auto" aria-label="Seleziona {{ e.nome or ('#' ~ e.id) }}"></td>
+          <td>
+            {{ (e.nome or ('#' ~ e.id))|accenti_tex }}
+            {% if e.difficolta %}<span class="muted" data-info="Difficoltà {{ e.difficolta }} su 3">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
+            {% if e.aperta %}<span class="badge badge-info">aperta</span>{% endif %}
+            {% set problemi = problemi_risposte(e) %}{% if problemi %}<span class="badge badge-err" data-info="{{ problemi|join('; ') }}">⚠ risposte uguali</span>{% endif %}
+          </td>
+          <td>{{ e.argomento or '-' }}</td>
+          <td>{{ e.varianti|length }}</td>
+          <td class="muted">
+            <button type="button" class="link-simile btn-anteprima-disponibile" data-esercizio="{{ e.id }}" data-info="Mostra l'esercizio">{{ (e.varianti[0].testo if e.varianti else '')[:70] }}&hellip;</button>
+          </td>
+        </tr>
+        <tr class="riga-anteprima-disponibile" data-esercizio="{{ e.id }}" style="display:none">
+          <td colspan="5"></td>
+        </tr>
+        {% endfor %}
+      </table>
+      <div class="barra-strumenti" style="margin-top:0.5rem">
+        <button type="submit" style="margin:0">{{ icona("piu", 14) }} Assegna selezionati</button>
+        <label style="display:inline-flex; align-items:center; gap:0.35rem; margin:0; color:var(--text)">
+          <input type="checkbox" name="obbligatorio" style="width:auto; margin:0"> come obbligatori</label>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="pannello-testo" data-pannello="altri" hidden data-url="{{ url }}/esercizi/altri-corsi">
+    <p class="muted">Caricamento degli esercizi degli altri corsi…</p>
+  </div>
+  <div class="pannello-testo" data-pannello="ia" hidden data-url="{{ url }}/ia">
+    <p class="muted">Caricamento delle prove di riferimento…</p>
+  </div>
+  <div class="pannello-testo" data-pannello="file" hidden>
+    {% set action_importa = url ~ "/esercizi/importa-json" %}
+    {% include "_importa_esercizi_form.html" %}
+  </div>
+  {% endif %}

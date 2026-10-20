@@ -86,15 +86,15 @@
         {% for v in c.varianti %}
         <div style="margin-top:0.5rem">
           {% if c.varianti|length > 1 %}<strong>Variante {{ loop.index }}.</strong>{% endif %}
-          <div style="white-space:pre-wrap">{{ v.testo }}</div>
+          <div style="white-space:pre-wrap">{{ v.testo | testo_web }}</div>
           {% if v.risposte %}
           <ol type="A" style="margin:0.3rem 0 0">
-            {% for r in v.risposte %}<li>{% if loop.first %}<strong>{{ r }} ✓</strong>{% else %}{{ r }}{% endif %}</li>{% endfor %}
+            {% for r in v.risposte %}<li>{% if loop.first %}<strong>{{ r | testo_web }} ✓</strong>{% else %}{{ r | testo_web }}{% endif %}</li>{% endfor %}
           </ol>
           {% endif %}
         </div>
         {% endfor %}
-        {% if c.soluzione %}<div class="card" style="margin:0.5rem 0 0; padding:0.5rem 0.75rem; white-space:pre-wrap"><strong>Soluzione:</strong> {{ c.soluzione }}</div>{% endif %}
+        {% if c.soluzione %}<div class="card" style="margin:0.5rem 0 0; padding:0.5rem 0.75rem; white-space:pre-wrap"><strong>Soluzione:</strong> {{ c.soluzione | testo_web }}</div>{% endif %}
         {% if c.note %}<p class="muted" style="margin:0.3rem 0 0">Note: {{ c.note }}</p>{% endif %}
       </details>
     </div>

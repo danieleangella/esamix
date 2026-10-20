@@ -6,9 +6,10 @@
 {% block content %}
 {% set sezione_corso = "statistiche" %}
 {% include "_intestazione_corso.html" %}
-<p class="muted"><a href="/corsi/{{ corso.tag }}/controllo-correzioni">Controllo delle correzioni</a> — ricalcola i voti
-  già assegnati e cerca le domande con una soluzione sospetta{% if corso.importato_da_legacy %}; da lì puoi anche ricostruire
-  il dettaglio dei compiti importati, necessario per le statistiche sugli esercizi{% endif %}.</p>
+{% from "_icone.html" import icona %}
+{% from "_info.html" import info %}
+<p style="margin:0 0 1rem"><a class="icona-azione" href="/corsi/{{ corso.tag }}/controllo-correzioni">{{ icona("spunta", 14) }} Controllo delle correzioni</a>
+  {{ info("Ricalcola i voti già assegnati e cerca le domande con una soluzione sospetta" ~ ("; da lì puoi anche ricostruire il dettaglio dei compiti importati, necessario per le statistiche sugli esercizi" if corso.importato_da_legacy else "") ~ ".") }}</p>
 
 <details class="card" open>
   <summary><strong>Riepilogo di tutti gli appelli</strong></summary>

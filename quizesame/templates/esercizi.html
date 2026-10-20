@@ -9,24 +9,25 @@
 <script defer src="/static/katex/contrib/auto-render.min.js"></script>
 {% endblock %}
 {% block content %}
+{% from "_icone.html" import icona %}
+{% from "_info.html" import info %}
 {% set sezione_corso = "esercizi" %}
 {% include "_intestazione_corso.html" %}
 
 {% if duplicati %}
 <details class="card" open>
-  <summary><strong>Possibili doppioni ({{ duplicati|length }} gruppi)</strong></summary>
-  <p class="muted" style="margin-top:0.75rem">Esercizi con lo stesso testo e le stesse risposte in ogni variante. Tienine uno per gruppo ed elimina gli altri (non è possibile eliminare un esercizio già assegnato a un appello).</p>
+  <summary><strong>Possibili doppioni ({{ duplicati|length }} gruppi)</strong> {{ info("Esercizi con lo stesso testo e le stesse risposte in ogni variante. Tienine uno per gruppo ed elimina gli altri (non è possibile eliminare un esercizio già assegnato a un appello).") }}</summary>
   {% for gruppo in duplicati %}
   <div style="padding:0.6rem 0; {% if not loop.first %}border-top:1px solid var(--border);{% endif %}">
     {% for e in gruppo %}
     <div style="display:flex; justify-content:space-between; align-items:center; padding:0.15rem 0">
       <span>
-        <button type="button" class="link-simile btn-anteprima-esercizio" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button>
+        <button type="button" class="link-simile btn-anteprima-esercizio" data-esercizio="{{ e.id }}">{{ (e.nome or ('#' ~ e.id))|accenti_tex }}</button>
         <span class="muted">({{ e.varianti|length }} variante/i)</span>
       </span>
       <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/elimina"
             onsubmit="return confirm({{ ('Eliminare l\'esercizio ' ~ (e.nome or ('#' ~ e.id)) ~ '?')|js }});">
-        <button type="submit" class="danger">Elimina</button>
+        <button type="submit" class="pulsante-icona" data-info="Elimina dalla banca" aria-label="Elimina {{ e.nome or ('#' ~ e.id) }}">{{ icona("cestino") }}</button>
       </form>
     </div>
     <div class="riga-anteprima-esercizio" data-esercizio="{{ e.id }}" style="display:none; padding:0.25rem 0 0.5rem">
@@ -39,7 +40,8 @@
 {% endif %}
 
 <details class="card" open>
-  <summary><strong>Banca esercizi del corso ({{ esercizi|length }})</strong></summary>
+  <summary><strong>Banca esercizi del corso ({{ esercizi|length }})</strong> {{ info("Ogni corso ha la sua banca esercizi, separata dalle altre. Per riusare un esercizio di un anno precedente o di un altro corso: dalla pagina dell'appello, scheda Testo, pulsante \"Da altri corsi\" (viene copiato in questa banca e aggiunto al compito).") }}
+    <span class="barra-anteprima"><a class="icona-azione" href="/esercizi" data-info="Gli esercizi di tutti i corsi insieme">{{ icona("copia", 14) }} Tutti i corsi</a></span></summary>
   {% if esercizi %}
   <div class="form-grid" style="margin-top:0.75rem">
     <div><label>Cerca</label><input type="text" class="filtro-ricerca-banca" placeholder="cerca per nome o testo"></div>
@@ -56,28 +58,28 @@
   {% set n_da_verificare = stati_v.values() | selectattr("stato", "in", ["mai", "modificato"]) | list | length %}
   {% set n_problemi = stati_v.values() | selectattr("stato", "in", ["errore", "dubbio"]) | list | length %}
   <p style="margin:0.75rem 0 0; display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center">
-    <a class="icona-azione" href="/corsi/{{ corso.tag }}/esercizi/ia/verifica">✓ Verifica con l'IA la banca</a>
+    <a class="icona-azione" href="/corsi/{{ corso.tag }}/esercizi/ia/verifica" data-info="Fai ricontrollare all'IA risposte corrette e soluzioni degli esercizi della banca">{{ icona("spunta", 14) }} Verifica con l'IA</a>
     <span class="muted">{{ esercizi|length - n_da_verificare - n_problemi }} verificati · {{ n_da_verificare }} da verificare{% if n_problemi %} · <strong>{{ n_problemi }} con errori o dubbi</strong>{% endif %}</span>
   </p>
   <table class="tabella-banca-esercizi" style="margin-top:0.75rem">
-    <tr><th>Nome</th><th>Argomento</th><th>Varianti</th><th>Anteprima</th><th></th></tr>
+    <tr><th>Nome</th><th>Argomento</th><th>Varianti</th><th>Inizio del testo</th><th></th></tr>
     {% for e in esercizi %}
     <tr data-nome="{{ (e.nome or '') | lower }}" data-testo="{{ (e.varianti | map(attribute='testo') | join(' ')) | lower }}" data-argomento="{{ e.argomento or '' }}">
       <td>
-        <button type="button" class="link-simile btn-anteprima-esercizio" data-esercizio="{{ e.id }}">{{ e.nome or ('#' ~ e.id) }}</button>
-        {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
-        {% if e.aperta %}<span class="badge badge-info">domanda aperta</span>{% endif %}
-        {% set problemi = problemi_risposte(e) %}{% if problemi %}<span class="badge badge-err" title="{{ problemi|join('; ') }}">⚠ risposte uguali</span>{% endif %}
+        <button type="button" class="link-simile btn-anteprima-esercizio" data-esercizio="{{ e.id }}" data-info="Mostra tutte le varianti e la soluzione">{{ (e.nome or ('#' ~ e.id))|accenti_tex }}</button>
+        {% if e.difficolta %}<span class="muted" data-info="Difficoltà {{ e.difficolta }} su 3">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
+        {% if e.aperta %}<span class="badge badge-info">aperta</span>{% endif %}
+        {% set problemi = problemi_risposte(e) %}{% if problemi %}<span class="badge badge-err" data-info="{{ problemi|join('; ') }}">⚠ risposte uguali</span>{% endif %}
         {{ stato_verifica(corso.tag, e, stati_v[e.id], "/corsi/" ~ corso.tag ~ "/esercizi") }}
       </td>
       <td>{{ e.argomento or '-' }}</td>
       <td>{{ e.varianti|length }}</td>
-      <td class="muted">{{ (e.varianti[0].testo if e.varianti else '')[:80] }}&hellip;</td>
-      <td style="white-space:nowrap">
-        <button type="button" class="secondary btn-modifica-esercizio" data-esercizio="{{ e.id }}">Modifica</button>
+      <td class="muted">{{ (e.varianti[0].testo if e.varianti else '')|anteprima_testo }}</td>
+      <td class="cella-azioni">
+        <button type="button" class="pulsante-icona btn-modifica-esercizio" data-esercizio="{{ e.id }}" data-info="Modifica l'esercizio" aria-label="Modifica {{ e.nome or ('#' ~ e.id) }}">{{ icona("matita") }}</button>
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/elimina"
               onsubmit="return confirm({{ ('Eliminare l\'esercizio ' ~ (e.nome or ('#' ~ e.id)) ~ '?')|js }});">
-          <button type="submit" class="danger">Elimina</button>
+          <button type="submit" class="pulsante-icona" data-info="Elimina dalla banca" aria-label="Elimina {{ e.nome or ('#' ~ e.id) }}">{{ icona("cestino") }}</button>
         </form>
       </td>
     </tr>
@@ -95,13 +97,6 @@
   {% endif %}
 </details>
 
-<div class="card">
-  <p class="muted" style="margin:0">Ogni corso ha la sua banca esercizi, separata dalle altre. Per riusare un esercizio di
-    un anno precedente o di un altro corso: dalla pagina dell'appello, scheda <em>Testo</em>, pannello
-    <em>Importa da altri corsi o anni precedenti</em> (viene copiato in questa banca e aggiunto al compito).
-    Per consultare gli esercizi di tutti i corsi insieme: <a href="/esercizi">Tutti gli esercizi →</a></p>
-</div>
-
 <details class="card dettaglio-fisarmonica pannello-azione">
   <summary>Nuovo esercizio</summary>
   <div style="margin-top:1rem">
@@ -118,6 +113,25 @@
 
 <script>
 (function () {
+  // Eliminare un esercizio dalla banca non ricarica la pagina: si tolgono le sue righe
+  document.addEventListener("submit", function (ev) {
+    var form = ev.target;
+    if (ev.defaultPrevented || !/\/esercizi\/\d+\/elimina$/.test(form.getAttribute("action") || "")) return;
+    ev.preventDefault();
+    fetch(form.action, { method: "POST", headers: { "X-Frammento": "1" } })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) { alert(res.d.errore); return; }
+        var id = form.action.match(/esercizi\/(\d+)\/elimina/)[1];
+        document.querySelectorAll('[data-esercizio="' + id + '"]').forEach(function (el) {
+          var riga = el.closest("tr, .riga-anteprima-esercizio") || el;
+          if (riga.matches("tr, .riga-anteprima-esercizio")) riga.remove();
+        });
+        var r = form.closest("tr, div");
+        if (r && document.contains(r)) r.remove();
+      })
+      .catch(function () { alert("Non sono riuscito a eliminare l'esercizio"); });
+  });
   // Anteprima e modifica si escludono a vicenda (una sola riga espansa alla volta, per
   // esercizio e tra esercizi diversi), come gli altri pannelli a scomparsa dell'app.
   function chiudiTutte(eccetto) {
