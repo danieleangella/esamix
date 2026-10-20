@@ -367,22 +367,13 @@ def crea_file_riferimento(ctx: LatexContext, esercizi_struct: list[dict], con_so
     n_varianti_max = max((len(es["varianti"]) for es in esercizi_struct), default=0)
     tex = BEGIN_DOCUMENT
     tex += intestazione_breve(ctx)
-    tex += (
-        "\\begin{center}\n"
-        "{\\small (foglio di riferimento"
-        + (" con soluzioni e suggerimenti" if con_soluzioni else "")
-        + ": un compito completo per ogni combinazione "
-        "di varianti degli esercizi; la risposta corretta \\`e sempre la A, segnata con $\\checkmark$)}\n"
-        "\\end{center}\n\\vspace{1cm}\n\n"
-    )
     for indice_compito in range(n_varianti_max):
         if indice_compito > 0:
             tex += "\\clearpage\n\n"
         tex += (
             "\\noindent\\fbox{\\parbox{\\dimexpr\\linewidth-2\\fboxsep-2\\fboxrule}{\\centering\\strut"
             f"\\large\\bfseries Compito {LETTERE.get(indice_compito, indice_compito + 1)}"
-            + (f"\\quad{{\\normalsize\\mdseries (variante {indice_compito + 1} di ogni esercizio)}}" if n_varianti_max > 1 else "")
-            + "}}\n\\vspace{0.4cm}\n\n"
+            "}}\n\\vspace{0.4cm}\n\n"
         )
         # \\raggedcolumns: a fine colonna resta spazio libero in fondo, invece di
         # distribuirlo tra le righe (che aprirebbe buchi dentro un esercizio)

@@ -1,3 +1,4 @@
+{% from "_icone.html" import icona %}
 {% from "_info.html" import info %}
 <div class="tab-pane" data-pane="compiti{{ pane_suffix }}" style="display:none">
 
@@ -28,43 +29,25 @@
   {% if md.appello.chiuso %}
   <p class="muted">Appello chiuso: non è possibile generare nuovi blocchi finché non lo riapri.</p>
   {% else %}
-  {% if not md.esercizi_assegnati %}
-  <p class="muted">Assegna prima almeno un esercizio dalla scheda Testo.</p>
+  {% set testo_pronto = md.esercizi_assegnati and md.appello.testo_chiuso %}
+  {% if not testo_pronto %}
+  <p class="muted">{{ icona("lucchetto", 14) }} I compiti si generano dal testo definitivo:
+    {{ 'chiudi prima il testo' if md.esercizi_assegnati else 'assegna prima gli esercizi e chiudi il testo' }} nella scheda
+    <a href="#creazione{{ pane_suffix }}" data-tab="creazione{{ pane_suffix }}">Testo</a>.</p>
   {% endif %}
-  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/genera-compiti"
-        class="form-genera-compiti"
-        data-obbligatori-assegnati="{{ md.esercizi_assegnati|selectattr('obbligatorio')|list|length }}"
-        data-obbligatori-attesi="{{ md.consegna_effettivo }}">
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/genera-compiti" class="form-genera-compiti">
     <div class="form-grid">
       <div><label class="campo-obbligatorio">Numero studenti</label><input type="number" name="numero_studenti" value="{{ md.numero_studenti_suggerito }}" min="0" required></div>
     </div>
-    <button type="submit" {% if not md.esercizi_assegnati %}disabled{% endif %}>Genera nuovo blocco di compiti</button>
-    {{ info("Ogni generazione crea un nuovo blocco, con un proprio PDF dei compiti e uno con la griglia delle soluzioni; il foglio di riferimento con le risposte corrette è comune a tutti i blocchi. Il numero suggerito porta il totale dei compiti un po' sopra (+10%) il numero di iscritti.") }}
+    <button type="submit" {% if not testo_pronto %}disabled{% endif %}>Genera nuovo blocco di compiti</button>
+    {{ info("Ogni generazione crea un nuovo blocco, con un proprio PDF dei compiti e uno con la griglia delle soluzioni. Il numero suggerito porta il totale dei compiti un po' sopra (+10%) il numero di iscritti.") }}
   </form>
-  <script>
-  (function () {
-    var root = document.currentScript.closest(".tab-pane");
-    var form = root.querySelector(".form-genera-compiti");
-    if (!form) return;
-    form.addEventListener("submit", function (ev) {
-      var assegnati = parseInt(form.dataset.obbligatoriAssegnati, 10);
-      var attesi = parseInt(form.dataset.obbligatoriAttesi, 10);
-      if (assegnati !== attesi) {
-        var msg = "Questo appello ha " + assegnati + " esercizi obbligatori assegnati, ma le " +
-          "impostazioni del corso ne prevedono " + attesi + ". Procedere comunque?";
-        if (!window.confirm(msg)) {
-          ev.preventDefault();
-        }
-      }
-    });
-  })();
-  </script>
   {% endif %}
 </details>
 
 {# I documenti generati restano sempre a portata di mano in una sezione propria: "Crea
    compiti" qui sopra si richiude quando la fase è completata, i PDF no. #}
-{% if md.blocchi or md.esercizi_assegnati %}
+{% if md.blocchi %}
 <details class="card" open>
   <summary><strong>Compiti generati ({{ md.compiti|length }})</strong></summary>
   {% from "_formati.html" import formati %}
@@ -72,10 +55,9 @@
   {% if md.esercizi_assegnati %}
   <form method="post" action="{{ url_appello }}/ricompila-pdf" class="barra-rigenera">
     <button type="submit" class="secondary pulsante-piccolo" style="margin:0">↻ Rigenera tutti i documenti</button>
-    {{ info("Ricrea compiti, griglie, fogli da pubblicare (con e senza soluzioni), anteprima, elenchi e risultati, in PDF e negli altri formati, con gli esercizi e la grafica attuali" ~ ("; stessi codici e stesso ordine di esercizi e risposte, quindi i compiti già stampati restano validi" if md.blocchi else "") ~ ". I file qui sotto vengono sostituiti dalla versione rigenerata.") }}
+    {{ info("Ricrea compiti, griglie, fogli da pubblicare (con e senza soluzioni, nella scheda Testo), elenchi e risultati, in PDF e negli altri formati, con la grafica attuale; stessi codici e stesso ordine di esercizi e risposte, quindi i compiti già stampati restano validi. I file qui sotto vengono sostituiti dalla versione rigenerata.") }}
   </form>
   {% endif %}
-  {% if md.blocchi %}
   <table class="tabella-documenti">
     <thead><tr><th>Blocco</th><th>Compiti</th><th>Testo da stampare</th><th>Griglia delle risposte</th><th>Creato il</th><th></th></tr></thead>
     {% for b in md.blocchi %}
@@ -101,25 +83,6 @@
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
     Tutti i blocchi in un unico PDF</a></p>
   {% endif %}
-  {% endif %}
-  {% if md.esercizi_assegnati %}
-  <h3 class="titoletto">Fogli di riferimento (comuni a tutti i blocchi, sempre aggiornati agli esercizi attuali)</h3>
-  <ul class="elenco-documenti">
-    <li>
-      <span><strong>Senza soluzioni</strong> <span class="muted">— testo e risposte corrette, da pubblicare online</span></span>
-      {{ formati(url_appello ~ "/riferimento", pdf=True, html=True, tex=True, md=True) }}
-    </li>
-    <li>
-      <span><strong>Con soluzioni e suggerimenti</strong> <span class="muted">— per il docente, o da pubblicare dopo la prova</span></span>
-      {{ formati(url_appello ~ "/riferimento-soluzioni", pdf=True, html=True, tex=True, md=True) }}
-    </li>
-    <li>
-      <span><strong>Anteprima di controllo</strong> <span class="muted">— tutte le varianti, con il riquadro di revisione</span></span>
-      {{ formati(url_appello ~ "/anteprima", pdf=True, html=True, tex=True) }}
-    </li>
-  </ul>
-  {% endif %}
-  {% if not md.blocchi %}<p class="muted">Nessun blocco di compiti ancora generato.</p>{% endif %}
 </details>
 {% endif %}
 

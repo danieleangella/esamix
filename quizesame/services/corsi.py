@@ -107,6 +107,10 @@ class Appello:
     # filtro sull'elenco iscritti (file della segreteria o aggiunti a mano): solo chi ha
     # matricola numerica >= questa soglia (es. per ammettere solo il primo anno)
     matricola_minima_iscritti: Optional[str] = None
+    # testo chiuso dalla scheda Testo: gli esercizi assegnati non si modificano più (né
+    # dalla banca) finché non lo si riapre esplicitamente; i compiti si generano solo dopo
+    testo_chiuso: bool = False
+    testo_chiuso_il: Optional[str] = None
 
 
 @dataclass
@@ -505,6 +509,8 @@ def _row_to_appello(conn, row) -> Appello:
         presenze_chiuse=bool(row["presenze_chiuse"]) if "presenze_chiuse" in chiavi else False,
         correzione_scritti_conclusa=bool(row["correzione_scritti_conclusa"]) if "correzione_scritti_conclusa" in chiavi else False,
         matricola_minima_iscritti=row["matricola_minima_iscritti"] if "matricola_minima_iscritti" in chiavi else None,
+        testo_chiuso=bool(row["testo_chiuso"]) if "testo_chiuso" in chiavi else False,
+        testo_chiuso_il=row["testo_chiuso_il"] if "testo_chiuso_il" in chiavi else None,
     )
 
 
@@ -667,6 +673,37 @@ def verifica_appello_aperto(tag: str, appello_id: int) -> None:
     appello = get_appello(tag, appello_id)
     if appello is not None and appello.chiuso:
         raise AppelloChiuso()
+
+
+class TestoChiuso(ValueError):
+    """Il testo dell'appello è chiuso: va riaperto dalla scheda Testo prima di modificarlo."""
+
+    def __init__(self, nome: str = ""):
+        dove = f" di «{nome}»" if nome else ""
+        super().__init__(f"Il testo{dove} è chiuso: riaprilo dalla scheda Testo per modificare gli esercizi")
+
+
+def verifica_testo_aperto(tag: str, appello_id: int) -> None:
+    """Per ogni modifica agli esercizi assegnati a un appello (assegnare, togliere,
+    riordinare, cambiare un esercizio della banca che vi compare)."""
+    appello = get_appello(tag, appello_id)
+    if appello is None:
+        return
+    if appello.chiuso:
+        raise AppelloChiuso()
+    if appello.testo_chiuso:
+        raise TestoChiuso(appello.nome)
+
+
+def chiudi_testo(tag: str, appello_id: int) -> None:
+    verifica_appello_aperto(tag, appello_id)
+    update_appello(tag, appello_id, testo_chiuso=True,
+                   testo_chiuso_il=datetime.now().strftime("%d/%m/%Y %H:%M"))
+
+
+def riapri_testo(tag: str, appello_id: int) -> None:
+    verifica_appello_aperto(tag, appello_id)
+    update_appello(tag, appello_id, testo_chiuso=False, testo_chiuso_il=None)
 
 
 def list_corsi_laurea(tag: str) -> list[dict]:

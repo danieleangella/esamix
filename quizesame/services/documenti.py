@@ -26,9 +26,8 @@ def riferimento_md(tag: str, appello_id: int, con_soluzioni: bool = False) -> st
     appello = corsi_service.get_appello(tag, appello_id)
     esercizi = compiti_service._esercizi_per_generazione(tag, appello_id)
     n_varianti = max((len(e["varianti"]) for e in esercizi), default=0)
-    titolo = "Foglio di riferimento" + (" con soluzioni" if con_soluzioni else "")
+    titolo = "Testo con soluzioni" if con_soluzioni else "Testo"
     righe = _intestazione(corso, appello, titolo)
-    righe += ["Un compito completo per ogni variante degli esercizi; la risposta corretta è segnata con ✓.", ""]
     for k in range(n_varianti):
         righe += ["---", "", f"## Compito {LETTERE.get(k, k + 1)}", ""]
         for i, e in enumerate(esercizi, start=1):

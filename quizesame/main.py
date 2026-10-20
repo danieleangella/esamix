@@ -255,9 +255,10 @@ async def gestisci_errore_generico(request: Request, exc: Exception):
 
 
 def _proteggi_modifica_esercizi(tag: str, appello_id: int) -> None:
-    """Solleva ValueError se questo appello ha già blocchi generati con risultati
-    registrati: cambiare gli esercizi assegnati a quel punto invaliderebbe codici già
-    usati da studenti reali."""
+    """Solleva ValueError se il testo di questo appello è chiuso (va riaperto dalla scheda
+    Testo) o se ha già blocchi generati con risultati registrati: cambiare gli esercizi
+    assegnati a quel punto invaliderebbe codici già usati da studenti reali."""
+    corsi_service.verifica_testo_aperto(tag, appello_id)
     bloccanti = compiti_service.blocchi_con_risultati(tag, appello_id)
     if bloccanti:
         raise ValueError(
@@ -816,10 +817,13 @@ def _calcola_riepilogo_home(corso, appello, dati: dict) -> dict:
     # l'appello nel suo insieme e si aggiungono in _fasi_globali.
     fasi = []
     n_esercizi = len(dati["esercizi_assegnati"])
+    testo_chiuso = bool(getattr(appello, "testo_chiuso", False))
     fasi.append({
-        "nome": "Testo", "scheda": "creazione", "fatta": bool(n_esercizi),
-        "dettaglio": f"{n_esercizi} esercizi assegnati",
-        "azione": "Scegli gli esercizi del compito (dalla banca, da altri corsi o creandone di nuovi)",
+        "nome": "Testo", "scheda": "creazione", "fatta": testo_chiuso,
+        "in_corso": bool(n_esercizi) and not testo_chiuso,
+        "dettaglio": f"{n_esercizi} esercizi, " + ("testo chiuso" if testo_chiuso else "testo ancora aperto"),
+        "azione": ("Controlla l'anteprima e chiudi il testo: si generano i fogli da pubblicare" if n_esercizi
+                   else "Scegli gli esercizi del compito (dalla banca, da altri corsi o creandone di nuovi)"),
     })
     fase_stampa_fatta = bool(dati["blocchi"]) and (numero_iscritti is None or compiti_totali >= numero_iscritti)
     dettaglio_stampa = f"{compiti_totali} compiti generati"
@@ -828,7 +832,8 @@ def _calcola_riepilogo_home(corso, appello, dati: dict) -> dict:
     fasi.append({
         "nome": "Compiti d'esame", "scheda": "compiti", "fatta": fase_stampa_fatta,
         "in_corso": bool(dati["blocchi"]) and not fase_stampa_fatta, "dettaglio": dettaglio_stampa,
-        "azione": "Carica gli iscritti, genera i compiti e stampali" if not dati["blocchi"]
+        "azione": "Chiudi prima il testo, poi genera i compiti" if not testo_chiuso and not dati["blocchi"]
+        else "Carica gli iscritti, genera i compiti e stampali" if not dati["blocchi"]
         else "Genera altri compiti: non bastano per tutti gli iscritti",
     })
 
@@ -1480,15 +1485,17 @@ def _esito_testo(request: Request, tag: str, appello_id: int, messaggio: str, ti
     appello = corsi_service.get_appello(tag, appello_id)
     if not request.headers.get("x-frammento"):
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", messaggio, tipo, anchor=_anchor_membro(appello, "creazione"))
+    corso = corsi_service.get_corso(tag)
     assegnati = esercizi_service.list_esercizi_appello(tag, appello_id)
     assegnati_ids = {e.id for e in assegnati}
     md = {
         "appello": appello, "esercizi_assegnati": assegnati,
         "esercizi_disponibili": [e for e in esercizi_service.list_esercizi(tag) if e.id not in assegnati_ids],
         "argomenti": esercizi_service.list_argomenti(tag), "blocchi": compiti_service.list_blocchi(tag, appello_id),
+        "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
     }
     return templates.TemplateResponse(request, "_testo_esercizi.html", {
-        "corso": corsi_service.get_corso(tag), "md": md, "messaggio": messaggio, "tipo": tipo,
+        "corso": corso, "md": md, "messaggio": messaggio, "tipo": tipo,
         "raggruppamento": corsi_service.get_raggruppamento_by_membro(tag, appello_id),
         "pane_suffix": f"-{appello_id}" if appello.membro_raggruppamento else "",
     })
@@ -1570,6 +1577,56 @@ async def ordina_esercizi(tag: str, appello_id: int, request: Request):
     except (ValueError, TypeError) as e:
         return JSONResponse({"errore": str(e)}, status_code=400)
     return JSONResponse({"ok": True})
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/testo/chiudi")
+def chiudi_testo(tag: str, appello_id: int):
+    """Chiude il testo: da qui gli esercizi non si modificano più (neanche dalla banca)
+    finché non lo si riapre, e si generano i fogli di riferimento da pubblicare, senza e
+    con le soluzioni. Se la compilazione fallisce il testo resta aperto."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
+    url = f"/corsi/{tag}/appelli/{appello_id}"
+    try:
+        corsi_service.verifica_testo_aperto(tag, appello_id)
+        compiti_service.verifica_testo_completo(tag, appello_id)
+        percorsi = [compiti_service.riferimento_aggiornato(tag, appello_id, sol)[0] for sol in (False, True)]
+    except ValueError as e:
+        return flash_redirect(url, str(e), "error", anchor=anchor)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        esiti = list(pool.map(compiti_service.compila_pdf, percorsi))
+    for p, e in zip(percorsi, esiti):
+        if not e.ok:
+            return flash_redirect(url, f"Testo non chiuso: {p.name} non compilato ({e.messaggio})", "error",
+                                  anchor=anchor, dettaglio=e.errore_dettagliato or "")
+    corsi_service.chiudi_testo(tag, appello_id)
+    msg = "Testo chiuso e fogli da pubblicare generati (senza e con soluzioni): ora puoi creare i compiti"
+    sporgenti = [(p, e) for p, e in zip(percorsi, esiti) if e.sporgenze]
+    if sporgenti:
+        dettaglio = "\n".join(f"{p.name}: {v}" for p, e in sporgenti for v in e.sporgenze[:5])
+        return flash_redirect(url, msg + ". Attenzione: in qualche punto il testo esce dal margine, controlla i PDF.",
+                              "warning", anchor=anchor, dettaglio=dettaglio)
+    return flash_redirect(url, msg, anchor=anchor)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/testo/riapri")
+def riapri_testo(tag: str, appello_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "creazione")
+    url = f"/corsi/{tag}/appelli/{appello_id}"
+    bloccanti = compiti_service.blocchi_con_risultati(tag, appello_id)
+    if bloccanti:
+        return flash_redirect(
+            url, "Non puoi riaprire il testo: il blocco " + ", ".join(str(n) for n in bloccanti)
+            + " ha già risultati registrati, e cambiare gli esercizi invaliderebbe quei compiti.", "error", anchor=anchor)
+    try:
+        corsi_service.riapri_testo(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(url, str(e), "error", anchor=anchor)
+    msg = "Testo riaperto: puoi modificare gli esercizi, poi richiudilo"
+    if compiti_service.list_blocchi(tag, appello_id):
+        msg += " (alla prima modifica i compiti già generati verranno rigenerati con nuovi codici)"
+    return flash_redirect(url, msg, anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/esercizi/nuovo")

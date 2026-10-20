@@ -402,7 +402,7 @@ def list_esercizi_appello(tag: str, appello_id: int) -> list[Esercizio]:
 
 
 def assegna_a_appello(tag: str, appello_id: int, esercizio_id: int, obbligatorio: bool = False) -> None:
-    corsi_service.verifica_appello_aperto(tag, appello_id)
+    corsi_service.verifica_testo_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         ordine = conn.execute(
@@ -423,7 +423,7 @@ def imposta_ordine(tag: str, appello_id: int, ordine: list[int]) -> None:
     ordinamento. L'ordine non incide sul compito dello studente (gli esercizi lì vengono
     comunque rimescolati), solo sull'elenco e sul foglio di riferimento. Gli esercizi
     assegnati che mancano da `ordine` (es. aggiunti da un'altra finestra) finiscono in fondo."""
-    corsi_service.verifica_appello_aperto(tag, appello_id)
+    corsi_service.verifica_testo_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         righe = conn.execute(
@@ -445,7 +445,7 @@ def imposta_ordine(tag: str, appello_id: int, ordine: list[int]) -> None:
 
 
 def imposta_obbligatorio(tag: str, appello_id: int, esercizio_id: int, obbligatorio: bool) -> None:
-    corsi_service.verifica_appello_aperto(tag, appello_id)
+    corsi_service.verifica_testo_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         conn.execute(
@@ -458,7 +458,7 @@ def imposta_obbligatorio(tag: str, appello_id: int, esercizio_id: int, obbligato
 
 
 def rimuovi_da_appello(tag: str, appello_id: int, esercizio_id: int) -> None:
-    corsi_service.verifica_appello_aperto(tag, appello_id)
+    corsi_service.verifica_testo_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         conn.execute(
@@ -837,7 +837,7 @@ def importa_in_appello_da_altri_corsi(
     """Copia nella banca del corso (vedi copia_da_altro_corso) e assegna subito al
     compito gli esercizi scelti da altri corsi/anni. `selezionati`: [(tag_sorgente,
     esercizio_id), ...]. Ritorna (assegnati, di cui già presenti nella banca)."""
-    corsi_service.verifica_appello_aperto(tag, appello_id)
+    corsi_service.verifica_testo_aperto(tag, appello_id)
     _verifica_aperte_consentite(tag, any(
         (e := get_esercizio(tag_sorgente, esercizio_id)) is not None and e.aperta
         for tag_sorgente, esercizio_id in selezionati if tag_sorgente != tag

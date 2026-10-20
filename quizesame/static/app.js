@@ -369,6 +369,23 @@ document.addEventListener("click", function (ev) {
   if (icona) { ev.preventDefault(); icona.focus(); }
 });
 
+// La nota si apre centrata sotto l'icona: vicino al bordo della finestra (es. un'icona
+// nell'ultima colonna di una tabella) uscirebbe di lato, quindi la si sposta all'interno.
+function _riposizionaNota(ev) {
+  var icona = ev.target.closest && ev.target.closest(".aiuto");
+  var nota = icona && icona.querySelector(".aiuto-testo");
+  if (!nota) return;
+  nota.style.transform = "";
+  var r = nota.getBoundingClientRect();
+  if (!r.width) return;  // non ancora visibile
+  var margine = 8, dx = 0;
+  if (r.right > window.innerWidth - margine) dx = window.innerWidth - margine - r.right;
+  if (r.left + dx < margine) dx = margine - r.left;
+  if (dx) nota.style.transform = "translateX(calc(-50% + " + Math.round(dx) + "px))";
+}
+document.addEventListener("mouseover", _riposizionaNota);
+document.addEventListener("focusin", _riposizionaNota);
+
 // --- Scheda Testo di un appello (_tab_creazione.html / _testo_esercizi.html) -----------
 // Le azioni sugli esercizi assegnati (assegna dalla banca, togli, obbligatorio, crea,
 // modifica, importa da altri corsi) vengono inviate in background: il server risponde con
@@ -394,6 +411,12 @@ function attivaTesto(sezione) {
         "OK = elimina definitivamente anche dalla banca\n" +
         "Annulla = lo tolgo solo da questo compito (resta nella banca, riusabile)");
       form.querySelector('[name="elimina_dalla_banca"]').value = elimina ? "1" : "";
+    }
+    if (form.classList.contains("form-chiudi-testo") && form.dataset.attesi !== "" &&
+        form.dataset.obbligatori !== form.dataset.attesi && !window.confirm(
+      "Il testo ha " + form.dataset.obbligatori + " esercizi obbligatori, ma le impostazioni del corso ne " +
+      "prevedono " + form.dataset.attesi + ". Chiudere comunque il testo?")) {
+      ev.preventDefault(); return;
     }
     var blocchi = Number(dati().blocchi);
     // il modulo di modifica chiede già lui conferma (data-avvisa-rigenerazione)
@@ -429,26 +452,23 @@ function attivaTesto(sezione) {
 }
 
 // Ciò che nella pagina dipende dagli esercizi assegnati, fuori dal riquadro: la fase Testo
-// del percorso e il pulsante "Genera" della scheda Compiti d'esame.
+// del percorso (il pulsante "Genera" dei compiti resta spento finché il testo è aperto).
 function _aggiornaDopoTesto(sezione) {
   var d = sezione.querySelector(".dati-testo").dataset;
   var n = Number(d.n);
   var passo = document.querySelector('.passo a[data-tab="' + sezione.dataset.scheda + '"]');
   if (passo) {
     var li = passo.parentElement;
-    li.classList.toggle("passo-fatta", n > 0);
+    // il riquadro si ridisegna solo a testo aperto: con esercizi la fase è in corso
+    // (si completa chiudendo il testo, che ricarica la pagina)
+    li.classList.remove("passo-fatta");
+    li.classList.toggle("passo-in_corso", n > 0);
     li.classList.toggle("passo-da_fare", n === 0);
     var icona = passo.querySelector(".passo-icona");
     var segno = icona.querySelector(".passo-segno");
-    if (n > 0 && !segno) icona.insertAdjacentHTML("beforeend", '<span class="passo-segno">✓</span>');
-    if (n === 0 && segno) segno.remove();
-    passo.dataset.info = "Testo — " + (n > 0 ? "Completata" : "Da fare") + ": " + n + " esercizi assegnati";
-  }
-  var scheda = document.querySelector('.tab-pane[data-pane="' + sezione.dataset.scheda.replace("creazione", "compiti") + '"]');
-  var genera = scheda && scheda.querySelector(".form-genera-compiti");
-  if (genera) {
-    genera.dataset.obbligatoriAssegnati = d.obbligatori;
-    genera.querySelector('button[type="submit"]').disabled = n === 0;
+    if (segno) segno.remove();
+    if (n > 0) icona.insertAdjacentHTML("beforeend", '<span class="passo-segno">•</span>');
+    passo.dataset.info = "Testo — " + (n > 0 ? "In corso" : "Da fare") + ": " + n + " esercizi, testo ancora aperto";
   }
 }
 

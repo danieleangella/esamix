@@ -145,9 +145,11 @@ ciascuna (verde completata, arancione in corso, bordo blu prossimo passo) e port
 scheda in cui completarla; il riquadro "Prossimo passo" dice cosa fare adesso.
 
 - **Testo**: esercizi del compito, aggiunti dalla banca del corso, da altri corsi, creati da
-  zero, generati con l'IA o importati da un file; obbligatorio sì/no con un clic.
+  zero, generati con l'IA o importati da un file; obbligatorio sì/no con un clic. Quando è
+  pronto si **chiude il testo**: non si modifica più finché non lo si riapre, e si generano i
+  fogli da pubblicare (senza e con soluzioni).
 - **Compiti d'esame**: elenco iscritti (file della segreteria, prenotazioni Moodle, aggiunte
-  una per una, cestino per togliere), generazione e stampa dei compiti; per le prove
+  una per una, cestino per togliere), generazione (a testo chiuso) e stampa dei compiti; per le prove
   parziali anche gli ammessi e l'assegnazione alle aule.
 - **Presenze**: registro del giorno della prova; in alternativa, finite le correzioni,
   "Segna assenti tutti i non corretti".
@@ -171,7 +173,8 @@ resta sul computer su cui gira l'app.
 
 ## Documenti
 
-Compiti, griglie, fogli di riferimento (con e senza soluzioni), anteprima di controllo,
+Compiti, griglie, fogli da pubblicare (con e senza soluzioni, generati quando si chiude il
+testo), anteprima di controllo,
 risultati ed elenchi di iscritti sono disponibili in PDF, HTML e TeX; i documenti da
 pubblicare anche in Markdown. Ogni compito occupa sempre due pagine (un foglio
 fronte-retro), in un carattere senza grazie leggibile anche per studenti con DSA. Dopo un

@@ -349,25 +349,34 @@ def blocchi_con_risultati(tag: str, appello_id: int) -> list[int]:
         conn.close()
 
 
+def verifica_testo_completo(tag: str, appello_id: int) -> None:
+    """Il testo può essere chiuso (e i compiti generati) solo se ha almeno un esercizio e
+    nessuna variante con due risposte uguali, che renderebbero ambiguo il foglio."""
+    assegnati = esercizi_service.list_esercizi_appello(tag, appello_id)
+    if not assegnati:
+        raise ValueError("Il testo non ha ancora esercizi assegnati")
+    problemi = [
+        f"'{e.nome or e.id}' ({'; '.join(esercizi_service.problemi_risposte(e))})"
+        for e in assegnati if esercizi_service.problemi_risposte(e)
+    ]
+    if problemi:
+        raise ValueError(
+            "Alcuni esercizi hanno due risposte uguali nella stessa variante: correggili nella scheda "
+            "Testo. " + " · ".join(problemi)
+        )
+
+
 def genera_blocco(tag: str, appello_id: int, numero_studenti: int) -> BloccoResult:
     corsi_service.verifica_appello_aperto(tag, appello_id)
     appello = corsi_service.get_appello(tag, appello_id)
     if appello is None:
         raise ValueError("Appello non trovato")
+    if not appello.testo_chiuso:
+        raise ValueError("Chiudi prima il testo nella scheda Testo: i compiti si generano dal testo definitivo")
     corso = corsi_service.get_corso(tag)
 
     esercizi_struct = _esercizi_per_generazione(tag, appello_id)
-    # due risposte uguali sullo stesso foglio lo renderebbero ambiguo: si correggono prima
-    problemi = [
-        f"'{e.nome or e.id}' ({'; '.join(esercizi_service.problemi_risposte(e))})"
-        for e in esercizi_service.list_esercizi_appello(tag, appello_id)
-        if esercizi_service.problemi_risposte(e)
-    ]
-    if problemi:
-        raise ValueError(
-            "Alcuni esercizi hanno due risposte uguali nella stessa variante: correggili nella scheda "
-            "Testo prima di generare i compiti. " + " · ".join(problemi)
-        )
+    verifica_testo_completo(tag, appello_id)
 
     n_obbligatori = sum(1 for e in esercizi_struct if e["obbligatorio"])
     avviso_obbligatori = None

@@ -6,10 +6,23 @@
 {% from "_icone.html" import icona %}
 {% from "_stato_verifica.html" import stato_verifica %}
 {% set url = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
-{% set chiuso = md.appello.chiuso %}
+{# testo chiuso (o appello chiuso): esercizi in sola lettura finché non lo si riapre #}
+{% set testo_chiuso = md.appello.testo_chiuso %}
+{% set chiuso = md.appello.chiuso or testo_chiuso %}
 {% set n_obbligatori = md.esercizi_assegnati|selectattr("obbligatorio")|list|length %}
-  <summary><strong>Esercizi assegnati ({{ md.esercizi_assegnati|length }})</strong>{% if md.esercizi_assegnati %} <span class="badge badge-ok">✓ completato</span>{% endif %}
+  <summary><strong>Esercizi assegnati ({{ md.esercizi_assegnati|length }})</strong>
+    {% if testo_chiuso %}<span class="badge badge-ok" data-info="Testo definitivo{{ ' dal ' ~ md.appello.testo_chiuso_il if md.appello.testo_chiuso_il }}: per modificarlo riaprilo qui sotto">{{ icona("lucchetto", 12) }} testo chiuso</span>
     {% if md.esercizi_assegnati %}
+    {# i fogli da pubblicare sempre raggiungibili, anche a sezione chiusa #}
+    <span class="barra-anteprima">
+      <a class="icona-azione formato-pdf" href="{{ url }}/riferimento.pdf?v={{ versione_link() }}" target="_blank" rel="noopener"
+         data-info="Testo da pubblicare online: esercizi e risposte corrette, senza soluzioni">{{ icona("file", 14) }} Senza soluzioni</a>
+      <a class="icona-azione formato-pdf" href="{{ url }}/riferimento-soluzioni.pdf?v={{ versione_link() }}" target="_blank" rel="noopener"
+         data-info="Testo con soluzioni e suggerimenti: per il docente, o da pubblicare dopo la prova">{{ icona("file", 14) }} Con soluzioni</a>
+    </span>
+    {% endif %}
+    {% elif md.esercizi_assegnati %}<span class="badge badge-warn" data-info="Quando il testo è pronto chiudilo (pulsante in fondo): si generano i fogli da pubblicare e si possono creare i compiti">testo aperto</span>{% endif %}
+    {% if md.esercizi_assegnati and not testo_chiuso %}
     {# anteprima di controllo sempre raggiungibile, anche a sezione chiusa #}
     <span class="barra-anteprima">
       <a class="icona-azione" href="{{ url }}/anteprima.pdf" target="_blank" rel="noopener" aria-label="Apri l'anteprima di controllo in PDF"
@@ -82,8 +95,8 @@
         {% endif %}
       </td>
       <td class="cella-azioni">
-        <button type="button" class="pulsante-icona btn-modifica-assegnato" data-esercizio="{{ e.id }}" data-info="Modifica l'esercizio" aria-label="Modifica {{ e.nome or ('#' ~ e.id) }}">{{ icona("matita") }}</button>
         {% if not chiuso %}
+        <button type="button" class="pulsante-icona btn-modifica-assegnato" data-esercizio="{{ e.id }}" data-info="Modifica l'esercizio" aria-label="Modifica {{ e.nome or ('#' ~ e.id) }}">{{ icona("matita") }}</button>
         <form class="inline form-rimuovi-esercizio" method="post" action="{{ url }}/esercizi/{{ e.id }}/rimuovi" data-nome="{{ e.nome or ('#' ~ e.id) }}">
           <input type="hidden" name="elimina_dalla_banca" value="">
           <button type="submit" class="pulsante-icona" data-info="Togli dal compito" aria-label="Togli {{ e.nome or ('#' ~ e.id) }} dal compito">{{ icona("cestino") }}</button>
@@ -103,6 +116,30 @@
   </table>
   {% else %}
   <p class="muted">Nessun esercizio ancora assegnato: aggiungine dalla banca, da altri corsi, creane uno nuovo o generalo con l'IA.</p>
+  {% endif %}
+
+  {% if testo_chiuso %}
+  {% from "_formati.html" import formati %}
+  {% if md.esercizi_assegnati %}
+  <h3 class="titoletto">Testo da pubblicare {{ info("Generati alla chiusura del testo: il foglio senza soluzioni (testo e risposte corrette) si può pubblicare online; quello con soluzioni e suggerimenti è per il docente, o da pubblicare dopo la prova.") }}</h3>
+  <ul class="elenco-documenti">
+    <li><span><strong>Senza soluzioni</strong></span>{{ formati(url ~ "/riferimento", pdf=True, html=True, tex=True, md=True) }}</li>
+    <li><span><strong>Con soluzioni</strong></span>{{ formati(url ~ "/riferimento-soluzioni", pdf=True, html=True, tex=True, md=True) }}</li>
+  </ul>
+  {% endif %}
+  {% if not md.appello.chiuso %}
+  <form class="barra-strumenti" method="post" action="{{ url }}/testo/riapri" style="margin-top:0.5rem"
+        onsubmit="return confirm({{ ('Riaprire il testo per modificarlo?' ~ (' Alla prima modifica i ' ~ md.blocchi|length ~ ' blocchi di compiti già generati verranno rigenerati con nuovi codici: quelli già stampati non saranno più validi.' if md.blocchi else ''))|js }});">
+    <button type="submit" class="secondary pulsante-piccolo" style="margin:0">{{ icona("matita", 14) }} Riapri il testo</button>
+    {% if md.appello.testo_chiuso_il %}<span class="muted">chiuso il {{ md.appello.testo_chiuso_il }}</span>{% endif %}
+  </form>
+  {% endif %}
+  {% if md.esercizi_assegnati %}
+  {# a testo chiuso servono di rado: link discreti in fondo #}
+  <p class="muted" style="margin:0.5rem 0 0; font-size:0.85rem">Controlli:
+    <a href="{{ url }}/anteprima.pdf" target="_blank" rel="noopener" data-info="Tutti gli esercizi con tutte le varianti, la risposta corretta e la soluzione">anteprima di controllo</a>
+    · <a href="{{ url }}/ia/verifica" data-info="Fai ricontrollare all'IA risposte corrette e soluzioni (per correggere un esercizio va riaperto il testo)">verifica con l'IA</a></p>
+  {% endif %}
   {% endif %}
 
   {% if not chiuso %}
@@ -176,4 +213,12 @@
     {% set action_importa = url ~ "/esercizi/importa-json" %}
     {% include "_importa_esercizi_form.html" %}
   </div>
+  {% endif %}
+
+  {% if md.esercizi_assegnati and not chiuso %}
+  <form class="barra-conclusione form-chiudi-testo" method="post" action="{{ url }}/testo/chiudi" style="margin-top:0.75rem"
+        data-obbligatori="{{ n_obbligatori }}" data-attesi="{{ md.consegna_effettivo if md.consegna_effettivo is defined else '' }}">
+    <button type="submit" style="margin:0">{{ icona("lucchetto", 14) }} Chiudi il testo</button>
+    {{ info("Quando il testo è definitivo: gli esercizi non si potranno più modificare (neanche dalla banca) finché non lo riapri, si generano i fogli da pubblicare (senza e con soluzioni) e si possono creare i compiti.") }}
+  </form>
   {% endif %}

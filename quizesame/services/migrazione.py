@@ -264,6 +264,9 @@ def migra(
                 "a nessuna colonna appello: registrati nell'appello 'Verbalizzazioni storiche (da migrazione)'"
             )
 
+        # prove già svolte: il loro testo è definitivo (riapribile dalla scheda Testo)
+        conn.execute("UPDATE appelli SET testo_chiuso=1 WHERE id IN (SELECT appello_id FROM compiti)"
+                     " OR id IN (SELECT appello_id FROM risultati)")
         conn.commit()
     finally:
         conn.close()

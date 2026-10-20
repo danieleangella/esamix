@@ -328,6 +328,9 @@ ADDITIVE_COLUMNS = {
         ("presenze_chiuse", "BOOLEAN NOT NULL DEFAULT 0"),
         ("correzione_scritti_conclusa", "BOOLEAN NOT NULL DEFAULT 0"),
         ("matricola_minima_iscritti", "TEXT"),
+        # testo chiuso (scheda Testo): esercizi non più modificabili finché non lo si riapre
+        ("testo_chiuso", "BOOLEAN NOT NULL DEFAULT 0"),
+        ("testo_chiuso_il", "TEXT"),
     ],
 }
 
@@ -344,6 +347,13 @@ def _ensure_schema_current(conn: sqlite3.Connection) -> None:
         for nome, dichiarazione in colonne:
             if nome not in colonne_presenti:
                 conn.execute(f"ALTER TABLE {tabella} ADD COLUMN {nome} {dichiarazione}")
+                if (tabella, nome) == ("appelli", "testo_chiuso"):
+                    # negli appelli già esistenti il testo con compiti generati (o di un
+                    # appello chiuso) è di fatto definitivo: nasce chiuso
+                    conn.execute(
+                        "UPDATE appelli SET testo_chiuso=1 WHERE chiuso=1"
+                        " OR id IN (SELECT appello_id FROM blocchi) OR id IN (SELECT appello_id FROM compiti)"
+                    )
     conn.commit()
 
 

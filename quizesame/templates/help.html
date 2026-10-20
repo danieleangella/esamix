@@ -132,8 +132,20 @@
     l'elenco, senza ricaricare la pagina.
   </p>
   <p>
-    Nella scheda Testo, l'icona <strong>Anteprima</strong> nel titolo di "Esercizi assegnati"
-    (visibile anche a sezione chiusa) apre un PDF di controllo con tutti gli esercizi del
+    Quando il testo è definitivo, il pulsante <strong>Chiudi il testo</strong> in fondo alla
+    scheda lo blocca: gli esercizi non si possono più assegnare, togliere, riordinare o
+    modificare (neanche dalla banca del corso) finché non lo si riapre con <strong>Riapri il
+    testo</strong>. Alla chiusura si generano i <strong>fogli da pubblicare</strong>, senza
+    soluzioni (testo e risposte corrette, da mettere online) e con soluzioni e suggerimenti, in
+    PDF, HTML, TeX e Markdown, raggiungibili dal titolo della sezione. I compiti si possono
+    generare solo a testo chiuso. Se dopo averlo riaperto si modifica un esercizio, i blocchi
+    già generati vengono rigenerati con nuovi codici; non si può riaprire un testo i cui
+    compiti hanno già risultati registrati.
+  </p>
+  <p>
+    Finché il testo è aperto, l'icona <strong>Anteprima</strong> nel titolo di "Esercizi assegnati"
+    (a testo chiuso, un link discreto in fondo alla scheda, insieme alla verifica con l'IA)
+    apre un PDF di controllo con tutti gli esercizi del
     compito, tutte le loro varianti, la risposta corretta segnata e la
     soluzione/suggerimento: si può aprire in qualunque momento, anche prima dei blocchi, e
     non crea codici. Si aggiorna da solo quando cambiano gli esercizi o le impostazioni del
@@ -293,7 +305,8 @@ COMPITO DA CONVERTIRE
   <summary>Un appello, scheda per scheda</summary>
   <p>
     In cima alla pagina di un appello c'è il <strong>percorso</strong>: tutte le fasi
-    nell'ordine in cui si svolgono — <strong>Testo</strong> (esercizi assegnati),
+    nell'ordine in cui si svolgono — <strong>Testo</strong> (esercizi assegnati; completata
+    quando si chiude il testo),
     <strong>Compiti d'esame</strong> (iscritti e generazione dei blocchi, vedi sotto),
     <strong>Presenze</strong>, <strong>Correzione</strong>, eventuali
     <strong>Orali</strong>, <strong>Verbalizzazione</strong> e <strong>Chiusura</strong> —
@@ -353,16 +366,15 @@ COMPITO DA CONVERTIRE
     Dalla stessa scheda, "Genera nuovo blocco di compiti"
     crea un <strong>blocco</strong>: un insieme di compiti (uno per studente, con codice
     univoco) stampati insieme. Si possono generare più blocchi nel tempo per lo stesso
-    appello (es. per chi arriva più tardi, o per aule diverse). Il <strong>foglio di
-    riferimento</strong> (testo e risposte corrette) è invece unico per l'appello,
-    comune a tutti i blocchi, e viene creato solo la prima volta, in due versioni: senza
-    soluzioni né suggerimenti (da pubblicare) e con soluzioni e suggerimenti. Per entrambi, oltre ai
-    file <code>.tex</code>/<code>.pdf</code> da scaricare, un link <strong>.html</strong>
-    apre subito in pagina un'anteprima (per il blocco, del primo compito generato) senza
-    dover scaricare né compilare nulla.
+    appello (es. per chi arriva più tardi, o per aule diverse). Si può generare un blocco
+    solo dopo aver chiuso il testo; il <strong>foglio di riferimento</strong> (testo e
+    risposte corrette, senza e con soluzioni) è invece unico per l'appello, comune a tutti i
+    blocchi, e si trova nella scheda Testo. Oltre ai file <code>.tex</code>/<code>.pdf</code>
+    da scaricare, un link <strong>.html</strong> apre subito in pagina un'anteprima (per il
+    blocco, del primo compito generato) senza dover scaricare né compilare nulla.
   </p>
   <p class="muted">
-    Se si modificano gli esercizi assegnati dopo aver già generato un blocco, l'app
+    Se si riapre il testo e si modificano gli esercizi dopo aver già generato un blocco, l'app
     chiede conferma e rigenera automaticamente tutti i blocchi esistenti (con nuovi
     codici) — a meno che qualche blocco non abbia già risultati registrati, nel qual
     caso la modifica viene bloccata per non invalidare compiti già corretti. Il testo si
@@ -679,9 +691,8 @@ COMPITO DA CONVERTIRE
   <p>
     Nella sezione <strong>Compiti generati</strong> della scheda Compiti d'esame,
     <strong>↻ Rigenera tutti i documenti</strong> ricostruisce compiti, griglie, fogli di
-    riferimento e anteprima con gli esercizi e la grafica attuali, mantenendo gli stessi codici e
-    lo stesso ordine di esercizi e risposte: i compiti già stampati restano validi. I fogli da
-    pubblicare (con e senza soluzioni) sono comunque sempre aggiornati agli esercizi attuali.
+    riferimento e anteprima con la grafica attuale, mantenendo gli stessi codici e
+    lo stesso ordine di esercizi e risposte: i compiti già stampati restano validi.
     Vengono rigenerati anche gli elenchi di iscritti e ammessi e i risultati, se presenti.
   </p>
   <p>

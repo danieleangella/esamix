@@ -18,9 +18,8 @@
   <h1>{{ appello.nome }}{% if appello.data %} <span class="muted">· {{ appello.data }}</span>{% endif %}</h1>
 </header>
 <div class="barra-riferimento non-stampare">
-  <p class="muted" style="margin:0">{% if tutte %}Tutte le varianti di ogni esercizio, con la risposta corretta segnata con ✓
-    e le soluzioni.{% else %}Compito di esempio con la prima variante di ogni esercizio; la risposta corretta è
-    segnata con ✓ (nel PDF pubblicato è sempre la A).{% endif %}</p>
+  {% if tutte %}<p class="muted" style="margin:0">Tutte le varianti di ogni esercizio, con la risposta corretta segnata con ✓
+    e le soluzioni.</p>{% else %}<span></span>{% endif %}
   <span class="formati">
     <label style="display:inline-flex; align-items:center; gap:0.35rem; margin:0; color:var(--text)">
       <input type="checkbox" id="mostra-soluzioni" style="width:auto; margin:0" {% if soluzioni %}checked{% endif %}> Mostra le soluzioni</label>
