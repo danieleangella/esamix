@@ -29,12 +29,28 @@
         </form>
       </td>
       <td class="cella-azioni">
+        {% if not md.appello.chiuso %}
+        <button type="button" class="pulsante-icona" data-modifica="modifica-aula-{{ a.id }}" aria-expanded="false"
+                data-info="Modifica nome e posti" aria-label="Modifica {{ a.nome }}">{{ icona("matita") }}</button>
+        {% endif %}
         <form class="inline" method="post" action="{{ url }}/aule/{{ a.id }}/elimina"
               data-conferma="{{ 'Eliminare l\'aula ' ~ a.nome ~ '? Gli studenti già assegnati resteranno senza aula.' }}">
           <button type="submit" class="pulsante-icona" data-info="Elimina l'aula" aria-label="Elimina {{ a.nome }}">{{ icona("cestino") }}</button>
         </form>
       </td>
     </tr>
+    {% if not md.appello.chiuso %}
+    <tr id="modifica-aula-{{ a.id }}" data-riga-modifica hidden>
+      <td colspan="4">
+        <form class="barra-aggiungi" method="post" action="{{ url }}/aule/{{ a.id }}/modifica" style="margin:0">
+          <input name="nome" value="{{ a.nome }}" aria-label="Nome dell'aula" required style="flex:2; min-width:10rem">
+          <input type="number" name="capienza" min="1" value="{{ a.capienza }}" aria-label="Posti" required style="flex:1; min-width:6rem">
+          <button type="submit" style="margin:0">{{ icona("spunta") }} Salva</button>
+          <button type="button" class="secondary" data-chiudi-modifica style="margin:0">Annulla</button>
+        </form>
+      </td>
+    </tr>
+    {% endif %}
     {% endfor %}
     <tr><td><strong>Totale</strong></td><td><strong>{{ posti }}</strong></td><td colspan="2"></td></tr>
   </table>

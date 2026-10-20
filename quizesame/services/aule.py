@@ -57,6 +57,19 @@ def imposta_aula_dsa(tag: str, appello_id: int, aula_id: int, dsa: bool) -> None
         conn.close()
 
 
+def modifica_aula(tag: str, appello_id: int, aula_id: int, nome: str, capienza: int) -> None:
+    """Nome e posti di un'aula; gli studenti già assegnati restano dove sono."""
+    if not nome.strip() or capienza < 1:
+        raise ValueError("Servono il nome dell'aula e almeno un posto")
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute("UPDATE appello_aule SET nome=?, capienza=? WHERE id=? AND appello_id=?",
+                     (nome.strip(), capienza, aula_id, appello_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def elimina_aula(tag: str, appello_id: int, aula_id: int) -> None:
     conn = db.get_connection(config.corso_db_path(tag))
     try:

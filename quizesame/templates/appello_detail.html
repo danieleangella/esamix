@@ -187,9 +187,22 @@
         <td>{{ m.nome }}</td>
         <td>{{ m.data or '-' }}</td>
         <td class="cella-azioni">
+          <button type="button" class="pulsante-icona" data-modifica="modifica-prova-{{ m.id }}" aria-expanded="false"
+                  data-info="Modifica nome e data della prova" aria-label="Modifica la prova {{ m.nome }}">{{ icona("matita") }}</button>
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ m.id }}/elimina"
                 onsubmit="return confirm({{ ('Eliminare la prova ' ~ m.nome ~ ' da questo raggruppamento? Le altre prove e il raggruppamento restano intatti.')|js }});">
             <button type="submit" class="pulsante-icona" data-info="Elimina questa prova (le altre restano)" aria-label="Elimina la prova {{ m.nome }}">{{ icona("cestino") }}</button>
+          </form>
+        </td>
+      </tr>
+      <tr id="modifica-prova-{{ m.id }}" data-riga-modifica hidden>
+        <td colspan="3">
+          <form class="barra-aggiungi" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ m.id }}/rinomina" style="margin:0">
+            <input type="hidden" name="torna" value="{{ appello.id }}">
+            <input name="nome" value="{{ m.nome }}" aria-label="Nome della prova" required style="flex:2; min-width:10rem">
+            <input type="date" name="data" value="{{ m.data | data_iso }}" min="2001-01-01" max="2099-12-31" aria-label="Data della prova" style="flex:1; min-width:9rem">
+            <button type="submit" style="margin:0">{{ icona("spunta") }} Salva</button>
+            <button type="button" class="secondary" data-chiudi-modifica style="margin:0">Annulla</button>
           </form>
         </td>
       </tr>

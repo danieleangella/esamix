@@ -369,6 +369,30 @@ document.addEventListener("click", function (ev) {
   if (icona) { ev.preventDefault(); icona.focus(); }
 });
 
+// Matita accanto al cestino (aule, prove di un raggruppamento, configurazioni IA): apre e
+// chiude il modulo di modifica sotto la riga, data-modifica="<id del modulo>"; il suo
+// pulsante Annulla (data-chiudi-modifica) lo richiude scartando quanto scritto.
+document.addEventListener("click", function (ev) {
+  var matita = ev.target.closest && ev.target.closest("[data-modifica]");
+  if (matita) {
+    var riga = document.getElementById(matita.dataset.modifica);
+    if (!riga) return;
+    riga.hidden = !riga.hidden;
+    matita.setAttribute("aria-expanded", riga.hidden ? "false" : "true");
+    var campo = !riga.hidden && riga.querySelector("input:not([type=hidden]), select");
+    if (campo) campo.focus();
+    return;
+  }
+  var annulla = ev.target.closest && ev.target.closest("[data-chiudi-modifica]");
+  if (annulla) {
+    var modulo = annulla.closest("[data-riga-modifica]");
+    if (!modulo) return;
+    var form = modulo.querySelector("form");
+    if (form) form.reset();
+    modulo.hidden = true;
+  }
+});
+
 // La nota si apre centrata sotto l'icona: vicino al bordo della finestra (es. un'icona
 // nell'ultima colonna di una tabella) uscirebbe di lato, quindi la si sposta all'interno.
 function _riposizionaNota(ev) {

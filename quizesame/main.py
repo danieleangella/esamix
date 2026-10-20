@@ -497,6 +497,34 @@ def aggiungi_profilo_ia(
     return flash_redirect("/impostazioni", msg, anchor="ia")
 
 
+@app.post("/impostazioni/ia/profili/{profilo_id}/modifica")
+def modifica_profilo_ia(profilo_id: str, nome: str = Form(""), chiave: str = Form(""), modello: str = Form(""),
+                        url: str = Form(""), token: str = Form("")):
+    """Nome, modello e (se se ne scrive una nuova) chiave o token di una configurazione già
+    salvata; il fornitore non cambia: per un altro fornitore se ne aggiunge una nuova."""
+    imp = app_config_service.get_settings()
+    profilo = next((p for p in imp.ia_profili if p["id"] == profilo_id), None)
+    if profilo is None:
+        return flash_redirect("/impostazioni", "Configurazione non trovata", "error", anchor="ia")
+    fornitore_p, chiave, modello = profilo.get("fornitore"), chiave.strip(), modello.strip()
+    if fornitore_p == "anthropic" and chiave and not chiave.startswith("sk-ant-"):
+        return flash_redirect("/impostazioni", "Non sembra una chiave API di Anthropic (inizia con sk-ant-)", "error", anchor="ia")
+    if fornitore_p == "openrouter" and chiave and not chiave.startswith("sk-or-"):
+        return flash_redirect("/impostazioni", "Non sembra una chiave di OpenRouter (inizia con sk-or-)", "error", anchor="ia")
+    if fornitore_p == "ollama" and (not url.strip() or not modello):
+        return flash_redirect("/impostazioni", "Per Ollama servono l'indirizzo del server e il modello", "error", anchor="ia")
+    aggiornato = dict(profilo, nome=nome.strip() or profilo.get("nome", ""), modello=modello)
+    if fornitore_p == "ollama":
+        aggiornato["url"] = _url_ollama(url)
+        if token.strip():
+            aggiornato["token"] = token.strip()
+    elif chiave:
+        aggiornato["chiave"] = chiave
+    profili = [aggiornato if p["id"] == profilo_id else p for p in imp.ia_profili]
+    app_config_service.update_settings(ia_profili=profili)
+    return flash_redirect("/impostazioni", f"Configurazione \"{aggiornato['nome']}\" aggiornata", anchor="ia")
+
+
 @app.post("/impostazioni/ia/profili/{profilo_id}/predefinito")
 def profilo_ia_predefinito(profilo_id: str):
     if not any(p["id"] == profilo_id for p in ia_service.profili()):
@@ -1092,6 +1120,17 @@ def modifica_appello(
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error")
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Impostazioni appello salvate")
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/rinomina")
+def rinomina_appello(tag: str, appello_id: int, nome: str = Form(...), data: str = Form(""), torna: int = Form(0)):
+    """Nome e data di una prova, dall'elenco delle prove di un raggruppamento (senza
+    toccare i dati dell'orale, che si impostano nelle impostazioni dell'appello)."""
+    destinazione = f"/corsi/{tag}/appelli/{torna or appello_id}"
+    if not nome.strip():
+        return flash_redirect(destinazione, "Il nome della prova non può essere vuoto", "error", anchor="impostazioni")
+    corsi_service.update_appello(tag, appello_id, nome=nome.strip(), data=_data_iso_a_it(data) or None)
+    return flash_redirect(destinazione, f"Prova «{nome.strip()}» aggiornata", anchor="impostazioni")
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/elimina")
@@ -2328,10 +2367,11 @@ def segna_assenza(request: Request, tag: str, appello_id: int, matricola: str = 
 @app.post("/corsi/{tag}/appelli/{appello_id}/annulla-compito")
 def annulla_compito(
     tag: str, appello_id: int, matricola: str = Form(...), nota: str = Form(""),
-    orale_obbligatorio: str = Form(""),
+    orale_obbligatorio: str = Form(""), torna: str = Form(""),
 ):
     appello = corsi_service.get_appello(tag, appello_id)
-    anchor = _anchor_membro(appello, "presenze")
+    # anche per cambiare il motivo di un annullamento dalla tabella dei risultati
+    anchor = _anchor_membro(appello, "valutazione" if torna == "valutazione" else "presenze")
     errore_iscritto = _errore_non_iscritto(tag, appello_id, matricola)
     if errore_iscritto:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", errore_iscritto, "error", anchor=anchor)
@@ -2341,7 +2381,7 @@ def annulla_compito(
         )
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
-    msg = f"Compito di {matricola} annullato"
+    msg = f"Motivo dell'annullamento di {matricola} aggiornato" if torna == "valutazione" else f"Compito di {matricola} annullato"
     if orale_obbligatorio:
         msg += ": l'orale sarà obbligatorio negli appelli successivi"
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
@@ -2973,6 +3013,15 @@ def imposta_aula_dsa(request: Request, tag: str, appello_id: int, aula_id: int, 
         ("Aula riservata ai DSA/L104" if dsa else "L'aula non è più riservata ai DSA/L104")
         + ": per aggiornare le assegnazioni usa \"Assegna automaticamente\" nella scheda Compiti d'esame",
     )
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/aule/{aula_id}/modifica")
+def modifica_aula(request: Request, tag: str, appello_id: int, aula_id: int, nome: str = Form(...), capienza: int = Form(...)):
+    try:
+        aule_service.modifica_aula(tag, appello_id, aula_id, nome, capienza)
+    except ValueError as e:
+        return _risposta_aule(request, tag, appello_id, str(e), "error")
+    return _risposta_aule(request, tag, appello_id, f"Aula {nome.strip()} aggiornata")
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/aule/{aula_id}/elimina")

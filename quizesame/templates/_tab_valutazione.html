@@ -249,6 +249,18 @@
         <td>
           {% if r.esito == 'rifiutato' %}<span class="badge badge-warn">rifiutato</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if r.annullamento_nota %} <span class="muted">— {{ r.annullamento_nota }}</span>{% endif %}
+          {% if not md.appello.chiuso and not r.verbalizzato %}
+          {# nella stessa cella, così segue la riga quando la tabella si riordina #}
+          <div id="modifica-annullato-{{ md.appello.id }}-{{ r.matricola }}" data-riga-modifica hidden>
+            <form class="barra-aggiungi" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/annulla-compito" style="margin:0.4rem 0 0">
+              <input type="hidden" name="matricola" value="{{ r.matricola }}">
+              <input type="hidden" name="torna" value="valutazione">
+              <input name="nota" value="{{ r.annullamento_nota or '' }}" placeholder="Motivo dell'annullamento" aria-label="Motivo dell'annullamento" style="flex:1; min-width:12rem">
+              <button type="submit" style="margin:0">{{ icona("spunta") }} Salva</button>
+              <button type="button" class="secondary" data-chiudi-modifica style="margin:0">Annulla</button>
+            </form>
+          </div>
+          {% endif %}
           {% elif r.esito != 'voto' %}{{ r.esito }}
           {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
@@ -270,6 +282,9 @@
           {% elif r.esito in ('voto', 'rifiutato') %}
           <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/modifica" class="pulsante-icona" style="display:inline-flex"
              data-info="Modifica la correzione" aria-label="Modifica il risultato di {{ r.cognome }} {{ r.nome }}">{{ icona("matita") }}</a>
+          {% elif r.esito == 'annullato' %}
+          <button type="button" class="pulsante-icona" data-modifica="modifica-annullato-{{ md.appello.id }}-{{ r.matricola }}" aria-expanded="false"
+                  data-info="Modifica il motivo dell'annullamento" aria-label="Modifica l'annullamento di {{ r.cognome }} {{ r.nome }}">{{ icona("matita") }}</button>
           {% endif %}
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/elimina"
                 onsubmit="return confirm({{ ('Eliminare il risultato di ' ~ r.cognome ~ ' ' ~ r.nome ~ ' per questo appello?')|js }});">

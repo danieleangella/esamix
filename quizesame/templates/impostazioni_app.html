@@ -76,6 +76,8 @@
         </form>
         {% endif %}
         {% if not p.da_ambiente %}
+        <button type="button" class="pulsante-icona" data-modifica="modifica-ia-{{ p.id }}" aria-expanded="false"
+                data-info="Modifica nome, modello e chiave" aria-label="Modifica {{ p.nome }}">{{ icona("matita") }}</button>
         <form class="inline" method="post" action="/impostazioni/ia/profili/{{ p.id }}/elimina"
               onsubmit="return confirm({{ ('Eliminare la configurazione «' ~ p.nome ~ '» e la sua chiave?')|js }});">
           <button type="submit" class="pulsante-icona" data-info="Elimina la configurazione e la sua chiave" aria-label="Elimina {{ p.nome }}">{{ icona("cestino") }}</button>
@@ -83,6 +85,27 @@
         {% else %}<span class="muted">dalla variabile d'ambiente</span>{% endif %}
       </span>
     </li>
+    {% if not p.da_ambiente %}
+    <li id="modifica-ia-{{ p.id }}" class="riga-modifica-ia" data-riga-modifica hidden>
+      <form method="post" action="/impostazioni/ia/profili/{{ p.id }}/modifica" style="margin:0">
+        <div class="form-grid">
+          <div><label>Nome</label><input name="nome" value="{{ p.nome }}" required></div>
+          {% if p.fornitore == 'ollama' %}
+          <div><label>Indirizzo del server</label><input name="url" value="{{ p.url }}" required></div>
+          <div><label>Modello</label><input name="modello" value="{{ p.modello }}" required></div>
+          <div><label>Token</label><input type="password" name="token" autocomplete="off" placeholder="vuoto: resta quello salvato"></div>
+          {% else %}
+          <div><label>Modello</label><input name="modello" value="{{ p.modello }}"></div>
+          <div><label>Nuova chiave API</label><input type="password" name="chiave" autocomplete="off" placeholder="vuoto: resta quella che finisce con …{{ p.finale_chiave }}"></div>
+          {% endif %}
+        </div>
+        <div class="barra-pulsanti">
+          <button type="submit">{{ icona("spunta", 14) }} Salva</button>
+          <button type="button" class="secondary" data-chiudi-modifica>Annulla</button>
+        </div>
+      </form>
+    </li>
+    {% endif %}
     {% endfor %}
   </ul>
   {% else %}

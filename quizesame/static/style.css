@@ -660,3 +660,7 @@ summary.testo-pericolo { color: var(--err-text) !important; }
 a.icona-azione, button.icona-azione { font-size: 0.85rem; font-weight: 500; }
 /* testi lunghi senza spazi (formule, matricole incollate) vanno a capo invece di sforare dalla tabella */
 td .link-simile, td.muted { overflow-wrap: anywhere; }
+
+/* modulo di modifica sotto una riga (matita accanto al cestino, vedi data-modifica in app.js) */
+[data-riga-modifica][hidden] { display: none !important; }
+.elenco-documenti li.riga-modifica-ia { display: block; }
