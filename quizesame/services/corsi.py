@@ -111,6 +111,7 @@ class Appello:
     # dalla banca) finché non lo si riapre esplicitamente; i compiti si generano solo dopo
     testo_chiuso: bool = False
     testo_chiuso_il: Optional[str] = None
+    rimanda_svolgimenti: bool = False
 
 
 @dataclass
@@ -511,6 +512,7 @@ def _row_to_appello(conn, row) -> Appello:
         matricola_minima_iscritti=row["matricola_minima_iscritti"] if "matricola_minima_iscritti" in chiavi else None,
         testo_chiuso=bool(row["testo_chiuso"]) if "testo_chiuso" in chiavi else False,
         testo_chiuso_il=row["testo_chiuso_il"] if "testo_chiuso_il" in chiavi else None,
+        rimanda_svolgimenti=bool(row["rimanda_svolgimenti"]) if "rimanda_svolgimenti" in chiavi else False,
     )
 
 

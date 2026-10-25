@@ -6,6 +6,36 @@
 {% block content %}
 <h1>Guida</h1>
 
+<details class="card dettaglio-fisarmonica" id="corso-prova">
+  <summary>Provare l'app con un corso di prova</summary>
+  <p>
+    Per provare tutte le funzioni senza toccare i propri corsi si può installare un
+    <strong>corso di prova</strong>, con studenti, esercizi e risultati inventati: un appello
+    singolo e due prove parziali raggruppate. Negli esercizi la risposta giusta è sempre
+    scritta nel testo (es. "Quanto fa 2 + 3? (la risposta giusta è 5)", con le risposte
+    segnate come giusta o sbagliata), così si capisce subito cosa aspettarsi in correzione.
+  </p>
+  <p>
+    Ci sono correzioni già fatte di ogni tipo (svolgimenti valutati con le note, un voto
+    cambiato a mano con la sua nota, un orale richiesto, un compito insufficiente per un
+    obbligatorio non svolto, valutazioni in sospeso, una bozza, un assente, un ritirato), la
+    prima prova parziale già conclusa e la seconda con gli svolgimenti rimandati da valutare
+    nella pagina Svolgimenti e note. Altri compiti sono lasciati da correggere: matricola,
+    codice e risposte da inserire sono elencati in Impostazioni → Corso di prova.
+  </p>
+  <p>
+    Finita la prova, "Elimina il corso di prova" (nello stesso riquadro) cancella il corso con
+    tutti i suoi dati e le sue voci nel registro delle attività, senza lasciare tracce; gli
+    altri corsi non vengono toccati.
+  </p>
+  {% if corso_prova_installato %}
+  <p><a href="/corsi/{{ corso_prova_tag }}" class="button" style="margin:0">Apri il corso di prova</a>
+    <a href="/impostazioni#corso-prova" style="margin-left:0.75rem">compiti da correggere ed eliminazione</a></p>
+  {% else %}
+  <form method="post" action="/impostazioni/corso-prova/installa"><button type="submit" style="margin:0">Installa il corso di prova</button></form>
+  {% endif %}
+</details>
+
 <details class="card dettaglio-fisarmonica" open>
   <summary>Corsi</summary>
   <p>
@@ -430,15 +460,21 @@ COMPITO DA CONVERTIRE
     <kbd>Invio</kbd> passa al campo successivo; sotto ogni campo un controllo immediato
     segnala uno studente già valutato, un codice inesistente o già usato da un altro
     studente, e quante risposte mancano o sono di troppo rispetto al compito. Nel riepilogo
-    il cursore è su Conferma (o sul primo punteggio da assegnare a mano), quindi un altro
-    <kbd>Invio</kbd> registra il voto e riporta al modulo per il compito successivo. Un elenco a scomparsa "Presenti da
+    il cursore è sul primo punteggio da assegnare a mano (o su Conferma): <kbd>Invio</kbd>
+    passa al punteggio successivo e poi a Conferma, dove un altro <kbd>Invio</kbd> registra il
+    voto e riporta al modulo per il compito successivo; da un campo <kbd>Invio</kbd> non
+    registra mai per sbaglio. Un elenco a scomparsa "Presenti da
     correggere" elenca chi risulta presente e non ancora corretto, con un pulsante che
     precompila la matricola e sposta il focus sul codice, per scorrere gli studenti più
-    rapidamente. Si arriva sempre a un riepilogo prima di salvare: mostra risposte date e
-    corrette una per una (✓ giusta, ✗ sbagliata, - non data), permette di correggere la
-    stringa e ricalcolare, modificare il voto finale, ed eventualmente
-    <strong>richiedere l'orale</strong> invece di salvare un voto scritto definitivo
-    (solo se il compito è sufficiente). Se non si vuole ancora decidere, "Salva come
+    rapidamente. Si arriva sempre a un riepilogo prima di salvare: in alto studente, codice e
+    il voto aggiornato in tempo reale; poi le risposte come caselle colorate (in alto la
+    lettera letta, sotto quella giusta: verde giusta, rosso sbagliata, grigio non data, blu
+    domanda aperta; bordo spesso per gli obbligatori), con la stringa letta da correggere e
+    ricalcolare. In fondo il voto finale, che si può cambiare a mano (il riepilogo lo
+    segnala, mostra il voto calcolato e invita a scriverne il motivo nella <strong>nota sul
+    compito</strong>, visibile solo al docente), ed eventualmente <strong>richiedere
+    l'orale</strong> invece di salvare un voto scritto definitivo (solo se il compito è
+    sufficiente). Se non si vuole ancora decidere, "Salva come
     bozza" tiene da parte matricola, codice e risposte senza registrare nessun esito: la
     correzione compare nella sezione "Bozze salvate" della scheda, pronta da riprendere
     ("Riprendi") o da scartare ("Elimina") in qualsiasi momento.
@@ -459,10 +495,40 @@ COMPITO DA CONVERTIRE
     una risposta corretta).
   </p>
   <p>
-    Se in quel momento non si vuole ancora giudicare uno o più di questi punteggi, si può
-    salvare un voto provvisorio con <strong>"Completa successivamente"</strong>: il
-    compito compare nella sezione "Valutazioni in sospeso" dell'appello finché non si
-    completa la valutazione (da "Modifica"), e nel frattempo non è verbalizzabile.
+    Ogni svolgimento ha i pulsanti dei punteggi possibili (o il campo numerico) e una
+    <strong>nota</strong> facoltativa per gli errori fatti. Mentre la si scrive, sotto
+    compaiono in piccolo le note simili già date allo stesso esercizio in altri compiti, con i
+    punteggi; passando sopra col mouse si vede l'elenco con studente, punteggio e nota, per
+    dare lo stesso giudizio agli stessi errori (un punteggio diverso da quelli dati con note
+    simili è evidenziato).
+  </p>
+  <p>
+    Uno svolgimento si può rimandare con la spunta <strong>"dopo"</strong> (o tutti con
+    "Rimanda tutti a dopo"): il compito si registra con un voto provvisorio, che conta il
+    massimo per le parti non ancora giudicate, compare tra le "Valutazioni in sospeso" e
+    intanto non è verbalizzabile. La prima volta l'app chiede se rimandare gli svolgimenti
+    anche in tutti i prossimi compiti dell'appello; la stessa scelta si attiva o disattiva
+    fin dall'inizio con la casella "Rimanda la valutazione degli svolgimenti a dopo" sotto il
+    modulo di correzione. In questa modalità si inseriscono solo le risposte della griglia, e
+    in ogni compito resta comunque possibile "Valuta adesso questo compito".
+  </p>
+  <p>
+    La pagina <strong>Svolgimenti e note</strong> (dalla scheda Correzione) mostra un
+    esercizio alla volta, con tutti gli studenti: si valutano di fila quelli rimandati
+    (<kbd>Invio</kbd> salva e passa allo studente successivo, il voto del compito si
+    ricalcola da solo) e si confrontano punteggi e note di compiti diversi, raggruppati per
+    punteggio. Per ogni esercizio l'elenco delle note usate segnala una stessa nota con
+    punteggi diversi; in fondo, i compiti con una nota o con un voto cambiato a mano (con il
+    voto calcolato accanto). Se il voto di un compito era stato cambiato a mano, cambiare un
+    punteggio non lo sovrascrive: un avviso mostra quanto sarebbe ora il voto calcolato.
+  </p>
+  <p>
+    Nel riepilogo, "Ricalcola" (dopo aver corretto la stringa delle risposte lette) conserva
+    punteggi e note già scritti. Per uno studente che deve fare l'orale in ogni appello la
+    casella "Richiedi l'orale" parte spuntata, e toglierla chiede conferma; con uno scritto
+    insufficiente l'orale non si può richiedere e il voto si salva normalmente. Un compito
+    con svolgimenti rimandati si registra senza decidere l'orale: lo si decide al
+    completamento della valutazione.
   </p>
   <p>
     Un esito già inserito si può modificare in qualsiasi momento (voto e/o risposte, con
@@ -491,8 +557,10 @@ COMPITO DA CONVERTIRE
   </p>
   <p>
     In fondo alla scheda Correzione, il pulsante <strong>"Chiudi la correzione"</strong> si
-    attiva quando tutti gli attesi hanno un esito registrato e non restano bozze (accanto è
-    indicato cosa manca). Chiudere la correzione — indipendente dalla chiusura dell'intero
+    attiva quando tutti gli attesi hanno un esito registrato e non restano né bozze né
+    svolgimenti da valutare, perché i voti ancora provvisori non finiscano nell'elenco da
+    pubblicare (accanto è indicato cosa manca). Da quel momento anche la pagina Svolgimenti
+    e note è in sola lettura, finché non si riapre la correzione. Chiudere la correzione — indipendente dalla chiusura dell'intero
     appello, che di solito arriva più tardi (dopo orali e verbalizzazioni) — blocca nuove correzioni
     per questa prova (si può sempre riaprire) e genera l'elenco risultati in
     <code>.html</code>, <code>.tex</code> e <code>.pdf</code> (matricola oscurata): non a

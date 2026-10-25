@@ -30,6 +30,9 @@
   {% else %}
   <p><strong>{{ risultato.esito }}</strong></p>
   {% endif %}
+  {% if risultato.nota_correzione %}
+  <p><strong>Nota:</strong> {{ risultato.nota_correzione }}</p>
+  {% endif %}
   {% if risultato.richiede_orale %}
   <p><strong>Orale richiesto</strong>{% if risultato.orale_motivazione %} ({{ risultato.orale_motivazione }}){% endif %}</p>
   {% endif %}
@@ -43,7 +46,7 @@
   </p>
   {% endif %}
   <table>
-    <tr><th>Esercizio</th><th>Obbligatorio</th><th>Risposta data</th><th>Risposta corretta</th><th>Esito</th><th>Punteggio assegnato</th></tr>
+    <tr><th>Esercizio</th><th>Obbligatorio</th><th>Risposta data</th><th>Risposta corretta</th><th>Esito</th><th>Punteggio assegnato</th><th>Nota</th></tr>
     {% for r in righe %}
     <tr>
       <td>{{ r.esercizio_nome }}</td>
@@ -55,6 +58,7 @@
         {% else %}<span class="badge badge-warn">sbagliata</span>{% endif %}
       </td>
       <td>{{ r.punteggio_assegnato if r.punteggio_assegnato is not none else '-' }}</td>
+      <td>{{ r.nota }}</td>
     </tr>
     {% endfor %}
   </table>

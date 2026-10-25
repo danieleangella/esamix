@@ -32,6 +32,31 @@ def registra(tipo: str, azione: str, esito: str = "", tag: str = "", appello_id:
         pass
 
 
+def dimentica_corso(tag: str) -> int:
+    """Toglie dal registro ogni voce di un corso (serve solo per il corso di prova, che
+    va eliminato senza lasciare tracce: per i corsi veri il registro non si riscrive mai).
+    Ritorna quante voci ha tolto."""
+    with _lock:
+        if not PATH.exists():
+            return 0
+        tenute, tolte = [], 0
+        for riga in PATH.read_text(encoding="utf-8").splitlines():
+            try:
+                voce = json.loads(riga)
+            except json.JSONDecodeError:
+                tenute.append(riga)
+                continue
+            if voce.get("tag") == tag or tag in (voce.get("percorso") or "") or tag in (voce.get("esito") or ""):
+                tolte += 1
+            else:
+                tenute.append(riga)
+        if tolte:
+            temporaneo = PATH.with_suffix(".jsonl.tmp")
+            temporaneo.write_text("".join(r + "\n" for r in tenute), encoding="utf-8")
+            temporaneo.replace(PATH)
+        return tolte
+
+
 def leggi(limite: int = 2000) -> list[dict]:
     """Le voci più recenti per prime."""
     if not PATH.exists():

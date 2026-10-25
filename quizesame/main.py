@@ -37,6 +37,7 @@ from quizesame.services import documenti as documenti_service
 from quizesame.services import registro as registro_service
 from quizesame.services import verifiche_ia as verifiche_ia_service
 from quizesame.services import controllo_correzioni as controllo_service
+from quizesame.services import corso_prova as corso_prova_service
 from quizesame.services import testo_web
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -157,6 +158,9 @@ async def registra_azioni(request: Request, call_next):
     risposta = await call_next(request)
     percorso = request.url.path
     if percorso.startswith(("/static", "/api/")) or percorso.endswith(("/modelli-ollama", "/form", "/anteprima")):
+        return risposta
+    # il corso di prova si installa e si elimina senza lasciare tracce nel registro
+    if percorso.startswith("/impostazioni/corso-prova"):
         return risposta
     documento = request.method == "GET" and _DOCUMENTO.search(percorso)
     if request.method != "POST" and not documento:
@@ -350,6 +354,12 @@ def home(request: Request, q: str = ""):
         if (appelli_c := corsi_service.list_appelli(c.tag)) and all(a.chiuso for a in appelli_c)
     }
     gruppi_corsi = corsi_service.raggruppa_per_nome(corsi)
+    # per l'elenco dei corsi: quanti appelli ha ciascuno e quanti sono ancora aperti
+    # (le prove di un raggruppamento contano col raggruppamento, non a parte)
+    conteggio_appelli = {}
+    for c in corsi:
+        elenco = [a for a in corsi_service.list_appelli(c.tag, includi_raggruppamenti=True) if not a.membro_raggruppamento]
+        conteggio_appelli[c.tag] = {"totale": len(elenco), "aperti": sum(1 for a in elenco if not a.chiuso)}
     # "Accesso rapido": gli appelli non ancora chiusi dei corsi in corso, con i link
     # diretti alle schede usate più spesso (per un raggruppamento, una riga per prova)
     in_lavorazione = []
@@ -362,7 +372,8 @@ def home(request: Request, q: str = ""):
             ragg = corsi_service.get_raggruppamento_by_appello(c.tag, a.id)
             in_lavorazione.append({
                 "corso": c, "appello": a, "url": f"/corsi/{c.tag}/appelli/{a.id}",
-                "prove": [(m.nome, f"-{m.id}") for m in ragg.membri] if ragg else [("", "")],
+                "prove": [{"nome": m.nome, "suffisso": f"-{m.id}", "data": m.data} for m in ragg.membri]
+                if ragg else [{"nome": "", "suffisso": "", "data": a.data}],
                 "raggruppamento": bool(ragg),
             })
     risultati_ricerca = studenti_service.cerca_in_tutti_i_corsi(q.strip()) if q.strip() else None
@@ -378,7 +389,7 @@ def home(request: Request, q: str = ""):
     return templates.TemplateResponse(request, "corsi_list.html", {
         "edizioni_recenti": edizioni_recenti, "in_lavorazione": in_lavorazione,
         "corsi": corsi, "gruppi_corsi": gruppi_corsi, "corsi_correnti": corsi_correnti,
-        "corsi_chiusi": corsi_chiusi,
+        "corsi_chiusi": corsi_chiusi, "conteggio_appelli": conteggio_appelli,
         "prossimi_appelli": corsi_service.prossimi_appelli(),
         "q": q, "risultati_ricerca": risultati_ricerca, "riepilogo_globale": riepilogo_globale,
         "aggiornamento_disponibile": aggiornamenti_service.aggiornamento_disponibile(),
@@ -443,7 +454,35 @@ def impostazioni_app(request: Request):
         "app_settings": imp,
         "numero_corsi": len(corsi_service.list_corsi()),
         "frase_conferma_elimina_tutto": FRASE_CONFERMA_ELIMINA_TUTTO,
+        "corso_prova_installato": corso_prova_service.installato(),
+        "corso_prova_tag": corso_prova_service.TAG,
+        "corso_prova_da_correggere": corso_prova_service.da_correggere(),
     })
+
+
+@app.post("/impostazioni/corso-prova/installa")
+def installa_corso_prova():
+    try:
+        non_compilati = corso_prova_service.installa(app_config_service.get_settings().docente)
+    except Exception as e:
+        return flash_redirect("/impostazioni", f"Corso di prova non installato: {e}", "error", anchor="corso-prova")
+    msg = "Corso di prova installato: dati inventati, da eliminare quando hai finito da Impostazioni → Corso di prova"
+    if non_compilati:
+        return flash_redirect(
+            f"/corsi/{corso_prova_service.TAG}",
+            msg + f". {len(non_compilati)} PDF non compilati (LaTeX non disponibile?): i .tex ci sono, "
+            "e i PDF si possono rigenerare dalla scheda Compiti d'esame", "warning", dettaglio="\n".join(non_compilati),
+        )
+    return flash_redirect(f"/corsi/{corso_prova_service.TAG}", msg + ", con i PDF dei compiti")
+
+
+@app.post("/impostazioni/corso-prova/elimina")
+def elimina_corso_prova():
+    try:
+        corso_prova_service.elimina()
+    except Exception as e:
+        return flash_redirect("/impostazioni", str(e), "error", anchor="corso-prova")
+    return flash_redirect("/impostazioni", "Corso di prova eliminato, con tutti i suoi dati", anchor="corso-prova")
 
 
 @app.post("/impostazioni")
@@ -627,7 +666,9 @@ def corso_detail(request: Request, tag: str):
         totale = len(risultati)
         votomin = corsi_service.effective_votomin(corso, a)
         sufficienti = sum(1 for r in risultati if r["voto"] is not None and r["voto"] >= votomin)
-        media = round(sum(r["voto"] for r in risultati if r["voto"] is not None) / totale, 1) if totale else None
+        voti = [r["voto"] for r in risultati if r["voto"] is not None]
+        # la media è dei voti: assenti e ritirati non hanno un voto e non vanno contati
+        media = round(sum(voti) / len(voti), 1) if voti else None
         statistiche[a.id] = {
             "totale": totale, "sufficienti": sufficienti,
             "percentuale": round(100 * sufficienti / totale) if totale else None,
@@ -641,8 +682,16 @@ def corso_detail(request: Request, tag: str):
         if a is not None and not a.chiuso:
             ctx = _contesto_appello(tag, corso, a)
             prossimi_passi[a.id] = ctx["prossimo_passo"]
+    # un solo elenco in ordine di creazione (di solito quello cronologico): un
+    # raggruppamento sta dove inizia la sua prima prova, con le prove elencate sotto
+    voci = [{"tipo": "appello", "appello": a, "ordine": a.id} for a in appelli] + [
+        {"tipo": "raggruppamento", "raggruppamento": r, "appello": raggruppamenti_appelli[r.appello_id],
+         "ordine": min([m.id for m in r.membri] or [r.appello_id])}
+        for r in raggruppamenti if raggruppamenti_appelli.get(r.appello_id)
+    ]
+    voci.sort(key=lambda v: v["ordine"])
     return templates.TemplateResponse(request, "corso_detail.html", {
-        "prossimi_passi": prossimi_passi,
+        "prossimi_passi": prossimi_passi, "voci": voci,
         "corso": corso, "appelli": appelli, "raggruppamenti": raggruppamenti, "statistiche": statistiche,
         "raggruppamenti_appelli": raggruppamenti_appelli, "oggi": date.today().strftime("%d/%m/%Y"),
     })
@@ -1026,6 +1075,8 @@ def _dati_appello(tag: str, corso, appello) -> dict:
         "risultati_tex_esiste": compiti_service.path_risultati(tag, appello.id, "tex", appello=appello).exists(),
         "risultati_pdf_esiste": compiti_service.path_risultati(tag, appello.id, "pdf", appello=appello).exists(),
     }
+    # usato dall'avviso della verifica con l'IA, in due schede: calcolato una volta sola
+    dati["stati_verifica_esercizi"] = esercizi_service.stati_verifica(tag, esercizi_assegnati) if esercizi_assegnati else {}
     dati["riepilogo_home"] = _calcola_riepilogo_home(corso, appello, dati)
     return dati
 
@@ -1056,6 +1107,8 @@ def _contesto_appello(tag: str, corso, appello) -> dict:
             # non la singola prova.
             dati_membro["numero_studenti_suggerito"] = _numero_studenti_suggerito(len(ammessi), len(dati_membro["compiti"]))
             # senza elenco iscritti, per una prova del raggruppamento si attendono gli ammessi
+            if dati_membro["riepilogo_presenze"] is None:
+                dati_membro["riepilogo_presenze"] = presenze_service.riepilogo(tag, m.id, ammessi)
             if dati_membro["non_valutati"] is None:
                 dati_membro["non_valutati"] = presenze_service.non_valutati(tag, m.id, ammessi)
                 # la fase Presenze dipende da chi è ancora senza esito: va ricalcolata
@@ -1162,6 +1215,15 @@ def _anchor_correzione(appello) -> str:
 def concludi_correzione_scritto(tag: str, appello_id: int):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_correzione(appello)
+    sospese = correzione_service.list_valutazioni_sospese(tag, appello_id)
+    if sospese:
+        n = len(sospese)
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}",
+            f"Non si può chiudere la correzione: {n} compit{'o ha' if n == 1 else 'i hanno'} ancora svolgimenti "
+            "da valutare (il voto è provvisorio). Completali dalla pagina Svolgimenti e note.",
+            "error", anchor=anchor,
+        )
     corsi_service.concludi_correzione_scritti(tag, appello_id)
     _genera_risultati_cache(tag, appello_id)
     msg = "Correzione scritta conclusa: elenco risultati generato, nessuna nuova correzione è possibile finché non riapri"
@@ -2142,28 +2204,22 @@ def genera_ia(
 
 def _render_correggi_revisione(
     request: Request, tag: str, appello_id: int, valutazione, voto_proposto=None, punteggi_proposti=None,
-    errore: str = "", richiedi_orale_checked=None, modifica: bool = False,
+    errore: str = "", richiedi_orale_checked=None, modifica: bool = False, note_proposte=None,
+    nota_correzione: str = "", voto_a_mano: bool = False, rimandati=None, orale_motivazione: str = "",
 ):
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
-    if voto_proposto is None:
-        voto_proposto = valutazione.voto_base
+    manuali = sorted(valutazione.da_valutare + valutazione.domande_aperte, key=lambda r: r.posizione)
     if punteggi_proposti is None:
-        punteggi_proposti = {r.posizione: corso.risposta_corretta for r in valutazione.da_valutare}
+        # correzione nuova: un obbligatorio con la risposta giusta parte dal punteggio pieno
+        # (basta confermare se lo svolgimento è a posto), una domanda aperta da vuoto
+        punteggi_proposti = {} if modifica else {r.posizione: corso.risposta_corretta for r in valutazione.da_valutare}
+    if rimandati is None:
+        rimandati = (
+            {r.posizione for r in manuali} if appello.rimanda_svolgimenti and not modifica else set()
+        )
     if richiedi_orale_checked is None:
         richiedi_orale_checked = bool(valutazione.orale_obbligatorio)
-    corretta_grezza = "".join(r.lettera_corretta for r in valutazione.righe)
-    gruppi = [corretta_grezza[i:i + 5] for i in range(0, len(corretta_grezza), 5)]
-    risposte_corrette_raggruppate = " ".join(gruppi)
-    # Un segno di spunta/croce sotto ogni lettera delle risposte corrette, allineato
-    # carattere per carattere (stesso raggruppamento a blocchi di 5): le domande aperte
-    # non hanno una lettera "corretta" da confrontare, quindi restano neutre.
-    marcatura_grezza = "".join(
-        "·" if r.aperta else ("✓" if r.corretta else ("-" if not r.svolta else "✗"))
-        for r in valutazione.righe
-    )
-    gruppi_marcatura = [marcatura_grezza[i:i + 5] for i in range(0, len(marcatura_grezza), 5)]
-    risposte_marcatura_raggruppata = " ".join(gruppi_marcatura)
 
     avviso_idoneita = None
     if appello.membro_raggruppamento:
@@ -2179,10 +2235,12 @@ def _render_correggi_revisione(
 
     return templates.TemplateResponse(request, "correggi_revisione.html", {
         "corso": corso, "appello": appello, "v": valutazione, "voto_proposto": voto_proposto,
-        "punteggi_proposti": punteggi_proposti, "errore": errore,
-        "richiedi_orale_checked": richiedi_orale_checked, "modifica": modifica,
-        "risposte_corrette_raggruppate": risposte_corrette_raggruppate,
-        "risposte_marcatura_raggruppata": risposte_marcatura_raggruppata,
+        "voto_a_mano": voto_a_mano and voto_proposto is not None,
+        "punteggi_proposti": punteggi_proposti, "note_proposte": note_proposte or {},
+        "nota_correzione": nota_correzione or "", "rimandati": rimandati, "errore": errore,
+        "richiedi_orale_checked": richiedi_orale_checked, "orale_motivazione": orale_motivazione,
+        "modifica": modifica, "manuali": manuali,
+        "note_precedenti": correzione_service.note_precedenti(tag, appello_id, valutazione.matricola) if manuali else {},
         "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
         "avviso_idoneita": avviso_idoneita,
     })
@@ -2205,7 +2263,7 @@ def _errore_non_iscritto(tag: str, appello_id: int, matricola: str) -> Optional[
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/correggi")
-def correggi(
+async def correggi(
     request: Request, tag: str, appello_id: int, matricola: str = Form(...), codice: str = Form(...),
     risposte: str = Form(...), modifica: str = Form(""),
 ):
@@ -2224,7 +2282,25 @@ def correggi(
         )
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
-    return _render_correggi_revisione(request, tag, appello_id, valutazione, modifica=bool(modifica))
+    # "Ricalcola" dal riepilogo: punteggi e note già scritti restano (le posizioni sono
+    # quelle del compito, non cambiano correggendo una lettera)
+    form = await request.form()
+    if "nota_correzione" not in form:
+        return _render_correggi_revisione(request, tag, appello_id, valutazione, modifica=bool(modifica))
+    manuali = valutazione.da_valutare + valutazione.domande_aperte
+    punteggi, note, rimandati = {}, {}, set()
+    for r in manuali:
+        note[r.posizione] = form.get(f"nota_{r.posizione}") or ""
+        valore = (form.get(f"punteggio_{r.posizione}") or "").strip()
+        if form.get(f"rimanda_{r.posizione}"):
+            rimandati.add(r.posizione)
+        if valore.lstrip("-").isdigit():
+            punteggi[r.posizione] = int(valore)
+    return _render_correggi_revisione(
+        request, tag, appello_id, valutazione, modifica=bool(modifica), punteggi_proposti=punteggi,
+        note_proposte=note, rimandati=rimandati, nota_correzione=form.get("nota_correzione") or "",
+        orale_motivazione=form.get("orale_motivazione") or "",
+    )
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/correggi/conferma")
@@ -2236,10 +2312,10 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
     codice = form.get("codice") or ""
     risposte = (form.get("risposte") or "").strip().replace(" ", "").upper()
     azione = form.get("azione") or "salva"
-    sospendi_valutazione = bool(form.get("sospendi_valutazione"))
     orale_motivazione = (form.get("orale_motivazione") or "").strip()
     conferma_orale_obbligatorio = bool(form.get("conferma_orale_obbligatorio"))
     modifica = bool(form.get("modifica"))
+    nota_correzione = (form.get("nota_correzione") or "").strip()
 
     errore_iscritto = _errore_non_iscritto(tag, appello_id, matricola)
     if errore_iscritto:
@@ -2255,60 +2331,109 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
 
-    punteggi_obbligatori = {}
+    # "rimanda anche tutti i prossimi" (o il suo contrario) scelto in questa pagina
+    if form.get("imposta_rimanda") in ("0", "1"):
+        corsi_service.update_appello(tag, appello_id, rimanda_svolgimenti=form.get("imposta_rimanda") == "1")
+
+    # svolgimenti: ogni posizione da giudicare ha un punteggio, o è rimandata (spunta
+    # "dopo", o campo vuoto: il servizio la tratta comunque come rimandata)
+    punteggi, note, rimandati = {}, {}, set()
+    errore = ""
     for r in valutazione.da_valutare + valutazione.domande_aperte:
-        valore = form.get(f"punteggio_{r.posizione}")
-        if valore is not None and valore != "":
-            punteggi_obbligatori[r.posizione] = int(valore)
-    # con "Completa successivamente" i campi non compilati sono valutazioni rimandate,
-    # non errori: il voto proposto dal client andrebbe ricalcolato assumendo un punteggio
-    # ottimistico anche per quelle posizioni, quindi si lascia decidere al server (None).
-    voto_str = form.get("voto_finale")
-    voto_finale = None if sospendi_valutazione else (int(voto_str) if voto_str not in (None, "") else None)
+        note[r.posizione] = form.get(f"nota_{r.posizione}") or ""
+        valore = (form.get(f"punteggio_{r.posizione}") or "").strip()
+        if form.get(f"rimanda_{r.posizione}") or valore == "":
+            rimandati.add(r.posizione)
+            continue
+        try:
+            punteggi[r.posizione] = int(valore)
+        except ValueError:
+            errore = f"Punteggio non valido per {r.esercizio_nome}: \"{valore}\""
+    voto_str = (form.get("voto_finale") or "").strip()
+    voto_a_mano = bool(form.get("voto_modificato")) and voto_str != ""
+    try:
+        voto_finale = int(voto_str) if voto_a_mano else None
+    except ValueError:
+        errore, voto_finale, voto_a_mano = f"Voto finale non valido: \"{voto_str}\"", None, False
 
-    richiedi_orale = azione == "richiedi_orale" and not sospendi_valutazione
+    richiedi_orale = azione == "richiedi_orale"
 
+    def riproponi(msg: str):
+        return _render_correggi_revisione(
+            request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi,
+            errore=msg, richiedi_orale_checked=richiedi_orale, modifica=modifica, note_proposte=note,
+            nota_correzione=nota_correzione, voto_a_mano=voto_a_mano, rimandati=rimandati,
+            orale_motivazione=orale_motivazione,
+        )
+
+    if errore:
+        return riproponi(errore)
     try:
         result = correzione_service.conferma_risultato(
             tag, appello_id, matricola, codice, risposte, voto_finale=voto_finale,
-            punteggi_obbligatori=punteggi_obbligatori, richiedi_orale=richiedi_orale,
+            punteggi_obbligatori=punteggi, richiedi_orale=richiedi_orale,
             orale_motivazione=orale_motivazione, conferma_orale_obbligatorio=conferma_orale_obbligatorio,
-            modifica=modifica, sospendi_valutazione=sospendi_valutazione,
+            modifica=modifica, note_svolgimenti=note, nota_correzione=nota_correzione,
         )
     except correzione_service.OraleObbligatorioNonConfermato as e:
-        return _render_correggi_revisione(
-            request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi_obbligatori,
-            errore=(
-                f"Questo studente deve fare l'orale in ogni appello (imposto in \"{e.origine}\": {e.motivazione}). "
-                "Conferma la casella qui sotto per salvare comunque un voto scritto, oppure spunta \"Richiedi l'orale\"."
-            ),
-            richiedi_orale_checked=richiedi_orale, modifica=modifica,
+        richiedi_orale = True  # si ripropone spuntato: togliere la spunta chiede la conferma
+        return riproponi(
+            f"Questo studente deve fare l'orale in ogni appello (imposto in \"{e.origine}\": {e.motivazione}). "
+            "Conferma con \"Richiedi l'orale\" spuntato, oppure togli la spunta per salvare comunque un voto scritto."
         )
-    except correzione_service.OraleNonConsentito as e:
-        return _render_correggi_revisione(
-            request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi_obbligatori,
-            errore=str(e), richiedi_orale_checked=richiedi_orale, modifica=modifica,
-        )
-    except correzione_service.RisultatoGiaValutato as e:
-        return _render_correggi_revisione(
-            request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi_obbligatori,
-            errore=str(e), richiedi_orale_checked=richiedi_orale, modifica=modifica,
-        )
+    except (correzione_service.OraleNonConsentito, correzione_service.RisultatoGiaValutato, ValueError) as e:
+        return riproponi(str(e))
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
 
     if result.valutazione_sospesa:
+        n = result.svolgimenti_rimandati
         msg = (
-            f"Valutazione di {result.nome} {result.cognome} messa in sospeso (voto provvisorio: {result.voto}): "
-            "completala dalla sezione \"Valutazioni in sospeso\""
+            f"{result.cognome} {result.nome} registrato con {n} svolgiment{'o' if n == 1 else 'i'} da valutare "
+            f"(voto provvisorio: {result.voto}): li trovi in \"Svolgimenti\""
         )
     elif result.richiede_orale:
-        msg = f"Orale richiesto per {result.nome} {result.cognome} (voto scritto di riferimento: {result.voto})"
+        msg = f"Orale richiesto per {result.cognome} {result.nome} (voto scritto di riferimento: {result.voto})"
     else:
-        msg = f"Voto calcolato per {result.nome} {result.cognome}: {result.voto}"
+        msg = f"{result.cognome} {result.nome}: voto {result.voto}"
         if result.insufficiente_per_obbligatorio:
             msg += " (insufficiente: esercizio obbligatorio non svolto)"
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/rimanda-svolgimenti")
+def imposta_rimanda_svolgimenti(tag: str, appello_id: int, attivo: str = Form("")):
+    appello = corsi_service.get_appello(tag, appello_id)
+    corsi_service.update_appello(tag, appello_id, rimanda_svolgimenti=bool(attivo))
+    msg = ("Svolgimenti rimandati: li valuterai dopo, esercizio per esercizio, dalla pagina \"Svolgimenti\""
+           if attivo else "Svolgimenti da valutare compito per compito, durante la correzione")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=_anchor_membro(appello, "valutazione"))
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/svolgimenti", response_class=HTMLResponse)
+def pagina_svolgimenti(request: Request, tag: str, appello_id: int, esercizio: str = "", solo: str = ""):
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    dati = correzione_service.svolgimenti_appello(tag, appello_id)
+    return templates.TemplateResponse(request, "svolgimenti.html", {
+        "corso": corso, "appello": appello, "dati": dati, "esercizio_scelto": esercizio,
+        "solo_da_valutare": bool(solo), "anchor": _anchor_membro(appello, "valutazione"),
+    })
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/svolgimenti/valuta")
+def valuta_svolgimento(
+    tag: str, appello_id: int, matricola: str = Form(...), posizione: int = Form(...),
+    punteggio: str = Form(""), nota: str = Form(""),
+):
+    try:
+        esito = correzione_service.valuta_svolgimento(
+            tag, appello_id, matricola, posizione,
+            int(punteggio) if punteggio.strip() else None, nota,
+        )
+    except Exception as e:
+        return JSONResponse({"errore": str(e)}, status_code=400)
+    return JSONResponse(esito)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/correggi/bozza")
@@ -2443,11 +2568,15 @@ def modifica_risultato_form(request: Request, tag: str, appello_id: int, matrico
     except Exception as e:
         appello = corsi_service.get_appello(tag, appello_id)
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=_anchor_membro(appello, "valutazione"))
-    punteggi_esistenti = json.loads(r["punteggi_obbligatori"]) if r["punteggi_obbligatori"] else {}
-    punteggi_proposti = {int(k): v for k, v in punteggi_esistenti.items()}
+    punteggi_proposti = {int(k): v for k, v in json.loads(r["punteggi_obbligatori"] or "{}").items()}
+    note_proposte = {int(k): v for k, v in json.loads(r["note_svolgimenti"] or "{}").items()}
+    voto_scritto = r["voto_scritto"] if r["voto_scritto"] is not None else r["voto"]
+    voto_a_mano = bool(r["voto_modificato"]) and not r["valutazione_sospesa"] and voto_scritto is not None
     return _render_correggi_revisione(
-        request, tag, appello_id, valutazione, voto_proposto=r["voto"], punteggi_proposti=punteggi_proposti,
-        modifica=True,
+        request, tag, appello_id, valutazione, voto_proposto=voto_scritto if voto_a_mano else None,
+        punteggi_proposti=punteggi_proposti, modifica=True, note_proposte=note_proposte,
+        nota_correzione=r["nota_correzione"] or "", voto_a_mano=voto_a_mano,
+        richiedi_orale_checked=bool(r["richiede_orale"]) or None, orale_motivazione=r["orale_motivazione"] or "",
     )
 
 
@@ -2765,7 +2894,7 @@ def chiudi_presenze(tag: str, appello_id: int):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "presenze")
     try:
-        esito = presenze_service.chiudi(tag, appello_id)
+        esito = presenze_service.chiudi(tag, appello_id, _ammessi_se_membro(tag, appello))
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     msg = f"Registro chiuso: {esito['segnati_assenti']} studenti non presenti segnati come assenti"
@@ -3526,7 +3655,8 @@ def api_cerca_studenti(tag: str, q: str = "", appello_id: Optional[int] = None):
         # cercando davvero, quindi va proposto per primo, senza però nascondere gli altri.
         # Lo stato (presente/assente/ritirato/già valutato) aiuta a riconoscerlo subito,
         # e a capire a colpo d'occhio chi resta ancora da correggere.
-        riepilogo = presenze_service.riepilogo(tag, appello_id)
+        appello = corsi_service.get_appello(tag, appello_id)
+        riepilogo = presenze_service.riepilogo(tag, appello_id, _ammessi_se_membro(tag, appello) if appello else None)
         iscritti = riepilogo["iscritti"] if riepilogo else []
         stati_per_matricola = {s["matricola"]: _stato_iscritto(s) for s in iscritti}
         matricole_iscritte = set(stati_per_matricola)
@@ -3578,7 +3708,10 @@ def fs_sfoglia(path: str = ""):
 
 @app.get("/help", response_class=HTMLResponse)
 def help_page(request: Request):
-    return templates.TemplateResponse(request, "help.html", {"formato_esercizi": ia_service.FORMATO_ESERCIZI})
+    return templates.TemplateResponse(request, "help.html", {
+        "formato_esercizi": ia_service.FORMATO_ESERCIZI,
+        "corso_prova_installato": corso_prova_service.installato(), "corso_prova_tag": corso_prova_service.TAG,
+    })
 
 
 def _versione_app() -> Optional[str]:

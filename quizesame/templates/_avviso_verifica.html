@@ -2,7 +2,7 @@
    errori o dubbi ancora aperti negli esercizi di questo appello (cioè non corretti né
    segnati come corretti né modificati da allora), con il link all'ultima verifica salvata. #}
 {% if md.esercizi_assegnati %}
-{% set _stati = stati_verifica(corso.tag, md.esercizi_assegnati) %}
+{% set _stati = md.stati_verifica_esercizi if md.stati_verifica_esercizi is defined else stati_verifica(corso.tag, md.esercizi_assegnati) %}
 {% set _ns = namespace(errori=[], dubbi=[]) %}
 {% for e in md.esercizi_assegnati %}
 {% if _stati[e.id].stato == 'errore' %}{% set _ns.errori = _ns.errori + [e] %}{% elif _stati[e.id].stato == 'dubbio' %}{% set _ns.dubbi = _ns.dubbi + [e] %}{% endif %}

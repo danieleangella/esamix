@@ -153,8 +153,13 @@ scheda in cui completarla; il riquadro "Prossimo passo" dice cosa fare adesso.
   parziali anche gli ammessi e l'assegnazione alle aule.
 - **Presenze**: registro del giorno della prova; in alternativa, finite le correzioni,
   "Segna assenti tutti i non corretti".
-- **Correzione**: inserimento delle risposte di ogni compito; in fondo "Chiudi la correzione",
-  attivo quando tutti hanno un esito.
+- **Correzione**: inserimento delle risposte di ogni compito, con il voto in tempo reale;
+  punteggio e nota degli errori per ogni svolgimento (obbligatori e domande aperte), con le
+  note simili già date ad altri studenti come suggerimento, e una nota sul compito. Gli
+  svolgimenti si possono rimandare, anche per tutti i compiti, e valutare poi esercizio per
+  esercizio nella pagina **Svolgimenti e note**, che confronta punteggi e note per vedere se
+  le correzioni sono coerenti. In fondo "Chiudi la correzione", attivo quando tutti hanno un
+  esito e non restano svolgimenti da valutare.
 - **Impostazioni** dell'appello: nome, data, orale e, per le prove parziali, le aule (una può
   essere riservata agli studenti DSA/L104; un avviso segnala quando gli studenti superano la
   quota di posti impostata nel corso, 50% di default).
@@ -162,6 +167,10 @@ scheda in cui completarla; il riquadro "Prossimo passo" dice cosa fare adesso.
 Le azioni più frequenti (iscritti, esercizi, aule) si salvano senza ricaricare la pagina. Le
 spiegazioni meno usate sono nelle icone **i**, e i pulsanti a icona mostrano cosa fanno al
 passaggio del mouse. La voce **Guida** del menu descrive tutto nel dettaglio.
+
+Per provare l'app senza toccare i propri corsi, **Impostazioni → Corso di prova** (o la Guida)
+installa un corso con dati inventati: un appello e due prove parziali, con correzioni già fatte
+e altre da fare. Si elimina con un clic, senza lasciare tracce.
 
 Dopo un aggiornamento del codice va riavviata l'app (l'app stessa lo segnala con un avviso).
 

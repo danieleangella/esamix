@@ -89,7 +89,7 @@ def _anteprima(testo: str, lunghezza: int = 70) -> str:
 
 
 def _statistiche_esercizi(tag: str, conn, risultati: list[dict]) -> list[dict]:
-    per_esercizio = defaultdict(lambda: {"nome": "", "corrette": 0, "sbagliate": 0, "risposte_sbagliate": Counter()})
+    per_esercizio = defaultdict(lambda: {"nome": "", "corrette": 0, "sbagliate": 0, "non_date": 0, "risposte_sbagliate": Counter()})
     for r in risultati:
         if not r["compito_id"] or not r["risposte"]:
             continue
@@ -114,35 +114,43 @@ def _statistiche_esercizi(tag: str, conn, risultati: list[dict]) -> list[dict]:
             stat["nome"] = pos["nome"]
             if lettera_data == lettera_corretta:
                 stat["corrette"] += 1
+            elif lettera_data == "X":
+                stat["non_date"] += 1
             else:
                 stat["sbagliate"] += 1
-                if lettera_data != "X":
-                    testo_scelto = None
-                    if pos["risposte_mischiate"]:
-                        opzioni = json.loads(pos["risposte_mischiate"])
-                        indice = ord(lettera_data) - ord("A")
-                        if 0 <= indice < len(opzioni):
-                            testo_scelto = opzioni[indice]
-                    # senza risposte_mischiate (compiti generati prima di questa
-                    # funzionalità) non c'è modo di risalire al testo: la lettera da sola
-                    # cambia significato a ogni compito, quindi si raggruppa come "ignota".
-                    stat["risposte_sbagliate"][testo_scelto or "(testo non disponibile)"] += 1
+                testo_scelto = None
+                if pos["risposte_mischiate"]:
+                    opzioni = json.loads(pos["risposte_mischiate"])
+                    indice = ord(lettera_data) - ord("A")
+                    if 0 <= indice < len(opzioni):
+                        testo_scelto = opzioni[indice]
+                # senza risposte_mischiate (compiti generati prima di questa
+                # funzionalità) non c'è modo di risalire al testo: la lettera da sola
+                # cambia significato a ogni compito, quindi si raggruppa come "ignota".
+                stat["risposte_sbagliate"][testo_scelto or "(testo non disponibile)"] += 1
 
     elenco = []
     for esercizio_id, stat in per_esercizio.items():
-        totale = stat["corrette"] + stat["sbagliate"]
+        totale = stat["corrette"] + stat["sbagliate"] + stat["non_date"]
+
+        def pct(n: int) -> int:
+            return round(100 * n / totale) if totale else 0
         risposte_sbagliate = [
-            {"testo": testo, "conteggio": n, "percentuale": round(100 * n / totale) if totale else 0}
+            {"testo": testo, "conteggio": n, "percentuale": pct(n)}
             for testo, n in stat["risposte_sbagliate"].most_common()
         ]
         esercizio = esercizi_service.get_esercizio_su_connessione(conn, esercizio_id)
         varianti_testo = [v.testo for v in esercizio.varianti] if esercizio else []
         elenco.append({
-            "nome": stat["nome"] or _anteprima(varianti_testo[0] if varianti_testo else "") or f"Esercizio #{esercizio_id}", "corrette": stat["corrette"], "sbagliate": stat["sbagliate"],
-            "percentuale_sbagliate": round(100 * stat["sbagliate"] / totale) if totale else 0,
+            "nome": stat["nome"] or _anteprima(varianti_testo[0] if varianti_testo else "") or f"Esercizio #{esercizio_id}",
+            "totale": totale, "corrette": stat["corrette"], "sbagliate": stat["sbagliate"], "non_date": stat["non_date"],
+            "percentuale_corrette": pct(stat["corrette"]), "percentuale_sbagliate": pct(stat["sbagliate"]),
+            "percentuale_non_date": pct(stat["non_date"]),
+            # sbagliate o non date: l'ordine dell'elenco, dal più difficile
+            "percentuale_errori": pct(stat["sbagliate"] + stat["non_date"]),
             "risposte_sbagliate": risposte_sbagliate, "varianti_testo": varianti_testo,
         })
-    elenco.sort(key=lambda s: s["percentuale_sbagliate"], reverse=True)
+    elenco.sort(key=lambda s: (s["percentuale_errori"], s["percentuale_sbagliate"]), reverse=True)
     return elenco
 
 

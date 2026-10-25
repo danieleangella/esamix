@@ -52,6 +52,40 @@
     </div>
   </form>
 </section>
+
+<section class="card riquadro-impostazioni campo-largo" id="corso-prova">
+  <h2>Corso di prova {{ info("Un corso con studenti, esercizi e risultati inventati, per provare tutte le funzioni senza toccare i corsi veri: un appello e due prove parziali raggruppate, con correzioni già fatte (voti, svolgimenti valutati con note, un voto cambiato a mano, un orale richiesto, valutazioni in sospeso, una bozza, un assente) e altre da fare. Negli esercizi la risposta giusta è sempre scritta nel testo. Eliminandolo spariscono tutti i suoi dati e le sue voci nel registro delle attività; gli altri corsi non vengono toccati.") }}</h2>
+  {% if corso_prova_installato %}
+  <p style="margin:0 0 0.6rem">
+    Installato: <a href="/corsi/{{ corso_prova_tag }}"><strong>apri il corso di prova</strong></a>
+    <span class="muted">(tag {{ corso_prova_tag }})</span>
+  </p>
+  {% if corso_prova_da_correggere %}
+  <p class="muted" style="margin:0 0 0.3rem; font-size:0.9rem">Compiti lasciati da correggere: nella scheda Correzione inserisci matricola, codice e risposte. Nell'appello c'è anche una bozza da riprendere, e nella seconda prova parziale svolgimenti rimandati da valutare nella pagina Svolgimenti e note.</p>
+  <table>
+    <tr><th>Prova</th><th>Studente</th><th>Matricola</th><th>Codice</th><th>Risposte</th></tr>
+    {% for d in corso_prova_da_correggere %}
+    <tr>
+      <td><a href="/corsi/{{ corso_prova_tag }}/appelli/{{ d.appello_id }}">{{ d.appello }}</a></td>
+      <td>{{ d.studente }}</td>
+      <td style="font-family:monospace">{{ d.matricola }}</td>
+      <td style="font-family:monospace">{{ d.codice }}</td>
+      <td style="font-family:monospace; letter-spacing:0.05em">{{ d.risposte }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  <form method="post" action="/impostazioni/corso-prova/elimina" style="margin-top:0.75rem"
+        onsubmit="return confirm('Eliminare il corso di prova con tutti i suoi dati? Gli altri corsi non vengono toccati.');">
+    <button type="submit" class="danger" style="margin:0">{{ icona("cestino", 14) }} Elimina il corso di prova</button>
+  </form>
+  {% else %}
+  <form method="post" action="/impostazioni/corso-prova/installa" style="margin:0">
+    <button type="submit" style="margin:0">{{ icona("piu", 14) }} Installa il corso di prova</button>
+    <span class="muted" style="font-size:0.85rem; margin-left:0.5rem">dati inventati, si elimina con un clic senza lasciare tracce</span>
+  </form>
+  {% endif %}
+</section>
 </div>
 
 <details class="card" id="ia" {% if not ia_attivo %}open{% endif %}>

@@ -718,3 +718,67 @@ document.addEventListener("click", function (ev) {
   form.querySelectorAll(".btn-annulla").forEach(function (b) { b.disabled = true; });
   form.dispatchEvent(new CustomEvent("annullato"));
 });
+
+// Correzione degli svolgimenti: mentre si scrive la nota di uno svolgimento, le note simili
+// già scritte per lo stesso esercizio in altri compiti (studente e punteggio), per dare lo
+// stesso giudizio agli stessi errori. Discreto: una riga in piccolo, l'elenco al passaggio
+// del mouse (o col focus da tastiera). `voci`: [{nota, punteggio, studente}].
+function _paroleNota(testo) {
+  return (testo || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .split(/[^a-z0-9]+/).filter(function (p) { return p.length >= 3; });
+}
+function noteSimili(testo, voci) {
+  var cercate = _paroleNota(testo);
+  var frase = (testo || "").trim().toLowerCase();
+  if (!frase) return [];
+  return voci.map(function (v) {
+    var parole = _paroleNota(v.nota);
+    var comuni = cercate.filter(function (p) {
+      // anche parole solo iniziate ("sbagl" trova "sbagliato") o con desinenza diversa
+      return parole.some(function (q) { return q === p || (p.length >= 4 && q.indexOf(p) === 0) || (q.length >= 4 && p.indexOf(q) === 0) || (p.length >= 5 && q.length >= 5 && p.slice(0, 5) === q.slice(0, 5)); });
+    }).length;
+    var somiglianza = v.nota.trim().toLowerCase() === frase ? 1
+      : (cercate.length && parole.length ? comuni / Math.min(cercate.length, parole.length) : 0);
+    return { voce: v, somiglianza: somiglianza };
+  }).filter(function (x) { return x.somiglianza >= 0.5; })
+    .sort(function (a, b) { return b.somiglianza - a.somiglianza; })
+    .map(function (x) { return x.voce; });
+}
+function mostraNoteSimili(box, testo, voci, punteggioCorrente) {
+  var simili = noteSimili(testo, voci);
+  box.innerHTML = "";
+  box.className = "note-simili";
+  if (!simili.length) return;
+  var punteggi = simili.map(function (v) { return v.punteggio; }).filter(function (p) { return p !== null && p !== undefined; });
+  var diverso = punteggioCorrente !== "" && punteggioCorrente !== null && punteggi.length &&
+    punteggi.indexOf(parseInt(punteggioCorrente, 10)) === -1;
+  var riga = document.createElement("span");
+  riga.className = "note-simili-riga";
+  riga.tabIndex = 0;
+  riga.textContent = "≈ " + simili.length + " not" + (simili.length === 1 ? "a simile" : "e simili") +
+    (punteggi.length ? " · punteggi " + punteggi.slice(0, 6).join(", ") + (punteggi.length > 6 ? "…" : "") : "") +
+    (diverso ? " · qui " + punteggioCorrente : "");
+  if (diverso) box.classList.add("diverso");
+  var elenco = document.createElement("ul");
+  elenco.className = "note-simili-elenco";
+  simili.slice(0, 12).forEach(function (v) {
+    var li = document.createElement("li");
+    var p = document.createElement("strong");
+    p.textContent = v.punteggio === null || v.punteggio === undefined ? "–" : v.punteggio;
+    var chi = document.createElement("span");
+    chi.className = "muted";
+    chi.textContent = v.studente;
+    var nota = document.createElement("span");
+    nota.textContent = v.nota;
+    li.appendChild(p); li.appendChild(chi); li.appendChild(nota);
+    elenco.appendChild(li);
+  });
+  if (simili.length > 12) {
+    var altre = document.createElement("li");
+    altre.className = "muted";
+    altre.textContent = "e altre " + (simili.length - 12);
+    elenco.appendChild(altre);
+  }
+  riga.appendChild(elenco);
+  box.appendChild(riga);
+}

@@ -1,6 +1,6 @@
 [project]
 name = "quizesame"
-version = "0.5.0"
+version = "0.6.0"
 description = "Gestione locale di creazione e correzione di compiti d'esame a risposta multipla"
 requires-python = ">=3.10"
 dependencies = [

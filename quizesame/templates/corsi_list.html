@@ -20,26 +20,41 @@
 {% if in_lavorazione %}
 <details class="card" open>
   <summary><strong>Accesso rapido: appelli aperti dei corsi in corso</strong></summary>
-  <table style="margin-top:0.75rem">
-    <tr><th>Appello</th><th>Vai a {{ info("Ogni icona apre la scheda corrispondente dell'appello (o della prova): Testo, Compiti d'esame, Presenze, Correzione e, per un raggruppamento, Risultati. Passa sopra a un'icona per il nome.") }}</th></tr>
+  <table style="margin-top:0.75rem" class="tabella-accesso-rapido">
+    <tr><th>Appello</th><th>Data</th><th>Vai a {{ info("Ogni icona apre la scheda corrispondente dell'appello (o della prova): Testo, Compiti d'esame, Presenze, Correzione e, per un raggruppamento, Risultati. Passa sopra a un'icona per il nome.") }}</th></tr>
     {% for r in in_lavorazione %}
-    {% for nome_prova, suffisso in r.prove %}
-    <tr>
-      <td>
-        {% if loop.first %}
+    {% if r.raggruppamento %}
+    {# un raggruppamento è un blocco solo: il titolo, poi le sue prove come elenco puntato #}
+    <tr class="riga-gruppo">
+      <td colspan="2">
         <a href="{{ r.url }}"><strong>{{ r.appello.nome }}</strong></a>
-        <span class="muted"><a href="/corsi/{{ r.corso.tag }}" title="Apri il corso">{{ r.corso.nome }}</a>{% if r.corso.anno %} ({{ r.corso.anno }}){% endif %}{% if r.appello.data %} · {{ r.appello.data }}{% endif %}</span>
-        {% endif %}
-        {% if nome_prova %}<div class="muted">{{ nome_prova }}</div>{% endif %}
+        <span class="muted">· <a href="/corsi/{{ r.corso.tag }}" title="Apri il corso">{{ r.corso.nome }}</a>{% if r.corso.anno %} ({{ r.corso.anno }}){% endif %}</span>
       </td>
       <td>
         <div class="azioni-rapide">
-          {% set dove = (" · " ~ nome_prova) if nome_prova else "" %}
-          <a class="icona-azione icona-sola" href="{{ r.url }}#creazione{{ suffisso }}" data-info="Testo{{ dove }}: esercizi assegnati" aria-label="Testo{{ dove }}">{{ icona("testo") }}</a>
-          <a class="icona-azione icona-sola" href="{{ r.url }}#compiti{{ suffisso }}" data-info="Compiti d'esame{{ dove }}: iscritti, generazione e stampa" aria-label="Compiti d'esame{{ dove }}">{{ icona("stampa") }}</a>
-          <a class="icona-azione icona-sola" href="{{ r.url }}#presenze{{ suffisso }}" data-info="Presenze{{ dove }}: registro del giorno della prova" aria-label="Presenze{{ dove }}">{{ icona("presenze") }}</a>
-          <a class="icona-azione icona-sola" href="{{ r.url }}#valutazione{{ suffisso }}" data-info="Correzione{{ dove }}" aria-label="Correzione{{ dove }}">{{ icona("correzione") }}</a>
-          {% if r.raggruppamento and loop.last %}<a class="icona-azione icona-sola" href="{{ r.url }}#risultati" data-info="Risultati: voti combinati delle prove" aria-label="Risultati">{{ icona("verbale") }}</a>{% endif %}
+          <a class="icona-azione icona-sola" href="{{ r.url }}#risultati" data-info="Risultati: voti combinati delle prove" aria-label="Risultati">{{ icona("verbale") }}</a>
+        </div>
+      </td>
+    </tr>
+    {% endif %}
+    {% for p in r.prove %}
+    <tr class="{{ 'riga-prova' if r.raggruppamento else '' }}{{ ' ultima' if loop.last else '' }}">
+      <td>
+        {% if r.raggruppamento %}
+        <span class="punto-prova">{{ p.nome }}</span>
+        {% else %}
+        <a href="{{ r.url }}"><strong>{{ r.appello.nome }}</strong></a>
+        <span class="muted">· <a href="/corsi/{{ r.corso.tag }}" title="Apri il corso">{{ r.corso.nome }}</a>{% if r.corso.anno %} ({{ r.corso.anno }}){% endif %}</span>
+        {% endif %}
+      </td>
+      <td class="muted" style="white-space:nowrap">{{ p.data or '' }}</td>
+      <td>
+        <div class="azioni-rapide">
+          {% set dove = (" · " ~ p.nome) if p.nome else "" %}
+          <a class="icona-azione icona-sola" href="{{ r.url }}#creazione{{ p.suffisso }}" data-info="Testo{{ dove }}: esercizi assegnati" aria-label="Testo{{ dove }}">{{ icona("testo") }}</a>
+          <a class="icona-azione icona-sola" href="{{ r.url }}#compiti{{ p.suffisso }}" data-info="Compiti d'esame{{ dove }}: iscritti, generazione e stampa" aria-label="Compiti d'esame{{ dove }}">{{ icona("stampa") }}</a>
+          <a class="icona-azione icona-sola" href="{{ r.url }}#presenze{{ p.suffisso }}" data-info="Presenze{{ dove }}: registro del giorno della prova" aria-label="Presenze{{ dove }}">{{ icona("presenze") }}</a>
+          <a class="icona-azione icona-sola" href="{{ r.url }}#valutazione{{ p.suffisso }}" data-info="Correzione{{ dove }}" aria-label="Correzione{{ dove }}">{{ icona("correzione") }}</a>
         </div>
       </td>
     </tr>
@@ -141,37 +156,38 @@
 </details>
 
 {% if corsi %}
+{% macro riga_corso(c, nome) -%}
+  {% set n = conteggio_appelli.get(c.tag, {}) %}
+  <tr class="{{ 'corso-corrente' if c.tag in corsi_correnti else '' }}">
+    <td>{% if nome %}<a href="/corsi/{{ c.tag }}" class="nome-corso">{{ c.nome }}</a>{% else %}<span class="rientro-anno"><a href="/corsi/{{ c.tag }}">{{ c.anno or c.tag }}</a></span>{% endif %}</td>
+    <td class="muted">{{ c.anno if nome else '' }}<span class="tag-corso">{{ c.tag }}</span></td>
+    <td class="numero">{% if n.totale %}{% if n.aperti %}<strong>{{ n.aperti }}</strong> apert{{ 'o' if n.aperti == 1 else 'i' }} · {% endif %}{{ n.totale }}{% else %}<span class="muted">-</span>{% endif %}</td>
+    <td>
+      {% if c.tag in corsi_chiusi %}<span class="muted stato-chiuso" data-info="Tutti gli appelli sono chiusi">{{ icona("lucchetto", 13) }} chiuso</span>
+      {% elif c.tag in corsi_correnti %}<span class="badge badge-ok">in corso</span>{% endif %}
+      {% if c.importato_da_legacy %}<span class="badge badge-warn" data-info="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
+    </td>
+  </tr>
+{%- endmacro %}
 <div class="card">
-  <ul class="list-links">
+  <table class="tabella-corsi">
+    <tr><th>Corso</th><th>Anno · tag</th><th class="numero" data-info="Appelli e raggruppamenti di prove: quanti ancora aperti, su quanti in tutto">Appelli</th><th>Stato</th></tr>
     {% for gruppo in gruppi_corsi %}
     {% if gruppo|length > 1 %}
-    <li>
-      <a href="/statistiche-generali?corsi={{ gruppo | map(attribute='tag') | map('urlencode') | join('&corsi=') }}" style="font-weight:600">{{ gruppo[0].nome }}</a>
-      <span class="muted">{{ gruppo[0].facolta }} · {{ gruppo|length }} anni</span>
-      <ul class="list-links" style="margin-top:0.25rem; margin-left:1.25rem">
-        {% for c in gruppo %}
-        <li{% if c.tag in corsi_correnti %} style="font-weight:600"{% endif %}>
-          <a href="/corsi/{{ c.tag }}">{{ c.anno }}</a>
-          <span class="muted">{{ c.tag }}</span>
-          {% if c.tag in corsi_chiusi %}<span class="badge badge-info">Chiuso</span>
-          {% elif c.tag in corsi_correnti %}<span class="badge badge-ok">In corso</span>{% endif %}
-          {% if c.importato_da_legacy %}<span class="badge badge-warn" title="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
-        </li>
-        {% endfor %}
-      </ul>
-    </li>
+    <tr class="riga-gruppo-corsi">
+      <td colspan="4">
+        <strong>{{ gruppo[0].nome }}</strong>
+        <span class="muted">{{ gruppo[0].facolta }}{% if gruppo[0].facolta %} · {% endif %}{{ gruppo|length }} anni</span>
+        <a href="/statistiche-generali?corsi={{ gruppo | map(attribute='tag') | map('urlencode') | join('&corsi=') }}" class="icona-azione icona-sola" style="margin-left:0.4rem; vertical-align:middle"
+           data-info="Statistiche di tutti gli anni di questo corso" aria-label="Statistiche di {{ gruppo[0].nome }}, tutti gli anni">{{ icona("grafico", 14) }}</a>
+      </td>
+    </tr>
+    {% for c in gruppo %}{{ riga_corso(c, false) }}{% endfor %}
     {% else %}
-    {% set c = gruppo[0] %}
-    <li{% if c.tag in corsi_correnti %} style="font-weight:600"{% endif %}>
-      <a href="/corsi/{{ c.tag }}">{{ c.nome }}</a>
-      <span class="muted">{{ c.anno }} · {{ c.tag }}</span>
-      {% if c.tag in corsi_chiusi %}<span class="badge badge-info">Chiuso</span>
-      {% elif c.tag in corsi_correnti %}<span class="badge badge-ok">In corso</span>{% endif %}
-      {% if c.importato_da_legacy %}<span class="badge badge-warn" title="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
-    </li>
+    {{ riga_corso(gruppo[0], true) }}
     {% endif %}
     {% endfor %}
-  </ul>
+  </table>
 </div>
 {% else %}
 <p class="muted">Nessun corso ancora creato. Crea un corso nuovo, oppure vai su

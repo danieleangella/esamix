@@ -51,14 +51,15 @@ def _con_risultato(conn, appello_id: int) -> dict[str, str]:
     }
 
 
-def riepilogo(tag: str, appello_id: int) -> Optional[dict]:
+def riepilogo(tag: str, appello_id: int, ammessi: Optional[list[dict]] = None) -> Optional[dict]:
     """None se per questo appello non c'è nessun elenco iscritti (né file della segreteria
-    né iscritti aggiunti a mano): il registro presenze si basa su quell'elenco. Uno
+    né iscritti aggiunti a mano) e non sono passati gli `ammessi` (prove di un
+    raggruppamento dopo la prima): il registro presenze si basa su quell'elenco. Uno
     studente già valutato (o già segnato assente/ritirato) conta come presente a
     prescindere dalla spunta, e non è più possibile togliergliela: ha comunque già un
     esito per questo appello ('esito', usato per distinguere chi risulta "assente" o
     "ritirato" da chi ha davvero un voto)."""
-    iscritti = esportazione_service.list_iscritti(tag, appello_id)
+    iscritti = elenco_da_valutare(tag, appello_id, ammessi)
     if iscritti is None:
         return None
     presenti = list_presenti(tag, appello_id)
@@ -69,6 +70,7 @@ def riepilogo(tag: str, appello_id: int) -> Optional[dict]:
         conn.close()
     elenco = [
         {
+            "registrato": True,  # gli ammessi sono sempre studenti del corso
             **s,
             "presente": s["matricola"] in presenti or s["matricola"] in con_risultato,
             "bloccato": s["matricola"] in con_risultato,
@@ -113,10 +115,11 @@ def _segna_assenti(tag: str, appello_id: int, elenco: list[dict], escludi: set[s
     return {"segnati_assenti": segnati_assenti, "non_registrati": non_registrati, "errori": errori}
 
 
-def chiudi(tag: str, appello_id: int) -> dict:
-    """Segna 'assente' (in risultati) ogni iscritto non spuntato presente e senza già un
-    risultato: da fare una volta sola, quando l'appello è finito e non arriva più nessuno."""
-    iscritti = esportazione_service.list_iscritti(tag, appello_id)
+def chiudi(tag: str, appello_id: int, ammessi: Optional[list[dict]] = None) -> dict:
+    """Segna 'assente' (in risultati) ogni iscritto (o ammesso, vedi riepilogo) non spuntato
+    presente e senza già un risultato: da fare una volta sola, quando l'appello è finito e
+    non arriva più nessuno."""
+    iscritti = elenco_da_valutare(tag, appello_id, ammessi)
     if iscritti is None:
         raise ValueError("Nessun elenco iscritti caricato per questo appello")
     corsi_service.verifica_appello_aperto(tag, appello_id)

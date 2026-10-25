@@ -55,6 +55,10 @@ def controlla_appello(tag: str, appello, corso=None, conn=None) -> dict:
                 continue
             if registrato is None:
                 continue
+            # un voto cambiato a mano di proposito o ancora provvisorio (svolgimenti da
+            # valutare) non è un'anomalia da segnalare
+            if r["voto_modificato"] or r["valutazione_sospesa"]:
+                continue
             controllati += 1
             punteggi = {int(k): v for k, v in json.loads(r["punteggi_obbligatori"] or "{}").items()}
             base, con_minuscole = _ricalcola(corso, soluzioni, risposte, punteggi)

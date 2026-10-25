@@ -1,3 +1,4 @@
+{% from "_info.html" import info %}
 <details class="card" open>
   <summary><strong>Riepilogo{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</strong></summary>
   <p class="muted" style="margin-top:0.75rem">Esiti su {{ stat.totale }} compiti corretti (voto minimo {{ stat.votomin }}).</p>
@@ -91,31 +92,52 @@
 {% if stat.esercizi %}
 <details class="card" open>
   <summary><strong>Esercizi più sbagliati{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</strong></summary>
-  <table style="margin-top:0.75rem">
-    <tr><th>Esercizio</th><th>Corrette</th><th>Sbagliate</th><th>% sbagliate</th><th>Risposte sbagliate scelte</th></tr>
+  <table class="tabella-esercizi-sbagliati" style="margin-top:0.75rem">
+    <tr>
+      <th class="numero">#</th><th>Esercizio</th>
+      <th class="numero">Giuste</th><th class="numero">Sbagliate</th><th class="numero">Non date</th>
+      <th>Risposte sbagliate più scelte {{ info("Percentuale sul totale dei compiti in cui compare l'esercizio, e tra parentesi quanti studenti l'hanno scelta. Le domande aperte non sono contate: non hanno una risposta giusta da confrontare.") }}</th>
+    </tr>
     {% for e in stat.esercizi %}
     <tr>
+      <td class="numero muted">{{ loop.index }}</td>
       <td>
-        <span class="esercizio-nome-hover" title="{{ e.varianti_testo|join(' /// ')|accenti_tex }}" style="cursor:help; text-decoration:underline dotted">{{ e.nome }}</span>
+        <span class="esercizio-nome-hover" title="{{ e.varianti_testo|join(' /// ')|accenti_tex }}">{{ e.nome }}</span>
         {% if e.varianti_testo %}
-        <button type="button" class="secondary btn-mostra-testo" data-target="testo-es-{{ stat_id }}-{{ loop.index }}" style="margin-left:0.3rem; padding:0.1rem 0.4rem; font-size:0.75rem">testo</button>
+        <button type="button" class="link-simile btn-mostra-testo" data-target="testo-es-{{ stat_id }}-{{ loop.index }}" style="margin-left:0.3rem; font-size:0.78rem">testo</button>
         <div id="testo-es-{{ stat_id }}-{{ loop.index }}" class="muted" style="display:none; margin-top:0.3rem; white-space:pre-wrap">
           {% for t in e.varianti_testo %}<div style="margin-top:0.2rem">{{ t | accenti_tex }}</div>{% endfor %}
         </div>
         {% endif %}
+        <div class="barra-esiti" role="img" aria-label="{{ e.percentuale_corrette }}% giuste, {{ e.percentuale_sbagliate }}% sbagliate, {{ e.percentuale_non_date }}% non date">
+          <span class="giuste" style="width:{{ e.percentuale_corrette }}%"></span><span class="sbagliate" style="width:{{ e.percentuale_sbagliate }}%"></span><span class="non-date" style="width:{{ e.percentuale_non_date }}%"></span>
+        </div>
       </td>
-      <td>{{ e.corrette }}</td>
-      <td>{{ e.sbagliate }}</td>
-      <td>{{ e.percentuale_sbagliate }}%</td>
-      <td>
-        {% for rs in e.risposte_sbagliate %}
-        <div>{{ rs.testo | accenti_tex }}: {{ rs.percentuale }}% ({{ rs.conteggio }})</div>
+      <td class="numero"><span class="valore-ok">{{ e.percentuale_corrette }}%</span> <span class="muted">({{ e.corrette }})</span></td>
+      <td class="numero"><strong class="valore-err">{{ e.percentuale_sbagliate }}%</strong> <span class="muted">({{ e.sbagliate }})</span></td>
+      <td class="numero">{{ e.percentuale_non_date }}% <span class="muted">({{ e.non_date }})</span></td>
+      <td class="risposte-scelte">
+        {% for rs in e.risposte_sbagliate[:3] %}
+        <div class="risposta-scelta"><span class="percentuale">{{ rs.percentuale }}% <span class="muted">({{ rs.conteggio }})</span></span><span>{{ rs.testo | accenti_tex }}</span></div>
         {% else %}
         <span class="muted">-</span>
         {% endfor %}
+        {% if e.risposte_sbagliate|length > 3 %}
+        <details><summary class="muted">altre {{ e.risposte_sbagliate|length - 3 }}</summary>
+          {% for rs in e.risposte_sbagliate[3:] %}<div class="risposta-scelta"><span class="percentuale">{{ rs.percentuale }}% <span class="muted">({{ rs.conteggio }})</span></span><span>{{ rs.testo | accenti_tex }}</span></div>{% endfor %}
+        </details>
+        {% endif %}
       </td>
     </tr>
     {% endfor %}
   </table>
+  <script>
+  // le risposte contengono formule: si disegnano quando KaTeX (caricato con defer) è pronto
+  (function () {
+    var tabella = document.currentScript.previousElementSibling;
+    function disegna() { renderizzaLatex(tabella); }
+    if (document.readyState === "complete") disegna(); else window.addEventListener("load", disegna);
+  })();
+  </script>
 </details>
 {% endif %}

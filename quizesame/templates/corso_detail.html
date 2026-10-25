@@ -5,80 +5,67 @@
 {% endblock %}
 {% block content %}
 {% from "_info.html" import info %}
+{% from "_icone.html" import icona %}
 {% set sezione_corso = "appelli" %}
 {% include "_intestazione_corso.html" %}
 
 <details class="card" open>
   <summary><strong>Appelli</strong></summary>
-  {% if appelli or raggruppamenti %}
-  <table>
-    <tr><th>Nome</th><th>Data</th><th>Prossimo passo</th><th>Risultati</th><th>Voto medio</th><th></th></tr>
-    {% for a in appelli %}
-    {% set s = statistiche[a.id] %}
+  {% macro stato(a, pp) -%}
+    {% if pp %}<a class="button secondary passo-link" href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}#{{ pp.scheda }}" data-info="Prossimo passo: {{ pp.azione }}">{{ pp.nome }}{% if pp.prova %} <span style="opacity:.8">· {{ pp.prova }}</span>{% endif %} &rarr;</a>
+    {% elif a.chiuso %}<span class="muted stato-chiuso">{{ icona("lucchetto", 13) }} chiuso</span>
+    {% else %}<span class="muted">-</span>{% endif %}
+    {% if a.data == oggi %} <span class="badge badge-ok">oggi</span>{% endif %}
+    {% if not a.attivo %} <span class="badge badge-warn">disattivato</span>{% endif %}
+  {%- endmacro %}
+  {% macro numeri(s) -%}
+    <td class="numero">{{ s.totale or '-' }}</td>
+    <td class="numero">{% if s.totale %}{{ s.sufficienti }} <span class="muted">({{ s.percentuale }}%)</span>{% else %}<span class="muted">-</span>{% endif %}</td>
+    <td class="numero">{{ s.media if s.media is not none else '-' }}</td>
+  {%- endmacro %}
+  {% if voci %}
+  <table class="tabella-appelli-corso">
     <tr>
-      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}" style="text-decoration:none; font-weight:500">{{ a.nome }}</a></td>
-      <td>{{ a.data or '-' }}</td>
-      <td>
-        {% set pp = prossimi_passi.get(a.id) %}
-        {% if pp %}<a class="button secondary passo-link" href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}#{{ pp.scheda }}" title="{{ pp.azione }}">{{ pp.nome }}{% if pp.prova %} <span style="opacity:.8">· {{ pp.prova }}</span>{% endif %} &rarr;</a>
-        {% elif a.chiuso %}<span class="muted">completato</span>{% else %}<span class="muted">-</span>{% endif %}
-      </td>
-      <td>
-        {% if s.totale %}
-        {{ s.sufficienti }}/{{ s.totale }} <span class="muted">({{ s.percentuale }}%)</span>
-        {% else %}
-        <span class="muted">-</span>
-        {% endif %}
-      </td>
-      <td>{{ s.media if s.media is not none else '-' }}</td>
-      <td>
-        {% if a.data == oggi %}<span class="badge badge-ok">In corso</span>{% endif %}
-        {% if a.chiuso %}<span class="badge">chiuso</span>{% endif %}
-        {% if not a.attivo %}<span class="badge badge-warn">disattivato</span>{% endif %}
-      </td>
+      <th>Appello</th><th>Data</th><th>Stato</th>
+      <th class="numero" data-info="Compiti con un esito registrato (voto, assente, ritirato…)">Esiti</th>
+      <th class="numero" data-info="Con voto almeno pari al minimo (per le prove parziali, quello delle prove)">Superati</th>
+      <th class="numero">Media</th>
     </tr>
-    {% endfor %}
-    {% if raggruppamenti %}
-    {# i raggruppamenti (es. prove parziali) compaiono in coda, leggermente staccati: le
-       singole prove che li compongono si aprono dalla pagina del raggruppamento #}
-    <tr class="riga-separatore-raggruppamenti"><td colspan="6">Raggruppamenti di prove</td></tr>
-    {% for r in raggruppamenti %}
-    {% set ra = raggruppamenti_appelli[r.appello_id] %}
-    {% set s = statistiche[r.appello_id] %}
+    {% for v in voci %}
+    {% set a = v.appello %}
+    {% if v.tipo == 'appello' %}
     <tr>
-      <td>
-        <a href="/corsi/{{ corso.tag }}/appelli/{{ r.appello_id }}" style="text-decoration:none; font-weight:500">{{ r.nome }}</a>
-        <span class="badge badge-info">raggruppamento</span>
-        <div class="muted" style="font-size:0.85em">prove: {{ r.membri | map(attribute='nome') | join(', ') }}</div>
-      </td>
-      <td>{{ (r.membri | map(attribute='data') | select | join(', ')) or '-' }}</td>
-      <td>
-        {% set pp = prossimi_passi.get(r.appello_id) %}
-        {% if pp %}<a class="button secondary passo-link" href="/corsi/{{ corso.tag }}/appelli/{{ r.appello_id }}#{{ pp.scheda }}" title="{{ pp.azione }}">{{ pp.nome }}{% if pp.prova %} <span style="opacity:.8">· {{ pp.prova }}</span>{% endif %} &rarr;</a>
-        {% elif ra.chiuso %}<span class="muted">completato</span>{% else %}<span class="muted">-</span>{% endif %}
-      </td>
-      <td>
-        {% if s.totale %}
-        {{ s.sufficienti }}/{{ s.totale }} <span class="muted">({{ s.percentuale }}%)</span>
-        {% else %}
-        <span class="muted">-</span>
-        {% endif %}
-      </td>
-      <td>{{ s.media if s.media is not none else '-' }}</td>
-      <td>
-        {% if ra.chiuso %}<span class="badge">chiuso</span>{% endif %}
-        {% if not ra.attivo %}<span class="badge badge-warn">disattivato</span>{% endif %}
-      </td>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}" class="nome-appello">{{ a.nome }}</a></td>
+      <td style="white-space:nowrap">{{ a.data or '-' }}</td>
+      <td>{{ stato(a, prossimi_passi.get(a.id)) }}</td>
+      {{ numeri(statistiche[a.id]) }}
+    </tr>
+    {% else %}
+    {% set r = v.raggruppamento %}
+    <tr class="riga-gruppo">
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}" class="nome-appello">{{ r.nome }}</a></td>
+      <td></td>
+      <td>{{ stato(a, prossimi_passi.get(a.id)) }}</td>
+      {{ numeri(statistiche[a.id]) }}
+    </tr>
+    {% for m in r.membri %}
+    {% set sm = statistiche[m.id] %}
+    <tr class="riga-prova{{ ' ultima' if loop.last else '' }}">
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ a.id }}#{{ 'valutazione' if sm.totale else 'creazione' }}-{{ m.id }}" class="punto-prova">{{ m.nome }}</a></td>
+      <td class="muted" style="white-space:nowrap">{{ m.data or '-' }}</td>
+      <td class="muted">{% if m.correzione_scritti_conclusa %}{{ icona("spunta", 13) }} correzione conclusa{% endif %}</td>
+      {{ numeri(sm) }}
     </tr>
     {% endfor %}
     {% endif %}
+    {% endfor %}
   </table>
   {% else %}
   <p class="muted">Nessun appello ancora creato per questo corso: crealo qui sotto.</p>
   {% endif %}
 </details>
 
-<details class="card dettaglio-fisarmonica pannello-azione" {% if not appelli and not raggruppamenti %}open{% endif %}>
+<details class="card dettaglio-fisarmonica pannello-azione" {% if not voci %}open{% endif %}>
   <summary>Nuovo appello</summary>
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/nuovo" style="margin-top:1rem">
     <div class="form-grid">

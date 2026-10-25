@@ -301,6 +301,13 @@ ADDITIVE_COLUMNS = {
         ("raggruppamento_da_confermare", "BOOLEAN NOT NULL DEFAULT 0"),
         # spiegazione scritta dal docente quando esito='annullato' (es. "cellulare in aula")
         ("annullamento_nota", "TEXT"),
+        # nota libera del docente sul compito (es. perché il voto finale è stato cambiato)
+        ("nota_correzione", "TEXT"),
+        # JSON {posizione: nota} con gli errori notati in ciascuno svolgimento giudicato a mano
+        ("note_svolgimenti", "TEXT"),
+        # voto finale scelto dal docente diverso da quello calcolato dai punteggi: non va
+        # ricalcolato quando poi cambia un punteggio
+        ("voto_modificato", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
     "esercizi": [
         ("argomento", "TEXT"),
@@ -331,6 +338,9 @@ ADDITIVE_COLUMNS = {
         # testo chiuso (scheda Testo): esercizi non più modificabili finché non lo si riapre
         ("testo_chiuso", "BOOLEAN NOT NULL DEFAULT 0"),
         ("testo_chiuso_il", "TEXT"),
+        # correzione: gli svolgimenti (obbligatori e domande aperte) si valutano dopo, tutti
+        # insieme esercizio per esercizio, invece che compito per compito
+        ("rimanda_svolgimenti", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
 }
 

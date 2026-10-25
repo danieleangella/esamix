@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% from "_info.html" import info %}
+{% from "_icone.html" import icona %}
+{% block title %}Svolgimenti · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Svolgimenti</span>
+{% endblock %}
+{% block content %}
+<div class="intestazione-pagina">
+  <div class="intestazione-livello">Correzione · <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }}</a></div>
+  <h1>Svolgimenti {{ info("Gli svolgimenti giudicati a mano (esercizi obbligatori con la risposta giusta e domande aperte), un esercizio alla volta e tutti gli studenti insieme: per valutare quelli rimandati uno dopo l'altro, e per confrontare punteggi e note di compiti diversi sullo stesso esercizio. Ogni modifica si salva da sola e ricalcola il voto del compito.") }}</h1>
+</div>
+
+{% set modificabile = not appello.chiuso and not appello.correzione_scritti_conclusa %}
+<div class="card barra-conclusione">
+  {% if dati.da_valutare %}
+  <span><span class="badge badge-warn">{{ dati.da_valutare }} da valutare</span></span>
+  {% elif dati.esercizi %}
+  <span><span class="badge badge-ok">✓ nessuno svolgimento da valutare</span></span>
+  {% endif %}
+  {% if modificabile %}
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/rimanda-svolgimenti" class="inline">
+    <label class="etichetta-check">
+      <input type="checkbox" name="attivo" value="1" {% if appello.rimanda_svolgimenti %}checked{% endif %} onchange="this.form.submit()">
+      Nei prossimi compiti rimanda la valutazione degli svolgimenti a questa pagina
+    </label>
+  </form>
+  {% else %}
+  <span class="muted">{{ 'Appello chiuso' if appello.chiuso else 'Correzione conclusa (riaprila dalla scheda Correzione per cambiare qualcosa)' }}: punteggi e note sono in sola lettura.</span>
+  {% endif %}
+  <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riferimento-soluzioni.html" target="_blank" rel="noopener" style="margin-left:auto" class="link-con-icona">{{ icona("occhio", 14) }} testo con le soluzioni {{ icona("esterno", 12) }}</a>
+  <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}" class="link-con-icona">{{ icona("indietro", 14) }} torna alla correzione</a>
+</div>
+
+{% if not dati.esercizi %}
+<div class="card">
+  <p class="muted" style="margin:0">Ancora nessuno svolgimento da giudicare a mano: compaiono qui i compiti già registrati
+    con esercizi obbligatori risposti correttamente o con domande aperte.</p>
+</div>
+{% else %}
+<div class="schede-esercizi" role="tablist">
+  {% for es in dati.esercizi %}
+  <button type="button" role="tab" data-scheda="{{ es.chiave }}">
+    {{ es.nome }}{% if es.da_valutare %} <span class="conteggio" data-conteggio="{{ es.chiave }}">{{ es.da_valutare }}</span>{% endif %}
+  </button>
+  {% endfor %}
+</div>
+
+{% for es in dati.esercizi %}
+<div class="pannello-esercizio" data-pannello="{{ es.chiave }}" hidden>
+  <div class="card">
+    <div class="titolo-sezione-correzione">
+      <h2>{{ es.nome }}</h2>
+      <span class="badge {{ 'badge-info' if es.aperta else 'badge-ok' }}">{{ 'domanda aperta' if es.aperta else 'obbligatorio' }}</span>
+      <span class="muted">punteggio da {{ corso.risposta_sbagliata }} a {{ es.massimo }} · {{ es.n_valutati }} valutat{{ 'o' if es.n_valutati == 1 else 'i' }} su {{ es.voci|length }}{% if es.media is not none %} · media {{ es.media }}{% endif %}</span>
+      <label class="etichetta-check" style="margin-left:auto; font-size:0.85rem">
+        <input type="checkbox" class="filtro-da-valutare" {% if solo_da_valutare %}checked{% endif %}> solo da valutare
+      </label>
+    </div>
+    <datalist id="note-{{ es.chiave }}">{% for g in es.note %}<option value="{{ g.nota }}">{% endfor %}</datalist>
+    <table class="tabella-svolgimenti">
+      <tr><th>Studente</th><th>Punteggio</th><th>Nota sullo svolgimento</th><th>Voto</th><th></th></tr>
+      {% set gruppo = namespace(corrente="__inizio__") %}
+      {% for voce in es.voci %}
+      {% set etichetta = 'Da valutare' if voce.da_valutare else ('Punteggio ' ~ voce.punteggio if voce.punteggio is not none else 'Senza punteggio') %}
+      {% if etichetta != gruppo.corrente %}
+      {% set gruppo.corrente = etichetta %}
+      <tr class="gruppo-punteggio" data-gruppo><td colspan="5">{{ etichetta }}</td></tr>
+      {% endif %}
+      <tr class="riga-voce{% if voce.da_valutare %} da-valutare{% endif %}" data-matricola="{{ voce.matricola }}" data-posizione="{{ voce.posizione }}"
+          data-da-valutare="{{ '1' if voce.da_valutare else '' }}" data-studente="{{ voce.cognome }} {{ voce.nome }}"
+          data-nota="{{ voce.nota }}" data-punteggio="{{ voce.punteggio if voce.punteggio is not none else '' }}">
+        <td>
+          <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ voce.matricola }}" target="_blank" rel="noopener">{{ voce.cognome }} {{ voce.nome }}</a>
+          <div class="muted" style="font-size:0.78rem">{{ voce.matricola }} · posizione {{ voce.posizione + 1 }}</div>
+        </td>
+        {% if modificabile and voce.modificabile %}
+        <td class="cella-punteggio">
+          {% if es.massimo - corso.risposta_sbagliata <= 10 %}
+          <span class="chip-punteggi">{% for k in range(corso.risposta_sbagliata, es.massimo + 1) %}<button type="button" class="chip-punteggio{% if voce.punteggio == k %} attivo{% endif %}" data-valore="{{ k }}" tabindex="-1">{{ k }}</button>{% endfor %}</span>
+          {% endif %}
+          <input type="number" class="campo-punteggio" min="{{ corso.risposta_sbagliata }}" max="{{ es.massimo }}"
+                 value="{{ voce.punteggio if voce.punteggio is not none else '' }}" aria-label="Punteggio di {{ voce.cognome }} {{ voce.nome }}">
+        </td>
+        <td><input class="campo-nota" value="{{ voce.nota }}" list="note-{{ es.chiave }}" placeholder="Errori o nota" aria-label="Nota su {{ voce.cognome }} {{ voce.nome }}"><div class="note-simili"></div></td>
+        {% else %}
+        <td class="cella-punteggio"><strong>{{ voce.punteggio if voce.punteggio is not none else '–' }}</strong></td>
+        <td>{{ voce.nota or '' }}</td>
+        {% endif %}
+        <td class="cella-voto">{{ voce.voto if voce.voto is not none else '–' }}{% if voce.sospesa %} <span class="muted">(provv.)</span>{% endif %}</td>
+        <td class="stato-riga muted">{% if voce.verbalizzato %}verbalizzato{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  {% if es.note %}
+  <div class="card">
+    <div class="titolo-sezione-correzione">
+      <h2>Note usate</h2>
+      {{ info("Per ogni nota, i punteggi dati agli svolgimenti che la riportano: una stessa nota con punteggi diversi è evidenziata, per controllare che errori uguali abbiano avuto lo stesso giudizio. Aggiornato al ricaricamento della pagina.") }}
+    </div>
+    <ul class="elenco-note-usate">
+      {% for g in es.note %}
+      <li class="{{ 'incoerente' if g.incoerente else '' }}">
+        <span>{% if g.incoerente %}⚠ {% endif %}{{ g.nota }}</span>
+        <span class="muted" style="white-space:nowrap">{% for p, n in g.punteggi %}{{ p }} punt{{ 'o' if p == 1 else 'i' }}{% if n > 1 %} ×{{ n }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if dati.compiti_annotati %}
+<div class="card">
+  <div class="titolo-sezione-correzione">
+    <h2>Note sui compiti e voti cambiati a mano ({{ dati.compiti_annotati|length }})</h2>
+    {{ info("I compiti con una nota del docente o con un voto finale diverso da quello calcolato dai punteggi.") }}
+  </div>
+  <table>
+    <tr><th>Studente</th><th>Voto</th><th>Nota</th><th></th></tr>
+    {% for c in dati.compiti_annotati %}
+    <tr>
+      <td>{{ c.cognome }} {{ c.nome }} <span class="muted">({{ c.matricola }})</span></td>
+      <td style="white-space:nowrap">
+        {% if c.voto_calcolato is not none %}<span class="muted">{{ c.voto_calcolato }} →</span> <strong>{{ c.voto }}</strong> <span class="badge badge-warn">a mano</span>
+        {% else %}{{ c.voto if c.voto is not none else '–' }}{% endif %}
+      </td>
+      <td>{{ c.nota or '' }}{% if c.voto_calcolato is not none and not c.nota %}<span class="muted">nessuna spiegazione</span>{% endif %}</td>
+      <td style="text-align:right">
+        {% if modificabile and not c.verbalizzato %}
+        <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ c.matricola }}/modifica" class="pulsante-icona" style="display:inline-flex" data-info="Modifica la correzione" aria-label="Modifica la correzione di {{ c.cognome }} {{ c.nome }}">{{ icona("matita") }}</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+<script>
+(function () {
+  var schede = Array.prototype.slice.call(document.querySelectorAll("[data-scheda]"));
+  if (!schede.length) return;
+  var url = "/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/svolgimenti/valuta";
+
+  function mostra(chiave) {
+    schede.forEach(function (b) { b.classList.toggle("attivo", b.dataset.scheda === chiave); b.setAttribute("aria-selected", b.dataset.scheda === chiave); });
+    document.querySelectorAll("[data-pannello]").forEach(function (p) { p.hidden = p.dataset.pannello !== chiave; });
+    try {
+      var u = new URL(location.href);
+      u.searchParams.set("esercizio", chiave);
+      history.replaceState(null, "", u);
+    } catch (e) { /* solo comodità */ }
+    var primo = document.querySelector('[data-pannello="' + chiave + '"] tr.da-valutare .campo-punteggio');
+    if (primo) primo.focus();
+  }
+  schede.forEach(function (b) { b.addEventListener("click", function () { mostra(b.dataset.scheda); }); });
+  var scelto = {{ esercizio_scelto|tojson }};
+  var iniziale = schede.filter(function (b) { return b.dataset.scheda === scelto; })[0]
+    || schede.filter(function (b) { return b.querySelector(".conteggio"); })[0] || schede[0];
+  mostra(iniziale.dataset.scheda);
+
+  // "solo da valutare": vale per tutti gli esercizi
+  var filtri = Array.prototype.slice.call(document.querySelectorAll(".filtro-da-valutare"));
+  function filtra(solo) {
+    filtri.forEach(function (f) { f.checked = solo; });
+    document.querySelectorAll(".riga-voce").forEach(function (tr) { tr.hidden = solo && !tr.dataset.daValutare; });
+    document.querySelectorAll("[data-gruppo]").forEach(function (tr) { tr.hidden = solo; });
+  }
+  filtri.forEach(function (f) { f.addEventListener("change", function () { filtra(f.checked); }); });
+  filtra(filtri.length && filtri[0].checked);
+
+  function salva(tr) {
+    var input = tr.querySelector(".campo-punteggio");
+    var nota = tr.querySelector(".campo-nota");
+    var stato = tr.querySelector(".stato-riga");
+    if (input.value !== "" && !input.checkValidity()) {
+      tr.classList.add("errore");
+      stato.textContent = "fuori intervallo (" + input.min + "…" + input.max + ")";
+      return;
+    }
+    var chiave = input.value + "\u0000" + nota.value;
+    // Invio e poi l'uscita dal campo chiedono lo stesso salvataggio: uno solo
+    if (tr.dataset.salvato === chiave || tr.dataset.inviando === chiave) return;
+    tr.dataset.inviando = chiave;
+    var dati = new FormData();
+    dati.append("matricola", tr.dataset.matricola);
+    dati.append("posizione", tr.dataset.posizione);
+    dati.append("punteggio", input.value);
+    dati.append("nota", nota.value);
+    stato.textContent = "salvo…";
+    fetch(url, { method: "POST", body: dati })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        delete tr.dataset.inviando;
+        tr.classList.remove("errore", "salvata");
+        if (!res.ok) { tr.classList.add("errore"); stato.textContent = res.d.errore || "errore"; stato.title = stato.textContent; return; }
+        var d = res.d;
+        tr.dataset.salvato = chiave;
+        tr.querySelector(".cella-voto").innerHTML = d.voto + (d.sospesa ? ' <span class="muted">(provv.)</span>' : "");
+        // tutte le righe dello stesso compito (altri esercizi) mostrano lo stesso voto
+        document.querySelectorAll('.riga-voce[data-matricola="' + tr.dataset.matricola + '"] .cella-voto').forEach(function (c) {
+          c.innerHTML = d.voto + (d.sospesa ? ' <span class="muted">(provv.)</span>' : "");
+        });
+        var eraDaValutare = !!tr.dataset.daValutare;
+        var oraDaValutare = input.value === "";
+        if (eraDaValutare !== oraDaValutare) {
+          tr.dataset.daValutare = oraDaValutare ? "1" : "";
+          tr.classList.toggle("da-valutare", oraDaValutare);
+          var pannello = tr.closest("[data-pannello]").dataset.pannello;
+          var conteggio = document.querySelector('[data-conteggio="' + pannello + '"]');
+          if (conteggio) {
+            var n = (parseInt(conteggio.textContent, 10) || 0) + (oraDaValutare ? 1 : -1);
+            conteggio.textContent = n;
+            conteggio.hidden = n <= 0;
+          }
+        }
+        stato.textContent = d.avviso ? "⚠ " + d.avviso : (d.sospesa ? "salvato · compito ancora da completare" : "✓ salvato");
+        stato.title = stato.textContent;
+        stato.className = "stato-riga " + (d.avviso ? "stato-campo stato-warn" : "muted");
+        void tr.offsetWidth;
+        tr.classList.add("salvata");
+      })
+      .catch(function () { delete tr.dataset.inviando; tr.classList.add("errore"); stato.textContent = "non salvato: server non raggiungibile"; });
+  }
+
+  var righe = Array.prototype.slice.call(document.querySelectorAll(".riga-voce"));
+  // note simili dello stesso esercizio scritte per altri studenti (anche appena scritte qui)
+  function simili(tr) {
+    var box = tr.querySelector(".note-simili");
+    if (!box) return;
+    var pannello = tr.closest("[data-pannello]");
+    var voci = righe.filter(function (r) { return r !== tr && r.closest("[data-pannello]") === pannello; }).map(function (r) {
+      var n = r.querySelector(".campo-nota"), p = r.querySelector(".campo-punteggio");
+      var punteggio = p ? p.value : r.dataset.punteggio;
+      return { nota: n ? n.value : r.dataset.nota, punteggio: punteggio === "" ? null : parseInt(punteggio, 10), studente: r.dataset.studente };
+    }).filter(function (v) { return v.nota && v.nota.trim(); });
+    mostraNoteSimili(box, tr.querySelector(".campo-nota").value, voci, tr.querySelector(".campo-punteggio").value);
+  }
+  function prossimoCampo(tr) {
+    var pannello = tr.closest("[data-pannello]");
+    var visibili = righe.filter(function (r) { return !r.hidden && r.closest("[data-pannello]") === pannello && r.querySelector(".campo-punteggio"); });
+    var dopo = visibili[visibili.indexOf(tr) + 1];
+    return dopo ? dopo.querySelector(".campo-punteggio") : null;
+  }
+  righe.forEach(function (tr) {
+    var input = tr.querySelector(".campo-punteggio");
+    if (!input) return;
+    var nota = tr.querySelector(".campo-nota");
+    tr.dataset.salvato = input.value + "\u0000" + nota.value;
+    function chip() {
+      tr.querySelectorAll(".chip-punteggio").forEach(function (c) { c.classList.toggle("attivo", c.dataset.valore === input.value); });
+    }
+    input.addEventListener("input", chip);
+    simili(tr);
+    input.addEventListener("change", function () { salva(tr); });
+    nota.addEventListener("change", function () { salva(tr); });
+    nota.addEventListener("input", function () { simili(tr); });
+    input.addEventListener("input", function () { simili(tr); });
+    tr.querySelectorAll(".chip-punteggio").forEach(function (c) {
+      c.addEventListener("click", function () { input.value = c.dataset.valore; chip(); salva(tr); nota.focus(); });
+    });
+    // Invio: salva e passa allo studente successivo (punteggio), per valutare di fila
+    [input, nota].forEach(function (campo) {
+      campo.addEventListener("keydown", function (ev) {
+        if (ev.key !== "Enter") return;
+        ev.preventDefault();
+        salva(tr);
+        var p = prossimoCampo(tr);
+        if (p) { p.focus(); p.select(); }
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}

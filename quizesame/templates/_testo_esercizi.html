@@ -37,7 +37,7 @@
 
   {% if md.esercizi_assegnati %}
   {% set riordinabile = not chiuso and md.esercizi_assegnati|length > 1 %}
-  {% set stati_v = stati_verifica(corso.tag, md.esercizi_assegnati) %}
+  {% set stati_v = md.stati_verifica_esercizi if md.stati_verifica_esercizi is defined else stati_verifica(corso.tag, md.esercizi_assegnati) %}
   <table class="tabella-esercizi-assegnati" data-url-ordine="{{ url }}/esercizi/ordine">
     <thead><tr>
       <th>#{% if riordinabile %} {{ info("Per cambiare l'ordine trascina la maniglia ⠿, usa le frecce o scrivi la posizione. L'ordine non incide sul compito dello studente (gli esercizi vengono comunque rimescolati), solo sul foglio di riferimento.") }}{% endif %}</th>
