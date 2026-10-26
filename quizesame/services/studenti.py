@@ -365,6 +365,15 @@ def upsert_studente(tag: str, matricola: str, nome: str, cognome: str, laurea_ct
         conn.close()
 
 
+# Tutte le tabelle (oltre a studenti) con una colonna matricola: cambiando la matricola
+# vanno aggiornate tutte, sia quelle con vincolo verso studenti (altrimenti il commit
+# fallisce) sia quelle senza (altrimenti presenze, iscrizioni, ecc. si perderebbero).
+_TABELLE_CON_MATRICOLA = (
+    "risultati", "orale_obbligatorio", "aula_assegnazioni", "ammissioni_manuali", "appello_iscritti_manuali",
+    "appello_iscritti_rimossi", "appello_eccezioni_matricola", "appello_presenze", "bozze_correzione",
+)
+
+
 def aggiorna_studente(
     tag: str, matricola: str, nome: str, cognome: str, nuova_matricola: Optional[str] = None, dsa_tipo: str = "",
     dsa_note: str = "",
@@ -388,8 +397,8 @@ def aggiorna_studente(
         if cur.rowcount == 0:
             raise ValueError(f"Studente con matricola '{matricola}' non trovato")
         if nuova_matricola != matricola:
-            conn.execute("UPDATE risultati SET matricola=? WHERE matricola=?", (nuova_matricola, matricola))
-            conn.execute("UPDATE orale_obbligatorio SET matricola=? WHERE matricola=?", (nuova_matricola, matricola))
+            for tabella in _TABELLE_CON_MATRICOLA:
+                conn.execute(f"UPDATE {tabella} SET matricola=? WHERE matricola=?", (nuova_matricola, matricola))
         conn.commit()
     finally:
         conn.close()
