@@ -51,8 +51,8 @@
 {% if statistiche.per_appello %}
 <details class="card" open>
   <summary><strong>Per appello</strong></summary>
-  <table style="margin-top:0.75rem">
-    <tr><th>Appello</th><th>Corretti</th><th>Promossi</th><th>Insufficienti</th><th>Media finale</th></tr>
+  <table class="testate-diagonali" style="margin-top:0.75rem">
+    <tr><th>Appello</th><th class="diagonale"><span>Corretti</span></th><th class="diagonale"><span>Promossi</span></th><th class="diagonale"><span>Insufficienti</span></th><th class="diagonale"><span>Media finale</span></th></tr>
     {% for a in statistiche.per_appello %}
     <tr>
       <td><a href="/corsi/{{ corso.tag }}/appelli/{{ a.appello_id }}#statistiche">{{ a.appello_nome }}</a></td>

@@ -3290,6 +3290,15 @@ def studente_dettaglio_corso(request: Request, tag: str, matricola: str):
     })
 
 
+@app.get("/corsi/{tag}/studenti/{matricola}/carriera", response_class=HTMLResponse)
+def studente_carriera(request: Request, tag: str, matricola: str):
+    """Frammento con i risultati dello studente in tutti i corsi: si apre
+    sotto la riga di un escluso dal filtro sulla matricola, per decidere se ammetterlo."""
+    return templates.TemplateResponse(request, "_carriera_studente.html", {
+        "matricola": matricola, "riepilogo": studenti_service.riepilogo_globale(matricola),
+    })
+
+
 @app.post("/corsi/{tag}/studenti/nuovo")
 def nuovo_studente(
     tag: str, matricola: str = Form(...), nome: str = Form(...), cognome: str = Form(...), dsa_tipo: str = Form(""),

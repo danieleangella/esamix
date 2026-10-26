@@ -167,6 +167,14 @@ table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
 th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
 td button, td input[type=submit] { margin-top: 0; }
+/* testate in diagonale e più piccole (tabelle delle statistiche): la colonna resta larga
+   quanto i dati, il testo sale inclinato sopra quelle vicine */
+.testate-diagonali th { vertical-align: bottom; }
+.testate-diagonali th.diagonale { height: 4.5rem; padding: 0 0 0.35rem 0.6rem; text-align: left; }
+.testate-diagonali th.diagonale > span {
+  display: inline-block; width: 1rem; font-size: 0.68rem; letter-spacing: 0.02em;
+  transform: rotate(-35deg); transform-origin: 0 100%;
+}
 
 .list-links { list-style: none; padding: 0; margin: 0; }
 .list-links li { padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
@@ -585,6 +593,11 @@ button.pulsante-icona {
   display: inline-flex; align-items: center; line-height: 1;
 }
 button.pulsante-icona:hover { color: var(--err-text); border-color: var(--err-text); background: var(--err-bg); filter: none; }
+button.pulsante-icona.pulsante-ok:hover { color: var(--ok-text); border-color: var(--ok-text); background: var(--ok-bg); }
+button.pulsante-icona.pulsante-neutro:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.btn-carriera svg { transition: transform 0.15s; }
+.btn-carriera[aria-expanded="true"] svg { transform: rotate(180deg); }
+.riga-carriera > td { background: var(--accent-soft); }
 button svg, .icona-azione svg { vertical-align: -0.15em; }
 
 /* suggerimento al passaggio del mouse (o col focus da tastiera) per icone e pulsanti

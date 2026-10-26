@@ -89,8 +89,8 @@
 {% if statistiche.per_corso %}
 <details class="card" open>
   <summary><strong>Per corso</strong></summary>
-  <table style="margin-top:0.75rem">
-    <tr><th>Corso</th><th>Corretti</th><th>Promossi</th><th>Insufficienti</th><th>Media finale</th></tr>
+  <table class="testate-diagonali" style="margin-top:0.75rem">
+    <tr><th>Corso</th><th class="diagonale"><span>Corretti</span></th><th class="diagonale"><span>Promossi</span></th><th class="diagonale"><span>Insufficienti</span></th><th class="diagonale"><span>Media finale</span></th></tr>
     {% for c in statistiche.per_corso %}
     <tr>
       <td><a href="/corsi/{{ c.corso_tag }}/statistiche">{{ c.corso_nome }}</a> <span class="muted">({{ c.corso_anno }})</span></td>
@@ -108,8 +108,8 @@
 <details class="card" open>
   <summary><strong>Variazione per anno accademico</strong></summary>
   <p class="muted" style="margin-top:0.75rem">Numero di studenti e percentuale di promossi, per anno (corsi collegati nello stesso anno sono sommati insieme).</p>
-  <table>
-    <tr><th>Anno</th><th>Studenti</th><th>Promossi</th><th>% promossi</th><th>Media finale</th></tr>
+  <table class="testate-diagonali">
+    <tr><th>Anno</th><th class="diagonale"><span>Studenti</span></th><th class="diagonale"><span>Promossi</span></th><th class="diagonale"><span>% promossi</span></th><th class="diagonale"><span>Media finale</span></th></tr>
     {% for a in statistiche.per_anno %}
     <tr>
       <td>{{ a.anno }}</td>

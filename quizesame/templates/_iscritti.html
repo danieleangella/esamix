@@ -125,10 +125,14 @@
     {% if da_confermare %}<span class="badge badge-warn">{{ da_confermare|length }} da confermare</span>{% endif %}
     <p class="muted" style="margin:0.25rem 0 0.5rem">Matricola inferiore a {{ md.appello.matricola_minima_iscritti }}: conferma
       l'esclusione, oppure ammetti comunque (es. DSA, L104, casi particolari). Finché non decidi restano esclusi.</p>
-    <table>
-      <thead><tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Decisione</th><th></th></tr></thead>
+    <table class="tabella-esclusi-filtro">
+      <thead><tr><th></th><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Decisione</th><th></th></tr></thead>
       {% for s in md.esclusi_filtro %}
       <tr>
+        <td class="cella-azioni">
+          <button type="button" class="pulsante-icona pulsante-neutro btn-carriera" data-matricola="{{ s.matricola }}" aria-expanded="false"
+                  data-info="Carriera dello studente" aria-label="Mostra la carriera di {{ s.cognome }} {{ s.nome }}">{{ icona("giu") }}</button>
+        </td>
         <td>{{ s.matricola }}</td>
         <td>{{ s.cognome }}</td>
         <td>{{ s.nome }}</td>
@@ -138,30 +142,36 @@
           {% elif s.decisione == 'escluso' %}<span class="badge">esclusione confermata</span>
           {% else %}<span class="badge badge-warn">da confermare</span>{% endif %}
         </td>
-        <td style="white-space:nowrap">
+        <td class="cella-azioni">
           {% if modificabile %}
           {% set url_decisione = url ~ "/iscritti-filtro/" ~ s.matricola %}
           {% if s.decisione != 'ammesso' %}
           <form class="inline form-frammento" method="post" action="{{ url_decisione }}"
                 data-conferma="{{ 'Ammettere comunque ' ~ s.cognome ~ ' ' ~ s.nome ~ ' (' ~ s.matricola ~ ')' ~ (' — ' ~ (s.dsa_tipo or 'DSA') if s.dsa else '') ~ ' in deroga al filtro sulla matricola?' }}">
             <input type="hidden" name="decisione" value="ammesso">
-            <button type="submit" class="pulsante-piccolo">Ammetti comunque</button>
+            <button type="submit" class="pulsante-icona pulsante-ok" data-info="Ammetti comunque"
+                    aria-label="Ammetti comunque {{ s.cognome }} {{ s.nome }}">{{ icona("utente-spunta") }}</button>
           </form>
           {% endif %}
           {% if s.decisione != 'escluso' %}
           <form class="inline form-frammento" method="post" action="{{ url_decisione }}">
             <input type="hidden" name="decisione" value="escluso">
-            <button type="submit" class="secondary pulsante-piccolo">Conferma esclusione</button>
+            <button type="submit" class="pulsante-icona" data-info="Conferma l'esclusione"
+                    aria-label="Conferma l'esclusione di {{ s.cognome }} {{ s.nome }}">{{ icona("utente-meno") }}</button>
           </form>
           {% endif %}
           {% if s.decisione %}
           <form class="inline form-frammento" method="post" action="{{ url_decisione }}">
             <input type="hidden" name="decisione" value="">
-            <button type="submit" class="link-simile">annulla</button>
+            <button type="submit" class="pulsante-icona pulsante-neutro" data-info="Annulla la decisione (torna da confermare)"
+                    aria-label="Annulla la decisione su {{ s.cognome }} {{ s.nome }}">{{ icona("annulla") }}</button>
           </form>
           {% endif %}
           {% endif %}
         </td>
+      </tr>
+      <tr class="riga-carriera" data-matricola="{{ s.matricola }}" hidden>
+        <td colspan="7" data-url="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/carriera"></td>
       </tr>
       {% endfor %}
     </table>

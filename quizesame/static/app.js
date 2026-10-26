@@ -317,6 +317,16 @@ function attivaIscritti(contenitore, tag) {
     if (!summary) return;
     contenitore.querySelectorAll("details.strumento[open]").forEach(function (d) { if (d !== summary.parentElement) d.open = false; });
   });
+  // esclusi dal filtro sulla matricola: la freccia apre sotto la riga la carriera dello
+  // studente in tutti i corsi, caricata alla prima apertura
+  contenitore.addEventListener("click", function (ev) {
+    var btn = ev.target.closest(".btn-carriera");
+    if (!btn) return;
+    var riga = contenitore.querySelector('.riga-carriera[data-matricola="' + btn.dataset.matricola + '"]');
+    riga.hidden = !riga.hidden;
+    btn.setAttribute("aria-expanded", riga.hidden ? "false" : "true");
+    if (!riga.hidden) caricaInRiga(riga, riga.querySelector("td").dataset.url);
+  });
   attivaRiquadro(contenitore, ".form-frammento", function (c) {
     _autocompleteStudenti(c.querySelector(".campo-input-matricola-iscritto"), c.querySelector(".campo-suggerimenti-studenti-iscritto"), tag);
     if (primaVolta) { primaVolta = false; return; }

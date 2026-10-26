@@ -92,10 +92,10 @@
 {% if stat.esercizi %}
 <details class="card" open>
   <summary><strong>Esercizi più sbagliati{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</strong></summary>
-  <table class="tabella-esercizi-sbagliati" style="margin-top:0.75rem">
+  <table class="tabella-esercizi-sbagliati testate-diagonali" style="margin-top:0.75rem">
     <tr>
       <th class="numero">#</th><th>Esercizio</th>
-      <th class="numero">Giuste</th><th class="numero">Sbagliate</th><th class="numero">Non date</th>
+      <th class="numero diagonale"><span>Giuste</span></th><th class="numero diagonale"><span>Sbagliate</span></th><th class="numero diagonale"><span>Non date</span></th>
       <th>Risposte sbagliate più scelte {{ info("Percentuale sul totale dei compiti in cui compare l'esercizio, e tra parentesi quanti studenti l'hanno scelta. Le domande aperte non sono contate: non hanno una risposta giusta da confrontare.") }}</th>
     </tr>
     {% for e in stat.esercizi %}

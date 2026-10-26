@@ -1,0 +1,31 @@
+{# Carriera di uno studente in tutti i corsi, in forma compatta: si apre sotto la riga di un
+   escluso dal filtro sulla matricola (_iscritti.html) per decidere se ammetterlo. #}
+{% if not riepilogo %}
+<p class="muted" style="margin:0.25rem 0">Nessun corso in EsaMiX con questa matricola: nessun risultato precedente.</p>
+{% else %}
+{% for c in riepilogo %}
+<p style="margin:0.25rem 0"><strong>{{ c.corso_nome }}</strong> <span class="muted">({{ c.corso_anno }})</span></p>
+{% if c.risultati %}
+<table style="margin:0 0 0.5rem">
+  {% for r in c.risultati %}
+  <tr>
+    <td>{{ r.appello_nome }}{% if r.appello_data %} <span class="muted">{{ r.appello_data }}</span>{% endif %}</td>
+    <td>
+      {% if r.esito == 'rifiutato' %}rifiutato <span class="muted">({{ r.voto }})</span>
+      {% elif r.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if r.annullamento_nota %} <span class="muted">— {{ r.annullamento_nota }}</span>{% endif %}
+      {% elif r.esito != 'voto' %}{{ r.esito }}
+      {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
+      {% elif r.esito_orale in ('assente', 'insufficiente') %}{{ r.esito_orale }} (orale)
+      {% elif r.superato %}<span class="badge badge-ok">{{ r.voto }}</span>
+      {% else %}<span class="badge badge-err">insufficiente</span> <span class="muted">({{ r.voto }})</span>{% endif %}
+    </td>
+    <td>{% if r.verbalizzato %}<span class="muted">verbalizzato {{ r.data_verbalizzazione or "" }}</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="muted" style="margin:0 0 0.5rem">Registrato, nessun risultato.</p>
+{% endif %}
+{% endfor %}
+<p style="margin:0.25rem 0"><a href="/studenti/{{ matricola }}" target="_blank">Riepilogo completo</a></p>
+{% endif %}
