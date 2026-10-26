@@ -4,6 +4,7 @@ import re
 import shutil
 import sqlite3
 import tempfile
+import unicodedata
 import zipfile
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -83,6 +84,9 @@ class Corso:
     # studente resta comunque indicato come annullato)
     annullato_come: str = "insufficiente"
     soglia_occupazione_aule: int = DEFAULT_SOGLIA_OCCUPAZIONE_AULE
+    # partizione dei cognomi seguita dal corso (es. "O-Z"): ogni nuova prova la eredita
+    # come filtro sugli iscritti (vedi cognome_ammesso)
+    filtro_cognome: str = ""
     domande_esame: str = ""  # la prima di domande_esame_lista: quella proposta di default
     domande_esame_lista: list[str] = field(default_factory=list)
     importato_da_legacy: bool = False
@@ -107,6 +111,9 @@ class Appello:
     # filtro sull'elenco iscritti (file della segreteria o aggiunti a mano): solo chi ha
     # matricola numerica >= questa soglia (es. per ammettere solo il primo anno)
     matricola_minima_iscritti: Optional[str] = None
+    # filtro sull'elenco iscritti per iniziale del cognome (es. "A-D", "E-N, O-Z"): vedi
+    # cognome_ammesso; alla creazione è quello del corso
+    cognome_iscritti: Optional[str] = None
     # testo chiuso dalla scheda Testo: gli esercizi assegnati non si modificano più (né
     # dalla banca) finché non lo si riapre esplicitamente; i compiti si generano solo dopo
     testo_chiuso: bool = False
@@ -240,7 +247,7 @@ _META_EREDITABILI = (
     "frase_obbligatorio",
     "orale_dopo_richiesta", "orale_soglia_attiva", "orale_soglia_n", "orale_soglia_voto",
     "orale_soglia_escludi_parziali", "ritirato_conta_insufficiente", "annullato_come", "domande_esame",
-    "domande_esame_lista", "soglia_occupazione_aule",
+    "domande_esame_lista", "soglia_occupazione_aule", "filtro_cognome",
 )
 
 
@@ -443,6 +450,7 @@ def get_corso(tag: str) -> Corso:
         ritirato_conta_insufficiente=meta.get("ritirato_conta_insufficiente", "0") == "1",
         annullato_come="ritirato" if meta.get("annullato_come") == "ritirato" else "insufficiente",
         soglia_occupazione_aule=int(meta.get("soglia_occupazione_aule") or DEFAULT_SOGLIA_OCCUPAZIONE_AULE),
+        filtro_cognome=meta.get("filtro_cognome") or "",
         domande_esame=(_domande_esame_da_meta(meta) or [""])[0],
         domande_esame_lista=_domande_esame_da_meta(meta),
         importato_da_legacy=meta.get("importato_da_legacy", "0") == "1",
@@ -510,6 +518,7 @@ def _row_to_appello(conn, row) -> Appello:
         presenze_chiuse=bool(row["presenze_chiuse"]) if "presenze_chiuse" in chiavi else False,
         correzione_scritti_conclusa=bool(row["correzione_scritti_conclusa"]) if "correzione_scritti_conclusa" in chiavi else False,
         matricola_minima_iscritti=row["matricola_minima_iscritti"] if "matricola_minima_iscritti" in chiavi else None,
+        cognome_iscritti=row["cognome_iscritti"] if "cognome_iscritti" in chiavi else None,
         testo_chiuso=bool(row["testo_chiuso"]) if "testo_chiuso" in chiavi else False,
         testo_chiuso_il=row["testo_chiuso_il"] if "testo_chiuso_il" in chiavi else None,
         rimanda_svolgimenti=bool(row["rimanda_svolgimenti"]) if "rimanda_svolgimenti" in chiavi else False,
@@ -561,9 +570,10 @@ def create_appello(
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         slug = _unique_appello_slug(conn, slug if slug else _slugify(nome))
+        filtro = conn.execute("SELECT value FROM meta WHERE key='filtro_cognome'").fetchone()
         cur = conn.execute(
-            "INSERT INTO appelli (slug, nome, tipo, data) VALUES (?,?,?,?)",
-            (slug, nome, tipo, data),
+            "INSERT INTO appelli (slug, nome, tipo, data, cognome_iscritti) VALUES (?,?,?,?,?)",
+            (slug, nome, tipo, data, (filtro["value"] if filtro else None) or None),
         )
         conn.commit()
         return get_appello(tag, cur.lastrowid)
@@ -819,6 +829,69 @@ def matricola_ammessa(matricola: str, soglia: Optional[str]) -> bool:
     return soglia_int is None or matricola_int is None or matricola_int >= soglia_int
 
 
+def _normalizza_cognome(testo: str) -> str:
+    """Solo le lettere, maiuscole e senza accenti: "D'Àngelo" -> "DANGELO"."""
+    senza_accenti = "".join(c for c in unicodedata.normalize("NFKD", testo or "") if not unicodedata.combining(c))
+    return "".join(c for c in senza_accenti.upper() if "A" <= c <= "Z")
+
+
+def intervalli_cognome(filtro: Optional[str]) -> list[tuple[str, str]]:
+    """Intervalli di un filtro sul cognome: "A-D", "E-N, O-Z", "A-Ma" (anche più lettere)
+    o una lettera sola ("Z"). Vuoto se il filtro è vuoto; ValueError se non si capisce."""
+    intervalli = []
+    for parte in re.split(r"[,;]", filtro or ""):
+        if not parte.strip():
+            continue
+        estremi = [_normalizza_cognome(e) for e in parte.split("-")]
+        if len(estremi) == 1:
+            estremi *= 2
+        if len(estremi) != 2 or not all(estremi) or estremi[0] > estremi[1]:
+            raise ValueError(f"Intervallo di cognomi non valido: '{parte.strip()}' (es. A-D, E-N, O-Z)")
+        intervalli.append((estremi[0], estremi[1]))
+    return intervalli
+
+
+def normalizza_filtro_cognome(filtro: Optional[str]) -> str:
+    """Il filtro scritto in forma canonica ("a-d,o-z" -> "A-D, O-Z", "a-ma" -> "A-Ma");
+    ValueError se non valido."""
+    return ", ".join(
+        da.capitalize() if da == a else f"{da.capitalize()}-{a.capitalize()}" for da, a in intervalli_cognome(filtro)
+    )
+
+
+def cognome_ammesso(cognome: str, filtro: Optional[str]) -> bool:
+    """Filtro sulle iniziali del cognome (es. corsi divisi A-D, E-N, O-Z): il cognome,
+    senza spazi, apostrofi e accenti, deve cadere in uno degli intervalli, confrontando
+    tante lettere quante ne ha l'estremo ("A-Ma" ammette "Mancini" ma non "Neri"). Un
+    filtro vuoto o non valido, o un cognome mancante, non escludono nessuno."""
+    try:
+        intervalli = intervalli_cognome(filtro)
+    except ValueError:
+        return True
+    nome = _normalizza_cognome(cognome)
+    if not intervalli or not nome:
+        return True
+    return any(nome[:len(da)] >= da and nome[:len(a)] <= a for da, a in intervalli)
+
+
+def applica_filtro_cognome_alle_prove(tag: str, vecchio: str, nuovo: str) -> int:
+    """Quando cambia il filtro sul cognome del corso, lo riporta sulle prove non chiuse
+    che seguivano quello precedente (o non ne avevano uno); quelle con un filtro diverso,
+    scelto apposta, restano com'erano. Ritorna quante prove sono cambiate."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        prima = conn.total_changes
+        conn.execute(
+            "UPDATE appelli SET cognome_iscritti=? WHERE chiuso=0 AND tipo != 'raggruppamento' "
+            "AND (cognome_iscritti IS NULL OR cognome_iscritti='' OR cognome_iscritti=?)",
+            (nuovo or None, vecchio or ""),
+        )
+        conn.commit()
+        return conn.total_changes - prima
+    finally:
+        conn.close()
+
+
 def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) -> list[dict]:
     """Studenti ammessi a sostenere la prova `raggruppamento.membri[indice]`: per la prima
     prova (indice 0), quelli dell'elenco iscritti della prima prova (nessuno se l'elenco è
@@ -845,6 +918,9 @@ def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) ->
                     "SELECT matricola, nome, cognome, dsa, dsa_tipo FROM studenti ORDER BY cognome COLLATE NOCASE, nome COLLATE NOCASE"
                 ).fetchall()]
             ammessi = [r for r in righe if matricola_ammessa(r["matricola"], raggruppamento.matricola_minima_prima_prova)]
+            if raggruppamento.fonte_ammessi != "iscritti":
+                # l'elenco iscritti è già filtrato; tutto il corso va filtrato qui
+                ammessi = [r for r in ammessi if cognome_ammesso(r["cognome"], membro.cognome_iscritti)]
         else:
             corso = get_corso(tag)
             membro_precedente = raggruppamento.membri[indice - 1]

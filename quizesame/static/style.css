@@ -574,6 +574,7 @@ ins.diff-nuovo { background: #d9f5e1; color: var(--ok-text); text-decoration: no
 /* elenco iscritti (_iscritti.html): campo per aggiungere, barra di strumenti a icone con
    pannelli a comparsa, cestino su ogni riga */
 .barra-aggiungi { display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; margin: 0.5rem 0; }
+.studente-scelto { font-size: 0.8rem; margin-top: 0.2rem; }
 .barra-strumenti { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.5rem 0; }
 .barra-strumenti-fine { margin-left: auto; display: inline-flex; align-items: center; gap: 0.3rem; color: var(--muted); }
 details.strumento { position: relative; }

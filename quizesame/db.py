@@ -335,6 +335,8 @@ ADDITIVE_COLUMNS = {
         ("presenze_chiuse", "BOOLEAN NOT NULL DEFAULT 0"),
         ("correzione_scritti_conclusa", "BOOLEAN NOT NULL DEFAULT 0"),
         ("matricola_minima_iscritti", "TEXT"),
+        # filtro sull'iniziale del cognome degli iscritti (es. "A-D"), vedi corsi.cognome_ammesso
+        ("cognome_iscritti", "TEXT"),
         # testo chiuso (scheda Testo): esercizi non più modificabili finché non lo si riapre
         ("testo_chiuso", "BOOLEAN NOT NULL DEFAULT 0"),
         ("testo_chiuso_il", "TEXT"),

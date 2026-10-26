@@ -12,6 +12,10 @@
   <div class="barra-strumenti" style="margin-top:0.75rem">
     <span>{{ icona("stampa", 14) }} Elenco ammessi</span>
     {{ formati(url ~ "/ammessi", pdf=True, html=True, tex=True, csv=True) }}
+    {% for a in md.aule %}
+    <span>· Aula {{ a.nome }} ({{ md.ammessi|selectattr("aula_id", "equalto", a.id)|list|length }})</span>
+    {{ formati(url ~ "/ammessi-aula-" ~ a.id, pdf=True, html=True) }}
+    {% endfor %}
   </div>
   <div class="barra-strumenti">
     {% if md.aule %}
@@ -35,18 +39,19 @@
   </div>
   {% endif %}
 
-  <details style="margin-top:0.5rem" data-chiave="elenco">
-    <summary>Elenco dettagliato e assegnazione alle aule</summary>
+  {% set regolari = md.ammessi|rejectattr("in_deroga")|list %}
+  {% set in_deroga = md.ammessi|selectattr("in_deroga")|list %}
+  {% macro tabella(righe) %}
     <table style="margin-top:0.5rem">
       <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Aula</th><th></th></tr>
-      {% for s in md.ammessi %}
+      {% for s in righe %}
       <tr>
         <td>{{ s.matricola }}</td>
         <td>{{ s.cognome }}</td>
         <td>{{ s.nome }}</td>
         <td>{% if s.dsa %}<span class="badge badge-info">{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
         <td>
-          {% if md.aule %}
+          {% if md.aule and not md.appello.chiuso %}
           <form class="inline" method="post" action="{{ url }}/aule/{{ s.matricola }}/assegna-manuale">
             <select name="aula_id" style="width:auto" onchange="this.form.requestSubmit()" aria-label="Aula di {{ s.cognome }} {{ s.nome }}">
               <option value="">non assegnata</option>
@@ -58,8 +63,7 @@
           {% endif %}
         </td>
         <td class="cella-azioni">
-          {% if s.in_deroga %}
-          <span class="badge badge-warn" data-info="Aggiunto a mano: non soddisfa i requisiti automatici di ammissione">in deroga</span>
+          {% if s.in_deroga and not md.appello.chiuso %}
           <form class="inline" method="post" action="{{ url }}/ammessi/{{ s.matricola }}/rimuovi"
                 data-conferma="{{ 'Rimuovere ' ~ s.cognome ~ ' ' ~ s.nome ~ ' dagli ammessi a questa prova?' }}">
             <button type="submit" class="pulsante-icona" data-info="Togli dagli ammessi" aria-label="Togli {{ s.cognome }} {{ s.nome }} dagli ammessi">{{ icona("cestino") }}</button>
@@ -69,6 +73,16 @@
       </tr>
       {% endfor %}
     </table>
+  {% endmacro %}
+
+  <details style="margin-top:0.5rem" data-chiave="elenco">
+    <summary>Elenco dettagliato e assegnazione alle aule ({{ regolari|length }})</summary>
+    {% if regolari %}{{ tabella(regolari) }}{% else %}<p class="muted">Nessuno studente ammesso per i requisiti della prova.</p>{% endif %}
+  </details>
+
+  <details style="margin-top:0.5rem" data-chiave="deroga">
+    <summary>Ammessi in deroga ({{ in_deroga|length }}) {{ info("Per le eccezioni: lo studente compare tra gli ammessi con l'avviso \"in deroga\" (anche negli elenchi stampati) pur non avendo superato la prova precedente o non rispettando i filtri della prova. Si può togliere in qualsiasi momento.") }}</summary>
+    {% if in_deroga %}{{ tabella(in_deroga) }}{% endif %}
 
     {% if not md.appello.chiuso %}
     <form class="barra-aggiungi" method="post" action="{{ url }}/ammessi/aggiungi" autocomplete="off" style="margin-top:0.75rem">
@@ -78,7 +92,6 @@
         <div class="campo-suggerimenti-studenti-ammesso sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
       </div>
       <button type="submit" class="secondary" style="margin:0">{{ icona("piu") }} Ammetti</button>
-      {{ info("Per le eccezioni: lo studente compare tra gli ammessi con l'avviso \"in deroga\" (anche negli elenchi stampati) pur non avendo superato la prova precedente o non rispettando la soglia di matricola. Si può togliere in qualsiasi momento.") }}
     </form>
     {% endif %}
   </details>

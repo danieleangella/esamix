@@ -254,12 +254,23 @@ function attivaRiquadro(contenitore, selettore, dopo) {
 }
 
 // Suggerimenti di studenti del corso per un campo matricola: scegliere un nome dalla
-// lista invia subito il modulo (un clic invece di due).
+// lista riempie solo il campo e mostra sotto chi è stato scelto; si aggiunge davvero
+// solo col pulsante del modulo (che prende il focus: basta Invio per confermare).
 function _autocompleteStudenti(campo, suggerimenti, tag) {
   if (!campo) return;
+  var scelto = document.createElement("div");
+  scelto.className = "muted studente-scelto";
+  scelto.hidden = true;
+  suggerimenti.parentNode.appendChild(scelto);
   suggerimenti.addEventListener("click", function (ev) {
-    if (ev.target.closest(".sfoglia-voce") && campo.form) campo.form.requestSubmit();
+    var voce = ev.target.closest(".sfoglia-voce");
+    if (!voce) return;
+    scelto.textContent = "Scelto: " + voce.textContent + " — premi il pulsante per confermare";
+    scelto.hidden = false;
+    var pulsante = campo.form && campo.form.querySelector('button[type="submit"]');
+    if (pulsante) pulsante.focus();
   });
+  campo.addEventListener("input", function () { scelto.hidden = true; });
   creaAutocomplete(
     campo, suggerimenti,
     function (q) { return "/corsi/" + tag + "/api/studenti/cerca?q=" + encodeURIComponent(q); },

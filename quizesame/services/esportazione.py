@@ -316,12 +316,17 @@ def importa_iscritti_moodle(tag: str, appello_id: int, studenti: list[dict], sos
 def iscrivi_tutti_gli_studenti(tag: str, appello_id: int, matricola_minima: str = "") -> int:
     """Aggiunge agli iscritti manuali di questo appello tutti gli studenti del corso (con
     matricola >= `matricola_minima`, se data): per le prove a cui è ammesso l'intero
-    corso, senza un file della segreteria. Ritorna quanti ne sono stati aggiunti."""
+    corso, senza un file della segreteria. Chi è fuori dal filtro sul cognome della prova
+    non viene aggiunto (altrimenti finirebbe tra gli esclusi da confermare uno per uno).
+    Ritorna quanti ne sono stati aggiunti."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    filtro_cognome = appello.cognome_iscritti if appello else None
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         matricole = [
-            r["matricola"] for r in conn.execute("SELECT matricola FROM studenti")
+            r["matricola"] for r in conn.execute("SELECT matricola, cognome FROM studenti")
             if corsi_service.matricola_ammessa(r["matricola"], matricola_minima.strip() or None)
+            and corsi_service.cognome_ammesso(r["cognome"], filtro_cognome)
         ]
         prima = conn.total_changes
         conn.executemany(
@@ -365,19 +370,26 @@ def list_iscritti(tag: str, appello_id: int) -> Optional[list[dict]]:
     matricola è vincolata a esistere già in 'studenti'). Una matricola ripetuta più volte
     nel file conta una sola volta (prima occorrenza). Se l'appello ha una matricola
     minima per gli iscritti, chi ha una matricola inferiore è escluso dall'elenco (ma resta
-    nel file salvato, che torna intero alla segreteria)."""
+    nel file salvato, che torna intero alla segreteria). Lo stesso per il filtro sul cognome
+    (es. solo A-D). Chi il docente ha ammesso in deroga resta comunque."""
     elenco = _list_iscritti_senza_filtro(tag, appello_id)
     if elenco is None:
         return None
     appello = corsi_service.get_appello(tag, appello_id)
-    soglia = appello.matricola_minima_iscritti if appello else None
-    if not soglia:
+    if not appello or not (appello.matricola_minima_iscritti or appello.cognome_iscritti):
         return elenco
     ammessi_in_deroga = {m for m, ammesso in _decisioni_filtro(tag, appello_id).items() if ammesso}
-    return [
-        s for s in elenco
-        if corsi_service.matricola_ammessa(s["matricola"], soglia) or s["matricola"] in ammessi_in_deroga
-    ]
+    return [s for s in elenco if not _motivi_esclusione(s, appello) or s["matricola"] in ammessi_in_deroga]
+
+
+def _motivi_esclusione(studente: dict, appello) -> list[str]:
+    """Perché uno studente non passa i filtri sugli iscritti di `appello` (vuoto se li passa)."""
+    motivi = []
+    if not corsi_service.matricola_ammessa(studente["matricola"], appello.matricola_minima_iscritti):
+        motivi.append(f"matricola < {appello.matricola_minima_iscritti}")
+    if not corsi_service.cognome_ammesso(studente.get("cognome") or "", appello.cognome_iscritti):
+        motivi.append(f"cognome fuori {appello.cognome_iscritti}")
+    return motivi
 
 
 def _decisioni_filtro(tag: str, appello_id: int) -> dict[str, bool]:
@@ -393,22 +405,25 @@ def _decisioni_filtro(tag: str, appello_id: int) -> dict[str, bool]:
 
 
 def list_esclusi_dal_filtro(tag: str, appello_id: int) -> list[dict]:
-    """Iscritti con matricola sotto la soglia del filtro di questo appello, ognuno con la
-    decisione del docente: "decisione" è "ammesso" (eccezione: resta tra gli iscritti),
-    "escluso" (esclusione confermata) o None (ancora da confermare). Vuoto se il filtro
-    non è attivo. I dati DSA/L104 servono a decidere con cognizione di causa."""
+    """Iscritti che non passano i filtri di questo appello (matricola sotto la soglia,
+    cognome fuori dall'intervallo), ognuno con i "motivi" e la decisione del docente:
+    "decisione" è "ammesso" (eccezione: resta tra gli iscritti), "escluso" (esclusione
+    confermata) o None (ancora da confermare). Vuoto se nessun filtro è attivo. I dati
+    DSA/L104 servono a decidere con cognizione di causa."""
     appello = corsi_service.get_appello(tag, appello_id)
-    soglia = appello.matricola_minima_iscritti if appello else None
     elenco = _list_iscritti_senza_filtro(tag, appello_id)
-    if not soglia or not elenco:
+    if not appello or not elenco or not (appello.matricola_minima_iscritti or appello.cognome_iscritti):
         return []
     decisioni = _decisioni_filtro(tag, appello_id)
     esclusi = []
     for s in elenco:
-        if corsi_service.matricola_ammessa(s["matricola"], soglia):
+        motivi = _motivi_esclusione(s, appello)
+        if not motivi:
             continue
         decisione = decisioni.get(s["matricola"])
-        esclusi.append({**s, "decisione": None if decisione is None else ("ammesso" if decisione else "escluso")})
+        esclusi.append({
+            **s, "motivi": motivi, "decisione": None if decisione is None else ("ammesso" if decisione else "escluso"),
+        })
     return esclusi
 
 

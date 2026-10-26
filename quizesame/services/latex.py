@@ -639,7 +639,7 @@ def crea_tex_risultati(ctx: LatexContext, lista) -> str:
     return tex
 
 
-def _tabella_ammessi(righe: list[dict]) -> str:
+def _tabella_ammessi(righe: list[dict], con_aula: bool = False) -> str:
     """Righe ben distanziate (spazio a sufficienza per segnare a penna presenza/assenza
     durante l'appello), con una riga di separazione tra uno studente e l'altro. La
     casella "Presente" è la prima colonna (senza intestazione, da spuntare a penna); la
@@ -647,10 +647,17 @@ def _tabella_ammessi(righe: list[dict]) -> str:
     soddisfacendo i requisiti automatici). Lo spazio verticale è dato da uno strut
     invisibile dentro ogni riga (non da un salto riga finale tipo '\\\\[0.9cm]'): messo
     dopo l'ultima riga, quest'ultimo lascerebbe la prima riga incollata all'intestazione,
-    con uno spazio diverso (più stretto) da quello, uniforme, fra tutte le altre righe."""
+    con uno spazio diverso (più stretto) da quello, uniforme, fra tutte le altre righe.
+    `con_aula`: colonna in più con l'aula assegnata (nell'elenco generale, se ci sono aule)."""
+    if con_aula:
+        colonne = "c >{\\ttfamily}l >{\\bfseries}p{0.24\\textwidth} p{0.2\\textwidth} l l"
+        intestazione = ("Presente", "Matricola", "Cognome", "Nome", "Aula", "Note")
+    else:
+        colonne = "c >{\\ttfamily}l >{\\bfseries}p{0.3\\textwidth} p{0.25\\textwidth} l"
+        intestazione = ("Presente", "Matricola", "Cognome", "Nome", "Note")
     tex = _RIGHE_ALTERNATE + (
-        "\\begin{longtable}{c >{\\ttfamily}l >{\\bfseries}p{0.3\\textwidth} p{0.25\\textwidth} l}\n\\toprule\n"
-        + _riga_intestazione("Presente", "Matricola", "Cognome", "Nome", "Note", altezza="0.75cm") + "\\midrule\n\\endhead\n"
+        f"\\begin{{longtable}}{{{colonne}}}\n\\toprule\n"
+        + _riga_intestazione(*intestazione, altezza="0.75cm") + "\\midrule\n\\endhead\n"
     )
     for i, r in enumerate(righe):
         note_parti = []
@@ -659,7 +666,8 @@ def _tabella_ammessi(righe: list[dict]) -> str:
         if r.get("in_deroga"):
             note_parti.append("deroga")
         note = ", ".join(note_parti)
-        tex += f"\\rule{{0pt}}{{0.75cm}}{{\\Large $\\square$}} & {r['matricola']} & {r['cognome']} & {r['nome']} & {note} \\\\\n"
+        aula = f" & {_escape_testo_semplice(r.get('aula_nome') or '--')}" if con_aula else ""
+        tex += f"\\rule{{0pt}}{{0.75cm}}{{\\Large $\\square$}} & {r['matricola']} & {r['cognome']} & {r['nome']}{aula} & {note} \\\\\n"
     tex += "\\bottomrule\n\\end{longtable}\n\n"
     return tex
 
@@ -668,12 +676,12 @@ def crea_tex_ammessi(ctx: LatexContext, titolo: str, lista: list[dict], aule: li
     """Elenco degli studenti ammessi a sostenere una prova (matricola per intero, non
     oscurata: serve a fare l'appello in aula, non va pubblicata come i risultati). `lista`:
     dict con matricola/nome/cognome/dsa/aula_nome. `aule`: le aule di questa prova (oggetti
-    con .id/.nome/.capienza); se presenti, dopo la tabella generale segue una tabella per
-    aula con solo gli studenti assegnati a quella specifica aula."""
+    con .id/.nome/.capienza); se presenti, la tabella generale indica l'aula di ciascuno e
+    dopo segue una tabella per aula con solo gli studenti assegnati a quella specifica aula."""
     tex = BEGIN_DOCUMENT
     tex += intestazione_breve(ctx)
     tex += _titolo_documento(titolo, _quanti(len(lista), "studente", "studenti"))
-    tex += _tabella_ammessi(lista)
+    tex += _tabella_ammessi(lista, con_aula=bool(aule))
     for aula in aule:
         righe_aula = [r for r in lista if r.get("aula_id") == aula.id]
         tex += "\\newpage\n"

@@ -770,9 +770,12 @@ def modifica_corso(
     orale_soglia_escludi_parziali: str = Form(""),
     ritirato_conta_insufficiente: str = Form(""), annullato_come: str = Form("insufficiente"),
     soglia_occupazione_aule: int = Form(corsi_service.DEFAULT_SOGLIA_OCCUPAZIONE_AULE),
+    filtro_cognome: str = Form(""),
     domande_esame: list[str] = Form([]),
 ):
     try:
+        filtro_cognome = corsi_service.normalizza_filtro_cognome(filtro_cognome)
+        filtro_precedente = corsi_service.get_corso(tag).filtro_cognome
         corsi_service.update_meta(
             tag, nome=nome, facolta=facolta, universita=universita, anno=anno, docente=docente,
             votomin=str(votomin), consegna=str(consegna), votomin_raggruppamento=str(votomin_raggruppamento),
@@ -789,11 +792,16 @@ def modifica_corso(
             ritirato_conta_insufficiente="1" if ritirato_conta_insufficiente else "0",
             annullato_come="ritirato" if annullato_come == "ritirato" else "insufficiente",
             soglia_occupazione_aule=str(max(1, min(100, soglia_occupazione_aule))),
+            filtro_cognome=filtro_cognome,
             **corsi_service.domande_esame_meta(domande_esame),
         )
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/impostazioni", str(e), "error")
     msg = "Impostazioni corso salvate"
+    if filtro_cognome != filtro_precedente:
+        n_prove = corsi_service.applica_filtro_cognome_alle_prove(tag, filtro_precedente, filtro_cognome)
+        if n_prove:
+            msg += f"; filtro sui cognomi aggiornato anche in {n_prove} prov{'a' if n_prove == 1 else 'e'} non chius{'a' if n_prove == 1 else 'e'}"
     if not domande_aperte_attive:
         n_aperte = sum(1 for e in esercizi_service.list_esercizi(tag) if e.aperta)
         if n_aperte:
@@ -2758,11 +2766,19 @@ def iscrivi_tutti(request: Request, tag: str, appello_id: int, matricola_minima:
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/iscritti-filtro")
-def imposta_filtro_iscritti(request: Request, tag: str, appello_id: int, matricola_minima: str = Form("")):
+def imposta_filtro_iscritti(
+    request: Request, tag: str, appello_id: int, matricola_minima: str = Form(""), cognome: str = Form(""),
+):
     soglia = matricola_minima.strip() or None
-    corsi_service.update_appello(tag, appello_id, matricola_minima_iscritti=soglia)
+    try:
+        intervallo = corsi_service.normalizza_filtro_cognome(cognome) or None
+    except ValueError as e:
+        return _risposta_iscritti(request, tag, appello_id, str(e), "error")
+    corsi_service.update_appello(tag, appello_id, matricola_minima_iscritti=soglia, cognome_iscritti=intervallo)
     n = esportazione_service.numero_iscritti(tag, appello_id)
-    msg = (f"Filtro salvato: solo matricole ≥ {soglia}" if soglia else "Filtro sulle matricole rimosso")
+    filtri = [f"matricole ≥ {soglia}" if soglia else "", f"cognomi {intervallo}" if intervallo else ""]
+    filtri = [f for f in filtri if f]
+    msg = f"Filtri salvati: solo {' e '.join(filtri)}" if filtri else "Filtri sugli iscritti rimossi"
     if n is not None:
         msg += f" — {n} iscritti nell'elenco"
     return _risposta_iscritti(request, tag, appello_id, msg)
@@ -2804,11 +2820,28 @@ def scarica_iscritti_csv(tag: str, appello_id: int):
     )
 
 
+_TIPO_ELENCO_RE = re.compile(r"^(iscritti|ammessi)$|^ammessi-aula-(\d+)$")
+
+
 def _elenco_studenti(tag: str, appello_id: int, tipo: str):
     """(appello, titolo, elenco, aule, percorso del .tex) per l'elenco degli iscritti o
-    degli ammessi a una prova (tipo "iscritti" | "ammessi"); elenco None se non disponibile.
+    degli ammessi a una prova (tipo "iscritti" | "ammessi" | "ammessi-aula-<id>", questo
+    con i soli ammessi assegnati a quell'aula); elenco None se non disponibile.
     Il .tex viene sempre riscritto: l'elenco cambia man mano che si aggiungono studenti."""
     appello = corsi_service.get_appello(tag, appello_id)
+    trovato = _TIPO_ELENCO_RE.match(tipo)
+    if trovato and trovato.group(2):
+        raggruppamento, indice = _membro_e_indice(tag, appello_id)
+        aula = next((a for a in aule_service.list_aule(tag, appello_id) if a.id == int(trovato.group(2))), None)
+        if raggruppamento is None or aula is None:
+            return appello, "", None, [], None
+        elenco = [s for s in corsi_service.list_ammessi_prova(tag, raggruppamento, indice) if s["aula_id"] == aula.id]
+        titolo = f"Studenti ammessi: {appello.nome}, aula {aula.nome}"
+        tex_path = compiti_service.path_ammessi(tag, appello_id, "tex", appello=appello)
+        tex_path = tex_path.with_name(f"{tex_path.stem}-aula-{aula.id}.tex")
+        ctx = risultati_service.ctx_for(tag, corsi_service.get_corso(tag), appello)
+        tex_path.write_text(latex_service.crea_tex_ammessi(ctx, titolo, elenco, []), encoding="utf-8")
+        return appello, titolo, elenco, [], tex_path
     corso = corsi_service.get_corso(tag)
     if tipo == "iscritti":
         elenco, aule = esportazione_service.list_iscritti(tag, appello_id), []
@@ -2828,7 +2861,7 @@ def _elenco_studenti(tag: str, appello_id: int, tipo: str):
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/{tipo}.tex", response_class=PlainTextResponse)
 def elenco_studenti_tex(tag: str, appello_id: int, tipo: str):
-    if tipo not in ("iscritti", "ammessi"):
+    if not _TIPO_ELENCO_RE.match(tipo):
         return PlainTextResponse("Documento non trovato", status_code=404)
     _, _, elenco, _, tex_path = _elenco_studenti(tag, appello_id, tipo)
     if elenco is None:
@@ -2838,7 +2871,7 @@ def elenco_studenti_tex(tag: str, appello_id: int, tipo: str):
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/{tipo}.html", response_class=HTMLResponse)
 def elenco_studenti_html(request: Request, tag: str, appello_id: int, tipo: str):
-    if tipo not in ("iscritti", "ammessi"):
+    if not _TIPO_ELENCO_RE.match(tipo):
         return PlainTextResponse("Documento non trovato", status_code=404)
     appello, titolo, elenco, aule, _ = _elenco_studenti(tag, appello_id, tipo)
     if elenco is None:
@@ -3211,8 +3244,9 @@ def scarica_ammessi_csv(tag: str, appello_id: int):
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/ammessi.pdf")
-def scarica_ammessi_pdf(tag: str, appello_id: int):
-    _, _, ammessi, _, tex_path = _elenco_studenti(tag, appello_id, "ammessi")
+@app.get("/corsi/{tag}/appelli/{appello_id}/ammessi-aula-{aula_id}.pdf")
+def scarica_ammessi_pdf(tag: str, appello_id: int, aula_id: Optional[int] = None):
+    _, _, ammessi, _, tex_path = _elenco_studenti(tag, appello_id, f"ammessi-aula-{aula_id}" if aula_id else "ammessi")
     if ammessi is None:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Questa prova non appartiene a un raggruppamento", "error")
     compilazione = compiti_service.compila_pdf(tex_path)

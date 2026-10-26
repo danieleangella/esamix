@@ -7,6 +7,61 @@
 {% set url = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
 {% set modificabile = not md.appello.chiuso %}
 {% set da_confermare = md.esclusi_filtro|selectattr("decisione", "none")|list %}
+{% set in_deroga = md.esclusi_filtro|selectattr("decisione", "equalto", "ammesso")|list %}
+{% set non_ammessi = md.esclusi_filtro|rejectattr("decisione", "equalto", "ammesso")|list %}
+{% macro tabella_esclusi(righe) %}
+    <table class="tabella-esclusi-filtro">
+      <thead><tr><th></th><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Motivo</th><th>DSA/L104</th><th>Decisione</th><th></th></tr></thead>
+      {% for s in righe %}
+      <tr>
+        <td class="cella-azioni">
+          <button type="button" class="pulsante-icona pulsante-neutro btn-carriera" data-matricola="{{ s.matricola }}" aria-expanded="false"
+                  data-info="Carriera dello studente" aria-label="Mostra la carriera di {{ s.cognome }} {{ s.nome }}">{{ icona("giu") }}</button>
+        </td>
+        <td>{{ s.matricola }}</td>
+        <td>{{ s.cognome }}</td>
+        <td>{{ s.nome }}</td>
+        <td class="muted">{{ s.motivi|join(", ") }}</td>
+        <td>{% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% if s.dsa_note %} <span class="muted">{{ s.dsa_note }}</span>{% endif %}{% endif %}</td>
+        <td>
+          {% if s.decisione == 'ammesso' %}<span class="badge badge-ok">ammesso in deroga</span>
+          {% elif s.decisione == 'escluso' %}<span class="badge">esclusione confermata</span>
+          {% else %}<span class="badge badge-warn">da confermare</span>{% endif %}
+        </td>
+        <td class="cella-azioni">
+          {% if modificabile %}
+          {% set url_decisione = url ~ "/iscritti-filtro/" ~ s.matricola %}
+          {% if s.decisione != 'ammesso' %}
+          <form class="inline form-frammento" method="post" action="{{ url_decisione }}"
+                data-conferma="{{ 'Ammettere comunque ' ~ s.cognome ~ ' ' ~ s.nome ~ ' (' ~ s.matricola ~ ')' ~ (' — ' ~ (s.dsa_tipo or 'DSA') if s.dsa else '') ~ ' in deroga ai filtri sugli iscritti?' }}">
+            <input type="hidden" name="decisione" value="ammesso">
+            <button type="submit" class="pulsante-icona pulsante-ok" data-info="Ammetti comunque"
+                    aria-label="Ammetti comunque {{ s.cognome }} {{ s.nome }}">{{ icona("utente-spunta") }}</button>
+          </form>
+          {% endif %}
+          {% if s.decisione != 'escluso' %}
+          <form class="inline form-frammento" method="post" action="{{ url_decisione }}">
+            <input type="hidden" name="decisione" value="escluso">
+            <button type="submit" class="pulsante-icona" data-info="Conferma l'esclusione"
+                    aria-label="Conferma l'esclusione di {{ s.cognome }} {{ s.nome }}">{{ icona("utente-meno") }}</button>
+          </form>
+          {% endif %}
+          {% if s.decisione %}
+          <form class="inline form-frammento" method="post" action="{{ url_decisione }}">
+            <input type="hidden" name="decisione" value="">
+            <button type="submit" class="pulsante-icona pulsante-neutro" data-info="Annulla la decisione (torna da confermare)"
+                    aria-label="Annulla la decisione su {{ s.cognome }} {{ s.nome }}">{{ icona("annulla") }}</button>
+          </form>
+          {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="riga-carriera" data-matricola="{{ s.matricola }}" hidden>
+        <td colspan="8" data-url="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/carriera"></td>
+      </tr>
+      {% endfor %}
+    </table>
+{% endmacro %}
 <div class="riquadro-iscritti" data-numero="{{ md.numero_iscritti if md.numero_iscritti is not none else '' }}"
      data-suggerito="{{ md.numero_studenti_suggerito }}">
   {% if messaggio %}<div class="flash flash-{{ tipo or 'success' }}" style="margin:0.5rem 0">{{ messaggio }}</div>{% endif %}
@@ -24,6 +79,7 @@
     Nessun iscritto: aggiungili uno alla volta qui sotto, oppure importa un elenco.
     {% endif %}
     {% if md.appello.matricola_minima_iscritti %}<span class="badge">solo matricole &ge; {{ md.appello.matricola_minima_iscritti }}</span>{% endif %}
+    {% if md.appello.cognome_iscritti %}<span class="badge">solo cognomi {{ md.appello.cognome_iscritti }}</span>{% endif %}
   </p>
 
   {% if modificabile %}
@@ -85,14 +141,19 @@
     </details>
 
     <details class="strumento" data-chiave="filtro">
-      <summary class="icona-azione">{{ icona("filtro") }} Filtro matricola{% if md.appello.matricola_minima_iscritti %} &ge; {{ md.appello.matricola_minima_iscritti }}{% endif %}</summary>
+      <summary class="icona-azione">{{ icona("filtro") }} Filtri{% if md.appello.matricola_minima_iscritti %} · matricola &ge; {{ md.appello.matricola_minima_iscritti }}{% endif %}{% if md.appello.cognome_iscritti %} · cognomi {{ md.appello.cognome_iscritti }}{% endif %}</summary>
       <div class="pannello-strumento">
         <form class="form-frammento" method="post" action="{{ url }}/iscritti-filtro">
           <label>Tieni solo le matricole &ge;</label>
           <input type="number" name="matricola_minima" value="{{ md.appello.matricola_minima_iscritti or '' }}" placeholder="vuoto = nessun filtro">
-          <p class="muted" style="margin:0.5rem 0 0">Es. per una prova riservata al primo anno: chi ha una matricola inferiore
-            non compare nell'elenco, nel registro presenze e non può essere corretto. Il file restituito alla segreteria resta intero.</p>
-          <button type="submit">Salva filtro</button>
+          <label>Tieni solo i cognomi</label>
+          <input type="text" name="cognome" value="{{ md.appello.cognome_iscritti or '' }}"
+                 placeholder="es. A-D, E-N, O-Z (vuoto = tutti)">
+          <p class="muted" style="margin:0.5rem 0 0">Es. per una prova riservata al primo anno, o per un corso diviso per
+            cognome{% if corso.filtro_cognome %} (questo corso: <strong>{{ corso.filtro_cognome }}</strong>, dalle impostazioni){% endif %}:
+            chi non rientra non compare nell'elenco, nel registro presenze e non può essere corretto, finché non lo ammetti
+            in deroga. Il file restituito alla segreteria resta intero.</p>
+          <button type="submit">Salva filtri</button>
         </form>
       </div>
     </details>
@@ -121,62 +182,20 @@
 
   {% if md.esclusi_filtro %}
   <div class="card" style="margin-top:0.75rem">
-    <strong>Esclusi dal filtro sulla matricola ({{ md.esclusi_filtro|length }})</strong>
+    <strong>Esclusi dai filtri ({{ non_ammessi|length }})</strong>
     {% if da_confermare %}<span class="badge badge-warn">{{ da_confermare|length }} da confermare</span>{% endif %}
-    <p class="muted" style="margin:0.25rem 0 0.5rem">Matricola inferiore a {{ md.appello.matricola_minima_iscritti }}: conferma
-      l'esclusione, oppure ammetti comunque (es. DSA, L104, casi particolari). Finché non decidi restano esclusi.</p>
-    <table class="tabella-esclusi-filtro">
-      <thead><tr><th></th><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Decisione</th><th></th></tr></thead>
-      {% for s in md.esclusi_filtro %}
-      <tr>
-        <td class="cella-azioni">
-          <button type="button" class="pulsante-icona pulsante-neutro btn-carriera" data-matricola="{{ s.matricola }}" aria-expanded="false"
-                  data-info="Carriera dello studente" aria-label="Mostra la carriera di {{ s.cognome }} {{ s.nome }}">{{ icona("giu") }}</button>
-        </td>
-        <td>{{ s.matricola }}</td>
-        <td>{{ s.cognome }}</td>
-        <td>{{ s.nome }}</td>
-        <td>{% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% if s.dsa_note %} <span class="muted">{{ s.dsa_note }}</span>{% endif %}{% endif %}</td>
-        <td>
-          {% if s.decisione == 'ammesso' %}<span class="badge badge-ok">ammesso in deroga</span>
-          {% elif s.decisione == 'escluso' %}<span class="badge">esclusione confermata</span>
-          {% else %}<span class="badge badge-warn">da confermare</span>{% endif %}
-        </td>
-        <td class="cella-azioni">
-          {% if modificabile %}
-          {% set url_decisione = url ~ "/iscritti-filtro/" ~ s.matricola %}
-          {% if s.decisione != 'ammesso' %}
-          <form class="inline form-frammento" method="post" action="{{ url_decisione }}"
-                data-conferma="{{ 'Ammettere comunque ' ~ s.cognome ~ ' ' ~ s.nome ~ ' (' ~ s.matricola ~ ')' ~ (' — ' ~ (s.dsa_tipo or 'DSA') if s.dsa else '') ~ ' in deroga al filtro sulla matricola?' }}">
-            <input type="hidden" name="decisione" value="ammesso">
-            <button type="submit" class="pulsante-icona pulsante-ok" data-info="Ammetti comunque"
-                    aria-label="Ammetti comunque {{ s.cognome }} {{ s.nome }}">{{ icona("utente-spunta") }}</button>
-          </form>
-          {% endif %}
-          {% if s.decisione != 'escluso' %}
-          <form class="inline form-frammento" method="post" action="{{ url_decisione }}">
-            <input type="hidden" name="decisione" value="escluso">
-            <button type="submit" class="pulsante-icona" data-info="Conferma l'esclusione"
-                    aria-label="Conferma l'esclusione di {{ s.cognome }} {{ s.nome }}">{{ icona("utente-meno") }}</button>
-          </form>
-          {% endif %}
-          {% if s.decisione %}
-          <form class="inline form-frammento" method="post" action="{{ url_decisione }}">
-            <input type="hidden" name="decisione" value="">
-            <button type="submit" class="pulsante-icona pulsante-neutro" data-info="Annulla la decisione (torna da confermare)"
-                    aria-label="Annulla la decisione su {{ s.cognome }} {{ s.nome }}">{{ icona("annulla") }}</button>
-          </form>
-          {% endif %}
-          {% endif %}
-        </td>
-      </tr>
-      <tr class="riga-carriera" data-matricola="{{ s.matricola }}" hidden>
-        <td colspan="7" data-url="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/carriera"></td>
-      </tr>
-      {% endfor %}
-    </table>
+    <p class="muted" style="margin:0.25rem 0 0.5rem">Non rientrano nei filtri sugli iscritti: conferma l'esclusione, oppure
+      ammetti comunque (es. DSA, L104, casi particolari). Finché non decidi restano esclusi.</p>
+    {% if non_ammessi %}{{ tabella_esclusi(non_ammessi) }}{% endif %}
+    {% if in_deroga %}
+    <details style="margin-top:0.5rem" data-chiave="in-deroga">
+      <summary>Ammessi in deroga ({{ in_deroga|length }})</summary>
+      {{ tabella_esclusi(in_deroga) }}
+    </details>
+    {% endif %}
   </div>
   {% endif %}
+
 
   {% if md.iscritti %}
   {% set non_registrati = md.iscritti|rejectattr('registrato')|list %}

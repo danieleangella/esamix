@@ -76,7 +76,12 @@
   </section>
 
   <section class="card riquadro-impostazioni">
-    <h2>Aule e compiti annullati</h2>
+    <h2>Iscritti, aule e compiti annullati</h2>
+    <div class="riga-opzione">
+      <span>Cognomi del corso</span>
+      <input type="text" name="filtro_cognome" value="{{ corso.filtro_cognome }}" placeholder="tutti" class="campo-corto" style="width:7rem">
+      {{ info("Per un corso diviso per cognome (es. A-D, E-N, O-Z): ogni nuova prova tiene tra gli iscritti solo i cognomi in questo intervallo, e chi è fuori finisce tra gli esclusi da confermare. Più intervalli si separano con la virgola (es. A-C, X-Z); si possono usare anche più lettere (es. A-Ma). Cambiandolo si aggiornano anche le prove non chiuse che seguivano il valore precedente. Vuoto = nessun filtro.") }}
+    </div>
     <div class="riga-opzione">
       <span>Avvisa se gli studenti superano il</span>
       <input type="number" name="soglia_occupazione_aule" min="1" max="100" value="{{ corso.soglia_occupazione_aule }}" required class="campo-corto">
