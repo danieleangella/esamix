@@ -106,8 +106,8 @@ def calcola_voto(corso, votomin: int, soluzioni: str, risposte: str, posizioni: 
     """Unico calcolo del voto di un compito, usato in tutte le pagine di correzione. Le
     posizioni "manuali" (domande aperte, e obbligatori con la risposta multiple-choice
     corretta) valgono il punteggio assegnato dal docente; se manca (valutazione
-    rimandata), provvisoriamente il massimo possibile, così il voto provvisorio non
-    sottostima mai quello definitivo."""
+    rimandata), provvisoriamente una domanda aperta vale 0 e un obbligatorio il massimo
+    (lo stesso che gli si assegna in automatico correggendo)."""
     manuali = {}
     insufficiente = False
     for p in posizioni:
@@ -122,7 +122,7 @@ def calcola_voto(corso, votomin: int, soluzioni: str, risposte: str, posizioni: 
             elif lettera == corretta:
                 manuali[i] = False
     mancanti = [i for i in manuali if i not in punteggi]
-    override = {i: punteggi.get(i, punteggio_massimo(corso, aperta)) for i, aperta in manuali.items()}
+    override = {i: punteggi.get(i, 0 if aperta else punteggio_massimo(corso, False)) for i, aperta in manuali.items()}
     voto = valuta_con_override(
         soluzioni, risposte, corso.risposta_corretta, corso.risposta_sbagliata, corso.risposta_vuota, override=override,
     )
@@ -343,6 +343,24 @@ def _risposte_simili(conn, appello_id: int, matricola: str, risposte: str) -> li
             })
     simili.sort(key=lambda s: s["percentuale"], reverse=True)
     return simili
+
+
+def completa_aperte(tag: str, appello_id: int, codice: str, risposte: str) -> str:
+    """Se sono arrivate solo le lettere delle domande chiuse (senza il "-" delle aperte,
+    es. JavaScript disattivato o codice non ancora riconosciuto mentre si scriveva), le
+    rimette nelle posizioni giuste; in ogni altro caso le risposte restano come sono."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        compito = conn.execute(
+            "SELECT soluzioni FROM compiti WHERE appello_id=? AND codice=?", (appello_id, codice)
+        ).fetchone()
+    finally:
+        conn.close()
+    soluzioni = compito["soluzioni"] if compito else ""
+    if "-" not in soluzioni or "-" in risposte or len(risposte) != len(soluzioni.replace("-", "")):
+        return risposte
+    lettere = iter(risposte)
+    return "".join("-" if c == "-" else next(lettere) for c in soluzioni)
 
 
 def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, risposte: str) -> ValutazionePreliminare:
@@ -1033,14 +1051,31 @@ def list_valutazioni_sospese(tag: str, appello_id: int) -> list[dict]:
 
 
 def elimina_risultato(tag: str, appello_id: int, matricola: str) -> None:
+    """Cancella l'esito registrato, ma lo studente non sparisce: torna da valutare. Se
+    aveva un compito corretto, codice e risposte restano come bozza (in "Correzioni da
+    completare", da riprendere); se aveva svolto la prova (non assente) resta segnato
+    presente, così compare anche tra i presenti da correggere."""
     corsi_service.verifica_appello_aperto(tag, appello_id)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         row = conn.execute(
-            "SELECT verbalizzato FROM risultati WHERE matricola=? AND appello_id=?", (matricola, appello_id)
+            "SELECT r.verbalizzato, r.esito, r.risposte, c.codice FROM risultati r "
+            "LEFT JOIN compiti c ON c.id = r.compito_id WHERE r.matricola=? AND r.appello_id=?",
+            (matricola, appello_id),
         ).fetchone()
         if row and row["verbalizzato"]:
             raise GiaVerbalizzato("Non è possibile eliminare un risultato già verbalizzato")
+        if row and row["codice"] and row["risposte"]:
+            conn.execute(
+                "INSERT INTO bozze_correzione (appello_id, matricola, codice, risposte, salvata_il) "
+                "VALUES (?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(appello_id, matricola) DO UPDATE SET "
+                "codice=excluded.codice, risposte=excluded.risposte, salvata_il=excluded.salvata_il",
+                (appello_id, matricola, row["codice"], row["risposte"]),
+            )
+        if row and (row["codice"] or row["esito"] == "ritirato"):
+            conn.execute(
+                "INSERT OR IGNORE INTO appello_presenze (matricola, appello_id) VALUES (?,?)", (matricola, appello_id)
+            )
         conn.execute("DELETE FROM risultati WHERE matricola=? AND appello_id=?", (matricola, appello_id))
         conn.commit()
     finally:

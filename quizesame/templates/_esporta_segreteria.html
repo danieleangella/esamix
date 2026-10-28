@@ -1,0 +1,28 @@
+{# Esportazione dei voti nel file della segreteria, nella fase di Verbalizzazione: per un
+   appello singolo il file si carica nella scheda Compiti d'esame, per un raggruppamento qui. #}
+{% from "_info.html" import info %}
+<details class="card" open>
+  <summary><strong>Esporta voti per la segreteria</strong> {{ info("Nel file \"Lista Studenti Esame\" della segreteria, per ogni studente con una valutazione completata e confermata, si compilano la colonna Esito (voto, ASS, RIT o 0 per insufficiente) e la colonna Domande d'esame (testo salvato nelle impostazioni del corso).") }}</summary>
+  {% if segreteria_csv %}
+  <p class="muted" style="margin-top:0.75rem">File: <strong>{{ segreteria_csv.nome_file }}</strong> (caricato il {{ segreteria_csv.caricato_il }})</p>
+  {% set url_esporta = "/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/esporta-voti" %}
+  {% include "_esporta_voti_bottone.html" %}
+  {% if raggruppamento %}
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/segreteria-csv/elimina" style="margin-top:0.5rem"
+        onsubmit="return confirm('Rimuovere il file caricato?');">
+    <button type="submit" class="secondary">Rimuovi file caricato</button>
+  </form>
+  {% endif %}
+  {% elif raggruppamento %}
+  <p class="muted" style="margin-top:0.75rem">Carica il file "Lista Studenti Esame" scaricato dalla segreteria.</p>
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/segreteria-csv" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv,.xls,.xlsx" required>
+    <button type="submit">Carica</button>
+  </form>
+  {% else %}
+  <p class="muted" style="margin-top:0.75rem">
+    Nessun file della segreteria ancora caricato: caricalo dalla scheda
+    <a href="#compiti" data-tab="compiti">Compiti d'esame</a>.
+  </p>
+  {% endif %}
+</details>

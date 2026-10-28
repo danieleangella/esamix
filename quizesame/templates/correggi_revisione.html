@@ -95,49 +95,34 @@
 {% if lunghezza_valida %}
 {# --- 2. svolgimenti da giudicare a mano --- #}
 {% if manuali %}
-{% set tutti_rimandati = rimandati|length == manuali|length %}
 <div class="card" id="card-svolgimenti">
   <div class="titolo-sezione-correzione">
     <h2>Svolgimenti da valutare ({{ manuali|length }})</h2>
-    {{ info("Obbligatori con la risposta giusta: punteggio da " ~ corso.risposta_sbagliata ~ " (come sbagliato) a " ~ corso.risposta_corretta ~ " (come giusto). Domande aperte: da " ~ corso.risposta_sbagliata ~ " a " ~ corso.punteggio_max_aperta ~ ". Invio passa al successivo. La nota (facoltativa) descrive gli errori: mentre la scrivi, sotto compaiono le note simili già date allo stesso esercizio in altri compiti (passa sopra per vedere studente e punteggio), e nella pagina Svolgimenti servono a confrontare le correzioni. \"Dopo\" rimanda la valutazione: il compito si registra con un voto provvisorio (contando il massimo) e lo completi più tardi.") }}
+    {{ info("Obbligatori con la risposta giusta: hanno già il punteggio massimo (" ~ corso.risposta_corretta ~ ", in grigio), da abbassare fino a " ~ corso.risposta_sbagliata ~ " se lo svolgimento non va. Domande aperte: da " ~ corso.risposta_sbagliata ~ " a " ~ corso.punteggio_max_aperta ~ "; finché non hanno un punteggio contano 0. La nota (facoltativa) descrive gli errori. \"Dopo\" rimanda la valutazione alla pagina Svolgimenti: il compito si registra con un voto provvisorio.") }}
     <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/svolgimenti" class="link-laterale" target="_blank" rel="noopener">{{ icona("elenco", 13) }} confronta con gli altri compiti {{ icona("esterno", 12) }}</a>
   </div>
-
-  {% if appello.rimanda_svolgimenti and not modifica %}
-  <div class="banner-rimanda" id="banner-rimanda-tutti">
-    <span>In questo appello gli svolgimenti si valutano <strong>dopo</strong>, tutti insieme, dalla pagina Svolgimenti.</span>
-    <button type="button" class="secondary pulsante-piccolo" id="btn-valuta-adesso">{{ icona("correzione", 13) }} Valuta adesso questo compito</button>
-    <button type="button" class="secondary pulsante-piccolo" id="btn-non-rimandare-piu">{{ icona("chiudi", 13) }} Non rimandare più</button>
-  </div>
-  {% endif %}
 
   <div class="elenco-svolgimenti">
   {% for r in manuali %}
   {% set massimo = corso.punteggio_max_aperta if r.aperta else corso.risposta_corretta %}
   {% set valore = punteggi_proposti.get(r.posizione, '') %}
   {% set rimandato = r.posizione in rimandati %}
-  <div class="riga-svolgimento{% if rimandato %} rimandato{% endif %}" data-pos="{{ r.posizione }}" data-max="{{ massimo }}" data-esercizio="{{ r.esercizio_id if r.esercizio_id is not none else '' }}">
+  <div class="riga-svolgimento{% if rimandato %} rimandato{% endif %}" data-pos="{{ r.posizione }}" data-max="{{ massimo }}"
+       data-aperta="{{ '1' if r.aperta else '' }}" data-esercizio="{{ r.esercizio_id if r.esercizio_id is not none else '' }}">
     <div class="svolg-nome">
       <strong>{{ r.posizione + 1 }}. {{ r.esercizio_nome }}</strong>
-      <span class="badge {{ 'badge-info' if r.aperta else 'badge-ok' }}">{{ 'aperta' if r.aperta else 'giusta: ' ~ r.lettera_corretta }}</span>
+      <span class="badge {{ 'badge-info' if r.aperta else 'badge-ok' }}">{{ 'aperta' if r.aperta else 'obbligatorio' }}</span>
     </div>
     <div class="svolg-punteggio">
-      {% if massimo - corso.risposta_sbagliata <= 10 %}
-      <div class="chip-punteggi" role="group" aria-label="Punteggio">
-        {% for k in range(corso.risposta_sbagliata, massimo + 1) %}
-        <button type="button" class="chip-punteggio" data-valore="{{ k }}" tabindex="-1" {% if rimandato %}disabled{% endif %}>{{ k }}</button>
-        {% endfor %}
-      </div>
-      {% endif %}
-      <input type="number" class="campo-punteggio" name="punteggio_{{ r.posizione }}" aria-label="Punteggio di {{ r.esercizio_nome }}"
+      <input type="number" class="campo-punteggio{% if r.posizione in automatici %} automatico{% endif %}" name="punteggio_{{ r.posizione }}" aria-label="Punteggio di {{ r.esercizio_nome }}"
              min="{{ corso.risposta_sbagliata }}" max="{{ massimo }}" value="{{ valore }}" {% if rimandato %}disabled{% endif %}>
       <span class="muted svolg-max">/ {{ massimo }}</span>
     </div>
     <input class="campo-nota" name="nota_{{ r.posizione }}" value="{{ note_proposte.get(r.posizione, '') }}"
            {% if r.esercizio_id is not none and note_precedenti.get(r.esercizio_id) %}list="note-es-{{ r.esercizio_id }}"{% endif %}
-           placeholder="Errori o nota (facoltativa)" aria-label="Nota su {{ r.esercizio_nome }}">
-    <label class="svolg-dopo" data-info="Valuta più tardi: il compito resta in sospeso">
-      <input type="checkbox" class="check-rimanda" name="rimanda_{{ r.posizione }}" value="1" {% if rimandato %}checked{% endif %}> {{ icona("orologio", 13) }} dopo
+           placeholder="Nota (facoltativa)" aria-label="Nota su {{ r.esercizio_nome }}">
+    <label class="svolg-dopo" data-info="Valuta più tardi dalla pagina Svolgimenti: il compito resta in sospeso">
+      <input type="checkbox" class="check-rimanda" name="rimanda_{{ r.posizione }}" value="1" {% if rimandato %}checked{% endif %}> dopo
     </label>
     <div class="note-simili"></div>
   </div>
@@ -146,15 +131,6 @@
   {% for es_id, note in note_precedenti.items() %}
   <datalist id="note-es-{{ es_id }}">{% for n in note|map(attribute='nota')|unique %}<option value="{{ n }}">{% endfor %}</datalist>
   {% endfor %}
-
-  <div class="piede-svolgimenti">
-    <button type="button" class="secondary pulsante-piccolo" id="btn-rimanda-tutti" {% if tutti_rimandati %}hidden{% endif %}>{{ icona("orologio", 13) }} Rimanda tutti a dopo</button>
-    <div class="domanda-rimanda" id="domanda-rimanda" hidden>
-      <span>Rimandare gli svolgimenti anche in <strong>tutti i prossimi compiti</strong> di questo appello?</span>
-      <button type="button" class="pulsante-piccolo" id="btn-rimanda-si">{{ icona("spunta", 13) }} Sì, in tutti</button>
-      <button type="button" class="secondary pulsante-piccolo" id="btn-rimanda-no">No, solo in questo</button>
-    </div>
-  </div>
 </div>
 {% endif %}
 
@@ -174,10 +150,12 @@
   </div>
   <input type="hidden" name="voto_modificato" id="voto-modificato" value="{{ '1' if voto_a_mano else '' }}">
 
-  <label for="nota-correzione" style="margin-top:0.9rem">Nota sul compito <span class="muted">(solo per il docente)</span></label>
-  <textarea name="nota_correzione" id="nota-correzione" rows="2" class="testo-normale"
-            placeholder="Es. perché hai cambiato il voto, o un'osservazione da ricordare">{{ nota_correzione }}</textarea>
-  <div class="stato-campo stato-warn" id="avviso-nota" hidden>Hai cambiato il voto a mano: scrivi qui il perché, per ritrovarlo confrontando le correzioni.</div>
+  <details class="dettaglio-nota" id="dettaglio-nota" {% if nota_correzione or voto_a_mano %}open{% endif %}>
+    <summary class="muted">Nota sul compito <span class="muted">(solo per il docente)</span></summary>
+    <textarea name="nota_correzione" id="nota-correzione" rows="2" class="testo-normale"
+              placeholder="Es. perché hai cambiato il voto, o un'osservazione da ricordare">{{ nota_correzione }}</textarea>
+    <div class="stato-campo stato-warn" id="avviso-nota" hidden>Hai cambiato il voto a mano: scrivi qui il perché.</div>
+  </details>
 
   <div class="riga-orale">
     <label class="etichetta-check">
@@ -192,15 +170,14 @@
   </div>
   <input type="hidden" name="azione" id="azione-hidden" value="salva">
   <input type="hidden" name="conferma_orale_obbligatorio" id="conferma-obbligatorio-hidden" value="">
-  <input type="hidden" name="imposta_rimanda" id="imposta-rimanda" value="">
 </div>
 
 <div class="barra-azioni-correzione">
   <button type="submit" id="btn-conferma-correzione">{{ icona("spunta", 17) }} <span class="etichetta-conferma">Conferma</span></button>
   <button type="submit" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/bozza" formnovalidate class="secondary"
-          data-info="Tiene da parte matricola, codice e risposte senza registrare nessun esito: la riprendi da &quot;Bozze salvate&quot;">{{ icona("nota", 14) }} Salva come bozza</button>
+          data-info="Tiene da parte matricola, codice e risposte senza registrare nessun esito: la riprendi da &quot;Correzioni da completare&quot;">{{ icona("nota", 14) }} Salva come bozza</button>
   <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione" class="muted link-con-icona">{{ icona("indietro", 14) }} Annulla</a>
-  <span class="muted suggerimento-tastiera"><kbd>Invio</kbd> passa al campo successivo, poi conferma</span>
+  <span class="muted suggerimento-tastiera"><kbd>Invio</kbd> passa al campo successivo</span>
 </div>
 {% endif %}
 </form>
@@ -210,7 +187,8 @@
   var form = document.getElementById("form-riepilogo");
   var inputRisposte = document.getElementById("input-risposte-riepilogo");
   var btnRicalcola = document.getElementById("btn-ricalcola");
-  formattaRisposte(inputRisposte);
+  var posizioniAperte = {{ v.righe | selectattr('aperta') | map(attribute='posizione') | list | tojson }};
+  formattaRisposte(inputRisposte, function () { return posizioniAperte; });
   var risposteOriginali = inputRisposte.value.replace(/\s+/g, "");
   var lunghezzaValida = {{ 'true' if lunghezza_valida else 'false' }};
   function risposteCambiate() { return inputRisposte.value.replace(/\s+/g, "") !== risposteOriginali; }
@@ -233,30 +211,28 @@
   var boxMotivazione = document.getElementById("box-motivazione-orale");
   var azioneHidden = document.getElementById("azione-hidden");
   var confermaObbligatorioHidden = document.getElementById("conferma-obbligatorio-hidden");
-  var impostaRimanda = document.getElementById("imposta-rimanda");
 
   var votoFisso = {{ v.voto_fisso }};
   var votomin = {{ votomin_effettivo }};
   var insufficientePerObbligatorio = {{ 'true' if v.non_svolte_obbligatorie else 'false' }};
   var oraleObbligatorio = {{ 'true' if v.orale_obbligatorio else 'false' }};
-  var rimandaTuttiAttivo = {{ 'true' if appello.rimanda_svolgimenti else 'false' }};
   var notePrecedenti = {{ note_precedenti|tojson }};
-  var chiaveDomanda = "esamix-domanda-rimanda-{{ corso.tag }}-{{ appello.id }}";
+  var modificaCorrente = {{ 'true' if modifica else 'false' }};
 
   var righe = Array.prototype.slice.call(document.querySelectorAll(".riga-svolgimento"));
   function campo(riga) { return riga.querySelector(".campo-punteggio"); }
   function rimandata(riga) { return riga.querySelector(".check-rimanda").checked; }
+  // senza punteggio (rimandato o ancora vuoto): una domanda aperta conta 0, un
+  // obbligatorio il massimo, come fa il server
+  function provvisorio(riga) { return riga.dataset.aperta ? 0 : parseInt(riga.dataset.max, 10); }
 
-  // --- voto in tempo reale: parte fissa (risposte a scelta multipla) + punteggi
-  // assegnati; uno svolgimento rimandato conta provvisoriamente il massimo, come fa il server
-  // "rimandati" quelli con la spunta "dopo"; "vuoti" quelli ancora da compilare (per
-  // confermare servono un punteggio o la spunta): entrambi contano il massimo, provvisorio
+  // --- voto in tempo reale: parte fissa (risposte a scelta multipla) + punteggi assegnati
   function calcola() {
     var somma = votoFisso, nRimandati = 0, nVuoti = 0;
     righe.forEach(function (riga) {
       var valore = parseInt(campo(riga).value, 10);
-      if (rimandata(riga)) { somma += parseInt(riga.dataset.max, 10); nRimandati++; }
-      else if (isNaN(valore)) { somma += parseInt(riga.dataset.max, 10); nVuoti++; }
+      if (rimandata(riga)) { somma += provvisorio(riga); nRimandati++; }
+      else if (isNaN(valore)) { somma += provvisorio(riga); nVuoti++; }
       else somma += valore;
     });
     if (insufficientePerObbligatorio && somma >= votomin) somma = votomin - 1;
@@ -278,17 +254,12 @@
       ? "provvisorio: " + c.mancanti + " svolgiment" + (c.mancanti === 1 ? "o" : "i") + " da valutare"
       : (insufficientePerObbligatorio ? "insufficiente: obbligatorio non svolto" : (insuff ? "insufficiente" : (aMano ? "cambiato a mano" : "")));
     badgeAMano.hidden = btnUsaCalcolato.hidden = !aMano;
+    if (aMano) document.getElementById("dettaglio-nota").open = true;
     avvisoNota.hidden = !aMano || notaCorrezione.value.trim() !== "";
     aggiornaOrale(voto, c);
-    aggiornaPulsante(c.rimandati);
-    var btnTutti = document.getElementById("btn-rimanda-tutti");
-    if (btnTutti) btnTutti.hidden = c.rimandati === righe.length;
-  }
-  function aggiornaPulsante(nRimandati) {
     conferma.querySelector(".etichetta-conferma").textContent =
-      nRimandati ? "Conferma, svolgimenti dopo" : (modificaCorrente ? "Salva le modifiche" : "Conferma");
+      c.rimandati ? "Conferma, svolgimenti dopo" : (modificaCorrente ? "Salva le modifiche" : "Conferma");
   }
-  var modificaCorrente = {{ 'true' if modifica else 'false' }};
 
   votoFinale.addEventListener("input", function () {
     votoModificato.value = String(parseInt(votoFinale.value, 10)) !== votoCalcolatoEl.textContent ? "1" : "";
@@ -326,115 +297,39 @@
     sincronizzaOrale();
   });
 
-  // --- svolgimenti: punteggio (pulsanti o campo), nota con suggerimenti, "dopo"
-  function aggiornaChip(riga) {
-    var valore = campo(riga).value;
-    riga.querySelectorAll(".chip-punteggio").forEach(function (chip) {
-      chip.classList.toggle("attivo", chip.dataset.valore === valore && !rimandata(riga));
-      chip.disabled = rimandata(riga);
-    });
-  }
+  // --- svolgimenti: punteggio, nota con suggerimenti, "dopo"
   function suggerimento(riga) {
     // note simili scritte per lo stesso esercizio negli altri compiti, con studente e punteggio
     mostraNoteSimili(riga.querySelector(".note-simili"), riga.querySelector(".campo-nota").value,
       notePrecedenti[riga.dataset.esercizio] || [], rimandata(riga) ? "" : campo(riga).value);
   }
-  function primoDaCompilare() {
-    return righe.filter(function (r) { return !rimandata(r); }).map(campo)[0] || null;
-  }
-  function successivo(elemento) {
-    // ordine di Invio: punteggio → punteggio della riga dopo → … → voto finale → Conferma
-    var campi = righe.filter(function (r) { return !rimandata(r); }).map(campo);
-    var i = campi.indexOf(elemento);
-    if (i !== -1 && i + 1 < campi.length) return campi[i + 1];
-    if (elemento.classList.contains("campo-nota")) {
-      var riga = elemento.closest(".riga-svolgimento");
-      var dopo = righe.slice(righe.indexOf(riga) + 1).filter(function (r) { return !rimandata(r); })[0];
-      if (dopo) return campo(dopo);
-    }
-    return conferma;
-  }
-  function impostaRimandata(riga, si) {
-    riga.querySelector(".check-rimanda").checked = si;
-    riga.classList.toggle("rimandato", si);
-    campo(riga).disabled = si;
-    aggiornaChip(riga);
-    suggerimento(riga);
-  }
-
-  var chiestoInQuestaPagina = false;
-  function chiediSeRimandareTutti() {
-    if (rimandaTuttiAttivo || chiestoInQuestaPagina) return;
-    try { if (sessionStorage.getItem(chiaveDomanda)) return; } catch (e) { /* nessuna memoria: si chiede */ }
-    chiestoInQuestaPagina = true;
-    document.getElementById("domanda-rimanda").hidden = false;
-  }
-  function rispostaDomanda(tutti) {
-    try { sessionStorage.setItem(chiaveDomanda, "1"); } catch (e) { /* pazienza */ }
-    document.getElementById("domanda-rimanda").hidden = true;
-    if (tutti) { impostaRimanda.value = "1"; righe.forEach(function (r) { impostaRimandata(r, true); }); aggiorna(); }
-  }
-
+  function campiAttivi() { return righe.filter(function (r) { return !rimandata(r); }).map(campo); }
   righe.forEach(function (riga) {
     var input = campo(riga);
     var nota = riga.querySelector(".campo-nota");
-    input.addEventListener("input", function () { aggiornaChip(riga); suggerimento(riga); aggiorna(); });
-    riga.querySelectorAll(".chip-punteggio").forEach(function (chip) {
-      chip.addEventListener("click", function () {
-        input.value = chip.dataset.valore;
-        aggiornaChip(riga); suggerimento(riga); aggiorna();
-        nota.focus();
-      });
-    });
+    input.addEventListener("input", function () { input.classList.remove("automatico"); suggerimento(riga); aggiorna(); });
     nota.addEventListener("input", function () { suggerimento(riga); });
     riga.querySelector(".check-rimanda").addEventListener("change", function (ev) {
-      impostaRimandata(riga, ev.target.checked);
+      riga.classList.toggle("rimandato", ev.target.checked);
+      input.disabled = ev.target.checked;
+      suggerimento(riga);
       aggiorna();
-      if (ev.target.checked) chiediSeRimandareTutti();
-      else input.focus();
+      if (!ev.target.checked) input.focus();
     });
-    aggiornaChip(riga);
     suggerimento(riga);
   });
 
-  var btnTutti = document.getElementById("btn-rimanda-tutti");
-  if (btnTutti) btnTutti.addEventListener("click", function () {
-    righe.forEach(function (r) { impostaRimandata(r, true); });
-    aggiorna();
-    chiediSeRimandareTutti();
-    conferma.focus();
-  });
-  var btnSi = document.getElementById("btn-rimanda-si");
-  if (btnSi) {
-    btnSi.addEventListener("click", function () { rispostaDomanda(true); conferma.focus(); });
-    document.getElementById("btn-rimanda-no").addEventListener("click", function () { rispostaDomanda(false); conferma.focus(); });
-  }
-  var btnAdesso = document.getElementById("btn-valuta-adesso");
-  if (btnAdesso) {
-    btnAdesso.addEventListener("click", function () {
-      righe.forEach(function (r) { impostaRimandata(r, false); });
-      aggiorna();
-      var primo = primoDaCompilare();
-      if (primo) { primo.focus(); primo.select(); }
-    });
-    document.getElementById("btn-non-rimandare-piu").addEventListener("click", function () {
-      impostaRimanda.value = "0";
-      rimandaTuttiAttivo = false;
-      document.getElementById("banner-rimanda-tutti").hidden = true;
-      btnAdesso.click();
-    });
-  }
-
-  // --- tastiera: Invio non invia mai il modulo per sbaglio da un campo; si arriva a
-  // Conferma passando dai campi, e lì Invio registra
+  // --- tastiera: Invio non invia mai il modulo per sbaglio da un campo; passa da un
+  // punteggio al successivo e dall'ultimo a Conferma, dove Invio registra
   form.addEventListener("keydown", function (ev) {
     if (ev.key !== "Enter" || ev.target.tagName !== "INPUT") return;
     ev.preventDefault();
     if (ev.target.type === "checkbox") return;
     if (ev.target === inputRisposte) { if (!btnRicalcola.disabled) btnRicalcola.click(); return; }
-    if (ev.target === votoFinale) { conferma.focus(); return; }
-    // dall'ultimo svolgimento si va dritti a Conferma: il voto finale si cambia con Tab o col mouse
-    var prossimo = successivo(ev.target);
+    var campi = campiAttivi();
+    var riga = ev.target.closest(".riga-svolgimento");
+    var i = riga ? campi.indexOf(campo(riga)) : -1;
+    var prossimo = (riga && i !== -1 && i + 1 < campi.length) ? campi[i + 1] : conferma;
     prossimo.focus();
     if (prossimo.select) prossimo.select();
   });
@@ -463,9 +358,9 @@
   });
 
   aggiorna();
-  // pronto per la tastiera: cursore sul primo punteggio da assegnare, altrimenti su Conferma
-  var primo = primoDaCompilare();
-  if (primo) { primo.focus(); primo.select(); } else { conferma.focus(); }
+  // pronto per la tastiera: cursore sulla prima domanda aperta da valutare, altrimenti su Conferma
+  var primo = righe.filter(function (r) { return !rimandata(r) && r.dataset.aperta && campo(r).value === ""; }).map(campo)[0];
+  if (primo) { primo.focus(); } else { conferma.focus(); }
 })();
 </script>
 {% endblock %}

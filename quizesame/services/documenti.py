@@ -52,10 +52,16 @@ def risultati_md(tag: str, appello_id: int) -> str:
     esito, come nel PDF."""
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
-    righe = _intestazione(corso, appello, "Risultati della prova scritta")
-    righe += ["Le matricole sono parzialmente oscurate; tra parentesi le iniziali di nome e cognome.", "",
-              "| Matricola | Iniziali | Esito |", "|---|:---:|---|"]
+    prove = risultati_service.nomi_prove(tag, appello_id)
+    righe = _intestazione(corso, appello, "Risultati complessivi delle prove" if prove else "Risultati della prova scritta")
+    nota = "Le matricole sono parzialmente oscurate; accanto le iniziali di nome e cognome."
+    if prove:
+        nota += " Compare solo chi ha superato tutte le prove; il voto finale è la media, approssimata per eccesso solo se la media esatta è già sufficiente."
+    righe += [nota, "",
+              "| Matricola | Iniziali | " + "".join(f"{p} | " for p in prove) + ("Voto finale |" if prove else "Esito |"),
+              "|:---:|:---:|" + ":---:|" * len(prove) + ":---:|"]
     for r in risultati_service.lista_risultati_html(tag, appello_id):
         iniziali = f"{(r['nome'] or ' ')[0]}{(r['cognome'] or ' ')[0]}".strip()
-        righe.append(f"| `{r['matricola']}` | {iniziali} | **{r['etichetta']}** |")
+        voti = "".join(f"{v} | " for v in r["voti_prove"])
+        righe.append(f"| `{r['matricola']}` | {iniziali} | {voti}**{r['etichetta']}** |")
     return "\n".join(righe) + "\n"

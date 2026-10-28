@@ -617,23 +617,32 @@ def _intestazione_orale(ctx: LatexContext) -> str:
     )
 
 
-def crea_tex_risultati(ctx: LatexContext, lista) -> str:
-    """lista: [(matricola, nome, cognome, etichetta), ...] — etichetta è già il testo da
-    stampare al posto del voto (un numero, "30lode", "non superato", "orale", "assente",
-    "ritirato", ...): la logica su quale etichetta usare vive in risultati.py."""
+def crea_tex_risultati(ctx: LatexContext, righe: list[dict], prove: list[str] = ()) -> str:
+    """righe: dict con matricola/nome/cognome/etichetta (e voti_prove, uno per ciascuna
+    delle `prove` di un raggruppamento) — etichetta è già il testo da stampare al posto del
+    voto (un numero, "30lode", "non superato", "orale", "assente", "ritirato", ...): la
+    logica su quale etichetta usare vive in risultati.py."""
     tex = BEGIN_DOCUMENT
     tex += intestazione_breve(ctx)
-    tex += _titolo_documento("Risultati della prova scritta", _quanti(len(lista), "studente", "studenti"))
+    titolo = "Risultati complessivi delle prove" if prove else "Risultati della prova scritta"
+    tex += _titolo_documento(titolo, _quanti(len(righe), "studente", "studenti"))
     tex += _intestazione_orale(ctx)
+    nota = "Le matricole sono parzialmente oscurate; accanto le iniziali di nome e cognome."
+    if prove:
+        nota += " Compare solo chi ha superato tutte le prove; il voto finale è la media, approssimata per eccesso solo se la media esatta è già sufficiente."
+    colonne_prove = " c" * len(prove)
     tex += (
-        "\\noindent{\\small Le matricole sono parzialmente oscurate; tra parentesi le iniziali di nome e cognome.}"
+        f"\\noindent{{\\small {nota}}}"
         "\\par\\medskip\n\n" + _RIGHE_ALTERNATE +
-        "\\begin{center}\n\\begin{longtable}{>{\\ttfamily}l c >{\\bfseries}l}\n\\toprule\n"
-        + _riga_intestazione("Matricola", "Iniziali", "Esito") + "\\midrule\n\\endhead\n"
+        f"\\begin{{center}}\n\\begin{{longtable}}{{>{{\\ttfamily}}c c{colonne_prove} >{{\\bfseries}}c}}\n\\toprule\n"
+        + _riga_intestazione("Matricola", "Iniziali", *(_escape_testo_semplice(p) for p in prove),
+                             "Voto finale" if prove else "Esito")
+        + "\\midrule\n\\endhead\n"
     )
-    for matricola, nome, cognome, etichetta in lista:
-        iniziali = f"{(nome or ' ')[0]}{(cognome or ' ')[0]}".strip()
-        tex += f"{celamatr(matricola)} & {iniziali} & {etichetta}\\\\\n"
+    for r in righe:
+        iniziali = f"{(r['nome'] or ' ')[0]}{(r['cognome'] or ' ')[0]}".strip()
+        voti = "".join(f" & {v}" for v in r.get("voti_prove") or [])
+        tex += f"{celamatr(r['matricola'])} & {iniziali}{voti} & {r['etichetta']}\\\\\n"
     tex += "\\bottomrule\n\\end{longtable}\n\\end{center}\n\n"
     tex += "\\vfill\n\\end{document}"
     return tex

@@ -159,6 +159,16 @@ CREATE TABLE IF NOT EXISTS appello_segreteria_csv (
     caricato_il TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Ultimo file di prenotazioni esportato da Moodle e caricato per un appello (righe già
+-- convertite in CSV): la sua struttura (colonne e righe degli studenti) si riusa per
+-- esportare i voti della prova da reimportare in Moodle.
+CREATE TABLE IF NOT EXISTS appello_moodle_file (
+    appello_id INTEGER PRIMARY KEY REFERENCES appelli(id),
+    nome_file TEXT NOT NULL,
+    contenuto TEXT NOT NULL,
+    caricato_il TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Iscritti aggiunti a mano uno per uno (alternativa al file della segreteria, quando non
 -- ancora caricato): a differenza del semplice numero manuale (appelli.iscritti_manuale),
 -- qui si tratta di un vero elenco nominale, usato anche per il controllo in correzione e

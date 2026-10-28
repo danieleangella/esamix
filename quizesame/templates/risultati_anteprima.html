@@ -8,12 +8,12 @@
 {% block content %}
 {% from "_formati.html" import formati %}
 <header class="intestazione-pagina">
-  <div class="intestazione-livello">Risultati della prova scritta ·
+  <div class="intestazione-livello">{{ 'Risultati complessivi delle prove' if prove else 'Risultati della prova scritta' }} ·
     <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">{{ corso.nome }} ({{ corso.anno }})</a></div>
   <h1>{{ appello.nome }}{% if appello.data %} <span class="muted">· {{ appello.data }}</span>{% endif %}</h1>
 </header>
 <div class="barra-riferimento non-stampare">
-  <p class="muted" style="margin:0">Matricole parzialmente oscurate, iniziali di nome e cognome: pronto da pubblicare.</p>
+  <p class="muted" style="margin:0">Matricole parzialmente oscurate, iniziali di nome e cognome: pronto da pubblicare.{% if prove %} Compare solo chi ha superato tutte le prove; il voto finale è la media, approssimata per eccesso solo se la media esatta è già sufficiente.{% endif %}</p>
   <span class="formati">
     {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/risultati", pdf=True, tex=True, md=True) }}
     <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">Stampa</button>
@@ -21,12 +21,13 @@
 </div>
 <div class="card" style="padding:0.5rem 1rem">
   {% if righe %}
-  <table class="tabella-elenco">
-    <thead><tr><th>Matricola</th><th>Iniziali</th><th>Esito</th></tr></thead>
+  <table class="tabella-elenco tabella-centrata">
+    <thead><tr><th>Matricola</th><th>Iniziali</th>{% for p in prove %}<th>{{ p }}</th>{% endfor %}<th>{{ 'Voto finale' if prove else 'Esito' }}</th></tr></thead>
     {% for r in righe %}
     <tr>
       <td style="font-family:monospace">{{ r.matricola }}</td>
       <td>{{ (r.nome or ' ')[0] }}{{ (r.cognome or ' ')[0] }}</td>
+      {% for v in r.voti_prove %}<td>{{ v }}</td>{% endfor %}
       <td><strong>{{ r.etichetta }}</strong></td>
     </tr>
     {% endfor %}

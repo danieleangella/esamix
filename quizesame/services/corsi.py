@@ -600,6 +600,8 @@ def elimina_appello(tag: str, appello_id: int) -> None:
         conn.execute("DELETE FROM appello_esercizi WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM appello_eccezioni_matricola WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM appello_iscritti_rimossi WHERE appello_id=?", (appello_id,))
+        conn.execute("DELETE FROM appello_segreteria_csv WHERE appello_id=?", (appello_id,))
+        conn.execute("DELETE FROM appello_moodle_file WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM esercizio_sospetti WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM raggruppamento_membri WHERE appello_id=?", (appello_id,))
         conn.execute("DELETE FROM raggruppamenti WHERE appello_id=?", (appello_id,))

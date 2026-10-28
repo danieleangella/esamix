@@ -733,14 +733,12 @@ td .link-simile, td.muted { overflow-wrap: anywhere; }
 .riga-svolgimento.rimandato .svolg-nome, .riga-svolgimento.rimandato .svolg-punteggio { opacity: 0.45; }
 .svolg-nome { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; }
 .svolg-punteggio { display: flex; align-items: center; gap: 0.35rem; }
-.chip-punteggi { display: inline-flex; gap: 0.2rem; }
-button.chip-punteggio {
-  margin: 0; min-width: 2rem; padding: 0.3rem 0.4rem; font-weight: 700; background: var(--panel); color: var(--text);
-  border: 1px solid var(--border-strong); border-radius: 6px;
-}
-button.chip-punteggio:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); filter: none; }
-button.chip-punteggio.attivo { background: var(--accent); border-color: var(--accent); color: #fff; }
 input.campo-punteggio { width: 4.2rem; font-size: 1.1rem; font-weight: 700; text-align: center; padding: 0.3rem; }
+/* punteggio assegnato in automatico (obbligatorio: il massimo), finché non lo si cambia */
+input.campo-punteggio.automatico { color: #9ca3af; font-weight: 500; }
+.dettaglio-nota { margin-top: 0.9rem; }
+.dettaglio-nota > summary { cursor: pointer; font-size: 0.9rem; }
+.dettaglio-nota textarea { margin-top: 0.4rem; }
 .svolg-max { font-size: 0.85rem; }
 .svolg-dopo { display: inline-flex; align-items: center; gap: 0.3rem; margin: 0; color: var(--text); cursor: pointer; white-space: nowrap; }
 .svolg-dopo input { width: auto; margin: 0; }
@@ -841,3 +839,8 @@ textarea.testo-normale { font-family: inherit; }
 .risposte-scelte .risposta-scelta { display: grid; grid-template-columns: 4.8rem 1fr; gap: 0.5rem; padding: 0.1rem 0; }
 .risposte-scelte .percentuale { text-align: right; font-weight: 600; white-space: nowrap; }
 .risposte-scelte details summary { font-size: 0.8rem; padding: 0.1rem 0; }
+
+/* tabelle dei risultati da pubblicare: tutte le colonne centrate */
+.tabella-centrata th, .tabella-centrata td { text-align: center; }
+.tabella-file-risultati td { vertical-align: middle; }
+.tabella-file-risultati td:first-child { white-space: nowrap; padding-right: 1.5rem; }

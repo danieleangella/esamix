@@ -999,7 +999,7 @@ def _fasi_globali(contesto: dict) -> list[dict]:
         "azione": "Esporta i voti per la segreteria e segna come verbalizzati quelli registrati",
     })
     fasi.append({
-        "nome": "Chiusura", "scheda": "impostazioni", "fatta": appello.chiuso,
+        "nome": "Chiusura", "scheda": "chiusura", "fatta": appello.chiuso,
         "dettaglio": "chiuso" if appello.chiuso else "ancora aperto",
         "azione": "Chiudi l'appello: nessuna modifica sarà più possibile (si può riaprire)",
     })
@@ -1071,6 +1071,7 @@ def _dati_appello(tag: str, corso, appello) -> dict:
         "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
         "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
         "segreteria_csv": esportazione_service.get_segreteria_csv(tag, appello.id),
+        "moodle_file": esportazione_service.get_file_moodle(tag, appello.id),
         "esclusi_filtro": esportazione_service.list_esclusi_dal_filtro(tag, appello.id),
         "iscritti": iscritti,
         "iscritti_manuali": esportazione_service.list_iscritti_manuali(tag, appello.id),
@@ -1105,6 +1106,14 @@ def _contesto_appello(tag: str, corso, appello) -> dict:
         "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
     }
     if raggruppamento:
+        # l'orale di un raggruppamento sta sulla sua riga, che può non avere ancora un voto
+        # (voti combinati mai calcolati): lo scritto di riferimento è la media delle prove
+        voti_prove = risultati_service.voti_prove_raggruppamento(tag, raggruppamento)
+        for r in contesto["orali_da_svolgere"] + contesto["orali_svolti"]:
+            voti = voti_prove.get(r["matricola"], {}).get("voti") or []
+            r["voti_prove"] = voti
+            if r["voto_scritto"] is None and voti and None not in voti:
+                r["voto_scritto"] = risultati_service.media_per_eccesso(voti, contesto["votomin_effettivo"])
         membri_dati = []
         for i, m in enumerate(raggruppamento.membri):
             dati_membro = _dati_appello(tag, corso, m)
@@ -1232,9 +1241,23 @@ def concludi_correzione_scritto(tag: str, appello_id: int):
             "da valutare (il voto è provvisorio). Completali dalla pagina Svolgimenti e note.",
             "error", anchor=anchor,
         )
+    raggruppamento = corsi_service.get_raggruppamento_by_appello(tag, appello_id)
+    if raggruppamento is not None:
+        # voti combinati aggiornati prima di generare l'elenco complessivo
+        risultati_service.calcola_raggruppamento(tag, raggruppamento.id)
     corsi_service.concludi_correzione_scritti(tag, appello_id)
     _genera_risultati_cache(tag, appello_id)
     msg = "Correzione scritta conclusa: elenco risultati generato, nessuna nuova correzione è possibile finché non riapri"
+    # chiusa la correzione dell'ultima prova di un raggruppamento, arrivano anche i
+    # risultati complessivi (voti delle prove e media)
+    gruppo = corsi_service.get_raggruppamento_by_membro(tag, appello_id) if appello.membro_raggruppamento else None
+    if gruppo is not None and all(
+        m.id == appello_id or m.correzione_scritti_conclusa for m in gruppo.membri
+    ):
+        risultati_service.calcola_raggruppamento(tag, gruppo.id)
+        corsi_service.concludi_correzione_scritti(tag, gruppo.appello_id)
+        _genera_risultati_cache(tag, gruppo.appello_id)
+        msg += f". Tutte le prove sono corrette: risultati complessivi pronti nella scheda Risultati di «{gruppo.nome}»"
     try:
         sospette = controllo_service.segnala_sospette(tag, appello_id)
     except Exception:
@@ -1261,7 +1284,7 @@ def riapri_correzione_scritto(tag: str, appello_id: int):
 @app.post("/corsi/{tag}/appelli/{appello_id}/riapri")
 def riapri_appello(tag: str, appello_id: int):
     corsi_service.riapri_appello(tag, appello_id)
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Appello riaperto", anchor="impostazioni")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Appello riaperto", anchor="chiusura")
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/genera-compiti")
@@ -2218,14 +2241,20 @@ def _render_correggi_revisione(
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
     manuali = sorted(valutazione.da_valutare + valutazione.domande_aperte, key=lambda r: r.posizione)
-    if punteggi_proposti is None:
-        # correzione nuova: un obbligatorio con la risposta giusta parte dal punteggio pieno
-        # (basta confermare se lo svolgimento è a posto), una domanda aperta da vuoto
-        punteggi_proposti = {} if modifica else {r.posizione: corso.risposta_corretta for r in valutazione.da_valutare}
     if rimandati is None:
+        # "rimanda a dopo" riguarda le domande aperte: gli obbligatori hanno già il massimo
         rimandati = (
-            {r.posizione for r in manuali} if appello.rimanda_svolgimenti and not modifica else set()
+            {r.posizione for r in valutazione.domande_aperte} if appello.rimanda_svolgimenti and not modifica else set()
         )
+    # un obbligatorio con la risposta giusta parte dal punteggio pieno, assegnato in
+    # automatico (in grigio: basta confermare se lo svolgimento è a posto); una domanda
+    # aperta parte da vuota
+    punteggi_proposti = dict(punteggi_proposti or {})
+    automatici = set()
+    for r in valutazione.da_valutare:
+        if r.posizione not in punteggi_proposti and r.posizione not in rimandati:
+            punteggi_proposti[r.posizione] = corso.risposta_corretta
+            automatici.add(r.posizione)
     if richiedi_orale_checked is None:
         richiedi_orale_checked = bool(valutazione.orale_obbligatorio)
 
@@ -2247,7 +2276,7 @@ def _render_correggi_revisione(
         "punteggi_proposti": punteggi_proposti, "note_proposte": note_proposte or {},
         "nota_correzione": nota_correzione or "", "rimandati": rimandati, "errore": errore,
         "richiedi_orale_checked": richiedi_orale_checked, "orale_motivazione": orale_motivazione,
-        "modifica": modifica, "manuali": manuali,
+        "modifica": modifica, "manuali": manuali, "automatici": automatici,
         "note_precedenti": correzione_service.note_precedenti(tag, appello_id, valutazione.matricola) if manuali else {},
         "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
         "avviso_idoneita": avviso_idoneita,
@@ -2281,6 +2310,7 @@ async def correggi(
     if errore_iscritto:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", errore_iscritto, "error", anchor=anchor)
     risposte = risposte.strip().replace(" ", "").upper()
+    risposte = correzione_service.completa_aperte(tag, appello_id, codice, risposte)
     try:
         valutazione = correzione_service.valuta_preliminare(tag, appello_id, matricola, codice, risposte)
     except correzione_service.StudenteNonTrovato as e:
@@ -2560,7 +2590,7 @@ def elimina_risultato(tag: str, appello_id: int, matricola: str):
         correzione_service.elimina_risultato(tag, appello_id, matricola)
     except Exception as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Risultato eliminato", anchor=anchor)
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Correzione cancellata: lo studente è di nuovo da valutare", anchor=anchor)
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}/modifica", response_class=HTMLResponse)
@@ -2633,7 +2663,7 @@ def risultati_anteprima(request: Request, tag: str, appello_id: int):
         )
     righe = risultati_service.lista_risultati_html(tag, appello_id)
     return templates.TemplateResponse(request, "risultati_anteprima.html", {
-        "corso": corso, "appello": appello, "righe": righe,
+        "corso": corso, "appello": appello, "righe": righe, "prove": risultati_service.nomi_prove(tag, appello_id),
     })
 
 
@@ -2721,7 +2751,10 @@ async def carica_iscritti_moodle(request: Request, tag: str, appello_id: int, fi
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "compiti")
     try:
-        studenti = esportazione_service.anteprima_iscritti_moodle(tag, appello_id, file.filename, await file.read())
+        contenuto = await file.read()
+        studenti = esportazione_service.anteprima_iscritti_moodle(tag, appello_id, file.filename, contenuto)
+        # la struttura del file serve poi per esportare i voti da reimportare in Moodle
+        esportazione_service.salva_file_moodle(tag, appello_id, file.filename, contenuto)
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     except Exception as e:
@@ -2754,6 +2787,21 @@ async def conferma_iscritti_moodle(request: Request, tag: str, appello_id: int):
     if esito["rimossi"]:
         msg += f"; {esito['rimossi']} iscritti non più presenti nel file sono stati tolti dall'elenco"
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg + ".", anchor=anchor)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/voti-moodle.csv")
+def scarica_voti_moodle(tag: str, appello_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    if not appello.correzione_scritti_conclusa:
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}", "Chiudi prima la correzione della prova", "error",
+            anchor=_anchor_membro(appello, "valutazione"),
+        )
+    testo, nome_file = esportazione_service.export_voti_moodle(tag, appello_id)
+    return Response(
+        testo.encode("utf-8-sig"), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{nome_file}"'},
+    )
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/iscritti-manuale/tutti")

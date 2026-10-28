@@ -4,7 +4,7 @@
 {% from "_icone.html" import icona %}
 {% from "_info.html" import info %}
 {% set icone_fasi = {"creazione": "testo", "compiti": "stampa", "presenze": "presenze", "valutazione": "correzione",
-                     "orali": "orale", "verbalizzati": "verbale", "risultati": "verbale", "impostazioni": "lucchetto"} %}
+                     "orali": "orale", "verbalizzati": "verbale", "risultati": "verbale", "impostazioni": "lucchetto", "chiusura": "lucchetto"} %}
 {% set nomi_brevi = {"Compiti d'esame": "Compiti"} %}
 {% set stati = {"fatta": "Completata", "saltata": "Non usata", "in_corso": "In corso", "da_fare": "Da fare"} %}
 <nav class="percorso" aria-label="Fasi dell'appello">
@@ -42,6 +42,6 @@
 {% elif appello.chiuso %}
 <div class="prossimo-passo prossimo-passo-fatto">
   <span class="prossimo-passo-azione">{{ icona("lucchetto", 14) }} Appello chiuso: non sono più possibili modifiche.</span>
-  <a class="icona-azione" href="#impostazioni" data-info="Per modificare qualcosa riapri l'appello dalla scheda Impostazioni">Riapri…</a>
+  <a class="icona-azione" href="#chiusura" data-info="Per modificare qualcosa riapri l'appello dalla scheda Chiusura">Riapri…</a>
 </div>
 {% endif %}

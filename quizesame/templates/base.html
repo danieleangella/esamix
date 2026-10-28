@@ -137,14 +137,35 @@
   // Stringa risposte del compito: sempre maiuscola e raggruppata ogni 5 caratteri per
   // leggerla più facilmente (es. "ABCXB ADCEB A"), ma il valore inviato al server resta
   // sempre senza spazi (vedi anche lo strip lato server, per sicurezza).
-  function formattaRisposte(input) {
-    function aggiorna() {
+  // `aperte` (facoltativo): funzione che restituisce le posizioni (da 0) delle domande
+  // aperte del compito: lì il "-" lo mette il campo da solo, e si digitano solo le
+  // lettere delle domande a risposta chiusa.
+  function formattaRisposte(input, aperte) {
+    function aggiorna(ev) {
       var pulita = input.value.toUpperCase().replace(/\s+/g, "");
+      var pos = aperte ? aperte() : [];
+      if (pos && pos.length) {
+        var lettere = pulita.replace(/-/g, "").split("");
+        var cancella = ev && ev.inputType && ev.inputType.indexOf("delete") === 0;
+        var esito = "";
+        for (var i = 0; lettere.length || pos.indexOf(i) !== -1; i++) {
+          if (pos.indexOf(i) !== -1) {
+            // un "-" in coda si aggiunge solo scrivendo, così Backspace lo può togliere
+            if (!lettere.length && cancella) break;
+            esito += "-";
+          } else {
+            if (!lettere.length) break;
+            esito += lettere.shift();
+          }
+        }
+        pulita = esito + lettere.join("");
+      }
       var gruppi = pulita.match(/.{1,5}/g);
       input.value = gruppi ? gruppi.join(" ") : "";
     }
     input.addEventListener("input", aggiorna);
     aggiorna();
+    return aggiorna;
   }
 
   // Doppia conferma per azioni distruttive e irreversibili: invece di un secondo

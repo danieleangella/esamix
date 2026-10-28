@@ -345,7 +345,9 @@ COMPITO DA CONVERTIRE
     mouse su una fase compaiono stato e dettagli (es. "0 compiti generati"), e l'icona
     <strong>i</strong> in fondo al percorso riassume il significato dei colori.
     Per un raggruppamento di prove le prime quattro fasi si ripetono per ciascuna prova.
-    Cliccando una fase si apre la scheda in cui completarla.
+    Cliccando una fase si apre la scheda in cui completarla. La <strong>Chiusura</strong>
+    dell'appello (e la sua riapertura) ha una scheda propria; le Impostazioni contengono
+    nome, data, orale, aule ed eliminazione.
   </p>
   <p>
     Sotto il percorso, il riquadro <strong>Prossimo passo</strong> dice cosa fare adesso
@@ -460,7 +462,9 @@ COMPITO DA CONVERTIRE
   <p>
     Dalla scheda <strong>Correzione</strong>, si inserisce matricola (o nome, con
     autocompletamento — anche qui proposti per primi gli iscritti a questo appello),
-    codice del compito e la stringa di risposte data. Il cursore è già sulla matricola e
+    codice del compito e la stringa di risposte data: solo le lettere delle domande a
+    risposta chiusa, perché il "-" delle domande aperte lo inserisce il campo da solo appena
+    il codice è riconosciuto. Il cursore è già sulla matricola e
     <kbd>Invio</kbd> passa al campo successivo; sotto ogni campo un controllo immediato
     segnala uno studente già valutato, un codice inesistente o già usato da un altro
     studente, e quante risposte mancano o sono di troppo rispetto al compito. Nel riepilogo
@@ -480,8 +484,9 @@ COMPITO DA CONVERTIRE
     l'orale</strong> invece di salvare un voto scritto definitivo (solo se il compito è
     sufficiente). Se non si vuole ancora decidere, "Salva come
     bozza" tiene da parte matricola, codice e risposte senza registrare nessun esito: la
-    correzione compare nella sezione "Bozze salvate" della scheda, pronta da riprendere
-    ("Riprendi") o da scartare ("Elimina") in qualsiasi momento.
+    correzione compare nell'elenco "Correzioni da completare" della scheda (insieme ai
+    compiti con svolgimenti ancora da valutare), pronta da riprendere ("Riprendi") o da
+    scartare in qualsiasi momento.
   </p>
   <p class="muted">
     Per i compiti importati da una migrazione dati legacy, a volte non è noto quale
@@ -491,15 +496,15 @@ COMPITO DA CONVERTIRE
   </p>
   <p>
     Se un esercizio obbligatorio non è stato svolto, il compito risulta automaticamente
-    insufficiente. Se è stato svolto e la risposta a scelta multipla è corretta, il
-    riepilogo chiede di giudicare lo svolgimento scritto assegnando un punteggio tra il
-    valore di una risposta sbagliata e quello di una corretta. Le domande aperte
+    insufficiente. Se è stato svolto e la risposta a scelta multipla è corretta, lo
+    svolgimento riceve in automatico il punteggio massimo (in grigio), da abbassare fino al
+    valore di una risposta sbagliata se lo svolgimento scritto non va. Le domande aperte
     richiedono sempre un punteggio assegnato a mano, fino a un massimo impostabile nelle
     Impostazioni del corso ("Punteggio massimo domanda aperta", può superare i punti di
     una risposta corretta).
   </p>
   <p>
-    Ogni svolgimento ha i pulsanti dei punteggi possibili (o il campo numerico) e una
+    Ogni svolgimento ha il campo del punteggio e una
     <strong>nota</strong> facoltativa per gli errori fatti. Mentre la si scrive, sotto
     compaiono in piccolo le note simili già date allo stesso esercizio in altri compiti, con i
     punteggi; passando sopra col mouse si vede l'elenco con studente, punteggio e nota, per
@@ -507,14 +512,11 @@ COMPITO DA CONVERTIRE
     simili è evidenziato).
   </p>
   <p>
-    Uno svolgimento si può rimandare con la spunta <strong>"dopo"</strong> (o tutti con
-    "Rimanda tutti a dopo"): il compito si registra con un voto provvisorio, che conta il
-    massimo per le parti non ancora giudicate, compare tra le "Valutazioni in sospeso" e
-    intanto non è verbalizzabile. La prima volta l'app chiede se rimandare gli svolgimenti
-    anche in tutti i prossimi compiti dell'appello; la stessa scelta si attiva o disattiva
-    fin dall'inizio con la casella "Rimanda la valutazione degli svolgimenti a dopo" sotto il
-    modulo di correzione. In questa modalità si inseriscono solo le risposte della griglia, e
-    in ogni compito resta comunque possibile "Valuta adesso questo compito".
+    Uno svolgimento si può rimandare con la spunta <strong>"dopo"</strong>: il compito si
+    registra con un voto provvisorio, in cui una domanda aperta senza punteggio conta 0 (e
+    un obbligatorio il massimo), compare tra le "Correzioni da completare" e intanto non è
+    verbalizzabile. Con la casella "Rimanda la valutazione degli svolgimenti a dopo", sotto
+    il modulo di correzione, le domande aperte di tutti i compiti partono già rimandate.
   </p>
   <p>
     La pagina <strong>Svolgimenti e note</strong> (dalla scheda Correzione) mostra un
@@ -540,7 +542,9 @@ COMPITO DA CONVERTIRE
     durante la prova, si usano i pulsanti "Assente"/"Segna ritirato" della scheda
     Presenze e ritirati, invece della correzione normale. Se è stato indicato un elenco
     iscritti (vedi sopra), correggere o segnare assente/ritirato uno studente che non vi
-    compare è bloccato.
+    compare è bloccato. Cancellare una correzione (cestino nei risultati inseriti) non fa
+    sparire lo studente: torna da valutare, con codice e risposte salvati come bozza tra le
+    "Correzioni da completare", pronti da riprendere.
   </p>
   <p>
     La pagina di un singolo compito corretto mostra anche, in fondo, un link discreto
@@ -561,8 +565,8 @@ COMPITO DA CONVERTIRE
   </p>
   <p>
     In fondo alla scheda Correzione, il pulsante <strong>"Chiudi la correzione"</strong> si
-    attiva quando tutti gli attesi hanno un esito registrato e non restano né bozze né
-    svolgimenti da valutare, perché i voti ancora provvisori non finiscano nell'elenco da
+    attiva quando tutti gli attesi hanno un esito registrato e non restano correzioni da
+    completare (bozze o svolgimenti da valutare), perché i voti ancora provvisori non finiscano nell'elenco da
     pubblicare (accanto è indicato cosa manca). Da quel momento anche la pagina Svolgimenti
     e note è in sola lettura, finché non si riapre la correzione. Chiudere la correzione — indipendente dalla chiusura dell'intero
     appello, che di solito arriva più tardi (dopo orali e verbalizzazioni) — blocca nuove correzioni
@@ -571,8 +575,10 @@ COMPITO DA CONVERTIRE
     ogni download, per non ricompilare inutilmente il PDF a ogni click mentre le
     correzioni sono ancora in corso. Restano comunque consultabili anche dopo. Per un
     raggruppamento, si chiude separatamente per ciascuna prova membro (dalla sua
-    scheda Correzione) e poi per il voto combinato (in fondo alla scheda Risultati, attivo
-    quando tutte le prove hanno chiuso la loro).
+    scheda Correzione); chiusa l'ultima, si chiude da sola anche quella del raggruppamento e
+    nella scheda Correzione di ogni prova compare una riga in più con i risultati
+    complessivi. A correzione chiusa, il pulsante <strong>Voti per Moodle</strong> scarica i
+    voti della prova da importare nel registro valutatore di Moodle.
   </p>
 </details>
 
@@ -582,7 +588,10 @@ COMPITO DA CONVERTIRE
     Nella scheda <strong>Orali</strong> di un appello compaiono gli studenti in attesa:
     per ciascuno si registra l'esito (voto assegnato, assente, o insufficiente). Un
     riquadro a scomparsa più sotto, "Orali svolti", raccoglie invece chi lo ha già
-    sostenuto, con l'indicazione di quanti. Nelle impostazioni del corso si può decidere
+    sostenuto, con l'indicazione di quanti. Cliccando sul nome di uno studente si apre il
+    dettaglio delle prove che ha svolto (per un raggruppamento, una per prova), con le
+    risposte sbagliate e i punteggi degli svolgimenti; per le prove parziali il voto scritto
+    è la media delle prove, con accanto il voto di ciascuna. Nelle impostazioni del corso si può decidere
     se, una volta richiesto l'orale a uno studente, resti obbligatorio per lui in tutti
     gli appelli successivi (anche in un altro anno accademico, se lo studente viene
     importato da un corso precedente), ed eventualmente attivare una soglia automatica
@@ -597,7 +606,9 @@ COMPITO DA CONVERTIRE
     Gli studenti idonei non ancora verbalizzati compaiono in cima alla scheda
     <strong>Verbalizzazione</strong> (per un raggruppamento: Risultati), con un pulsante "Verbalizza" per ciascuno (oltre a quello per
     verbalizzarli tutti insieme) e uno per rifiutare il voto; una volta verbalizzato, un
-    esito non è più modificabile o eliminabile. Chi ha sostenuto l'orale è segnalato come
+    esito non è più modificabile o eliminabile. Nella stessa scheda c'è <strong>Esporta voti
+    per la segreteria</strong>, che compila il file "Lista Studenti Esame" caricato (per un
+    appello singolo, nella scheda Compiti d'esame). Chi ha sostenuto l'orale è segnalato come
     tale sia tra i risultati inseriti sia tra i voti verbalizzati.
   </p>
   <p>
@@ -685,11 +696,12 @@ COMPITO DA CONVERTIRE
     Una prova membro non ha più una pagina propria: tutto vive nella pagina del
     raggruppamento, con una riga di tab per ciascuna prova (nell'ordine, col nome vero
     della prova seguito dalle sue fasi Testo, Compiti, Presenze e Correzione) e delle
-    schede globali — <strong>Risultati</strong> (elenco combinato, verbalizzazione ed
-    esportazione .tex/.pdf/segreteria), <strong>Orali</strong> (l'orale è unico per il
+    schede globali — <strong>Risultati</strong> (in cima tutti i file da pubblicare,
+    complessivi e di ogni prova; poi verbalizzazione, esportazione per la segreteria ed
+    elenco combinato), <strong>Orali</strong> (l'orale è unico per il
     raggruppamento: se richiesto durante la correzione di una prova, il suo voto
-    sostituisce la media delle prove parziali una volta svolto), <strong>Verbalizzati</strong>, <strong>Statistiche</strong> (per prova e combinate) e
-    <strong>Impostazioni</strong>.
+    sostituisce la media delle prove parziali una volta svolto), <strong>Verbalizzati</strong>, <strong>Statistiche</strong> (per prova e combinate),
+    <strong>Chiusura</strong> e <strong>Impostazioni</strong>.
   </p>
   <p>
     Alla seconda prova (e successive) può partecipare solo chi ha superato la prova
@@ -728,6 +740,16 @@ COMPITO DA CONVERTIRE
     qualche studente ha una valutazione da esportare ma la sua matricola non compare nel
     file caricato, compare un avviso con l'elenco pronto da copiare e incollare, per
     aggiungerlo a mano sul sistema della segreteria.
+  </p>
+  <p>
+    Quando si chiude la correzione dell'ultima prova, si calcolano i voti combinati e si
+    genera l'elenco dei <strong>risultati complessivi</strong> da pubblicare: solo chi ha
+    superato tutte le prove, con matricola oscurata, iniziali, il voto di ciascuna prova e
+    il voto finale, cioè la media approssimata per eccesso solo se la media esatta è già sufficiente ("non superato" se sotto il voto
+    minimo dell'esame: con soglia 18, 17 e 18 danno 17,5, non superato; "orale" per chi deve sostenerlo). A correzione chiusa, ogni prova ha
+    anche il pulsante <strong>Voti per Moodle</strong>: un CSV con la stessa struttura del
+    file di prenotazioni Moodle caricato (anche quello di un'altra prova del raggruppamento)
+    più una colonna con il voto, da importare nel registro valutatore.
   </p>
 </details>
 

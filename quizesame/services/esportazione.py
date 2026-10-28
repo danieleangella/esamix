@@ -222,16 +222,7 @@ def anteprima_iscritti_moodle(tag: str, appello_id: int, nome_file: str, contenu
     deselezionato di default) o "senza_matricola" (non importabile). "gia_iscritto"
     segnala chi è già nell'elenco iscritti di questo appello."""
     righe, _ = _righe_e_codifica(nome_file, contenuto)
-    indice, colonne = None, {}
-    for i, riga in enumerate(righe):
-        normalizzate = [c.strip().lower() for c in riga]
-        trovate = {
-            campo: next((normalizzate.index(n) for n in nomi if n in normalizzate), None)
-            for campo, nomi in _COLONNE_MOODLE.items()
-        }
-        if trovate["matricola"] is not None and trovate["cognome"] is not None:
-            indice, colonne = i, trovate
-            break
+    indice, colonne = _intestazione_moodle(righe)
     if indice is None:
         raise ValueError(
             "Non trovo nel file le colonne di Moodle 'ID number' e 'Last name' "
@@ -275,6 +266,104 @@ def anteprima_iscritti_moodle(tag: str, appello_id: int, nome_file: str, contenu
             "email": cella(riga, "email"), "stato": stato, "gia_iscritto": matricola in gia_iscritti,
         })
     return risultato
+
+
+def _intestazione_moodle(righe: list[list[str]]) -> tuple[Optional[int], dict]:
+    """Indice della riga d'intestazione di un file Moodle e posizione delle colonne note
+    (matricola/nome/cognome/email); (None, {}) se non la trova."""
+    for i, riga in enumerate(righe):
+        normalizzate = [c.strip().lower() for c in riga]
+        trovate = {
+            campo: next((normalizzate.index(n) for n in nomi if n in normalizzate), None)
+            for campo, nomi in _COLONNE_MOODLE.items()
+        }
+        if trovate["matricola"] is not None and trovate["cognome"] is not None:
+            return i, trovate
+    return None, {}
+
+
+def salva_file_moodle(tag: str, appello_id: int, nome_file: str, contenuto: bytes) -> None:
+    """Conserva il file di prenotazioni Moodle appena caricato (come CSV), per esportare
+    poi i voti della prova con la stessa struttura."""
+    righe, _ = _righe_e_codifica(nome_file, contenuto)
+    buffer = io.StringIO()
+    csv.writer(buffer, lineterminator="\r\n").writerows(righe)
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute(
+            "INSERT INTO appello_moodle_file (appello_id, nome_file, contenuto) VALUES (?,?,?) "
+            "ON CONFLICT(appello_id) DO UPDATE SET nome_file=excluded.nome_file, contenuto=excluded.contenuto, "
+            "caricato_il=CURRENT_TIMESTAMP",
+            (appello_id, nome_file, buffer.getvalue()),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_file_moodle(tag: str, appello_id: int, anche_dal_raggruppamento: bool = True) -> Optional[dict]:
+    """Il file Moodle caricato per questo appello; se non c'è e l'appello è una prova di
+    un raggruppamento, quello di un'altra prova dello stesso raggruppamento (di solito le
+    prenotazioni si caricano solo per la prima prova, ma la struttura è la stessa)."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        row = conn.execute("SELECT * FROM appello_moodle_file WHERE appello_id=?", (appello_id,)).fetchone()
+        if row is None and anche_dal_raggruppamento:
+            row = conn.execute(
+                "SELECT f.* FROM appello_moodle_file f JOIN raggruppamento_membri a ON a.appello_id = f.appello_id "
+                "JOIN raggruppamento_membri b ON b.raggruppamento_id = a.raggruppamento_id "
+                "WHERE b.appello_id=? ORDER BY f.caricato_il DESC LIMIT 1",
+                (appello_id,),
+            ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def _voto_moodle(r: dict) -> str:
+    """Il voto della prova come numero da importare nel registro di Moodle (il voto dello
+    scritto anche se si attende l'orale); vuoto per assenti, ritirati e annullati."""
+    if r["esito"] not in ("voto", "rifiutato"):
+        return ""
+    voto = r["voto_scritto"] if r["voto_scritto"] is not None else r["voto"]
+    return "" if voto is None else str(voto)
+
+
+def export_voti_moodle(tag: str, appello_id: int) -> tuple[str, str]:
+    """CSV con i voti della prova, nella struttura del file di prenotazioni Moodle
+    caricato (stesse colonne, e per chi c'era la sua stessa riga) più una colonna con il
+    voto; senza file, con le colonne standard di Moodle. Ritorna (testo, nome del file)."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    titolo_voto = f"Voto {appello.nome}"
+    file_moodle = get_file_moodle(tag, appello_id)
+    righe_file = list(csv.reader(io.StringIO(file_moodle["contenuto"]))) if file_moodle else []
+    indice, colonne = _intestazione_moodle(righe_file)
+    if indice is None:
+        intestazione = ["Nome", "Cognome", "Codice identificativo", "Indirizzo email"]
+        colonne = {"nome": 0, "cognome": 1, "matricola": 2, "email": 3}
+        righe_studenti = {}
+    else:
+        intestazione = righe_file[indice]
+        righe_studenti = {}
+        for riga in righe_file[indice + 1:]:
+            idx = colonne["matricola"]
+            if idx < len(riga) and riga[idx].strip():
+                righe_studenti.setdefault(riga[idx].strip(), riga)
+
+    uscita = [intestazione + [titolo_voto]]
+    for r in correzione_service.list_risultati(tag, appello_id):
+        riga = list(righe_studenti.get(r["matricola"]) or [])
+        if not riga:
+            riga = [""] * len(intestazione)
+            for campo, valore in (("matricola", r["matricola"]), ("nome", r["nome"]), ("cognome", r["cognome"])):
+                if colonne.get(campo) is not None:
+                    riga[colonne[campo]] = valore
+        riga = (riga + [""] * len(intestazione))[:len(intestazione)]
+        uscita.append(riga + [_voto_moodle(r)])
+
+    buffer = io.StringIO()
+    csv.writer(buffer, lineterminator="\r\n").writerows(uscita)
+    return buffer.getvalue(), f"voti-moodle-{appello.slug}.csv"
 
 
 def importa_iscritti_moodle(tag: str, appello_id: int, studenti: list[dict], sostituisci: bool = False) -> dict:

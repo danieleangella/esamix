@@ -594,20 +594,24 @@ def compila_pdf(tex_path: Path) -> CompilazioneResult:
         )
 
     out_dir = tex_path.parent
+    log_path = tex_path.with_suffix(".log")
     try:
-        # una sola passata: questi documenti non usano \ref/\cite/\tableofcontents, quindi
-        # non c'è nulla che una seconda passata risolverebbe meglio della prima.
-        risultato = subprocess.run(
-            ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", tex_path.name],
-            cwd=out_dir, capture_output=True, text=True, timeout=120,
-        )
+        # di solito basta una passata (niente \ref/\cite/\tableofcontents); le tabelle
+        # longtable (risultati, elenchi) però allineano le colonne fra intestazione e
+        # righe solo dalla seconda, e lo chiedono nel log ("Rerun LaTeX")
+        for _ in range(3):
+            risultato = subprocess.run(
+                ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", tex_path.name],
+                cwd=out_dir, capture_output=True, text=True, timeout=120,
+            )
+            log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
+            if risultato.returncode != 0 or "Rerun LaTeX" not in log:
+                break
     except subprocess.TimeoutExpired:
         return CompilazioneResult(ok=False, messaggio="Compilazione PDF troppo lenta, annullata")
 
     pdf_path = tex_path.with_suffix(".pdf")
     if pdf_path.exists():
-        log_path = tex_path.with_suffix(".log")
-        log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
         pagine = re.search(r"Output written on .*?\((\d+) pages?", log)
         return CompilazioneResult(ok=True, messaggio="PDF compilato", pdf_path=pdf_path, sporgenze=_sporgenze_latex(log),
                                   pagine=int(pagine.group(1)) if pagine else None)
@@ -755,8 +759,11 @@ def verifica_codice(tag: str, appello_id: int, codice: str) -> dict:
             "WHERE r.appello_id=? AND r.compito_id=?",
             (appello_id, compito["id"]),
         ).fetchone()
+        soluzioni = compito["soluzioni"] or ""
         return {
-            "esiste": True, "lunghezza": len(compito["soluzioni"] or ""),
+            "esiste": True, "lunghezza": len(soluzioni),
+            # posizioni delle domande aperte: il campo risposte vi mette da solo il "-"
+            "aperte": [i for i, c in enumerate(soluzioni) if c == "-"],
             "usato_da": dict(usato) if usato else None,
         }
     finally:

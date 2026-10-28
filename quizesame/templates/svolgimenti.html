@@ -76,11 +76,9 @@
         </td>
         {% if modificabile and voce.modificabile %}
         <td class="cella-punteggio">
-          {% if es.massimo - corso.risposta_sbagliata <= 10 %}
-          <span class="chip-punteggi">{% for k in range(corso.risposta_sbagliata, es.massimo + 1) %}<button type="button" class="chip-punteggio{% if voce.punteggio == k %} attivo{% endif %}" data-valore="{{ k }}" tabindex="-1">{{ k }}</button>{% endfor %}</span>
-          {% endif %}
           <input type="number" class="campo-punteggio" min="{{ corso.risposta_sbagliata }}" max="{{ es.massimo }}"
                  value="{{ voce.punteggio if voce.punteggio is not none else '' }}" aria-label="Punteggio di {{ voce.cognome }} {{ voce.nome }}">
+          <span class="muted svolg-max">/ {{ es.massimo }}</span>
         </td>
         <td><input class="campo-nota" value="{{ voce.nota }}" list="note-{{ es.chiave }}" placeholder="Errori o nota" aria-label="Nota su {{ voce.cognome }} {{ voce.nome }}"><div class="note-simili"></div></td>
         {% else %}
@@ -252,18 +250,11 @@
     if (!input) return;
     var nota = tr.querySelector(".campo-nota");
     tr.dataset.salvato = input.value + "\u0000" + nota.value;
-    function chip() {
-      tr.querySelectorAll(".chip-punteggio").forEach(function (c) { c.classList.toggle("attivo", c.dataset.valore === input.value); });
-    }
-    input.addEventListener("input", chip);
     simili(tr);
     input.addEventListener("change", function () { salva(tr); });
     nota.addEventListener("change", function () { salva(tr); });
     nota.addEventListener("input", function () { simili(tr); });
     input.addEventListener("input", function () { simili(tr); });
-    tr.querySelectorAll(".chip-punteggio").forEach(function (c) {
-      c.addEventListener("click", function () { input.value = c.dataset.valore; chip(); salva(tr); nota.focus(); });
-    });
     // Invio: salva e passa allo studente successivo (punteggio), per valutare di fila
     [input, nota].forEach(function (campo) {
       campo.addEventListener("keydown", function (ev) {
