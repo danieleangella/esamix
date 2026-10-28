@@ -31,7 +31,9 @@ def _etichetta_esito(r, votomin: int, annullato_come: str = "insufficiente") -> 
     if r["esito"] == "rifiutato":
         return "rifiutato"
     if r["richiede_orale"] and not r["orale_svolto"]:
-        return "orale"
+        # anche a chi deve fare l'orale si pubblica il voto dello scritto
+        scritto = r["voto_scritto"] if r["voto_scritto"] is not None else r["voto"]
+        return f"{celavoto(int(scritto), votomin)} (orale)" if scritto is not None else "orale"
     if r["esito_orale"] == "assente":
         return "assente (orale)"
     if r["esito_orale"] == "insufficiente":
@@ -103,7 +105,7 @@ def _righe_pubblicabili(tag: str, appello_id: int) -> list[dict]:
     """Le righe dell'elenco da pubblicare (matricola in chiaro: la oscura chi stampa).
     Per un raggruppamento compaiono solo gli studenti che hanno superato tutte le prove,
     con i voti di ciascuna e la media approssimata per eccesso ("non superato" sotto il
-    voto minimo dell'esame, "orale" per chi lo deve sostenere)."""
+    voto minimo dell'esame, con "(orale)" accanto per chi lo deve sostenere)."""
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
     votomin = corsi_service.effective_votomin(corso, appello)
@@ -122,10 +124,9 @@ def _righe_pubblicabili(tag: str, appello_id: int) -> list[dict]:
         if not dati["superate"]:
             continue
         r = combinati.get(matricola)
+        etichetta = celavoto(media_per_eccesso(dati["voti"], votomin), votomin)
         if r is not None and r["richiede_orale"] and not r["orale_svolto"]:
-            etichetta = "orale"
-        else:
-            etichetta = celavoto(media_per_eccesso(dati["voti"], votomin), votomin)
+            etichetta += " (orale)"
         nome, cognome = anagrafica.get(matricola, ("", ""))
         righe.append({"matricola": matricola, "nome": nome, "cognome": cognome,
                       "voti_prove": [str(v) for v in dati["voti"]], "etichetta": etichetta})

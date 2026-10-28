@@ -320,10 +320,11 @@ def get_file_moodle(tag: str, appello_id: int, anche_dal_raggruppamento: bool = 
         conn.close()
 
 
-def _voto_moodle(r: dict) -> str:
-    """Il voto della prova come numero da importare nel registro di Moodle (il voto dello
-    scritto anche se si attende l'orale); vuoto per assenti, ritirati e annullati."""
-    if r["esito"] not in ("voto", "rifiutato"):
+def _voto_moodle(r: dict, orale_in_attesa: set[str]) -> str:
+    """Il voto della prova come numero da importare nel registro di Moodle; vuoto per
+    assenti, ritirati, annullati e per chi deve ancora fare l'orale (in questa prova o nel
+    raggruppamento di cui fa parte)."""
+    if r["esito"] not in ("voto", "rifiutato") or r["matricola"] in orale_in_attesa:
         return ""
     voto = r["voto_scritto"] if r["voto_scritto"] is not None else r["voto"]
     return "" if voto is None else str(voto)
@@ -350,6 +351,14 @@ def export_voti_moodle(tag: str, appello_id: int) -> tuple[str, str]:
             if idx < len(riga) and riga[idx].strip():
                 righe_studenti.setdefault(riga[idx].strip(), riga)
 
+    appelli_orale = [appello_id]
+    gruppo = corsi_service.get_raggruppamento_by_membro(tag, appello_id) if appello.membro_raggruppamento else None
+    if gruppo is not None:
+        appelli_orale.append(gruppo.appello_id)
+    orale_in_attesa = {
+        o["matricola"] for a in appelli_orale for o in correzione_service.list_orali_da_svolgere(tag, a)
+    }
+
     uscita = [intestazione + [titolo_voto]]
     for r in correzione_service.list_risultati(tag, appello_id):
         riga = list(righe_studenti.get(r["matricola"]) or [])
@@ -359,7 +368,7 @@ def export_voti_moodle(tag: str, appello_id: int) -> tuple[str, str]:
                 if colonne.get(campo) is not None:
                     riga[colonne[campo]] = valore
         riga = (riga + [""] * len(intestazione))[:len(intestazione)]
-        uscita.append(riga + [_voto_moodle(r)])
+        uscita.append(riga + [_voto_moodle(r, orale_in_attesa)])
 
     buffer = io.StringIO()
     csv.writer(buffer, lineterminator="\r\n").writerows(uscita)
