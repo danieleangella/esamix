@@ -142,7 +142,8 @@ Dalla homepage si apre un corso, e da lì i suoi appelli (o un raggruppamento di
 parziali). In cima alla pagina di un appello il **percorso** mostra le fasi nell'ordine —
 Testo, Compiti d'esame, Presenze, Correzione, Verbalizzazione, Chiusura — con lo stato di
 ciascuna (verde completata, arancione in corso, bordo blu prossimo passo) e porta alla
-scheda in cui completarla; il riquadro "Prossimo passo" dice cosa fare adesso.
+scheda in cui completarla (tratteggiata se non ancora disponibile); il riquadro "Prossimo passo"
+dice cosa fare adesso. In tutti gli elenchi di studenti, cliccando il nome si apre la sua carriera.
 
 - **Testo**: esercizi del compito, aggiunti dalla banca del corso, da altri corsi, creati da
   zero, generati con l'IA o importati da un file; obbligatorio sì/no con un clic. Quando è
@@ -186,7 +187,7 @@ l'orale contattare il docente" con l'email impostata nelle Impostazioni dell'app
 
 Per provare l'app senza toccare i propri corsi, **Impostazioni → Corso di prova** (o la Guida)
 installa un corso con dati inventati: un appello e due prove parziali, con correzioni già fatte
-e altre da fare. Si elimina con un clic, senza lasciare tracce.
+e altre da fare, e un appello già concluso, con orali e voti da verbalizzare. Si elimina con un clic, senza lasciare tracce.
 
 Dopo un aggiornamento del codice va riavviata l'app (l'app stessa lo segnala con un avviso).
 

@@ -1,0 +1,6 @@
+{# Nome di uno studente in un elenco: cliccandolo si apre sotto la riga la sua carriera in
+   breve (con il link alla pagina completa), vedi apriCarriera in app.js. #}
+{% macro nome_studente(tag, matricola, testo) -%}
+<button type="button" class="link-simile apri-carriera" data-url="/corsi/{{ tag }}/studenti/{{ matricola }}/carriera"
+        aria-expanded="false" data-info="Carriera dello studente">{{ testo }}</button>
+{%- endmacro %}

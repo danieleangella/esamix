@@ -11,7 +11,8 @@
   <p>
     Per provare tutte le funzioni senza toccare i propri corsi si può installare un
     <strong>corso di prova</strong>, con studenti, esercizi e risultati inventati: un appello
-    singolo e due prove parziali raggruppate. Negli esercizi la risposta giusta è sempre
+    singolo e due prove parziali raggruppate, in corso, e un appello già concluso (con un orale
+    da svolgere e i voti da verbalizzare), così ogni fase del percorso si può aprire. Negli esercizi la risposta giusta è sempre
     scritta nel testo (es. "Quanto fa 2 + 3? (la risposta giusta è 5)", con le risposte
     segnate come giusta o sbagliata), così si capisce subito cosa aspettarsi in correzione.
   </p>
@@ -345,7 +346,13 @@ COMPITO DA CONVERTIRE
     mouse su una fase compaiono stato e dettagli (es. "0 compiti generati"), e l'icona
     <strong>i</strong> in fondo al percorso riassume il significato dei colori.
     Per un raggruppamento di prove le prime quattro fasi si ripetono per ciascuna prova.
-    Cliccando una fase si apre la scheda in cui completarla. La <strong>Chiusura</strong>
+    Cliccando una fase si apre la scheda in cui completarla. Una fase
+    <strong>tratteggiata</strong> non è ancora disponibile (passandoci sopra si legge quando si
+    apre): i Compiti d'esame dopo la chiusura del testo, le Presenze dopo aver generato i
+    compiti, la Correzione dal giorno della prova, e la Conclusione (orali, verbalizzazione,
+    chiusura) dopo aver chiuso la correzione — per un raggruppamento, di tutte le prove. Una
+    fase già avviata non si blocca mai. In tutti gli elenchi di studenti, cliccando il nome si
+    apre sotto la riga la sua carriera in breve, con il link alla pagina completa. La <strong>Chiusura</strong>
     dell'appello (e la sua riapertura) ha una scheda propria; le Impostazioni contengono
     nome, data, orale, aule ed eliminazione.
   </p>
@@ -430,8 +437,12 @@ COMPITO DA CONVERTIRE
 <details class="card dettaglio-fisarmonica">
   <summary>Presenze e ritirati</summary>
   <p>
-    Il registro presenze si spunta direttamente in questa scheda: "Presente"/"Assente"
-    per riga si salvano subito, senza ricaricare la pagina. Chi ha già un voto o un
+    Il registro presenze si spunta direttamente in questa scheda: le icone ✓ (presente) e
+    ✕ (assente) di ogni riga si salvano subito, senza ricaricare la pagina. La tabella si
+    riordina per matricola, cognome o, se la prova ha più aule, per aula (cliccando
+    l'intestazione, crescente o decrescente), e si filtra per cognome/matricola, aula e
+    stato; "Presenti i restanti" e "Assenti i restanti" segnano in un colpo solo quelli
+    ancora da segnare tra quelli mostrati (es. tutta un'aula). Chi ha già un voto o un
     esito per l'appello risulta presente automaticamente e non è più modificabile da
     qui. "Chiudi registro" segna assenti tutti gli iscritti non spuntati (e senza già un
     esito): un'operazione da fare una volta sola, a fine appello. Le presenze sono una fase
@@ -701,7 +712,7 @@ COMPITO DA CONVERTIRE
     della prova seguito dalle sue fasi Testo, Compiti, Presenze e Correzione) e delle
     schede globali — <strong>Risultati</strong> (in cima tutti i file da pubblicare,
     complessivi e di ogni prova; poi verbalizzazione, esportazione per la segreteria ed
-    elenco combinato), <strong>Orali</strong> (l'orale è unico per il
+    elenco combinato), <strong>Orali</strong> (nella riga "Conclusione" del percorso, prima della Verbalizzazione; l'orale è unico per il
     raggruppamento: se richiesto durante la correzione di una prova, il suo voto
     sostituisce la media delle prove parziali una volta svolto), <strong>Verbalizzati</strong>, <strong>Statistiche</strong> (per prova e combinate),
     <strong>Chiusura</strong> e <strong>Impostazioni</strong>.
@@ -736,13 +747,12 @@ COMPITO DA CONVERTIRE
     quale aula accoglie i DSA/L104, senza nomi né numeri. Dopo l'assegnazione le aule sono
     <strong>bloccate</strong>: "Riassegna tutte…" le rifà da capo, dopo una conferma (cambia
     l'aula di chi non è stato spostato a mano). Le eccezioni si aggiungono senza toccare gli
-    altri: "Aggiungi in un'aula" mette uno studente arrivato all'ultimo momento (anche non
+    altri: "Aggiungi uno studente" mette uno studente arrivato all'ultimo momento (anche non
     registrato nel corso: allora con cognome e nome) nell'aula scelta o in quella del suo
-    cognome, ammettendolo alla prova se serve; anche chi viene ammesso in deroga va da solo
-    nell'aula del suo cognome.
+    cognome, ammettendolo alla prova se serve.
     Se gli studenti attesi superano una certa quota dei posti (50% di default, si cambia nelle
     Impostazioni del corso, sezione Aule) compare un avviso. Uno studente che non soddisfa i requisiti si può
-    comunque ammettere con "Ammetti in deroga", in cima alla scheda Compiti d'esame della prova: comparirà con l'avviso
+    comunque ammettere con "Aggiungi uno studente", nel riquadro degli ammessi della prova: comparirà con l'avviso
     "in deroga" (anche nell'export csv/pdf), e si può togliere di nuovo in qualsiasi
     momento.
   </p>

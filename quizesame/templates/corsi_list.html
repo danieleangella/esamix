@@ -17,92 +17,10 @@
 </div>
 {% endif %}
 
-{% if in_lavorazione %}
-<details class="card" open>
-  <summary><strong>Accesso rapido: appelli aperti dei corsi in corso</strong></summary>
-  <table style="margin-top:0.75rem" class="tabella-accesso-rapido">
-    <tr><th>Appello</th><th>Data</th><th>Vai a {{ info("Ogni icona apre la scheda corrispondente dell'appello (o della prova): Testo, Compiti d'esame, Presenze, Correzione e, per un raggruppamento, Risultati. Passa sopra a un'icona per il nome.") }}</th></tr>
-    {% for r in in_lavorazione %}
-    {% if r.raggruppamento %}
-    {# un raggruppamento è un blocco solo: il titolo, poi le sue prove come elenco puntato #}
-    <tr class="riga-gruppo">
-      <td colspan="2">
-        <a href="{{ r.url }}"><strong>{{ r.appello.nome }}</strong></a>
-        <span class="muted">· <a href="/corsi/{{ r.corso.tag }}" title="Apri il corso">{{ r.corso.nome }}</a>{% if r.corso.anno %} ({{ r.corso.anno }}){% endif %}</span>
-      </td>
-      <td>
-        <div class="azioni-rapide">
-          <a class="icona-azione icona-sola" href="{{ r.url }}#risultati" data-info="Risultati: voti combinati delle prove" aria-label="Risultati">{{ icona("verbale") }}</a>
-        </div>
-      </td>
-    </tr>
-    {% endif %}
-    {% for p in r.prove %}
-    <tr class="{{ 'riga-prova' if r.raggruppamento else '' }}{{ ' ultima' if loop.last else '' }}">
-      <td>
-        {% if r.raggruppamento %}
-        <span class="punto-prova">{{ p.nome }}</span>
-        {% else %}
-        <a href="{{ r.url }}"><strong>{{ r.appello.nome }}</strong></a>
-        <span class="muted">· <a href="/corsi/{{ r.corso.tag }}" title="Apri il corso">{{ r.corso.nome }}</a>{% if r.corso.anno %} ({{ r.corso.anno }}){% endif %}</span>
-        {% endif %}
-      </td>
-      <td class="muted" style="white-space:nowrap">{{ p.data or '' }}</td>
-      <td>
-        <div class="azioni-rapide">
-          {% set dove = (" · " ~ p.nome) if p.nome else "" %}
-          <a class="icona-azione icona-sola" href="{{ r.url }}#creazione{{ p.suffisso }}" data-info="Testo{{ dove }}: esercizi assegnati" aria-label="Testo{{ dove }}">{{ icona("testo") }}</a>
-          <a class="icona-azione icona-sola" href="{{ r.url }}#compiti{{ p.suffisso }}" data-info="Compiti d'esame{{ dove }}: iscritti, generazione e stampa" aria-label="Compiti d'esame{{ dove }}">{{ icona("stampa") }}</a>
-          <a class="icona-azione icona-sola" href="{{ r.url }}#presenze{{ p.suffisso }}" data-info="Presenze{{ dove }}: registro del giorno della prova" aria-label="Presenze{{ dove }}">{{ icona("presenze") }}</a>
-          <a class="icona-azione icona-sola" href="{{ r.url }}#valutazione{{ p.suffisso }}" data-info="Correzione{{ dove }}" aria-label="Correzione{{ dove }}">{{ icona("correzione") }}</a>
-        </div>
-      </td>
-    </tr>
-    {% endfor %}
-    {% endfor %}
-  </table>
-</details>
-{% endif %}
-
-{% if riepilogo_globale %}
-<details class="card">
-  <summary><strong>Riepilogo generale</strong></summary>
-  <p class="muted" style="margin-top:0.75rem">
-    In {{ riepilogo_globale.numero_corsi }} corsi{% if riepilogo_globale.anno_iniziale %}, a partire dall'anno accademico {{ riepilogo_globale.anno_iniziale }}{% endif %}.
-  </p>
-  <div class="stats-grid">
-    <div class="stat-tile">
-      <div class="stat-value">{{ riepilogo_globale.esami_svolti }}</div>
-      <div class="stat-label">Esami svolti</div>
-    </div>
-    <div class="stat-tile stat-ok">
-      <div class="stat-value">{{ riepilogo_globale.sufficienze }} {% if riepilogo_globale.sufficienze_pct is not none %}<span class="stat-pct">({{ riepilogo_globale.sufficienze_pct }}%)</span>{% endif %}</div>
-      <div class="stat-label">Sufficienze</div>
-    </div>
-  </div>
-  <p style="margin-top:0.75rem"><a href="/statistiche-generali">Statistiche generali (scegli i corsi da includere) &rarr;</a></p>
-</details>
-{% endif %}
-
-{% if prossimi_appelli %}
-<details class="card" open>
-  <summary><strong>Appelli in programma (prossime 2 settimane)</strong></summary>
-  <table style="margin-top:0.75rem">
-    <tr><th>Data</th><th>Appello</th><th>Corso</th></tr>
-    {% for a in prossimi_appelli %}
-    <tr>
-      <td>{{ a.data }} <span class="muted">({{ 'oggi' if a.giorni_mancanti == 0 else 'domani' if a.giorni_mancanti == 1 else 'tra ' + a.giorni_mancanti|string + ' giorni' }})</span></td>
-      <td><a href="/corsi/{{ a.corso_tag }}/appelli/{{ a.appello_id }}">{{ a.appello_nome }}</a></td>
-      <td>{{ a.corso_nome }} <span class="muted">({{ a.corso_anno }})</span></td>
-    </tr>
-    {% endfor %}
-  </table>
-</details>
-{% endif %}
-
-<details class="card" open>
-  <summary><strong>Cerca uno studente</strong></summary>
-  <form method="get" action="/" style="margin-top:0.75rem">
+<div class="griglia-home-alto">
+<section class="card box-home box-cerca">
+  <h2>{{ icona("persone", 18) }} Cerca uno studente</h2>
+  <form method="get" action="/">
     <div style="position:relative">
       <input type="text" name="q" id="input-cerca-studente" value="{{ q }}" placeholder="Cerca per matricola, nome o cognome (in tutti i corsi)">
       <div id="suggerimenti-cerca-studente" class="sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
@@ -153,7 +71,53 @@
     <p class="muted" style="margin-top:0.75rem">Nessuno studente trovato per "{{ q }}".</p>
     {% endif %}
   {% endif %}
-</details>
+</section>
+
+<section class="card box-home box-nuovo">
+  <h2>{{ icona("piu", 18) }} Nuovo corso</h2>
+  <p class="muted" style="margin:0 0 0.6rem">Per un nuovo anno accademico o un nuovo insegnamento: le impostazioni si copiano dall'edizione precedente.</p>
+  <button type="button" onclick="var d=document.getElementById('pannello-nuovo-corso'); d.open=true; d.scrollIntoView({behavior:'smooth'}); document.getElementById('corso-nome').focus();">{{ icona("piu", 14) }} Crea un corso</button>
+</section>
+</div>
+
+<h2 class="titolo-sezione-home">Appelli in corso</h2>
+{% if in_lavorazione %}
+<div class="griglia-home-appelli">
+  {% for r in in_lavorazione %}
+  <article class="card box-appello">
+    <div class="box-appello-corso"><a href="/corsi/{{ r.corso.tag }}">{{ r.corso.nome }}</a>{% if r.corso.anno %} · {{ r.corso.anno }}{% endif %}</div>
+    <h3><a href="{{ r.url }}">{{ r.appello.nome }}</a></h3>
+    <ul class="box-appello-prove">
+      {% for p in r.prove %}
+      <li>
+        {% if p.nome %}<span>{{ p.nome }}</span>{% endif %}
+        <span class="muted">{{ p.data or 'data da fissare' }}</span>
+        {% if p.tra_giorni is not none and p.tra_giorni >= 0 and p.tra_giorni <= 14 %}
+        <span class="badge {{ 'badge-warn' if p.tra_giorni <= 2 else 'badge-info' }}">{{ 'oggi' if p.tra_giorni == 0 else 'domani' if p.tra_giorni == 1 else 'tra ' ~ p.tra_giorni ~ ' giorni' }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% set pct = r.percentuale %}
+    <div class="barra-avanzamento" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100" aria-label="Avanzamento">
+      <div style="width:{{ pct }}%"></div>
+    </div>
+    <div class="muted box-appello-pct">{{ pct }}% del percorso</div>
+    {% if r.prossimo %}
+    <div class="box-appello-prossimo">
+      <span class="muted">Prossimo passo{% if r.prossimo.prova %} · {{ r.prossimo.prova }}{% endif %}</span>
+      <span>{{ r.prossimo.azione }}</span>
+    </div>
+    <a class="button" href="{{ r.url }}#{{ r.prossimo.scheda }}">Vai a {{ r.prossimo.nome }} &rarr;</a>
+    {% else %}
+    <a class="button secondary" href="{{ r.url }}">Apri &rarr;</a>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><p class="muted" style="margin:0">Nessun appello aperto nei corsi in corso.</p></div>
+{% endif %}
 
 {% if corsi %}
 {% macro riga_corso(c, nome) -%}
@@ -169,6 +133,7 @@
     </td>
   </tr>
 {%- endmacro %}
+<h2 class="titolo-sezione-home">Tutti i corsi</h2>
 <div class="card">
   <table class="tabella-corsi">
     <tr><th>Corso</th><th>Anno · tag</th><th class="numero" data-info="Appelli e raggruppamenti di prove: quanti ancora aperti, su quanti in tutto">Appelli</th><th>Stato</th></tr>
@@ -194,7 +159,27 @@
   <a href="/migrazione">Migrazione dati legacy</a> per importare i dati di un corso già esistente.</p>
 {% endif %}
 
-<details class="card dettaglio-fisarmonica pannello-azione">
+{% if riepilogo_globale %}
+<details class="card">
+  <summary><strong>Riepilogo generale</strong></summary>
+  <p class="muted" style="margin-top:0.75rem">
+    In {{ riepilogo_globale.numero_corsi }} corsi{% if riepilogo_globale.anno_iniziale %}, a partire dall'anno accademico {{ riepilogo_globale.anno_iniziale }}{% endif %}.
+  </p>
+  <div class="stats-grid">
+    <div class="stat-tile">
+      <div class="stat-value">{{ riepilogo_globale.esami_svolti }}</div>
+      <div class="stat-label">Esami svolti</div>
+    </div>
+    <div class="stat-tile stat-ok">
+      <div class="stat-value">{{ riepilogo_globale.sufficienze }} {% if riepilogo_globale.sufficienze_pct is not none %}<span class="stat-pct">({{ riepilogo_globale.sufficienze_pct }}%)</span>{% endif %}</div>
+      <div class="stat-label">Sufficienze</div>
+    </div>
+  </div>
+  <p style="margin-top:0.75rem"><a href="/statistiche-generali">Statistiche generali (scegli i corsi da includere) &rarr;</a></p>
+</details>
+{% endif %}
+
+<details class="card dettaglio-fisarmonica pannello-azione" id="pannello-nuovo-corso">
   <summary>Nuovo corso</summary>
   <form method="post" action="/corsi/nuovo" id="nuovo-corso-form" style="margin-top:1rem">
     <div class="form-grid">

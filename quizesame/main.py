@@ -371,11 +371,18 @@ def home(request: Request, q: str = ""):
             if a.chiuso or a.membro_raggruppamento:
                 continue
             ragg = corsi_service.get_raggruppamento_by_appello(c.tag, a.id)
+            # percorso e prossimo passo, come nella pagina dell'appello
+            contesto = _contesto_appello(c.tag, c, a)
+            prove = ([{"nome": m.nome, "suffisso": f"-{m.id}", "data": m.data} for m in ragg.membri]
+                     if ragg else [{"nome": "", "suffisso": "", "data": a.data}])
+            oggi = __import__("datetime").date.today()
+            for p in prove:
+                giorno = _data_prova(p["data"])
+                p["tra_giorni"] = (giorno - oggi).days if giorno else None
             in_lavorazione.append({
-                "corso": c, "appello": a, "url": f"/corsi/{c.tag}/appelli/{a.id}",
-                "prove": [{"nome": m.nome, "suffisso": f"-{m.id}", "data": m.data} for m in ragg.membri]
-                if ragg else [{"nome": "", "suffisso": "", "data": a.data}],
-                "raggruppamento": bool(ragg),
+                "corso": c, "appello": a, "url": f"/corsi/{c.tag}/appelli/{a.id}", "prove": prove,
+                "raggruppamento": bool(ragg), "prossimo": contesto["prossimo_passo"],
+                "percentuale": contesto["percentuale_percorso"],
             })
     risultati_ricerca = studenti_service.cerca_in_tutti_i_corsi(q.strip()) if q.strip() else None
     app_settings = app_config_service.get_settings()
@@ -883,6 +890,43 @@ def _numero_studenti_suggerito(numero_iscritti, n_compiti_esistenti: int) -> int
     return max(1, obiettivo - n_compiti_esistenti)
 
 
+def _data_prova(data: Optional[str]):
+    """La data di un appello ('gg/mm/aaaa', o 'aaaa-mm-gg') come date; None se manca."""
+    from datetime import date
+    testo = (data or "").strip()
+    try:
+        if "/" in testo:
+            g, m, a = testo.split("/")
+        else:
+            a, m, g = testo.split("-")
+        return date(int(a), int(m), int(g))
+    except ValueError:
+        return None
+
+
+def _blocca_fasi(fasi: list[dict], appello, dati: dict, valutati_totale: int) -> None:
+    """Una fase non ancora iniziata è bloccata (tratteggiata, non cliccabile) finché non
+    è pronto ciò che serve: i compiti dopo il testo chiuso, le presenze dopo i compiti
+    generati, la correzione dal giorno della prova. Una fase già avviata (o con dati) non
+    si blocca mai, anche se i prerequisiti mancano (es. dati importati)."""
+    from datetime import date
+    compiti = len(dati["compiti"])
+    giorno = _data_prova(appello.data)
+    motivi = {
+        "compiti": None if getattr(appello, "testo_chiuso", False) or dati["blocchi"] or compiti
+        else "si apre quando chiudi il testo",
+        "presenze": None if compiti or valutati_totale or appello.presenze_chiuse
+        else "si apre quando hai generato i compiti",
+        "valutazione": None if valutati_totale or dati.get("bozze_correzione")
+        else ("si apre quando hai generato i compiti" if not compiti
+              else f"si apre il giorno della prova ({appello.data})" if giorno and giorno > date.today() else None),
+    }
+    for f in fasi:
+        motivo = motivi.get(f["scheda"])
+        if motivo and not f.get("fatta") and not f.get("in_corso"):
+            f["bloccata"] = motivo
+
+
 def _calcola_riepilogo_home(corso, appello, dati: dict) -> dict:
     """Punto della situazione di una singola prova (per un appello normale, o per
     ciascuna prova membro di un raggruppamento) per la scheda Home: dove siamo nel
@@ -972,6 +1016,7 @@ def _calcola_riepilogo_home(corso, appello, dati: dict) -> dict:
                    else "Correggi i compiti consegnati"),
     })
 
+    _blocca_fasi(fasi, appello, dati, valutati_totale)
     punti = sum(1.0 if f.get("fatta") or f.get("saltata") else (0.5 if f.get("in_corso") else 0.0) for f in fasi)
     percentuale = round(100 * punti / len(fasi)) if fasi else 0
 
@@ -985,7 +1030,8 @@ def _calcola_riepilogo_home(corso, appello, dati: dict) -> dict:
 
 def _fasi_globali(contesto: dict) -> list[dict]:
     """Fasi che riguardano l'appello nel suo insieme (per un raggruppamento, dopo tutte
-    le prove): orali (solo se qualcuno li deve sostenere), verbalizzazione e chiusura."""
+    le prove): orali (sempre, "non usata" finché nessuno lo deve sostenere),
+    verbalizzazione e chiusura."""
     appello = contesto["appello"]
     risultati = contesto.get("risultati") or []
     fasi = []
@@ -995,6 +1041,12 @@ def _fasi_globali(contesto: dict) -> list[dict]:
             "nome": "Orali", "scheda": "orali", "fatta": da_orale == 0,
             "dettaglio": "tutti svolti" if da_orale == 0 else f"{da_orale} da svolgere",
             "azione": f"Registra l'esito degli orali ({da_orale} studenti da sentire)",
+        })
+    else:
+        fasi.append({
+            "nome": "Orali", "scheda": "orali", "saltata": True, "facoltativa": True,
+            "dettaglio": "nessuno studente deve sostenere l'orale",
+            "azione": "Nessun orale da svolgere",
         })
     n_idonei, n_verbalizzati = len(contesto["idonei"]), len(contesto["verbalizzati"])
     fasi.append({
@@ -1009,6 +1061,21 @@ def _fasi_globali(contesto: dict) -> list[dict]:
         "dettaglio": "chiuso" if appello.chiuso else "ancora aperto",
         "azione": "Chiudi l'appello: nessuna modifica sarà più possibile (si può riaprire)",
     })
+    # la conclusione si apre quando è chiusa la correzione (di tutte le prove, per un
+    # raggruppamento), a meno che qualcosa non sia già stato fatto
+    if contesto.get("raggruppamento"):
+        corrette = all(md["appello"].correzione_scritti_conclusa for md in contesto["membri_dati"])
+        motivo = "si apre quando hai chiuso la correzione di tutte le prove"
+    else:
+        corrette = bool(appello.correzione_scritti_conclusa)
+        motivo = "si apre quando hai chiuso la correzione"
+    if not corrette and not appello.chiuso:
+        for f in fasi:
+            avviata = f.get("fatta") or f.get("in_corso") or (f["nome"] == "Orali" and not f.get("saltata"))
+            if f["nome"] == "Verbalizzazione" and n_verbalizzati:
+                avviata = True
+            if not avviata:
+                f["bloccata"] = motivo
     return fasi
 
 
@@ -1027,6 +1094,7 @@ def _percorso(contesto: dict) -> tuple[list[dict], Optional[dict]]:
     passi.extend(dict(f, prova="") for f in _fasi_globali(contesto))
     for p in passi:
         p["stato"] = (
+            "bloccata" if p.get("bloccata") else
             "fatta" if p.get("fatta") else "saltata" if p.get("saltata")
             else "in_corso" if p.get("in_corso") else "da_fare"
         )
@@ -1034,7 +1102,7 @@ def _percorso(contesto: dict) -> tuple[list[dict], Optional[dict]]:
     for i, p in enumerate(passi):
         if contesto["appello"].chiuso:
             break  # appello chiuso: nessun passo da proporre (si può solo riaprire)
-        if p["stato"] in ("fatta", "saltata") or p.get("attende_correzione"):
+        if p["stato"] in ("fatta", "saltata", "bloccata") or p.get("attende_correzione"):
             continue
         if p.get("facoltativa") and any(q["stato"] in ("fatta", "in_corso") for q in passi[i + 1:]):
             continue
@@ -1136,7 +1204,10 @@ def _contesto_appello(tag: str, corso, appello) -> dict:
                 dati_membro["non_valutati"] = presenze_service.non_valutati(tag, m.id, ammessi)
                 # la fase Presenze dipende da chi è ancora senza esito: va ricalcolata
                 dati_membro["riepilogo_home"] = _calcola_riepilogo_home(corso, m, dati_membro)
-            membri_dati.append({**dati_membro, "aule": aule_service.list_aule(tag, m.id), "ammessi": ammessi, "indice": i})
+            membri_dati.append({
+                **dati_membro, "aule": aule_service.list_aule(tag, m.id), "ammessi": ammessi, "indice": i,
+                "aula_di": {s["matricola"]: s.get("aula_nome") for s in ammessi},
+            })
         contesto["membri_dati"] = membri_dati
         contesto["statistiche_confronto"] = statistiche_service.confronto_raggruppamento(tag, raggruppamento)
         contesto["risultati"] = correzione_service.list_risultati(tag, appello.id)
@@ -2992,6 +3063,26 @@ def imposta_presenza(request: Request, tag: str, appello_id: int, matricola: str
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Presenza aggiornata", anchor=anchor)
 
 
+@app.post("/corsi/{tag}/appelli/{appello_id}/presenze/segna-restanti")
+async def segna_restanti_presenze(request: Request, tag: str, appello_id: int):
+    form = await request.form()
+    esito = form.get("esito") or ""
+    appello = corsi_service.get_appello(tag, appello_id)
+    anchor = _anchor_membro(appello, "presenze")
+    try:
+        esito_operazione = presenze_service.segna_restanti(
+            tag, appello_id, form.getlist("matricole"), esito, _ammessi_se_membro(tag, appello),
+        )
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
+    n = esito_operazione["segnati"]
+    radice = "present" if esito == "presente" else "assent"
+    msg = f"{n} student{'e segnato' if n == 1 else 'i segnati'} {radice}{'e' if n == 1 else 'i'}"
+    if esito_operazione["non_registrati"]:
+        msg += f"; {len(esito_operazione['non_registrati'])} non registrati nel corso: registrali per segnarli assenti"
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/presenze/chiudi")
 def chiudi_presenze(tag: str, appello_id: int):
     appello = corsi_service.get_appello(tag, appello_id)
@@ -3305,6 +3396,9 @@ def aggiungi_studente_in_aula(
         if matricola not in {s["matricola"] for s in ammessi}:
             corsi_service.ammetti_manualmente(tag, appello_id, matricola)
         aule = aule_service.list_aule(tag, appello_id)
+        if not (aule and corsi_service.get_appello(tag, appello_id).aule_chiuse):
+            # aule non ancora assegnate: lo farà l'assegnazione automatica, con gli altri
+            return _risposta_ammessi_aule(request, tag, appello_id, f"{studente.cognome} {studente.nome} ammesso alla prova")
         if aula_id.strip():
             scelta = int(aula_id)
         else:
@@ -3316,7 +3410,7 @@ def aggiungi_studente_in_aula(
         return _risposta_ammessi_aule(request, tag, appello_id, str(e), "error")
     nome_aula = next((a.nome for a in aule if a.id == scelta), "")
     return _risposta_ammessi_aule(
-        request, tag, appello_id, f"{studente.cognome} {studente.nome} aggiunto nell'aula {nome_aula}: gli altri non cambiano",
+        request, tag, appello_id, f"{studente.cognome} {studente.nome} ammesso e messo nell'aula {nome_aula}: gli altri non cambiano",
     )
 
 
@@ -3455,7 +3549,7 @@ def studente_carriera(request: Request, tag: str, matricola: str):
     """Frammento con i risultati dello studente in tutti i corsi: si apre
     sotto la riga di un escluso dal filtro sulla matricola, per decidere se ammetterlo."""
     return templates.TemplateResponse(request, "_carriera_studente.html", {
-        "matricola": matricola, "riepilogo": studenti_service.riepilogo_globale(matricola),
+        "matricola": matricola, "riepilogo": studenti_service.riepilogo_globale(matricola), "tag": tag,
     })
 
 

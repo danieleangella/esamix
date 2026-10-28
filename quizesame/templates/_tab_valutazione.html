@@ -1,3 +1,4 @@
+{% from "_studente.html" import nome_studente %}
 {% from "_info.html" import info %}
 {% from "_icone.html" import icona %}
 <div class="tab-pane" data-pane="valutazione{{ pane_suffix }}" style="display:none">
@@ -205,7 +206,7 @@
       {% for s in presenti_da_correggere %}
       <tr>
         <td>{{ s.matricola }}</td>
-        <td>{{ s.cognome }}</td>
+        <td>{{ nome_studente(corso.tag, s.matricola, s.cognome) }}</td>
         <td>{{ s.nome }}</td>
         <td style="text-align:right">
           <button type="button" class="secondary btn-correggi-presente" data-matricola="{{ s.matricola }}" data-nome="{{ s.cognome }} {{ s.nome }}" style="margin-top:0">{{ icona("correzione", 13) }} Correggi</button>
@@ -229,7 +230,7 @@
       <tr><th>Studente</th><th>Matricola</th><th>Stato</th><th></th></tr>
       {% for b in md.bozze_correzione %}
       <tr>
-        <td>{{ b.cognome }} {{ b.nome }}</td>
+        <td>{{ nome_studente(corso.tag, b.matricola, b.cognome ~ ' ' ~ b.nome) }}</td>
         <td>{{ b.matricola }}</td>
         <td class="muted">bozza · compito <span style="font-family:monospace">{{ b.codice }}</span></td>
         <td style="text-align:right; white-space:nowrap">
@@ -248,7 +249,7 @@
       {% endfor %}
       {% for r in md.valutazioni_sospese %}
       <tr>
-        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>{{ nome_studente(corso.tag, r.matricola, r.cognome ~ ' ' ~ r.nome) }}</td>
         <td>{{ r.matricola }}</td>
         <td class="muted">svolgimenti da valutare · voto provvisorio {{ r.voto }}</td>
         <td style="text-align:right; white-space:nowrap">

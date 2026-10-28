@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_studente.html" import nome_studente %}
 {% from "_info.html" import info %}
 {% from "_icone.html" import icona %}
 {% block title %}Svolgimenti · {{ appello.nome }}{% endblock %}
@@ -122,7 +123,7 @@
     <tr><th>Studente</th><th>Voto</th><th>Nota</th><th></th></tr>
     {% for c in dati.compiti_annotati %}
     <tr>
-      <td>{{ c.cognome }} {{ c.nome }} <span class="muted">({{ c.matricola }})</span></td>
+      <td>{{ nome_studente(corso.tag, c.matricola, c.cognome ~ ' ' ~ c.nome) }} <span class="muted">({{ c.matricola }})</span></td>
       <td style="white-space:nowrap">
         {% if c.voto_calcolato is not none %}<span class="muted">{{ c.voto_calcolato }} →</span> <strong>{{ c.voto }}</strong> <span class="badge badge-warn">a mano</span>
         {% else %}{{ c.voto if c.voto is not none else '–' }}{% endif %}

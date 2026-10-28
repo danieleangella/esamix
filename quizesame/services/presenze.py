@@ -165,5 +165,42 @@ def segna_assenti_non_valutati(tag: str, appello_id: int, ammessi: Optional[list
     return _segna_assenti(tag, appello_id, elenco, bozze)
 
 
+def segna_restanti(
+    tag: str, appello_id: int, matricole: list[str], esito: str, ammessi: Optional[list[dict]] = None,
+) -> dict:
+    """Segna presenti (esito "presente") o assenti ("assente") gli studenti di `matricole`
+    (quelli visibili nella tabella delle presenze, es. di un'aula sola) ancora da segnare:
+    chi è già presente o ha già un esito non cambia. Ritorna i conteggi."""
+    corsi_service.verifica_appello_aperto(tag, appello_id)
+    appello = corsi_service.get_appello(tag, appello_id)
+    if appello.presenze_chiuse:
+        raise ValueError("Il registro presenze è chiuso: riaprilo prima di modificare le presenze")
+    elenco = elenco_da_valutare(tag, appello_id, ammessi) or []
+    scelte = set(matricole)
+    presenti = list_presenti(tag, appello_id)
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        con_risultato = _con_risultato(conn, appello_id)
+    finally:
+        conn.close()
+    restanti = [s for s in elenco if s["matricola"] in scelte
+                and s["matricola"] not in presenti and s["matricola"] not in con_risultato]
+    if esito == "presente":
+        conn = db.get_connection(config.corso_db_path(tag))
+        try:
+            conn.executemany(
+                "INSERT INTO appello_presenze (matricola, appello_id) VALUES (?,?) ON CONFLICT DO NOTHING",
+                [(s["matricola"], appello_id) for s in restanti],
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        return {"segnati": len(restanti), "non_registrati": []}
+    if esito == "assente":
+        esiti = _segna_assenti(tag, appello_id, restanti, set())
+        return {"segnati": esiti["segnati_assenti"], "non_registrati": esiti["non_registrati"]}
+    raise ValueError(f"Esito non valido: {esito}")
+
+
 def riapri(tag: str, appello_id: int) -> None:
     corsi_service.update_appello(tag, appello_id, presenze_chiuse=False)

@@ -6,7 +6,7 @@
 {% set icone_fasi = {"creazione": "testo", "compiti": "stampa", "presenze": "presenze", "valutazione": "correzione",
                      "orali": "orale", "verbalizzati": "verbale", "risultati": "verbale", "impostazioni": "lucchetto", "chiusura": "lucchetto"} %}
 {% set nomi_brevi = {"Compiti d'esame": "Compiti"} %}
-{% set stati = {"fatta": "Completata", "saltata": "Non usata", "in_corso": "In corso", "da_fare": "Da fare"} %}
+{% set stati = {"fatta": "Completata", "saltata": "Non usata", "in_corso": "In corso", "da_fare": "Da fare", "bloccata": "Non ancora disponibile"} %}
 <nav class="percorso" aria-label="Fasi dell'appello">
   {% set ns = namespace(prova=None) %}
   {% for p in percorso %}
@@ -19,6 +19,14 @@
   {% endif %}
     {% set base = p.scheda.split("-")[0] %}
     <li class="passo passo-{{ p.stato }}{% if p.prossimo %} passo-prossimo{% endif %}">
+      {% if p.stato == 'bloccata' %}
+      {# non ancora disponibile: stesso aspetto, tratteggiata, ma non porta alla scheda #}
+      <span class="passo-chiuso" tabindex="0" data-info="{{ p.nome }} — non ancora disponibile: {{ p.bloccata }}">
+        <span class="passo-icona" aria-hidden="true">{{ icona(icone_fasi.get(base, "spunta"), 14) }}</span>
+        <span class="passo-nome">{{ nomi_brevi.get(p.nome, p.nome) }}</span>
+        <span class="sr-only">— non ancora disponibile: {{ p.bloccata }}</span>
+      </span>
+      {% else %}
       <a href="#{{ p.scheda }}" data-tab="{{ p.scheda }}"{% if p.prossimo %} aria-current="step"{% endif %}
          data-info="{{ p.nome }}{% if p.facoltativa %} (facoltativa){% endif %} — {{ stati[p.stato] }}{% if p.prossimo %}, è il prossimo passo{% endif %}{% if p.dettaglio %}: {{ p.dettaglio }}{% endif %}">
         <span class="passo-icona" aria-hidden="true">{{ icona(icone_fasi.get(base, "spunta"), 14) }}
@@ -26,9 +34,10 @@
         <span class="passo-nome">{{ nomi_brevi.get(p.nome, p.nome) }}</span>
         <span class="sr-only">— {{ stati[p.stato]|lower }}{% if p.prossimo %}, prossimo passo{% endif %}</span>
       </a>
+      {% endif %}
     </li>
   {% if loop.last %}</ol>
-  {{ info("Ogni fase porta alla sua scheda. Verde con ✓: completata; arancione: in corso; bordo blu: è il prossimo passo; grigio: da fare; sbiadita: non usata. Passa sopra a una fase per i dettagli.") }}
+  {{ info("Ogni fase porta alla sua scheda. Verde con ✓: completata; arancione: in corso; bordo blu: è il prossimo passo; grigio: da fare; sbiadita: non usata; tratteggiata: non ancora disponibile (passa sopra per sapere quando si apre). Passa sopra a una fase per i dettagli.") }}
   </div>{% endif %}
   {% endfor %}
 </nav>

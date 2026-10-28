@@ -1,3 +1,4 @@
+{% from "_studente.html" import nome_studente %}
   <div class="card">
     <h2>Verbalizzazione ({{ idonei|length }} idonei non ancora verbalizzati)</h2>
     {% if idonei %}
@@ -10,7 +11,7 @@
         {% for r in idonei %}
         <tr>
           <td><input type="checkbox" name="matricole" value="{{ r.matricola }}" class="campo-idoneo-incluso" style="width:auto" checked></td>
-          <td>{{ r.cognome }} {{ r.nome }}</td>
+          <td>{{ nome_studente(corso.tag, r.matricola, r.cognome ~ ' ' ~ r.nome) }}</td>
           <td>{{ r.matricola }}</td>
           <td>{{ r.voto }}</td>
           <td style="white-space:nowrap">

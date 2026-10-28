@@ -10,21 +10,6 @@
 
 {% include "_avviso_verifica.html" %}
 
-{% if md.ammessi is defined and not md.appello.chiuso %}
-{# prova di un raggruppamento: ammettere chi non ha i requisiti (es. non ha superato la
-   prova precedente); compare nell'elenco degli ammessi con l'etichetta "deroga" #}
-<div class="card riga-deroga">
-  <form class="barra-aggiungi" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/ammessi/aggiungi" autocomplete="off" style="margin:0">
-    <span><strong>Ammetti in deroga</strong> {{ info("Per ammettere a questa prova uno studente che non ne ha i requisiti (" ~ ("non ha superato la prova precedente" if md.indice else "non è tra gli iscritti o non rispetta i filtri della prova") ~ "): compare tra gli ammessi con l'etichetta \"deroga\", anche negli elenchi stampati, e si toglie dal cestino nell'elenco degli ammessi.") }}</span>
-    <div style="position:relative; flex:1; min-width:14rem">
-      <input name="matricola" class="campo-input-matricola-deroga" placeholder="matricola o cognome" aria-label="Ammetti in deroga: matricola o cognome" autocomplete="off" required>
-      <div class="campo-suggerimenti-deroga sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-    </div>
-    <button type="submit" class="secondary" style="margin:0">{{ icona("piu") }} Ammetti</button>
-  </form>
-  <script>(function (r) { _autocompleteStudenti(r.querySelector(".campo-input-matricola-deroga"), r.querySelector(".campo-suggerimenti-deroga"), "{{ corso.tag }}"); })(document.currentScript.parentElement);</script>
-</div>
-{% endif %}
 
 {% set iscritti_fatti = md.numero_iscritti is not none %}
 <details class="card sezione-flusso" data-sezione="iscritti-{{ md.appello.id }}" data-fatta="{{ 1 if iscritti_fatti else 0 }}"{% if not iscritti_fatti %} open{% endif %}>

@@ -1,3 +1,4 @@
+{% from "_studente.html" import nome_studente %}
 {# Elenco iscritti di un appello: frammento di _tab_compiti.html, ridisegnato da solo dopo
    ogni modifica fatta dai moduli con class="form-frammento" (vedi _risposta_iscritti e
    attivaRiquadro in app.js). Un solo elenco, comunque sia nato (file della segreteria,
@@ -5,7 +6,9 @@
 {% from "_icone.html" import icona %}
 {% from "_formati.html" import formati %}
 {% set url = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
-{% set modificabile = not md.appello.chiuso %}
+{# aule già assegnate: l'elenco è chiuso, i nuovi arrivati si aggiungono dal riquadro degli
+   ammessi ("Aggiungi uno studente"), che li mette anche in un'aula #}
+{% set modificabile = not md.appello.chiuso and not md.appello.aule_chiuse %}
 {% set da_confermare = md.esclusi_filtro|selectattr("decisione", "none")|list %}
 {% set in_deroga = md.esclusi_filtro|selectattr("decisione", "equalto", "ammesso")|list %}
 {% set non_ammessi = md.esclusi_filtro|rejectattr("decisione", "equalto", "ammesso")|list %}
@@ -177,6 +180,10 @@
     {% endif %}
   </div>
   {% elif md.iscritti %}
+  {% if md.appello.aule_chiuse and not md.appello.chiuso %}
+  <p class="muted" style="margin:0.5rem 0">{{ icona("lucchetto", 13) }} Aule già assegnate: l'elenco degli iscritti non si modifica più.
+    Per chi si aggiunge, usa "Aggiungi uno studente" nel riquadro degli ammessi, più in basso.</p>
+  {% endif %}
   <p>{{ icona("stampa", 14) }} {{ formati(url ~ "/iscritti", pdf=True, html=True, tex=True, csv=True) }}</p>
   {% endif %}
 
@@ -213,8 +220,8 @@
     <tr>
       <td>{{ s.matricola }}</td>
       {% if s.registrato %}
-      <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
-      <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
+      <td>{{ nome_studente(corso.tag, s.matricola, s.cognome) }}</td>
+      <td>{{ s.nome }}</td>
       {% else %}
       <td>{{ s.cognome }}</td><td>{{ s.nome }}</td>
       {% endif %}

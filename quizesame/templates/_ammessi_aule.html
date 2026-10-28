@@ -1,3 +1,4 @@
+{% from "_studente.html" import nome_studente %}
 {# frammento di _tab_compiti.html, ridisegnato da solo dopo ogni modifica (vedi _risposta_ammessi_aule).
    Qui si assegnano gli studenti alle aule; le aule stesse si definiscono nella scheda
    Impostazioni (_aule.html). #}
@@ -16,14 +17,16 @@
   {% if md.aule %}
   <div class="barra-strumenti file-aule">
     {% for a in md.aule %}
-    <span>Aula {{ a.nome }} ({{ md.ammessi|selectattr("aula_id", "equalto", a.id)|list|length }})</span>
+    {% set n_aula = md.ammessi|selectattr("aula_id", "equalto", a.id)|list|length %}
+    <span>Aula {{ a.nome }}{% if a.dsa %} (DSA){% endif %}: {{ n_aula }}/{{ a.capienza }} posti, <strong>{{ (100 * n_aula / a.capienza)|round|int if a.capienza else 0 }}%</strong></span>
     {{ formati(url ~ "/ammessi-aula-" ~ a.id, pdf=True, html=True) }}
     {% endfor %}
   </div>
   {% endif %}
   <div class="barra-strumenti">
     {% if md.aule %}
-    <span>{{ md.aule|length }} aul{{ 'a' if md.aule|length == 1 else 'e' }}, {{ posti }} posti{% if aula_dsa %} · aula DSA: <strong>{{ aula_dsa.nome }}</strong>{% endif %}</span>
+    {% set n_assegnati = md.ammessi|selectattr("aula_id")|list|length %}
+    <span>{{ md.aule|length }} aul{{ 'a' if md.aule|length == 1 else 'e' }}, {{ posti }} posti{% if posti %}, occupati {{ (100 * n_assegnati / posti)|round|int }}%{% endif %}{% if aula_dsa %} · aula DSA: <strong>{{ aula_dsa.nome }}</strong>{% endif %}</span>
     {% else %}
     <span class="muted">Nessuna aula per questa prova.</span>
     {% endif %}
@@ -67,7 +70,7 @@
       {% for s in righe %}
       <tr>
         <td>{{ s.matricola }}</td>
-        <td>{{ s.cognome }}{% if s.in_deroga %} <span class="badge badge-warn" data-info="Ammesso in deroga, senza i requisiti della prova">deroga</span>{% endif %}</td>
+        <td>{{ nome_studente(corso.tag, s.matricola, s.cognome) }}{% if s.in_deroga %} <span class="badge badge-warn" data-info="Ammesso in deroga, senza i requisiti della prova">deroga</span>{% endif %}</td>
         <td>{{ s.nome }}</td>
         <td>{% if s.dsa %}<span class="badge badge-info">{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
         <td>
@@ -95,9 +98,10 @@
     </table>
   {% endmacro %}
 
-  {% if md.aule and md.appello.aule_chiuse and not md.appello.chiuso %}
+  {% if not md.appello.chiuso %}
+  {% set con_aula = md.aule and md.appello.aule_chiuse %}
   <form class="barra-aggiungi form-aggiungi-in-aula" method="post" action="{{ url }}/aule/aggiungi-studente" autocomplete="off" style="margin-top:0.75rem">
-    <span><strong>Aggiungi in un'aula</strong> {{ info("Per chi si aggiunge all'ultimo momento, anche se non è registrato nel corso (allora servono cognome e nome): viene ammesso alla prova se non lo è già e messo nell'aula scelta o, con \"secondo il cognome\", in quella del suo intervallo di cognomi (i DSA/L104 nell'aula DSA). Gli altri studenti non cambiano aula.") }}</span>
+    <span><strong>Aggiungi uno studente</strong> {{ info("Per chi non è tra gli ammessi (es. non ha superato la prova precedente) o si aggiunge all'ultimo momento, anche se non è registrato nel corso: allora servono cognome e nome. Viene ammesso alla prova con l'etichetta \"deroga\"" ~ (" e messo nell'aula scelta o, con \"secondo il cognome\", in quella del suo intervallo di cognomi (i DSA/L104 nell'aula DSA): gli altri non cambiano aula." if con_aula else ".")) }}</span>
     <div style="position:relative; flex:1; min-width:10rem">
       <input name="matricola" class="campo-input-matricola-aula" placeholder="matricola o cognome" aria-label="Matricola o cognome" required>
       <div class="campo-suggerimenti-aula sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
@@ -105,10 +109,12 @@
     <input name="cognome" placeholder="cognome (se nuovo)" aria-label="Cognome, se non registrato" style="flex:1; min-width:8rem">
     <input name="nome" placeholder="nome (se nuovo)" aria-label="Nome, se non registrato" style="flex:1; min-width:7rem">
     <label class="etichetta-check" style="font-size:0.85rem"><input type="checkbox" name="dsa" value="1"> DSA/L104</label>
+    {% if con_aula %}
     <select name="aula_id" style="width:auto" aria-label="Aula">
       <option value="">secondo il cognome</option>
       {% for a in md.aule %}<option value="{{ a.id }}">{{ a.nome }}{% if a.dsa %} (DSA){% endif %}</option>{% endfor %}
     </select>
+    {% endif %}
     <button type="submit" class="secondary" style="margin:0">{{ icona("piu") }} Aggiungi</button>
   </form>
   {% endif %}

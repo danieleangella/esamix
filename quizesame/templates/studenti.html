@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_studente.html" import nome_studente %}
 {% block title %}Studenti · {{ corso.nome }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <span class="current">Studenti</span>
@@ -64,8 +65,8 @@
     {% set st = stato_esame.get(s.matricola) %}
     <tr>
       <td>{{ s.matricola }}</td>
-      <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.cognome }}</a></td>
-      <td><a href="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}">{{ s.nome }}</a></td>
+      <td>{{ nome_studente(corso.tag, s.matricola, s.cognome) }}</td>
+      <td>{{ s.nome }}</td>
       <td>{% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}data-info="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
       <td>
         {% if not st %}<span class="muted">mai sostenuto</span>

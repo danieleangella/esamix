@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_studente.html" import nome_studente %}
 {% block title %}{{ appello.nome }} · {{ corso.nome }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <span class="current">{{ appello.nome }}</span>
@@ -406,7 +407,7 @@
       <tr><th>Studente</th><th>Matricola</th><th>Voto</th><th>Orale</th><th>Data</th><th></th></tr>
       {% for r in verbalizzati %}
       <tr>
-        <td>{{ r.cognome }} {{ r.nome }}</td>
+        <td>{{ nome_studente(corso.tag, r.matricola, r.cognome ~ ' ' ~ r.nome) }}</td>
         <td>{{ r.matricola }}</td>
         <td>{{ r.voto }}</td>
         <td>

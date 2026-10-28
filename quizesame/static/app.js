@@ -803,3 +803,38 @@ function mostraNoteSimili(box, testo, voci, punteggioCorrente) {
   riga.appendChild(elenco);
   box.appendChild(riga);
 }
+
+// Nome di uno studente in un elenco (_studente.html): apre/chiude sotto la riga la sua
+// carriera in breve, caricata la prima volta. Vale per tutte le tabelle della pagina,
+// anche quelle ridisegnate dopo un'azione.
+document.addEventListener("click", function (ev) {
+  var btn = ev.target.closest(".apri-carriera");
+  if (!btn) return;
+  ev.preventDefault();
+  var riga = btn.closest("tr");
+  var url = btn.dataset.url;
+  var box = riga ? riga.nextElementSibling : btn.nextElementSibling;
+  if (box && box.classList.contains("carriera-aperta") && box.dataset.url === url) {
+    box.hidden = !box.hidden;
+    btn.setAttribute("aria-expanded", String(!box.hidden));
+    return;
+  }
+  var dove;
+  if (riga) {
+    box = document.createElement("tr");
+    var colonne = 0;
+    Array.prototype.forEach.call(riga.cells, function (c) { colonne += c.colSpan || 1; });
+    box.innerHTML = '<td colspan="' + colonne + '"></td>';
+    dove = box.firstChild;
+    riga.parentNode.insertBefore(box, riga.nextSibling);
+  } else {
+    box = document.createElement("div");
+    dove = box;
+    btn.parentNode.insertBefore(box, btn.nextSibling);
+  }
+  box.className = "carriera-aperta";
+  box.dataset.url = url;
+  dove.innerHTML = '<span class="muted">carico…</span>';
+  btn.setAttribute("aria-expanded", "true");
+  fetch(url).then(function (r) { return r.text(); }).then(function (html) { dove.innerHTML = '<div class="box-carriera">' + html + "</div>"; });
+});

@@ -1,6 +1,7 @@
 """Corso di prova: un corso completo con dati inventati, per provare tutte le funzioni
 dell'app senza toccare i corsi veri (un appello e due prove parziali raggruppate, con
-correzioni già fatte e altre da fare), e da eliminare senza lasciare tracce.
+correzioni già fatte e altre da fare, e un appello già concluso con orali e voti da
+verbalizzare), e da eliminare senza lasciare tracce.
 
 Tutto sta nella cartella del corso (database con studenti, esercizi, risultati; file
 generati): eliminarla basta, più le righe del registro delle attività che lo riguardano.
@@ -19,6 +20,7 @@ from quizesame.services import esercizi as esercizi_service
 from quizesame.services import esportazione as esportazione_service
 from quizesame.services import presenze as presenze_service
 from quizesame.services import registro as registro_service
+from quizesame.services import risultati as risultati_service
 from quizesame.services import studenti as studenti_service
 
 TAG = "PROVA-EsaMiX"
@@ -258,6 +260,29 @@ def _popola(oggi: date) -> list[str]:
     corsi_service.update_appello(TAG, seconda.id, rimanda_svolgimenti=True)
     for m in ammessi[4:]:
         da_fare.append(_da_fare(seconda, m, next(c), rng))
+
+    # --- un appello già corretto e concluso: orale da svolgere, voti da verbalizzare e
+    # chiusura, così ogni fase del percorso si può aprire anche nel corso di prova
+    concluso = corsi_service.create_appello(TAG, "Appello concluso di prova", data=(oggi - timedelta(days=20)).strftime("%d/%m/%Y"))
+    compiti_concluso = _prepara_appello(
+        concluso.id, [(i, False) for i in ids["mc"][2:10]] + [(ids["obbl"][1], True)], 10, da_compilare,
+    )
+    iscritti_concluso = [m for m, _, _ in STUDENTI[6:16]]
+    for m in iscritti_concluso:
+        esportazione_service.aggiungi_iscritto_manuale(TAG, concluso.id, m)
+    c = iter(compiti_concluso)
+    for m, bravura in zip(iscritti_concluso[:7], [0.95, 0.9, 0.85, 0.8, 0.7, 0.6, 0.5]):
+        presenze_service.segna_presente(TAG, concluso.id, m)
+        _correggi(concluso.id, m, next(c), rng, bravura)
+    presenze_service.segna_presente(TAG, concluso.id, iscritti_concluso[7])
+    _correggi(concluso.id, iscritti_concluso[7], next(c), rng, 0.9, richiedi_orale=True)
+    correzione_service.segna_esito_speciale(TAG, concluso.id, iscritti_concluso[8], "ritirato")
+    correzione_service.segna_esito_speciale(TAG, concluso.id, iscritti_concluso[9], "assente")
+    corsi_service.concludi_correzione_scritti(TAG, concluso.id)
+    corsi_service.update_appello(TAG, concluso.id, presenze_chiuse=True)
+    tex_risultati = compiti_service.path_risultati(TAG, concluso.id, "tex")
+    tex_risultati.write_text(risultati_service.stampa_risultati(TAG, concluso.id), encoding="utf-8")
+    da_compilare.append(tex_risultati)
 
     corsi_service.update_meta(TAG, prova_da_correggere=json.dumps(da_fare, ensure_ascii=False))
     return _compila(da_compilare)

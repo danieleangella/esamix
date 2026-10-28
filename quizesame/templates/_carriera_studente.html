@@ -30,5 +30,6 @@
 <p class="muted" style="margin:0 0 0.5rem">Registrato, nessun risultato.</p>
 {% endif %}
 {% endfor %}
-<p style="margin:0.25rem 0"><a href="/studenti/{{ matricola }}" target="_blank">Riepilogo completo</a></p>
+<p style="margin:0.25rem 0"><a href="/corsi/{{ tag }}/studenti/{{ matricola }}" target="_blank" rel="noopener">Pagina dello studente ↗</a>
+  · <a href="/studenti/{{ matricola }}" target="_blank" rel="noopener">tutti i corsi ↗</a></p>
 {% endif %}
