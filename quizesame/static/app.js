@@ -283,7 +283,6 @@ function _autocompleteStudenti(campo, suggerimenti, tag) {
 function attivaAmmessiAule(riquadro, tag) {
   attivaRiquadro(riquadro, "form", function (r) {
     r.open = true;
-    _autocompleteStudenti(r.querySelector(".campo-input-matricola-ammesso"), r.querySelector(".campo-suggerimenti-studenti-ammesso"), tag);
   });
 }
 
@@ -301,7 +300,6 @@ function ridisegnaAmmessi(riquadro, urlAppello, tag) {
       riquadro.querySelectorAll("details[data-chiave]").forEach(function (d) {
         if (aperti[d.dataset.chiave] !== undefined) d.open = aperti[d.dataset.chiave];
       });
-      _autocompleteStudenti(riquadro.querySelector(".campo-input-matricola-ammesso"), riquadro.querySelector(".campo-suggerimenti-studenti-ammesso"), tag);
     });
 }
 

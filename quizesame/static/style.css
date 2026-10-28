@@ -846,3 +846,7 @@ textarea.testo-normale { font-family: inherit; }
 .tabella-file-risultati td:first-child { white-space: nowrap; padding-right: 1.5rem; }
 /* pagina dello studente: sotto la riga di un raggruppamento, il dettaglio delle prove */
 .riga-prove td { border-top: none; padding-top: 0; font-size: 0.82rem; color: var(--muted); padding-left: 1.5rem; }
+/* riquadro ammessi e aule: file delle singole aule in piccolo, riassunto da comunicare */
+.file-aule { font-size: 0.8rem; margin-top: 0.15rem; }
+.file-aule .icona-azione { font-size: 0.75rem; padding: 0.1rem 0.4rem; }
+pre.riassunto-aule { white-space: pre-wrap; font-family: inherit; font-size: 0.9rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem 0.8rem; margin: 0.4rem 0 0; }

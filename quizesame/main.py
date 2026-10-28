@@ -119,6 +119,7 @@ templates.env.globals["versione_link"] = lambda: str(int(__import__("time").time
 templates.env.filters["js"] = lambda value: json.dumps(str(value))
 templates.env.globals["static_version"] = _static_version
 templates.env.globals["get_app_settings"] = app_config_service.get_settings
+templates.env.globals["riassunto_aule"] = aule_service.riassunto_assegnazione
 
 @__import__("contextlib").asynccontextmanager
 async def _ciclo_di_vita(_app):
@@ -1135,7 +1136,7 @@ def _contesto_appello(tag: str, corso, appello) -> dict:
                 dati_membro["non_valutati"] = presenze_service.non_valutati(tag, m.id, ammessi)
                 # la fase Presenze dipende da chi è ancora senza esito: va ricalcolata
                 dati_membro["riepilogo_home"] = _calcola_riepilogo_home(corso, m, dati_membro)
-            membri_dati.append({**dati_membro, "aule": aule_service.list_aule(tag, m.id), "ammessi": ammessi})
+            membri_dati.append({**dati_membro, "aule": aule_service.list_aule(tag, m.id), "ammessi": ammessi, "indice": i})
         contesto["membri_dati"] = membri_dati
         contesto["statistiche_confronto"] = statistiche_service.confronto_raggruppamento(tag, raggruppamento)
         contesto["risultati"] = correzione_service.list_risultati(tag, appello.id)

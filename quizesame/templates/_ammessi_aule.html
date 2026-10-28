@@ -12,11 +12,15 @@
   <div class="barra-strumenti" style="margin-top:0.75rem">
     <span>{{ icona("stampa", 14) }} Elenco ammessi</span>
     {{ formati(url ~ "/ammessi", pdf=True, html=True, tex=True, csv=True) }}
+  </div>
+  {% if md.aule %}
+  <div class="barra-strumenti file-aule">
     {% for a in md.aule %}
-    <span>· Aula {{ a.nome }} ({{ md.ammessi|selectattr("aula_id", "equalto", a.id)|list|length }})</span>
+    <span>Aula {{ a.nome }} ({{ md.ammessi|selectattr("aula_id", "equalto", a.id)|list|length }})</span>
     {{ formati(url ~ "/ammessi-aula-" ~ a.id, pdf=True, html=True) }}
     {% endfor %}
   </div>
+  {% endif %}
   <div class="barra-strumenti">
     {% if md.aule %}
     <span>{{ md.aule|length }} aul{{ 'a' if md.aule|length == 1 else 'e' }}, {{ posti }} posti{% if aula_dsa %} · aula DSA: <strong>{{ aula_dsa.nome }}</strong>{% endif %}</span>
@@ -29,7 +33,7 @@
     <form class="inline" method="post" action="{{ url }}/aule/assegna">
       <button type="submit" class="pulsante-piccolo">Assegna automaticamente</button>
     </form>
-    {{ info("Distribuisce in ordine di cognome, in proporzione ai posti di ciascuna aula, gli ammessi che non hai già spostato a mano (quelli restano dove li hai messi). Se c'è un'aula DSA, tutti i DSA/L104 vanno lì e gli altri nelle aule restanti.") }}
+    {{ info("Distribuisce in ordine di cognome, lo stesso numero in ogni aula (senza superarne i posti), gli ammessi che non hai già spostato a mano (quelli restano dove li hai messi). Se c'è un'aula DSA, tutti i DSA/L104 vanno lì e gli altri nelle aule restanti.") }}
     {% endif %}
   </div>
   {% if md.aule and md.ammessi and md.ammessi|length * 100 > posti * corso.soglia_occupazione_aule %}
@@ -39,15 +43,22 @@
   </div>
   {% endif %}
 
-  {% set regolari = md.ammessi|rejectattr("in_deroga")|list %}
-  {% set in_deroga = md.ammessi|selectattr("in_deroga")|list %}
+  {% if md.aule and md.ammessi|selectattr("aula_id")|list %}
+  {% set riassunto = riassunto_aule(md.appello.nome ~ (" · " ~ md.appello.data if md.appello.data else "") ~ " — distribuzione nelle aule", md.ammessi, md.aule) %}
+  <details style="margin-top:0.5rem" data-chiave="riassunto" open>
+    <summary>Riassunto da comunicare agli studenti {{ info("Come sono distribuiti nelle aule: per ogni aula l'intervallo di cognomi (con le lettere che bastano a distinguere il confine), e l'aula per i DSA/L104 senza nomi. Copialo in un avviso o in un'email.") }}</summary>
+    <pre class="riassunto-aule">{{ riassunto }}</pre>
+    <button type="button" class="secondary pulsante-piccolo btn-copia-riassunto" style="margin-top:0.4rem"
+            onclick="var b=this; copiaTesto(b.previousElementSibling.textContent, b.parentElement).then(function (ok) { if (ok) { b.textContent='Copiato!'; setTimeout(function () { b.textContent='Copia'; }, 1500); } });">{{ icona("copia", 13) }} Copia</button>
+  </details>
+  {% endif %}
   {% macro tabella(righe) %}
     <table style="margin-top:0.5rem">
       <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Aula</th><th></th></tr>
       {% for s in righe %}
       <tr>
         <td>{{ s.matricola }}</td>
-        <td>{{ s.cognome }}</td>
+        <td>{{ s.cognome }}{% if s.in_deroga %} <span class="badge badge-warn" data-info="Ammesso in deroga, senza i requisiti della prova">deroga</span>{% endif %}</td>
         <td>{{ s.nome }}</td>
         <td>{% if s.dsa %}<span class="badge badge-info">{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
         <td>
@@ -76,22 +87,6 @@
   {% endmacro %}
 
   <details style="margin-top:0.5rem" data-chiave="elenco">
-    <summary>Elenco dettagliato e assegnazione alle aule ({{ regolari|length }})</summary>
-    {% if regolari %}{{ tabella(regolari) }}{% else %}<p class="muted">Nessuno studente ammesso per i requisiti della prova.</p>{% endif %}
-  </details>
-
-  <details style="margin-top:0.5rem" data-chiave="deroga">
-    <summary>Ammessi in deroga ({{ in_deroga|length }}) {{ info("Per le eccezioni: lo studente compare tra gli ammessi con l'avviso \"in deroga\" (anche negli elenchi stampati) pur non avendo superato la prova precedente o non rispettando i filtri della prova. Si può togliere in qualsiasi momento.") }}</summary>
-    {% if in_deroga %}{{ tabella(in_deroga) }}{% endif %}
-
-    {% if not md.appello.chiuso %}
-    <form class="barra-aggiungi" method="post" action="{{ url }}/ammessi/aggiungi" autocomplete="off" style="margin-top:0.75rem">
-      <div style="position:relative; flex:1; min-width:14rem">
-        <input name="matricola" class="campo-input-matricola-ammesso" placeholder="Ammetti in deroga: matricola o cognome"
-               aria-label="Ammetti in deroga: matricola o cognome" autocomplete="off" required>
-        <div class="campo-suggerimenti-studenti-ammesso sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
-      </div>
-      <button type="submit" class="secondary" style="margin:0">{{ icona("piu") }} Ammetti</button>
-    </form>
-    {% endif %}
+    <summary>Elenco dettagliato e assegnazione alle aule ({{ md.ammessi|length }})</summary>
+    {% if md.ammessi %}{{ tabella(md.ammessi) }}{% else %}<p class="muted">Nessuno studente ammesso a questa prova.</p>{% endif %}
   </details>

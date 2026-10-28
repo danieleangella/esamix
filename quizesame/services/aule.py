@@ -1,7 +1,7 @@
 """Aule per una singola prova (membro di un raggruppamento) e assegnazione degli
 studenti ammessi: le aule si definiscono da zero per ogni prova, e l'assegnazione
-automatica distribuisce gli ammessi non ancora fissati a mano proporzionalmente alla
-capienza residua di ciascuna aula, in ordine di cognome. Un'aula può essere riservata agli
+automatica distribuisce gli ammessi non ancora fissati a mano in ordine di cognome, lo
+stesso numero in ogni aula nei limiti della capienza residua. Un'aula può essere riservata agli
 studenti DSA/L104: se ce n'è almeno una, tutti i DSA vanno lì e gli altri nelle restanti."""
 from dataclasses import dataclass
 from typing import Optional
@@ -102,28 +102,24 @@ def assegna_manuale(tag: str, appello_id: int, matricola: str, aula_id: Optional
         conn.close()
 
 
-def _ripartizione_resti_piu_alti(quote: list[float], n: int) -> list[int]:
-    """Arrotonda `quote` (una per aula, proporzionale alla capienza residua) a un elenco
-    di interi che sommano esattamente a `n`, col metodo dei resti più alti: si parte dalla
-    parte intera di ciascuna quota, poi si distribuisce l'eventuale differenza (n meno la
-    somma delle parti intere) alle quote coi resti frazionari più alti."""
-    basi = [int(q) for q in quote]
-    resto = n - sum(basi)
-    ordine_resti = sorted(range(len(quote)), key=lambda i: quote[i] - basi[i], reverse=True)
-    for i in ordine_resti[:resto]:
-        basi[i] += 1
-    return basi
+def _ripartizione_uniforme(capienze: list[int], n: int) -> list[int]:
+    """Quanti studenti in ciascuna aula: lo stesso numero in tutte (al più uno di
+    differenza), senza superare i posti di nessuna; chi non ci sta in un'aula piccola va
+    nelle altre. Si parte dalle aule più piccole, che si riempiono per prime."""
+    quantita = [0] * len(capienze)
+    restanti = n
+    ordine = sorted(range(len(capienze)), key=lambda i: capienze[i])
+    for k, i in enumerate(ordine):
+        aule_rimaste = len(ordine) - k
+        quantita[i] = min(capienze[i], -(-restanti // aule_rimaste))
+        restanti -= quantita[i]
+    return quantita
 
 
 def _distribuisci(conn, appello_id: int, aule: list, capienze: list[int], pool: list[str]) -> None:
     """Riempie `aule` (con le rispettive capienze residue) con gli studenti di `pool`,
-    nell'ordine dato, proporzionalmente alle capienze."""
-    totale_residuo = sum(capienze)
-    n = min(len(pool), totale_residuo)
-    if totale_residuo > 0 and n > 0:
-        quantita = _ripartizione_resti_piu_alti([c / totale_residuo * n for c in capienze], n)
-    else:
-        quantita = [0 for _ in aule]
+    nell'ordine dato (di cognome): lo stesso numero in ogni aula, nei limiti dei posti."""
+    quantita = _ripartizione_uniforme(capienze, min(len(pool), sum(capienze)))
     cursore = 0
     for aula, quantita_aula in zip(aule, quantita):
         for matricola in pool[cursore:cursore + quantita_aula]:
@@ -141,8 +137,8 @@ def assegna_automatica(
     """Distribuisce su `list_aule(tag, appello_id)` gli studenti di `matricole_ordinate`
     (già filtrati sugli ammessi e ordinati per cognome dal chiamante) che non hanno già
     un'assegnazione manuale: le assegnazioni manuali restano fisse, e la capienza usata per
-    il calcolo proporzionale è quella residua (capienza totale meno i pin manuali già
-    presenti in ciascuna aula). Se almeno un'aula è riservata ai DSA/L104, gli studenti di
+    il calcolo è quella residua (capienza totale meno le assegnazioni manuali già presenti
+    in ciascuna aula). Le aule si riempiono in modo uniforme (vedi _ripartizione_uniforme). Se almeno un'aula è riservata ai DSA/L104, gli studenti di
     `matricole_dsa` vanno tutti nelle aule riservate e gli altri nelle restanti; senza aule
     riservate si distribuiscono tutti insieme come prima. Chi eccede la capienza residua
     resta senza aula (anche se in precedenza ne aveva una assegnata automaticamente)."""
@@ -180,3 +176,63 @@ def assegna_automatica(
         conn.commit()
     finally:
         conn.close()
+
+
+def _prefisso_distintivo(a: str, b: str) -> int:
+    """Quante lettere servono per distinguere due cognomi consecutivi (es. Gallo/Gamba: 3)."""
+    a, b = a.lower(), b.lower()
+    n = 0
+    while n < min(len(a), len(b)) and a[n] == b[n]:
+        n += 1
+    return n + 1
+
+
+def riassunto_assegnazione(titolo: str, ammessi: list[dict], aule: list[Aula]) -> str:
+    """Testo da comunicare agli studenti su come sono distribuiti nelle aule: per ogni
+    aula l'intervallo di cognomi (iniziali quanto basta per distinguere il confine con
+    l'aula successiva, dalla A alla Z agli estremi), e l'aula riservata ai DSA/L104 (senza
+    nomi). Segnala gli studenti fuori dall'ordine di cognome (spostati a mano)."""
+    righe = [titolo, ""] if titolo else []
+    normali = []
+    for aula in aule:
+        if aula.dsa:
+            continue
+        studenti = sorted(
+            (s for s in ammessi if s.get("aula_id") == aula.id and not (s.get("dsa") and any(a.dsa for a in aule))),
+            key=lambda s: ((s["cognome"] or "").lower(), (s["nome"] or "").lower()),
+        )
+        if studenti:
+            normali.append((aula, studenti))
+    normali.sort(key=lambda x: (x[1][0]["cognome"] or "").lower())
+    for i, (aula, studenti) in enumerate(normali):
+        primo, ultimo = studenti[0]["cognome"] or "", studenti[-1]["cognome"] or ""
+        if i == 0:
+            da = "A"
+        else:
+            precedente = normali[i - 1][1][-1]["cognome"] or ""
+            da = primo[:_prefisso_distintivo(precedente, primo)]
+        if i == len(normali) - 1:
+            a = "Z"
+        else:
+            successivo = normali[i + 1][1][0]["cognome"] or ""
+            a = ultimo[:_prefisso_distintivo(ultimo, successivo)]
+        righe.append(f"Aula {aula.nome}: cognomi da {da.capitalize()} a {a.capitalize()}")
+    # chi è in un'aula ma con un cognome dentro l'intervallo di un'altra (spostato a mano)
+    fuori_ordine = 0
+    for i, (aula, studenti) in enumerate(normali):
+        for j, (altra, altri) in enumerate(normali):
+            if i == j:
+                continue
+            lo, hi = altri[0]["cognome"].lower(), altri[-1]["cognome"].lower()
+            fuori_ordine += sum(1 for s in studenti if lo < (s["cognome"] or "").lower() < hi)
+    for aula in aule:
+        if aula.dsa:
+            n = sum(1 for s in ammessi if s.get("aula_id") == aula.id)
+            righe.append(f"Aula {aula.nome}: studenti DSA e L104" + (f" ({n})" if n else ""))
+    senza = sum(1 for s in ammessi if not s.get("aula_id"))
+    if senza:
+        righe.append(f"Ancora senza aula: {senza} student{'e' if senza == 1 else 'i'}")
+    if fuori_ordine:
+        righe.append(f"Attenzione: {fuori_ordine} student{'e è' if fuori_ordine == 1 else 'i sono'} in un'aula "
+                     "fuori dall'ordine di cognome (assegnati a mano): controlla prima di comunicarlo.")
+    return "\n".join(righe)
