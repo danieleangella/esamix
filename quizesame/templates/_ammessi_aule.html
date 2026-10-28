@@ -33,7 +33,7 @@
     <form class="inline" method="post" action="{{ url }}/aule/assegna">
       <button type="submit" class="pulsante-piccolo">Assegna automaticamente</button>
     </form>
-    {{ info("Distribuisce in ordine di cognome, lo stesso numero in ogni aula (senza superarne i posti), gli ammessi che non hai già spostato a mano (quelli restano dove li hai messi). Se c'è un'aula DSA, tutti i DSA/L104 vanno lì e gli altri nelle aule restanti.") }}
+    {{ info("Distribuisce in ordine di cognome, lo stesso numero in ogni aula (senza superarne i posti), gli ammessi che non hai già spostato a mano (quelli restano dove li hai messi). Se c'è un'aula DSA, tutti i DSA/L104 vanno lì qualunque sia il cognome, e i posti che restano li occupano gli altri come nelle altre aule.") }}
     {% endif %}
   </div>
   {% if md.aule and md.ammessi and md.ammessi|length * 100 > posti * corso.soglia_occupazione_aule %}
@@ -46,10 +46,11 @@
   {% if md.aule and md.ammessi|selectattr("aula_id")|list %}
   {% set riassunto = riassunto_aule(md.appello.nome ~ (" · " ~ md.appello.data if md.appello.data else "") ~ " — distribuzione nelle aule", md.ammessi, md.aule) %}
   <details style="margin-top:0.5rem" data-chiave="riassunto" open>
-    <summary>Riassunto da comunicare agli studenti {{ info("Come sono distribuiti nelle aule: per ogni aula l'intervallo di cognomi (con le lettere che bastano a distinguere il confine), e l'aula per i DSA/L104 senza nomi. Copialo in un avviso o in un'email.") }}</summary>
-    <pre class="riassunto-aule">{{ riassunto }}</pre>
+    <summary>Riassunto da comunicare agli studenti {{ info("Come sono distribuiti nelle aule: per ogni aula l'intervallo di cognomi (con le lettere che bastano a distinguere il confine), e l'aula che accoglie i DSA/L104, senza nomi né numeri. Copialo in un avviso o in un'email.") }}</summary>
+    <pre class="riassunto-aule">{{ riassunto.testo }}</pre>
     <button type="button" class="secondary pulsante-piccolo btn-copia-riassunto" style="margin-top:0.4rem"
             onclick="var b=this; copiaTesto(b.previousElementSibling.textContent, b.parentElement).then(function (ok) { if (ok) { b.textContent='Copiato!'; setTimeout(function () { b.textContent='Copia'; }, 1500); } });">{{ icona("copia", 13) }} Copia</button>
+    {% for a in riassunto.avvisi %}<div class="stato-campo stato-warn">⚠ {{ a }}</div>{% endfor %}
   </details>
   {% endif %}
   {% macro tabella(righe) %}

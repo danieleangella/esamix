@@ -20,10 +20,10 @@
         <form class="inline" method="post" action="{{ url }}/aule/{{ a.id }}/dsa">
           <input type="hidden" name="dsa" value="{{ '' if a.dsa else '1' }}">
           {% if a.dsa %}
-          <button type="submit" class="pulsante-dsa attivo" data-info="Aula riservata ai DSA/L104: clicca per togliere la riserva"
+          <button type="submit" class="pulsante-dsa attivo" data-info="Aula dei DSA/L104 (che ci vanno tutti, insieme ad altri studenti): clicca per toglierla"
                   aria-pressed="true">{{ icona("accessibile") }} Aula DSA</button>
           {% else %}
-          <button type="submit" class="pulsante-dsa" data-info="Riserva quest'aula agli studenti DSA/L104"
+          <button type="submit" class="pulsante-dsa" data-info="Metti in quest'aula tutti gli studenti DSA/L104 (insieme ad altri)"
                   aria-pressed="false" aria-label="Riserva {{ a.nome }} agli studenti DSA/L104">{{ icona("accessibile") }}</button>
           {% endif %}
         </form>
