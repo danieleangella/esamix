@@ -21,6 +21,9 @@
     </td>
     <td>{% if r.verbalizzato %}<span class="muted">verbalizzato {{ r.data_verbalizzazione or "" }}</span>{% endif %}</td>
   </tr>
+  {% if r.prove %}
+  <tr class="riga-prove"><td colspan="3">{% for p in r.prove %}{{ p.nome }}: {{ p.voto if p.voto is not none else (p.esito or 'non svolta') }} · {% endfor %}media {{ r.media or '–' }}</td></tr>
+  {% endif %}
   {% endfor %}
 </table>
 {% else %}

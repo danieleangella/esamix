@@ -627,13 +627,9 @@ def crea_tex_risultati(ctx: LatexContext, righe: list[dict], prove: list[str] = 
     titolo = "Risultati complessivi delle prove" if prove else "Risultati della prova scritta"
     tex += _titolo_documento(titolo, _quanti(len(righe), "studente", "studenti"))
     tex += _intestazione_orale(ctx)
-    nota = "Le matricole sono parzialmente oscurate; accanto le iniziali di nome e cognome."
-    if prove:
-        nota += " Compare solo chi ha superato tutte le prove; il voto finale è la media, approssimata per eccesso solo se la media esatta è già sufficiente."
     colonne_prove = " c" * len(prove)
     tex += (
-        f"\\noindent{{\\small {nota}}}"
-        "\\par\\medskip\n\n" + _RIGHE_ALTERNATE +
+        _RIGHE_ALTERNATE +
         f"\\begin{{center}}\n\\begin{{longtable}}{{>{{\\ttfamily}}c c{colonne_prove} >{{\\bfseries}}c}}\n\\toprule\n"
         + _riga_intestazione("Matricola", "Iniziali", *(_escape_testo_semplice(p) for p in prove),
                              "Voto finale" if prove else "Esito")

@@ -844,3 +844,5 @@ textarea.testo-normale { font-family: inherit; }
 .tabella-centrata th, .tabella-centrata td { text-align: center; }
 .tabella-file-risultati td { vertical-align: middle; }
 .tabella-file-risultati td:first-child { white-space: nowrap; padding-right: 1.5rem; }
+/* pagina dello studente: sotto la riga di un raggruppamento, il dettaglio delle prove */
+.riga-prove td { border-top: none; padding-top: 0; font-size: 0.82rem; color: var(--muted); padding-left: 1.5rem; }

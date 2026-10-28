@@ -52,6 +52,11 @@
       </td>
       <td><a href="/corsi/{{ tag }}/appelli/{{ r.appello_id }}/risultati/{{ studente.matricola }}">Dettaglio</a></td>
     </tr>
+    {% if r.prove %}
+    <tr class="riga-prove"><td colspan="6">
+      {% for p in r.prove %}<a href="/corsi/{{ tag }}/appelli/{{ p.appello_id }}/risultati/{{ studente.matricola }}">{{ p.nome }}</a>: <strong>{{ p.voto if p.voto is not none else (p.esito or 'non svolta') }}</strong>{% if p.voto is not none and not p.superata %} <span class="badge badge-err">non superata</span>{% endif %} · {% endfor %}media <strong>{{ r.media or '–' }}</strong>
+    </td></tr>
+    {% endif %}
     {% endfor %}
   </table>
 {% endmacro %}

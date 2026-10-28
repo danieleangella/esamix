@@ -115,7 +115,8 @@ def risultati_studente(tag: str, matricola: str) -> list[dict]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         rows = conn.execute(
-            "SELECT a.id AS appello_id, a.nome AS appello_nome, a.data AS appello_data, r.voto, r.esito, r.richiede_orale, "
+            "SELECT a.id AS appello_id, a.nome AS appello_nome, a.data AS appello_data, a.tipo AS appello_tipo, "
+            "r.voto, r.voto_scritto, r.esito, r.richiede_orale, "
             "r.orale_svolto, r.esito_orale, r.verbalizzato, r.data_verbalizzazione, r.annullamento_nota, "
             "EXISTS(SELECT 1 FROM raggruppamento_membri rm WHERE rm.appello_id = a.id) AS membro_raggruppamento "
             "FROM risultati r JOIN appelli a ON a.id = r.appello_id "
@@ -131,6 +132,72 @@ def risultati_studente(tag: str, matricola: str) -> list[dict]:
         return risultati
     finally:
         conn.close()
+
+
+def carriera_studente(tag: str, matricola: str) -> list[dict]:
+    """Come risultati_studente, ma per le pagine dello studente: le prove di un
+    raggruppamento (es. due prove parziali) diventano una riga sola, quella del
+    raggruppamento, con il voto finale, la media esatta e in "prove" il dettaglio di
+    ciascuna prova. La riga c'è anche se il voto combinato non è (ancora) stato calcolato:
+    allora l'esito dice se le prove sono ancora in corso o non sono state superate."""
+    corso = corsi_service.get_corso(tag)
+    risultati = risultati_studente(tag, matricola)
+    per_appello = {d["appello_id"]: d for d in risultati}
+    gruppi = {}
+    for d in risultati:
+        if d["appello_tipo"] == "raggruppamento":
+            gruppi.setdefault(d["appello_id"], None)
+    for d in risultati:
+        g = corsi_service.get_raggruppamento_by_membro(tag, d["appello_id"]) if d["appello_tipo"] != "raggruppamento" else None
+        if g is not None:
+            gruppi.setdefault(g.appello_id, g)
+    membri_ids = set()
+    righe_gruppo = {}
+    for appello_id, g in gruppi.items():
+        g = g or corsi_service.get_raggruppamento_by_appello(tag, appello_id)
+        if g is None:
+            continue
+        membri_ids.update(m.id for m in g.membri)
+        prove = []
+        for m in g.membri:
+            p = per_appello.get(m.id)
+            voto = None
+            if p is not None and p["esito"] in ("voto", "rifiutato"):
+                voto = p["voto_scritto"] if p["voto_scritto"] is not None else p["voto"]
+            soglia = corsi_service.effective_votomin(corso, m)
+            prove.append({
+                "appello_id": m.id, "nome": m.nome, "data": m.data, "voto": voto,
+                "esito": p["esito"] if p else None, "superata": voto is not None and voto >= soglia,
+            })
+        riga = per_appello.get(g.appello_id)
+        if riga is None:
+            appello = corsi_service.get_appello(tag, g.appello_id)
+            in_corso = any(pr["esito"] is None for pr in prove) and not any(
+                pr["esito"] is not None and not pr["superata"] for pr in prove)
+            riga = {
+                "appello_id": g.appello_id, "appello_nome": appello.nome, "appello_data": appello.data,
+                "appello_tipo": "raggruppamento", "voto": None, "voto_scritto": None,
+                "esito": "prove in corso" if in_corso else "prove non superate", "richiede_orale": False,
+                "orale_svolto": False, "esito_orale": None, "verbalizzato": False,
+                "data_verbalizzazione": None, "annullamento_nota": None, "superato": None,
+            }
+        else:
+            riga = dict(riga)
+        riga["prove"] = prove
+        voti = [pr["voto"] for pr in prove]
+        if voti and None not in voti:
+            riga["media"] = f"{sum(voti) / len(voti):.2f}".rstrip("0").rstrip(".").replace(".", ",")
+        if not riga.get("appello_data"):
+            riga["appello_data"] = next((pr["data"] for pr in reversed(prove) if pr["data"]), None)
+        righe_gruppo[g.appello_id] = riga
+    carriera = []
+    for d in risultati:
+        if d["appello_id"] in membri_ids or d["appello_id"] in righe_gruppo:
+            continue
+        carriera.append(d)
+    carriera.extend(righe_gruppo.values())
+    carriera.sort(key=lambda d: (d["appello_data"] is None, d["appello_data"] or "", d["appello_id"]))
+    return carriera
 
 
 def cerca_globale(query: str, limite: int = 15) -> list[dict]:
@@ -162,7 +229,7 @@ def riepilogo_globale(matricola: str) -> list[dict]:
             continue
         riepilogo.append({
             "corso_tag": corso.tag, "corso_nome": corso.nome, "corso_anno": corso.anno,
-            "nome": s.nome, "cognome": s.cognome, "risultati": risultati_studente(corso.tag, matricola),
+            "nome": s.nome, "cognome": s.cognome, "risultati": carriera_studente(corso.tag, matricola),
         })
     return riepilogo
 
@@ -257,7 +324,7 @@ def cerca_in_tutti_i_corsi(query: str) -> list[dict]:
             risultati.append({
                 "corso_tag": corso.tag, "corso_nome": corso.nome, "corso_anno": corso.anno,
                 "matricola": s.matricola, "nome": s.nome, "cognome": s.cognome,
-                "laurea_nome": s.laurea_nome, "risultati": risultati_studente(corso.tag, s.matricola),
+                "laurea_nome": s.laurea_nome, "risultati": carriera_studente(corso.tag, s.matricola),
             })
     return risultati
 
@@ -286,7 +353,7 @@ def storico_altri_corsi(tag: str, matricola: str) -> list[dict]:
     for corso in corsi_service.list_corsi():
         if corso.tag == tag or get_studente(corso.tag, matricola) is None:
             continue
-        altri.append({"corso": corso, "risultati": _dal_piu_recente(risultati_studente(corso.tag, matricola))})
+        altri.append({"corso": corso, "risultati": _dal_piu_recente(carriera_studente(corso.tag, matricola))})
     return altri
 
 
@@ -305,7 +372,7 @@ def dettaglio_studente_corso(tag: str, matricola: str) -> Optional[dict]:
     finally:
         conn.close()
     return {
-        "studente": studente, "storico": _dal_piu_recente(risultati_studente(tag, matricola)),
+        "studente": studente, "storico": _dal_piu_recente(carriera_studente(tag, matricola)),
         "orale_obbligatorio": dict(orale_obb) if orale_obb else None,
     }
 

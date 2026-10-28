@@ -13,7 +13,7 @@
   <h1>{{ appello.nome }}{% if appello.data %} <span class="muted">· {{ appello.data }}</span>{% endif %}</h1>
 </header>
 <div class="barra-riferimento non-stampare">
-  <p class="muted" style="margin:0">Matricole parzialmente oscurate, iniziali di nome e cognome: pronto da pubblicare.{% if prove %} Compare solo chi ha superato tutte le prove; il voto finale è la media, approssimata per eccesso solo se la media esatta è già sufficiente.{% endif %}</p>
+  <p class="muted" style="margin:0">Pronto da pubblicare.</p>
   <span class="formati">
     {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/risultati", pdf=True, tex=True, md=True) }}
     <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">Stampa</button>

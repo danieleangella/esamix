@@ -1278,7 +1278,17 @@ def riapri_correzione_scritto(tag: str, appello_id: int):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_correzione(appello)
     corsi_service.riapri_correzione_scritti(tag, appello_id)
-    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Correzione scritta riaperta", anchor=anchor)
+    msg = "Correzione scritta riaperta"
+    # i voti di una prova possono cambiare: i risultati complessivi del raggruppamento non
+    # valgono più, si rigenerano chiudendo di nuovo la correzione dell'ultima prova
+    gruppo = corsi_service.get_raggruppamento_by_membro(tag, appello_id) if appello.membro_raggruppamento else None
+    if gruppo is not None:
+        corsi_service.riapri_correzione_scritti(tag, gruppo.appello_id)
+        tex = compiti_service.path_risultati(tag, gruppo.appello_id, "tex")
+        for estensione in ("tex", "pdf", "aux", "log"):
+            tex.with_suffix(f".{estensione}").unlink(missing_ok=True)
+        msg += ": i risultati complessivi delle prove sono stati cancellati, si rigenerano chiudendo di nuovo la correzione"
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/riapri")
