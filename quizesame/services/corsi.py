@@ -1,3 +1,4 @@
+from functools import lru_cache
 import io
 import json
 import re
@@ -124,6 +125,7 @@ class Appello:
     testo_chiuso: bool = False
     testo_chiuso_il: Optional[str] = None
     rimanda_svolgimenti: bool = False
+    aule_chiuse: bool = False
 
 
 @dataclass
@@ -485,16 +487,35 @@ def domande_esame_meta(lista: list[str]) -> dict:
     return {"domande_esame_lista": json.dumps(lista, ensure_ascii=False), "domande_esame": lista[0] if lista else ""}
 
 
+# impostazioni del corso già lette, finché il file del database non cambia: una pagina
+# chiede get_corso decine di volte (a volte centinaia), e ogni volta erano una connessione
+# e una query
+_cache_meta: dict[str, tuple[tuple, dict]] = {}
+
+
 def get_meta(tag: str) -> dict:
-    conn = db.get_connection(config.corso_db_path(tag))
+    percorso = config.corso_db_path(tag)
+    try:
+        info = percorso.stat()
+        firma = (info.st_mtime_ns, info.st_size, info.st_ino)  # anche un file sostituito (ripristino)
+    except OSError:
+        firma = None
+    in_cache = _cache_meta.get(tag)
+    if firma is not None and in_cache and in_cache[0] == firma:
+        return dict(in_cache[1])
+    conn = db.get_connection(percorso)
     try:
         rows = conn.execute("SELECT key, value FROM meta").fetchall()
-        return {r["key"]: r["value"] for r in rows}
+        meta = {r["key"]: r["value"] for r in rows}
     finally:
         conn.close()
+    if firma is not None:
+        _cache_meta[tag] = (firma, meta)
+    return dict(meta)
 
 
 def update_meta(tag: str, **fields) -> None:
+    _cache_meta.pop(tag, None)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         for key, value in fields.items():
@@ -528,6 +549,7 @@ def _row_to_appello(conn, row) -> Appello:
         testo_chiuso=bool(row["testo_chiuso"]) if "testo_chiuso" in chiavi else False,
         testo_chiuso_il=row["testo_chiuso_il"] if "testo_chiuso_il" in chiavi else None,
         rimanda_svolgimenti=bool(row["rimanda_svolgimenti"]) if "rimanda_svolgimenti" in chiavi else False,
+        aule_chiuse=bool(row["aule_chiuse"]) if "aule_chiuse" in chiavi else False,
     )
 
 
@@ -837,13 +859,15 @@ def matricola_ammessa(matricola: str, soglia: Optional[str]) -> bool:
     return soglia_int is None or matricola_int is None or matricola_int >= soglia_int
 
 
+@lru_cache(maxsize=4096)
 def _normalizza_cognome(testo: str) -> str:
     """Solo le lettere, maiuscole e senza accenti: "D'Àngelo" -> "DANGELO"."""
     senza_accenti = "".join(c for c in unicodedata.normalize("NFKD", testo or "") if not unicodedata.combining(c))
     return "".join(c for c in senza_accenti.upper() if "A" <= c <= "Z")
 
 
-def intervalli_cognome(filtro: Optional[str]) -> list[tuple[str, str]]:
+@lru_cache(maxsize=256)
+def intervalli_cognome(filtro: Optional[str]) -> tuple[tuple[str, str], ...]:
     """Intervalli di un filtro sul cognome: "A-D", "E-N, O-Z", "A-Ma" (anche più lettere)
     o una lettera sola ("Z"). Vuoto se il filtro è vuoto; ValueError se non si capisce."""
     intervalli = []
@@ -856,7 +880,7 @@ def intervalli_cognome(filtro: Optional[str]) -> list[tuple[str, str]]:
         if len(estremi) != 2 or not all(estremi) or estremi[0] > estremi[1]:
             raise ValueError(f"Intervallo di cognomi non valido: '{parte.strip()}' (es. A-D, E-N, O-Z)")
         intervalli.append((estremi[0], estremi[1]))
-    return intervalli
+    return tuple(intervalli)
 
 
 def normalizza_filtro_cognome(filtro: Optional[str]) -> str:

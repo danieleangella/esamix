@@ -248,3 +248,28 @@ def riassunto_assegnazione(titolo: str, ammessi: list[dict], aule: list[Aula]) -
         avvisi.append(f"{fuori_ordine} student{'e è' if fuori_ordine == 1 else 'i sono'} in un'aula fuori "
                       "dall'ordine di cognome (assegnati a mano): il riassunto non lo dice")
     return {"testo": "\n".join(righe), "avvisi": avvisi}
+
+
+def aula_per_cognome(cognome: str, ammessi: list[dict], aule: list[Aula], dsa: bool = False) -> Optional[int]:
+    """L'aula in cui mettere uno studente aggiunto dopo l'assegnazione, senza toccare gli
+    altri: quella dei DSA/L104 se lo è, altrimenti quella dell'intervallo di cognomi in cui
+    cade (fra due intervalli, la prima dopo); None se non si può dedurre."""
+    if dsa:
+        aula_dsa = next((a for a in aule if a.dsa), None)
+        if aula_dsa:
+            return aula_dsa.id
+    aula_dsa_presente = any(a.dsa for a in aule)
+    intervalli = []
+    for aula in aule:
+        cognomi = sorted((s["cognome"] or "").lower() for s in ammessi
+                         if s.get("aula_id") == aula.id and not (aula_dsa_presente and s.get("dsa")))
+        if cognomi:
+            intervalli.append((cognomi[0], cognomi[-1], aula.id))
+    if not intervalli:
+        return None
+    intervalli.sort()
+    c = (cognome or "").lower()
+    for primo, ultimo, aula_id in intervalli:
+        if c <= ultimo:
+            return aula_id
+    return intervalli[-1][2]

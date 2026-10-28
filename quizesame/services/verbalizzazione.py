@@ -2,7 +2,6 @@ from datetime import date
 
 from quizesame import config, db
 from quizesame.services import corsi as corsi_service
-from quizesame.services import studenti as studenti_service
 from quizesame.services.correzione import GiaVerbalizzato
 
 
@@ -127,16 +126,22 @@ def stato_esame_studenti(tag: str) -> dict[str, dict]:
                 continue
             stato[r["matricola"]] = {"stato": "da_verbalizzare", "voto": r["voto"], "appello_nome": appello.nome}
 
-    for s in studenti_service.list_studenti(tag):
-        if s.matricola in stato:
-            continue
-        voti = [
-            r["voto"] for r in studenti_service.risultati_studente(tag, s.matricola)
-            if r["voto"] is not None and r["esito"] in ("voto", "rifiutato")
-            and not (r["richiede_orale"] and not r["orale_svolto"])
-        ]
-        if voti:
-            stato[s.matricola] = {"stato": "insufficiente", "voto": round(sum(voti) / len(voti), 1)}
+    # i voti di tutti gli studenti con una sola query (prima: una per studente)
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        righe = conn.execute(
+            "SELECT r.matricola, r.voto FROM risultati r JOIN studenti s ON s.matricola = r.matricola "
+            "WHERE r.voto IS NOT NULL AND r.esito IN ('voto', 'rifiutato') "
+            "AND NOT (r.richiede_orale = 1 AND r.orale_svolto = 0)"
+        ).fetchall()
+    finally:
+        conn.close()
+    voti: dict[str, list[int]] = {}
+    for r in righe:
+        voti.setdefault(r["matricola"], []).append(r["voto"])
+    for matricola, v in voti.items():
+        if matricola not in stato:
+            stato[matricola] = {"stato": "insufficiente", "voto": round(sum(v) / len(v), 1)}
     return stato
 
 

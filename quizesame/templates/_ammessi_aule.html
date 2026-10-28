@@ -29,7 +29,15 @@
     {% endif %}
     <a class="icona-azione icona-sola" href="#impostazioni" data-info="{{ 'Gestisci le aule (nome, posti, aula DSA) nella scheda Impostazioni' if md.aule else 'Aggiungi le aule di questa prova nella scheda Impostazioni' }}"
        aria-label="{{ 'Gestisci le aule' if md.aule else 'Aggiungi le aule' }}">{{ icona("ingranaggio", 14) }}</a>
-    {% if md.aule and not md.appello.chiuso %}
+    {% if md.aule and md.appello.aule_chiuse %}
+    <span class="badge badge-ok">{{ icona("lucchetto", 12) }} aule assegnate</span>
+    {% if not md.appello.chiuso %}
+    <form class="inline" method="post" action="{{ url }}/aule/assegna"
+          data-conferma="Riassegnare le aule a tutti gli studenti? Cambia l'aula di chiunque non sia stato spostato a mano: i file e la distribuzione già comunicati non varranno più.">
+      <button type="submit" class="secondary pulsante-piccolo">Riassegna tutte…</button>
+    </form>
+    {% endif %}
+    {% elif md.aule and not md.appello.chiuso %}
     <form class="inline" method="post" action="{{ url }}/aule/assegna">
       <button type="submit" class="pulsante-piccolo">Assegna automaticamente</button>
     </form>
@@ -63,7 +71,7 @@
         <td>{{ s.nome }}</td>
         <td>{% if s.dsa %}<span class="badge badge-info">{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
         <td>
-          {% if md.aule and not md.appello.chiuso %}
+          {% if md.aule and not md.appello.chiuso and not (md.appello.aule_chiuse and s.aula_id) %}
           <form class="inline" method="post" action="{{ url }}/aule/{{ s.matricola }}/assegna-manuale">
             <select name="aula_id" style="width:auto" onchange="this.form.requestSubmit()" aria-label="Aula di {{ s.cognome }} {{ s.nome }}">
               <option value="">non assegnata</option>
@@ -86,6 +94,24 @@
       {% endfor %}
     </table>
   {% endmacro %}
+
+  {% if md.aule and md.appello.aule_chiuse and not md.appello.chiuso %}
+  <form class="barra-aggiungi form-aggiungi-in-aula" method="post" action="{{ url }}/aule/aggiungi-studente" autocomplete="off" style="margin-top:0.75rem">
+    <span><strong>Aggiungi in un'aula</strong> {{ info("Per chi si aggiunge all'ultimo momento, anche se non è registrato nel corso (allora servono cognome e nome): viene ammesso alla prova se non lo è già e messo nell'aula scelta o, con \"secondo il cognome\", in quella del suo intervallo di cognomi (i DSA/L104 nell'aula DSA). Gli altri studenti non cambiano aula.") }}</span>
+    <div style="position:relative; flex:1; min-width:10rem">
+      <input name="matricola" class="campo-input-matricola-aula" placeholder="matricola o cognome" aria-label="Matricola o cognome" required>
+      <div class="campo-suggerimenti-aula sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
+    </div>
+    <input name="cognome" placeholder="cognome (se nuovo)" aria-label="Cognome, se non registrato" style="flex:1; min-width:8rem">
+    <input name="nome" placeholder="nome (se nuovo)" aria-label="Nome, se non registrato" style="flex:1; min-width:7rem">
+    <label class="etichetta-check" style="font-size:0.85rem"><input type="checkbox" name="dsa" value="1"> DSA/L104</label>
+    <select name="aula_id" style="width:auto" aria-label="Aula">
+      <option value="">secondo il cognome</option>
+      {% for a in md.aule %}<option value="{{ a.id }}">{{ a.nome }}{% if a.dsa %} (DSA){% endif %}</option>{% endfor %}
+    </select>
+    <button type="submit" class="secondary" style="margin:0">{{ icona("piu") }} Aggiungi</button>
+  </form>
+  {% endif %}
 
   <details style="margin-top:0.5rem" data-chiave="elenco">
     <summary>Elenco dettagliato e assegnazione alle aule ({{ md.ammessi|length }})</summary>

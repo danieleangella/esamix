@@ -353,6 +353,8 @@ ADDITIVE_COLUMNS = {
         # correzione: gli svolgimenti (obbligatori e domande aperte) si valutano dopo, tutti
         # insieme esercizio per esercizio, invece che compito per compito
         ("rimanda_svolgimenti", "BOOLEAN NOT NULL DEFAULT 0"),
+        # aule assegnate e bloccate: rifarle chiede conferma, si aggiungono solo eccezioni
+        ("aule_chiuse", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
 }
 
@@ -369,6 +371,11 @@ def _ensure_schema_current(conn: sqlite3.Connection) -> None:
         for nome, dichiarazione in colonne:
             if nome not in colonne_presenti:
                 conn.execute(f"ALTER TABLE {tabella} ADD COLUMN {nome} {dichiarazione}")
+                if (tabella, nome) == ("appelli", "aule_chiuse"):
+                    # le prove con le aule già assegnate nascono con le aule chiuse
+                    conn.execute(
+                        "UPDATE appelli SET aule_chiuse=1 WHERE id IN (SELECT appello_id FROM aula_assegnazioni)"
+                    )
                 if (tabella, nome) == ("appelli", "testo_chiuso"):
                     # negli appelli già esistenti il testo con compiti generati (o di un
                     # appello chiuso) è di fatto definitivo: nasce chiuso

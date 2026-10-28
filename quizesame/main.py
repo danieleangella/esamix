@@ -1219,9 +1219,9 @@ def elimina_appello(tag: str, appello_id: int):
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/chiudi")
-def chiudi_appello(tag: str, appello_id: int):
+def chiudi_appello(tag: str, appello_id: int, background_tasks: BackgroundTasks):
     corsi_service.chiudi_appello(tag, appello_id)
-    _genera_risultati_cache(tag, appello_id)
+    _genera_risultati_cache(tag, appello_id, background_tasks)
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Appello chiuso: non sono più possibili modifiche")
 
 
@@ -1235,7 +1235,7 @@ def _anchor_correzione(appello) -> str:
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/concludi-correzione-scritto")
-def concludi_correzione_scritto(tag: str, appello_id: int):
+def concludi_correzione_scritto(tag: str, appello_id: int, background_tasks: BackgroundTasks):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_correzione(appello)
     sospese = correzione_service.list_valutazioni_sospese(tag, appello_id)
@@ -1252,7 +1252,7 @@ def concludi_correzione_scritto(tag: str, appello_id: int):
         # voti combinati aggiornati prima di generare l'elenco complessivo
         risultati_service.calcola_raggruppamento(tag, raggruppamento.id)
     corsi_service.concludi_correzione_scritti(tag, appello_id)
-    _genera_risultati_cache(tag, appello_id)
+    _genera_risultati_cache(tag, appello_id, background_tasks)
     msg = "Correzione scritta conclusa: elenco risultati generato, nessuna nuova correzione è possibile finché non riapri"
     # chiusa la correzione dell'ultima prova di un raggruppamento, arrivano anche i
     # risultati complessivi (voti delle prove e media)
@@ -1262,7 +1262,7 @@ def concludi_correzione_scritto(tag: str, appello_id: int):
     ):
         risultati_service.calcola_raggruppamento(tag, gruppo.id)
         corsi_service.concludi_correzione_scritti(tag, gruppo.appello_id)
-        _genera_risultati_cache(tag, gruppo.appello_id)
+        _genera_risultati_cache(tag, gruppo.appello_id, background_tasks)
         msg += f". Tutte le prove sono corrette: risultati complessivi pronti nella scheda Risultati di «{gruppo.nome}»"
     try:
         sospette = controllo_service.segnala_sospette(tag, appello_id)
@@ -2634,15 +2634,20 @@ def modifica_risultato_form(request: Request, tag: str, appello_id: int, matrico
     )
 
 
-def _genera_risultati_cache(tag: str, appello_id: int) -> None:
+def _genera_risultati_cache(tag: str, appello_id: int, background_tasks: Optional[BackgroundTasks] = None) -> None:
     """Genera e compila l'elenco risultati (.tex/.pdf), una volta sola: chiamata quando
     l'appello si chiude, invece che a ogni singolo download (la compilazione LaTeX del
     PDF non è istantanea, e mentre le correzioni sono ancora in corso l'elenco cambia
-    comunque a ogni compito corretto)."""
+    comunque a ogni compito corretto). Con `background_tasks` il PDF si compila dopo aver
+    risposto (il vecchio si toglie subito, perché il link non mostri l'elenco superato)."""
     tex = risultati_service.stampa_risultati(tag, appello_id)
     tex_path = compiti_service.path_risultati(tag, appello_id, "tex")
     tex_path.write_text(tex, encoding="utf-8")
-    compiti_service.compila_pdf(tex_path)
+    if background_tasks is None:
+        compiti_service.compila_pdf(tex_path)
+        return
+    tex_path.with_suffix(".pdf").unlink(missing_ok=True)
+    background_tasks.add_task(_compila_in_background, [tex_path])
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/risultati.tex", response_class=PlainTextResponse)
@@ -3263,10 +3268,56 @@ def assegna_aule(request: Request, tag: str, appello_id: int):
     if raggruppamento is None:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Questa prova non appartiene a un raggruppamento", "error")
     ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
+    if not aule_service.list_aule(tag, appello_id):
+        return _risposta_ammessi_aule(request, tag, appello_id, "Aggiungi prima le aule nella scheda Impostazioni", "error")
+    rifatte = corsi_service.get_appello(tag, appello_id).aule_chiuse
     aule_service.assegna_automatica(
         tag, appello_id, [s["matricola"] for s in ammessi], matricole_dsa={s["matricola"] for s in ammessi if s["dsa"]},
     )
-    return _risposta_ammessi_aule(request, tag, appello_id, "Assegnazione aule aggiornata")
+    # da qui l'assegnazione è chiusa: si aggiungono solo eccezioni, rifarla chiede conferma
+    corsi_service.update_appello(tag, appello_id, aule_chiuse=True)
+    return _risposta_ammessi_aule(
+        request, tag, appello_id,
+        "Aule riassegnate a tutti: ricomunica la distribuzione agli studenti" if rifatte else "Aule assegnate e bloccate",
+    )
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/aule/aggiungi-studente")
+def aggiungi_studente_in_aula(
+    request: Request, tag: str, appello_id: int, matricola: str = Form(...), cognome: str = Form(""),
+    nome: str = Form(""), dsa: str = Form(""), aula_id: str = Form(""),
+):
+    """Eccezione ad aule già assegnate (chi arriva all'ultimo momento, anche non ancora
+    registrato nel corso): lo registra se serve, lo ammette alla prova se non lo è, e lo
+    mette nell'aula scelta o in quella del suo cognome, senza toccare gli altri."""
+    raggruppamento, indice = _membro_e_indice(tag, appello_id)
+    if raggruppamento is None:
+        return _risposta_ammessi_aule(request, tag, appello_id, "Questa prova non appartiene a un raggruppamento", "error")
+    matricola = matricola.strip()
+    try:
+        studente = studenti_service.get_studente(tag, matricola)
+        if studente is None:
+            if not cognome.strip() or not nome.strip():
+                raise ValueError(f"La matricola {matricola} non è nel corso: indica anche cognome e nome per registrarlo")
+            studenti_service.crea_studente(tag, matricola, nome, cognome, dsa_tipo="DSA" if dsa else "")
+            studente = studenti_service.get_studente(tag, matricola)
+        ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
+        if matricola not in {s["matricola"] for s in ammessi}:
+            corsi_service.ammetti_manualmente(tag, appello_id, matricola)
+        aule = aule_service.list_aule(tag, appello_id)
+        if aula_id.strip():
+            scelta = int(aula_id)
+        else:
+            scelta = aule_service.aula_per_cognome(studente.cognome, ammessi, aule, dsa=bool(studente.dsa))
+            if scelta is None:
+                raise ValueError("Non so in che aula metterlo: scegli l'aula")
+        aule_service.assegna_manuale(tag, appello_id, matricola, scelta)
+    except ValueError as e:
+        return _risposta_ammessi_aule(request, tag, appello_id, str(e), "error")
+    nome_aula = next((a.nome for a in aule if a.id == scelta), "")
+    return _risposta_ammessi_aule(
+        request, tag, appello_id, f"{studente.cognome} {studente.nome} aggiunto nell'aula {nome_aula}: gli altri non cambiano",
+    )
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/aule/{matricola}/assegna-manuale")
@@ -3280,6 +3331,16 @@ def assegna_aula_manuale(request: Request, tag: str, appello_id: int, matricola:
 def aggiungi_ammesso_manuale(request: Request, tag: str, appello_id: int, matricola: str = Form(...)):
     try:
         corsi_service.ammetti_manualmente(tag, appello_id, matricola.strip())
+        if corsi_service.get_appello(tag, appello_id).aule_chiuse:
+            # aule già assegnate: il nuovo ammesso va nell'aula del suo cognome, gli altri restano
+            raggruppamento, indice = _membro_e_indice(tag, appello_id)
+            studente = studenti_service.get_studente(tag, matricola.strip())
+            aula = aule_service.aula_per_cognome(
+                studente.cognome, corsi_service.list_ammessi_prova(tag, raggruppamento, indice),
+                aule_service.list_aule(tag, appello_id), dsa=bool(studente.dsa),
+            )
+            if aula is not None:
+                aule_service.assegna_manuale(tag, appello_id, matricola.strip(), aula)
     except ValueError as e:
         return _risposta_ammessi_aule(request, tag, appello_id, str(e), "error")
     return _risposta_ammessi_aule(
