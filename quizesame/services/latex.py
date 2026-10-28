@@ -30,6 +30,8 @@ class LatexContext:
     orale_data: str = ""
     orale_ora: str = ""
     orale_aula: str = ""
+    # già pronta (LaTeX): per chi deve fare l'orale quando l'appello non ne ha data/ora/aula
+    frase_orale: str = ""
 
 
 class _SafeDict(dict):
@@ -608,12 +610,15 @@ def celavoto(voto: int, votomin: int) -> str:
 
 
 def _intestazione_orale(ctx: LatexContext) -> str:
-    if not (ctx.orale_data or ctx.orale_ora or ctx.orale_aula):
+    """Riquadro con data, ora e aula dell'orale, o in mancanza la frase del corso (es.
+    "contattare il docente"): solo se nell'elenco c'è qualcuno che deve fare l'orale."""
+    dettagli = ", ".join(_escape_testo_semplice(p) for p in (ctx.orale_data, ctx.orale_ora, ctx.orale_aula) if p)
+    testo = f"{{\\bfseries Orale:}} {dettagli}" if dettagli else ctx.frase_orale
+    if not testo:
         return ""
-    dettagli = ", ".join(p for p in (ctx.orale_data, ctx.orale_ora, ctx.orale_aula) if p)
     return (
-        "\\noindent\\fbox{\\parbox{\\dimexpr\\textwidth-2\\fboxsep-2\\fboxrule}{\\strut"
-        f"{{\\bfseries Orale:}} {dettagli}}}}}\\par\\vspace{{0.4cm}}\n\n"
+        "\\noindent\\fbox{\\parbox{\\dimexpr\\textwidth-2\\fboxsep-2\\fboxrule}{\\strut "
+        f"{testo}}}}}\\par\\vspace{{0.4cm}}\n\n"
     )
 
 
@@ -626,7 +631,8 @@ def crea_tex_risultati(ctx: LatexContext, righe: list[dict], prove: list[str] = 
     tex += intestazione_breve(ctx)
     titolo = "Risultati complessivi delle prove" if prove else "Risultati della prova scritta"
     tex += _titolo_documento(titolo, _quanti(len(righe), "studente", "studenti"))
-    tex += _intestazione_orale(ctx)
+    if any(r.get("orale_in_attesa") for r in righe):
+        tex += _intestazione_orale(ctx)
     colonne_prove = " c" * len(prove)
     tex += (
         _RIGHE_ALTERNATE +

@@ -180,7 +180,9 @@ Per le **prove parziali**, chiusa la correzione dell'ultima prova si generano i 
 complessivi**: solo chi ha superato tutte le prove, con il voto di ciascuna e il voto finale,
 cioè la media arrotondata per eccesso solo se la media esatta è già sufficiente (con soglia 18,
 17 e 18 danno 17,5: non superato), con "(orale)" accanto per chi deve sostenerlo. La scheda **Risultati** raccoglie in cima
-tutti i file da pubblicare, complessivi e di ogni prova.
+tutti i file da pubblicare, complessivi e di ogni prova. Se qualcuno deve fare l'orale, il foglio
+dei risultati indica data, ora e aula, oppure una frase impostabile nel corso (di serie "Per
+l'orale contattare il docente" con l'email impostata nelle Impostazioni dell'app).
 
 Per provare l'app senza toccare i propri corsi, **Impostazioni → Corso di prova** (o la Guida)
 installa un corso con dati inventati: un appello e due prove parziali, con correzioni già fatte

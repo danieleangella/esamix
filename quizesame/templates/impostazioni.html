@@ -110,11 +110,12 @@
   </section>
 
   <details class="card riquadro-impostazioni campo-largo">
-    <summary><strong>Testo del compito</strong> {{ info("Le frasi stampate su ogni compito. I codici tra parentesi graffe (es. {consegna}, {votomin}, indicati accanto ai campi di Voti e punteggi) vengono sostituiti con i valori di ciascun appello quando si genera il testo.") }}</summary>
+    <summary><strong>Testo del compito e dei risultati</strong> {{ info("Le frasi stampate su ogni compito e, per l'orale, nei fogli dei risultati. I codici tra parentesi graffe (es. {consegna}, {votomin}, indicati accanto ai campi di Voti e punteggi) vengono sostituiti con i valori di ciascun appello quando si genera il testo.") }}</summary>
     {% for nome, etichetta, righe in [
       ("frase_consegna", "Consegna (in testa al compito e nelle regole)", 2),
       ("frase_obbligatorio", "Esercizi obbligatori (in grassetto prima del testo di ciascuno)", 2),
       ("frase_regole", "Valutazione (punteggi e voto minimo)", 3),
+      ("frase_orale", "Orale senza data (nei fogli dei risultati; {docente} e {email} dalle impostazioni dell'app)", 2),
     ] %}
     <div class="riga-frase">
       <label for="{{ nome|replace('_', '-') }}">{{ etichetta }}</label>
@@ -126,6 +127,7 @@
     <template id="tpl-default-frase-consegna">{{ default_frase_consegna }}</template>
     <template id="tpl-default-frase-obbligatorio">{{ default_frase_obbligatorio }}</template>
     <template id="tpl-default-frase-regole">{{ default_frase_regole }}</template>
+    <template id="tpl-default-frase-orale">{{ default_frase_orale }}</template>
   </details>
 </div>
 

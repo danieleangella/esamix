@@ -1,4 +1,4 @@
-"""Impostazioni dell'app nel suo complesso (non di un singolo corso): nome del docente,
+"""Impostazioni dell'app nel suo complesso (non di un singolo corso): nome ed email del docente,
 mostrato nel menu in alto, se mostrare il riquadro di riepilogo generale in homepage e
 le configurazioni per l'IA. Salvate in un file JSON accanto alle cartelle dei corsi, non
 in un database per corso, perché valgono per l'intera installazione."""
@@ -16,6 +16,8 @@ FORNITORI_IA = ("anthropic", "openrouter", "ollama")
 @dataclass
 class AppSettings:
     docente: str = ""
+    # scritta nei fogli dei risultati, per chi deve fare l'orale senza data fissata
+    email_docente: str = ""
     mostra_riepilogo_home: bool = True
     # Configurazioni per l'IA (vedi services/ia.py): se ne possono salvare più d'una (es.
     # una chiave personale e una del dipartimento, o un server Ollama) e scegliere di volta
@@ -63,6 +65,7 @@ def get_settings() -> AppSettings:
         profili, predefinito = _profili_da_vecchie_impostazioni(data)
     return AppSettings(
         docente=data.get("docente", ""),
+        email_docente=data.get("email_docente", ""),
         mostra_riepilogo_home=bool(data.get("mostra_riepilogo_home", True)),
         ia_profili=profili,
         ia_profilo_predefinito=predefinito,

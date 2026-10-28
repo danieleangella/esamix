@@ -14,6 +14,8 @@
   <form method="post" action="/impostazioni">
     <label>Nome del docente {{ info("Appare tra parentesi accanto al titolo \"EsaMiX\" nel menu in alto.") }}</label>
     <input name="docente" value="{{ app_settings.docente }}" placeholder="es. Prof. Rossi">
+    <label>Email del docente {{ info("Nei fogli dei risultati, per chi deve fare l'orale quando l'appello non ha data, ora e aula dell'orale: la frase si imposta nelle impostazioni di ogni corso, dove {email} diventa questo indirizzo.") }}</label>
+    <input type="email" name="email_docente" value="{{ app_settings.email_docente }}" placeholder="es. nome.cognome@unifi.it">
     <label class="riga-opzione">
       <input type="checkbox" name="mostra_riepilogo_home" {% if app_settings.mostra_riepilogo_home %}checked{% endif %}>
       Riepilogo generale in homepage

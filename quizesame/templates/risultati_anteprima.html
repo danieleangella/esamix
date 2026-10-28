@@ -19,6 +19,7 @@
     <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">Stampa</button>
   </span>
 </div>
+{% if frase_orale %}<div class="card" style="padding:0.6rem 1rem"><strong>{{ frase_orale }}</strong></div>{% endif %}
 <div class="card" style="padding:0.5rem 1rem">
   {% if righe %}
   <table class="tabella-elenco tabella-centrata">

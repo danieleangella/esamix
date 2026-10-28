@@ -34,6 +34,10 @@ DEFAULT_ORALE_SOGLIA_VOTO = 10
 # effettivi dell'appello al momento della generazione dei compiti.
 DEFAULT_FRASE_CONSEGNA = "Consegnate lo svolgimento dei {consegna} esercizi obbligatori.\n"
 # anteposta in grassetto al testo di ciascun esercizio marcato obbligatorio
+# nei fogli dei risultati, per chi deve fare l'orale quando l'appello non ne ha data, ora e
+# aula: {docente} e {email} vengono dalle impostazioni dell'app
+DEFAULT_FRASE_ORALE = "Per l'orale contattare il docente ({email})."
+
 DEFAULT_FRASE_OBBLIGATORIO = (
     "Di questo esercizio \\`e obbligatorio indicare una risposta e consegnare uno svolgimento "
     "che la giustifichi."
@@ -73,6 +77,7 @@ class Corso:
     frase_consegna: str = DEFAULT_FRASE_CONSEGNA
     frase_regole: str = DEFAULT_FRASE_REGOLE
     frase_obbligatorio: str = DEFAULT_FRASE_OBBLIGATORIO
+    frase_orale: str = DEFAULT_FRASE_ORALE
     orale_dopo_richiesta: bool = True
     orale_soglia_attiva: bool = False
     orale_soglia_n: Optional[int] = None
@@ -244,7 +249,7 @@ def raggruppa_per_nome(corsi: list[Corso]) -> list[list[Corso]]:
 _META_EREDITABILI = (
     "votomin", "votomin_raggruppamento", "consegna", "risposta_corretta", "risposta_sbagliata",
     "risposta_vuota", "punteggio_max_aperta", "domande_aperte_attive", "frase_consegna", "frase_regole",
-    "frase_obbligatorio",
+    "frase_obbligatorio", "frase_orale",
     "orale_dopo_richiesta", "orale_soglia_attiva", "orale_soglia_n", "orale_soglia_voto",
     "orale_soglia_escludi_parziali", "ritirato_conta_insufficiente", "annullato_come", "domande_esame",
     "domande_esame_lista", "soglia_occupazione_aule", "filtro_cognome",
@@ -440,6 +445,7 @@ def get_corso(tag: str) -> Corso:
         frase_consegna=meta.get("frase_consegna") or DEFAULT_FRASE_CONSEGNA,
         frase_regole=meta.get("frase_regole") or DEFAULT_FRASE_REGOLE,
         frase_obbligatorio=meta.get("frase_obbligatorio") or DEFAULT_FRASE_OBBLIGATORIO,
+        frase_orale=meta.get("frase_orale") or DEFAULT_FRASE_ORALE,
         orale_dopo_richiesta=meta.get("orale_dopo_richiesta", "1") == "1",
         orale_soglia_attiva=meta.get(
             "orale_soglia_attiva", "1" if meta.get("orale_soglia_n") and meta.get("orale_soglia_voto") else "0"

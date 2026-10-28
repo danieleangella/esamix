@@ -1,10 +1,14 @@
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from math import ceil, floor
 
 from quizesame import config, db
 from quizesame.services import corsi as corsi_service
-from quizesame.services.latex import LatexContext, crea_tex_risultati, celavoto, celamatr
+from quizesame.services import app_config as app_config_service
+from quizesame.services.latex import (
+    LatexContext, crea_tex_risultati, celavoto, celamatr, _escape_testo_semplice, _safe_format,
+)
 
 
 def ctx_for(tag: str, corso, appello) -> LatexContext:
@@ -16,6 +20,11 @@ def ctx_for(tag: str, corso, appello) -> LatexContext:
         risposta_vuota=corso.risposta_vuota, frase_consegna=corso.frase_consegna, frase_regole=corso.frase_regole,
         frase_obbligatorio=corso.frase_obbligatorio,
         orale_data=appello.orale_data or "", orale_ora=appello.orale_ora or "", orale_aula=appello.orale_aula or "",
+        frase_orale=_senza_vuoti(_safe_format(
+            corso.frase_orale,
+            docente=_escape_testo_semplice(app_config_service.get_settings().docente),
+            email=_escape_testo_semplice(app_config_service.get_settings().email_docente),
+        )),
     )
 
 
@@ -41,6 +50,26 @@ def _etichetta_esito(r, votomin: int, annullato_come: str = "insufficiente") -> 
     if r["voto"] is None:
         return "-"
     return celavoto(int(r["voto"]), votomin)
+
+
+def _orale_in_attesa(r) -> bool:
+    return r["esito"] == "voto" and bool(r["richiede_orale"]) and not r["orale_svolto"]
+
+
+def frase_orale(tag: str, corso, appello) -> str:
+    """Cosa dire nei fogli dei risultati a chi deve fare l'orale: data, ora e aula se
+    l'appello le ha, altrimenti la frase del corso con nome ed email del docente (dalle
+    impostazioni dell'app). Testo semplice: chi lo usa in LaTeX lo deve adattare."""
+    dettagli = ", ".join(p for p in (appello.orale_data, appello.orale_ora, appello.orale_aula) if p)
+    if dettagli:
+        return f"Orale: {dettagli}"
+    impostazioni = app_config_service.get_settings()
+    return _senza_vuoti(_safe_format(corso.frase_orale, docente=impostazioni.docente, email=impostazioni.email_docente))
+
+
+def _senza_vuoti(frase: str) -> str:
+    """Senza email (o nome) impostati, niente "()" vuote o spazi prima della punteggiatura."""
+    return re.sub(r"\s+([.,;:])", r"\1", re.sub(r"\s*\(\s*\)", "", frase)).strip()
 
 
 def _righe_risultati(tag: str, appello_id: int, votomin: int):
@@ -114,7 +143,8 @@ def _righe_pubblicabili(tag: str, appello_id: int) -> list[dict]:
     if raggruppamento is None:
         return [
             {"matricola": r["matricola"], "nome": r["nome"], "cognome": r["cognome"], "voti_prove": [],
-             "etichetta": _etichetta_esito(r, votomin, corso.annullato_come)}
+             "etichetta": _etichetta_esito(r, votomin, corso.annullato_come),
+             "orale_in_attesa": _orale_in_attesa(r)}
             for r in rows
         ]
     combinati = {r["matricola"]: r for r in rows}
@@ -125,11 +155,13 @@ def _righe_pubblicabili(tag: str, appello_id: int) -> list[dict]:
             continue
         r = combinati.get(matricola)
         etichetta = celavoto(media_per_eccesso(dati["voti"], votomin), votomin)
-        if r is not None and r["richiede_orale"] and not r["orale_svolto"]:
+        orale = r is not None and _orale_in_attesa(r)
+        if orale:
             etichetta += " (orale)"
         nome, cognome = anagrafica.get(matricola, ("", ""))
         righe.append({"matricola": matricola, "nome": nome, "cognome": cognome,
-                      "voti_prove": [str(v) for v in dati["voti"]], "etichetta": etichetta})
+                      "voti_prove": [str(v) for v in dati["voti"]], "etichetta": etichetta,
+                      "orale_in_attesa": orale})
     righe.sort(key=lambda x: (x["cognome"].lower(), x["nome"].lower()))
     return righe
 

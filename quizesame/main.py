@@ -488,10 +488,12 @@ def elimina_corso_prova():
 @app.post("/impostazioni")
 def modifica_impostazioni_app(
     docente: str = Form(""),
+    email_docente: str = Form(""),
     mostra_riepilogo_home: str = Form(""),
 ):
     app_config_service.update_settings(
-        docente=docente.strip(), mostra_riepilogo_home=bool(mostra_riepilogo_home),
+        docente=docente.strip(), email_docente=email_docente.strip(),
+        mostra_riepilogo_home=bool(mostra_riepilogo_home),
     )
     return flash_redirect("/impostazioni", "Impostazioni salvate")
 
@@ -753,6 +755,7 @@ def impostazioni_corso(request: Request, tag: str):
         "default_frase_consegna": corsi_service.DEFAULT_FRASE_CONSEGNA,
         "default_frase_regole": corsi_service.DEFAULT_FRASE_REGOLE,
         "default_frase_obbligatorio": corsi_service.DEFAULT_FRASE_OBBLIGATORIO,
+        "default_frase_orale": corsi_service.DEFAULT_FRASE_ORALE,
     })
 
 
@@ -765,6 +768,7 @@ def modifica_corso(
     punteggio_max_aperta: int = Form(corsi_service.DEFAULT_PUNTEGGIO_MAX_APERTA),
     domande_aperte_attive: str = Form(""),
     frase_consegna: str = Form(""), frase_regole: str = Form(""), frase_obbligatorio: str = Form(""),
+    frase_orale: str = Form(""),
     orale_dopo_richiesta: str = Form(""), orale_soglia_attiva: str = Form(""),
     orale_soglia_n: str = Form(""), orale_soglia_voto: str = Form(""),
     orale_soglia_escludi_parziali: str = Form(""),
@@ -785,6 +789,7 @@ def modifica_corso(
             frase_consegna=frase_consegna.strip() or corsi_service.DEFAULT_FRASE_CONSEGNA,
             frase_regole=frase_regole.strip() or corsi_service.DEFAULT_FRASE_REGOLE,
             frase_obbligatorio=frase_obbligatorio.strip() or corsi_service.DEFAULT_FRASE_OBBLIGATORIO,
+            frase_orale=frase_orale.strip() or corsi_service.DEFAULT_FRASE_ORALE,
             orale_dopo_richiesta="1" if orale_dopo_richiesta else "0",
             orale_soglia_attiva="1" if orale_soglia_attiva else "0",
             orale_soglia_n=orale_soglia_n.strip(), orale_soglia_voto=orale_soglia_voto.strip(),
@@ -2674,6 +2679,7 @@ def risultati_anteprima(request: Request, tag: str, appello_id: int):
     righe = risultati_service.lista_risultati_html(tag, appello_id)
     return templates.TemplateResponse(request, "risultati_anteprima.html", {
         "corso": corso, "appello": appello, "righe": righe, "prove": risultati_service.nomi_prove(tag, appello_id),
+        "frase_orale": risultati_service.frase_orale(tag, corso, appello) if any(r["orale_in_attesa"] for r in righe) else "",
     })
 
 

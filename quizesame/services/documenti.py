@@ -54,10 +54,13 @@ def risultati_md(tag: str, appello_id: int) -> str:
     appello = corsi_service.get_appello(tag, appello_id)
     prove = risultati_service.nomi_prove(tag, appello_id)
     righe = _intestazione(corso, appello, "Risultati complessivi delle prove" if prove else "Risultati della prova scritta")
+    elenco = risultati_service.lista_risultati_html(tag, appello_id)
+    if any(r["orale_in_attesa"] for r in elenco):
+        righe += [f"**{risultati_service.frase_orale(tag, corso, appello)}**", ""]
     righe += [
               "| Matricola | Iniziali | " + "".join(f"{p} | " for p in prove) + ("Voto finale |" if prove else "Esito |"),
               "|:---:|:---:|" + ":---:|" * len(prove) + ":---:|"]
-    for r in risultati_service.lista_risultati_html(tag, appello_id):
+    for r in elenco:
         iniziali = f"{(r['nome'] or ' ')[0]}{(r['cognome'] or ' ')[0]}".strip()
         voti = "".join(f"{v} | " for v in r["voti_prove"])
         righe.append(f"| `{r['matricola']}` | {iniziali} | {voti}**{r['etichetta']}** |")
