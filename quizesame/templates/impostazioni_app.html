@@ -16,6 +16,8 @@
     <input name="docente" value="{{ app_settings.docente }}" placeholder="es. Prof. Rossi">
     <label>Email del docente {{ info("Nei fogli dei risultati, per chi deve fare l'orale quando l'appello non ha data, ora e aula dell'orale: la frase si imposta nelle impostazioni di ogni corso, dove {email} diventa questo indirizzo.") }}</label>
     <input type="email" name="email_docente" value="{{ app_settings.email_docente }}" placeholder="es. nome.cognome@unifi.it">
+    <label>Studio del docente {{ info("Dove si svolgono gli orali in studio: nelle impostazioni di ogni appello si sceglie con un clic come aula dell'orale.") }}</label>
+    <input name="studio_docente" value="{{ app_settings.studio_docente }}" placeholder="es. studio 12, 2° piano, viale Morgagni 67/a">
     <label class="riga-opzione">
       <input type="checkbox" name="mostra_riepilogo_home" {% if app_settings.mostra_riepilogo_home %}checked{% endif %}>
       Riepilogo generale in homepage

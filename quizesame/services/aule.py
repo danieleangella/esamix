@@ -16,6 +16,7 @@ class Aula:
     nome: str
     capienza: int
     dsa: bool = False
+    quota: Optional[int] = None  # % degli studenti scelta a mano; None = in proporzione ai posti
 
 
 def list_aule(tag: str, appello_id: int) -> list[Aula]:
@@ -25,7 +26,8 @@ def list_aule(tag: str, appello_id: int) -> list[Aula]:
             "SELECT * FROM appello_aule WHERE appello_id=? ORDER BY id", (appello_id,)
         ).fetchall()
         return [
-            Aula(id=r["id"], appello_id=r["appello_id"], nome=r["nome"], capienza=r["capienza"], dsa=bool(r["dsa"]))
+            Aula(id=r["id"], appello_id=r["appello_id"], nome=r["nome"], capienza=r["capienza"], dsa=bool(r["dsa"]),
+                 quota=r["quota"] if "quota" in r.keys() else None)
             for r in rows
         ]
     finally:
@@ -57,14 +59,17 @@ def imposta_aula_dsa(tag: str, appello_id: int, aula_id: int, dsa: bool) -> None
         conn.close()
 
 
-def modifica_aula(tag: str, appello_id: int, aula_id: int, nome: str, capienza: int) -> None:
-    """Nome e posti di un'aula; gli studenti già assegnati restano dove sono."""
+def modifica_aula(tag: str, appello_id: int, aula_id: int, nome: str, capienza: int, quota: Optional[int] = None) -> None:
+    """Nome, posti e quota (% degli studenti, None = in proporzione ai posti) di un'aula;
+    gli studenti già assegnati restano dove sono."""
     if not nome.strip() or capienza < 1:
         raise ValueError("Servono il nome dell'aula e almeno un posto")
+    if quota is not None and not 0 <= quota <= 100:
+        raise ValueError("La quota è una percentuale, da 0 a 100")
     conn = db.get_connection(config.corso_db_path(tag))
     try:
-        conn.execute("UPDATE appello_aule SET nome=?, capienza=? WHERE id=? AND appello_id=?",
-                     (nome.strip(), capienza, aula_id, appello_id))
+        conn.execute("UPDATE appello_aule SET nome=?, capienza=?, quota=? WHERE id=? AND appello_id=?",
+                     (nome.strip(), capienza, quota, aula_id, appello_id))
         conn.commit()
     finally:
         conn.close()
@@ -102,28 +107,57 @@ def assegna_manuale(tag: str, appello_id: int, matricola: str, aula_id: Optional
         conn.close()
 
 
-def _ripartizione_proporzionale(capienze: list[int], n: int) -> list[int]:
-    """Quanti studenti in ciascuna aula, in proporzione ai posti (tutte le aule piene
-    alla stessa percentuale), arrotondando col metodo dei resti più alti perché la somma
-    sia esattamente `n`. Con n non oltre i posti totali, nessuna aula supera i suoi."""
-    totale = sum(capienze)
-    if totale <= 0 or n <= 0:
-        return [0] * len(capienze)
-    quote = [c / totale * n for c in capienze]
-    basi = [int(q) for q in quote]
-    ordine_resti = sorted(range(len(quote)), key=lambda i: quote[i] - basi[i], reverse=True)
-    for i in ordine_resti[:n - sum(basi)]:
-        basi[i] += 1
-    return basi
+def pesi_aule(capienze: list[int], quote: list[Optional[int]]) -> list[float]:
+    """Percentuale di studenti per ciascuna aula: quella scelta a mano (quota), e per le
+    altre quanto resta, diviso in proporzione ai posti."""
+    fissate = sum(q for q in quote if q is not None)
+    libere = [c if q is None else 0 for c, q in zip(capienze, quote)]
+    resto = max(0.0, 100.0 - fissate)
+    return [float(q) if q is not None else (resto * c / sum(libere) if sum(libere) else 0.0)
+            for c, q in zip(libere, quote)]
 
 
-def _distribuisci(conn, appello_id: int, aule: list, capienze: list[int], pool: list[str], dsa: set[str]) -> None:
+def _ripartizione_proporzionale(capienze: list[int], n: int, quote: Optional[list] = None) -> list[int]:
+    """Quanti studenti in ciascuna aula: in proporzione ai posti (tutte piene alla stessa
+    percentuale), o alle quote scelte a mano dove ci sono (vedi pesi_aule), arrotondando
+    col metodo dei resti più alti perché la somma sia esattamente `n`. Un'aula non supera
+    mai i suoi posti: chi non ci sta va nelle altre, sempre secondo i pesi."""
+    pesi = pesi_aule(capienze, quote or [None] * len(capienze))
+    quantita = [0] * len(capienze)
+    restanti = min(n, sum(capienze))
+    aperte = [i for i in range(len(capienze)) if capienze[i] > 0]
+    while restanti > 0 and aperte:
+        totale = sum(pesi[i] for i in aperte) or float(len(aperte))
+        quote_i = {i: (pesi[i] if totale else 1.0) / totale * restanti for i in aperte}
+        basi = {i: int(q) for i, q in quote_i.items()}
+        avanzo = restanti - sum(basi.values())
+        for i in sorted(aperte, key=lambda i: quote_i[i] - basi[i], reverse=True)[:avanzo]:
+            basi[i] += 1
+        piene = []
+        for i in aperte:
+            dato = min(basi[i], capienze[i] - quantita[i])
+            quantita[i] += dato
+            restanti -= dato
+            if quantita[i] >= capienze[i]:
+                piene.append(i)
+        if not piene:
+            break
+        aperte = [i for i in aperte if i not in piene]
+        if all(pesi[i] == 0 for i in aperte):
+            # le aule rimaste avevano quota 0: chi non ci sta altrove va lì, nei posti liberi
+            pesi = [float(c) for c in capienze]
+    return quantita
+
+
+def _distribuisci(conn, appello_id: int, aule: list, capienze: list[int], pool: list[str], dsa: set[str],
+                  quote: Optional[list] = None) -> None:
     """Riempie `aule` (con le rispettive capienze residue) con gli studenti di `pool`
     (in ordine di cognome) in proporzione ai posti di ciascuna, aula DSA compresa: se
     c'è un'aula per i DSA/L104, quelli di `dsa` vanno tutti lì, qualunque sia il cognome,
     e i posti che restano della sua quota li occupano gli altri, come nelle aule normali."""
     n = min(len(pool), sum(capienze))
-    quantita = _ripartizione_proporzionale(capienze, n)
+    quote = quote or [None] * len(aule)
+    quantita = _ripartizione_proporzionale(capienze, n, quote)
     i_dsa = next((i for i, a in enumerate(aule) if a["dsa"]), None)
     da_dsa = [m for m in pool if m in dsa] if i_dsa is not None else []
     if i_dsa is not None:
@@ -132,7 +166,7 @@ def _distribuisci(conn, appello_id: int, aule: list, capienze: list[int], pool: 
             # più DSA della quota dell'aula: li prende tutti, le altre si dividono gli
             # altri studenti sempre in proporzione ai posti
             altre = [k for k in range(len(aule)) if k != i_dsa]
-            ripartite = _ripartizione_proporzionale([capienze[k] for k in altre], n - len(da_dsa))
+            ripartite = _ripartizione_proporzionale([capienze[k] for k in altre], n - len(da_dsa), [quote[k] for k in altre])
             quantita = [0] * len(aule)
             quantita[i_dsa] = len(da_dsa)
             for k, q in zip(altre, ripartite):
@@ -188,7 +222,8 @@ def assegna_automatica(
         residua = [max(0, aula["capienza"] - conteggio_manuali[aula["id"]]) for aula in aule]
         pool = [m for m in matricole_ordinate if m not in manuali]
         conn.execute("DELETE FROM aula_assegnazioni WHERE appello_id=? AND manuale=0", (appello_id,))
-        _distribuisci(conn, appello_id, list(aule), residua, pool, matricole_dsa)
+        quote = [a["quota"] if "quota" in a.keys() else None for a in aule]
+        _distribuisci(conn, appello_id, list(aule), residua, pool, matricole_dsa, quote)
         conn.commit()
     finally:
         conn.close()

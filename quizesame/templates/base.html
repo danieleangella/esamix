@@ -55,19 +55,26 @@
       if (conteggio) conteggio.textContent = visibili + " esercizi su " + righe.length;
     }
     filtri.forEach(function (f) { f.addEventListener(f.tagName === "INPUT" ? "input" : "change", applica); });
-    radice.querySelectorAll(".btn-anteprima-elenco").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var riga = btn.closest("tr").nextElementSibling;
-        var aperta = riga.style.display !== "none";
-        riga.style.display = aperta ? "none" : "";
-        if (aperta) return;
-        if (riga.dataset.caricata) { renderizzaLatex(riga); return; }
-        fetch(btn.dataset.url).then(function (r) { return r.text(); }).then(function (html) {
-          riga.querySelector("td").innerHTML = html;
-          riga.dataset.caricata = "1";
-          renderizzaLatex(riga);
-        });
+    // sotto la riga: l'anteprima dell'esercizio o il modulo per modificarlo
+    function apriSotto(btn, modo, dopo) {
+      var riga = btn.closest("tr").nextElementSibling;
+      var aperta = riga.style.display !== "none";
+      if (aperta && riga.dataset.modo === modo) { riga.style.display = "none"; return; }
+      riga.style.display = "";
+      if (riga.dataset.modo === modo) { renderizzaLatex(riga); return; }
+      riga.dataset.modo = modo;
+      riga.querySelector("td").innerHTML = '<p class="muted">Caricamento…</p>';
+      fetch(btn.dataset.url).then(function (r) { return r.text(); }).then(function (html) {
+        riga.querySelector("td").innerHTML = html;
+        renderizzaLatex(riga);
+        if (dopo) dopo(riga);
       });
+    }
+    radice.querySelectorAll(".btn-anteprima-elenco").forEach(function (btn) {
+      btn.addEventListener("click", function () { apriSotto(btn, "anteprima"); });
+    });
+    radice.querySelectorAll(".btn-modifica-elenco").forEach(function (btn) {
+      btn.addEventListener("click", function () { apriSotto(btn, "modifica", inizializzaFormEsercizi); });
     });
     applica();
   }

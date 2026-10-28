@@ -324,6 +324,9 @@ ADDITIVE_COLUMNS = {
         ("difficolta", "INTEGER"),
         ("soluzione", "TEXT"),
         ("aperta", "BOOLEAN NOT NULL DEFAULT 0"),
+        # sostituito da una copia modificata (vedi esercizi.sostituisci_con_copia): resta
+        # solo per i compiti già generati che lo usano, non compare più nella banca
+        ("nascosto", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
     "compiti": [
         ("blocco_id", "INTEGER REFERENCES blocchi(id)"),
@@ -335,6 +338,8 @@ ADDITIVE_COLUMNS = {
     "appello_aule": [
         # aula riservata agli studenti DSA/L104 (vedi aule.assegna_automatica)
         ("dsa", "BOOLEAN NOT NULL DEFAULT 0"),
+        # percentuale degli studenti da mettere in quest'aula; vuota = in proporzione ai posti
+        ("quota", "INTEGER"),
     ],
     "appelli": [
         ("orale_data", "TEXT"),

@@ -120,6 +120,7 @@ templates.env.filters["js"] = lambda value: json.dumps(str(value))
 templates.env.globals["static_version"] = _static_version
 templates.env.globals["get_app_settings"] = app_config_service.get_settings
 templates.env.globals["riassunto_aule"] = aule_service.riassunto_assegnazione
+templates.env.globals["pesi_aule"] = aule_service.pesi_aule
 
 @__import__("contextlib").asynccontextmanager
 async def _ciclo_di_vita(_app):
@@ -271,6 +272,15 @@ def _proteggi_modifica_esercizi(tag: str, appello_id: int) -> None:
             + ", ".join(str(n) for n in bloccanti)
             + " ha già risultati registrati. Elimina prima quei risultati, oppure crea un nuovo appello."
         )
+
+
+def _appelli_fissati(tag: str, appelli: list[int]) -> list[int]:
+    """Gli appelli i cui compiti non devono più cambiare: testo chiuso o compiti generati."""
+    return [a for a in appelli if corsi_service.get_appello(tag, a).testo_chiuso or compiti_service.list_blocchi(tag, a)]
+
+
+def _nomi_appelli(tag: str, appelli: list[int]) -> str:
+    return ", ".join(corsi_service.get_appello(tag, a).nome for a in appelli)
 
 
 def _compila_in_background(percorsi: list) -> None:
@@ -497,10 +507,11 @@ def elimina_corso_prova():
 def modifica_impostazioni_app(
     docente: str = Form(""),
     email_docente: str = Form(""),
+    studio_docente: str = Form(""),
     mostra_riepilogo_home: str = Form(""),
 ):
     app_config_service.update_settings(
-        docente=docente.strip(), email_docente=email_docente.strip(),
+        docente=docente.strip(), email_docente=email_docente.strip(), studio_docente=studio_docente.strip(),
         mostra_riepilogo_home=bool(mostra_riepilogo_home),
     )
     return flash_redirect("/impostazioni", "Impostazioni salvate")
@@ -2277,6 +2288,22 @@ def conferma_correzione_ia(tag: str, esercizio_id: int, background_tasks: Backgr
         return flash_redirect(destinazione, "L'esercizio è stato modificato dopo la proposta: richiedi una nuova correzione", "error")
     proposta = json.loads(proposta_json)
     appelli_coinvolti = esercizi_service.appelli_che_usano(tag, esercizio_id)
+    # usato in compiti già generati o in un testo chiuso: quei compiti restano com'erano e
+    # la correzione diventa una nuova versione dell'esercizio (il vecchio diventa invisibile)
+    fissati = _appelli_fissati(tag, appelli_coinvolti)
+    if fissati:
+        try:
+            nuovo = esercizi_service.sostituisci_con_copia(
+                tag, esercizio_id, [a for a in appelli_coinvolti if a not in fissati],
+                nome=e.nome or proposta.get("nome") or "", note=e.note or "",
+                argomento=e.argomento or proposta.get("argomento") or "", varianti=proposta["varianti"],
+                difficolta=e.difficolta, soluzione=proposta.get("soluzione") or "", aperta=bool(proposta.get("aperta")),
+            )
+            esercizi_service.registra_verifica(tag, nuovo, "ok", origine="correzione")
+        except ValueError as err:
+            return flash_redirect(destinazione, str(err), "error")
+        return flash_redirect(destinazione, f"Correzione salvata come nuova versione dell'esercizio (#{nuovo.id}), segnata come "
+                              f"verificata: i compiti già generati ({_nomi_appelli(tag, fissati)}) restano com'erano")
     try:
         for appello_id in appelli_coinvolti:
             _proteggi_modifica_esercizi(tag, appello_id)
@@ -3339,9 +3366,13 @@ def imposta_aula_dsa(request: Request, tag: str, appello_id: int, aula_id: int, 
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/aule/{aula_id}/modifica")
-def modifica_aula(request: Request, tag: str, appello_id: int, aula_id: int, nome: str = Form(...), capienza: int = Form(...)):
+def modifica_aula(
+    request: Request, tag: str, appello_id: int, aula_id: int, nome: str = Form(...), capienza: int = Form(...),
+    quota: str = Form(""),
+):
     try:
-        aule_service.modifica_aula(tag, appello_id, aula_id, nome, capienza)
+        quota_aula = int(quota.strip().rstrip("%")) if quota.strip() else None
+        aule_service.modifica_aula(tag, appello_id, aula_id, nome, capienza, quota_aula)
     except ValueError as e:
         return _risposta_aule(request, tag, appello_id, str(e), "error")
     return _risposta_aule(request, tag, appello_id, f"Aula {nome.strip()} aggiornata")
@@ -3854,6 +3885,25 @@ async def modifica_esercizio(tag: str, esercizio_id: int, request: Request, back
     destinazione = (form.get("redirect_to") or "").strip() or f"/corsi/{tag}/esercizi"
     ancora = (form.get("redirect_anchor") or "").strip()
     appelli_coinvolti = esercizi_service.appelli_che_usano(tag, esercizio_id)
+    # usato in compiti già generati o in un testo chiuso: quei compiti restano com'erano e
+    # si salva una copia modificata al posto del vecchio esercizio (che diventa invisibile)
+    fissati = _appelli_fissati(tag, appelli_coinvolti)
+    if fissati:
+        try:
+            nuovo = esercizi_service.sostituisci_con_copia(
+                tag, esercizio_id, [a for a in appelli_coinvolti if a not in fissati],
+                nome=(form.get("nome") or "").strip(), note=(form.get("note") or "").strip(),
+                argomento=(form.get("argomento") or "").strip(), varianti=varianti, **extra,
+            )
+        except ValueError as e:
+            return flash_redirect(destinazione, str(e), "error", anchor=ancora)
+        nomi = _nomi_appelli(tag, fissati)
+        msg = (f"Esercizio salvato come nuova versione (#{nuovo.id}): i compiti già generati ({nomi}) restano "
+               "com'erano. La nuova versione va verificata di nuovo con l'IA.")
+        appello_frammento = request.headers.get("x-appello", "")
+        if request.headers.get("x-frammento") and appello_frammento.isdigit():
+            return _esito_testo(request, tag, int(appello_frammento), msg)
+        return flash_redirect(destinazione, msg, anchor=ancora)
     try:
         for appello_id in appelli_coinvolti:
             _proteggi_modifica_esercizi(tag, appello_id)

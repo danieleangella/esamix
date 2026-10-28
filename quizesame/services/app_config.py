@@ -18,6 +18,8 @@ class AppSettings:
     docente: str = ""
     # scritta nei fogli dei risultati, per chi deve fare l'orale senza data fissata
     email_docente: str = ""
+    # dove riceve il docente (es. "studio 12, 2° piano"): si sceglie come aula dell'orale
+    studio_docente: str = ""
     mostra_riepilogo_home: bool = True
     # Configurazioni per l'IA (vedi services/ia.py): se ne possono salvare più d'una (es.
     # una chiave personale e una del dipartimento, o un server Ollama) e scegliere di volta
@@ -66,6 +68,7 @@ def get_settings() -> AppSettings:
     return AppSettings(
         docente=data.get("docente", ""),
         email_docente=data.get("email_docente", ""),
+        studio_docente=data.get("studio_docente", ""),
         mostra_riepilogo_home=bool(data.get("mostra_riepilogo_home", True)),
         ia_profili=profili,
         ia_profilo_predefinito=predefinito,

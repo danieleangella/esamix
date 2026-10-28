@@ -814,11 +814,18 @@ document.addEventListener("click", function (ev) {
   var riga = btn.closest("tr");
   var url = btn.dataset.url;
   var box = riga ? riga.nextElementSibling : btn.nextElementSibling;
+  // una carriera aperta alla volta: aprirne una chiude le altre
+  function chiudiAltre(tranne) {
+    document.querySelectorAll(".carriera-aperta").forEach(function (b) { if (b !== tranne) b.hidden = true; });
+    document.querySelectorAll('.apri-carriera[aria-expanded="true"]').forEach(function (a) { if (a !== btn) a.setAttribute("aria-expanded", "false"); });
+  }
   if (box && box.classList.contains("carriera-aperta") && box.dataset.url === url) {
+    if (box.hidden) chiudiAltre(box);
     box.hidden = !box.hidden;
     btn.setAttribute("aria-expanded", String(!box.hidden));
     return;
   }
+  chiudiAltre(null);
   var dove;
   if (riga) {
     box = document.createElement("tr");
@@ -837,4 +844,14 @@ document.addEventListener("click", function (ev) {
   dove.innerHTML = '<span class="muted">carico…</span>';
   btn.setAttribute("aria-expanded", "true");
   fetch(url).then(function (r) { return r.text(); }).then(function (html) { dove.innerHTML = '<div class="box-carriera">' + html + "</div>"; });
+});
+
+// Aula di uno studente (ammessi, presenze): si legge il nome, la matita apre il menu per cambiarla
+document.addEventListener("click", function (ev) {
+  var btn = ev.target.closest(".btn-cambia-aula");
+  if (!btn) return;
+  var scelta = btn.parentNode.querySelector(".scelta-aula");
+  if (!scelta) return;
+  scelta.hidden = !scelta.hidden;
+  if (!scelta.hidden) { var sel = scelta.tagName === "SELECT" ? scelta : scelta.querySelector("select"); if (sel) sel.focus(); }
 });

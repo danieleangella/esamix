@@ -113,7 +113,19 @@
         <td>{{ s.cognome }}</td>
         <td>{{ s.nome }}</td>
         {% endif %}
-        {% if con_aule %}<td>{{ aula or '—' }}</td>{% endif %}
+        {% if con_aule %}
+        <td>
+          {% if s.registrato and not md.appello.chiuso %}
+          {# cambiare l'aula di uno studente è un'eccezione: gli altri restano dove sono #}
+          <span class="aula-attuale">{{ aula or '—' }}</span>
+          <button type="button" class="pulsante-icona pulsante-neutro btn-cambia-aula" data-info="Cambia l'aula (solo per questo studente)" aria-label="Cambia l'aula di {{ s.cognome }} {{ s.nome }}">{{ icona("matita", 13) }}</button>
+          <select class="sel-aula-presenze scelta-aula" hidden data-url="{{ url_appello }}/aule/{{ s.matricola }}/assegna-manuale" aria-label="Aula di {{ s.cognome }} {{ s.nome }}" style="width:auto">
+            <option value="" {% if not aula %}selected{% endif %}>—</option>
+            {% for a in md.aule %}<option value="{{ a.id }}" data-nome="{{ a.nome }}" {% if aula == a.nome %}selected{% endif %}>{{ a.nome }}{% if a.dsa %} (DSA){% endif %}</option>{% endfor %}
+          </select>
+          {% else %}{{ aula or '—' }}{% endif %}
+        </td>
+        {% endif %}
         <td>
           {% if s.dsa %}<span class="badge badge-info" {% if s.dsa_note %}title="{{ s.dsa_note }}"{% endif %}>{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}
           {% if not s.registrato %}
@@ -212,6 +224,30 @@
         });
       });
       aggiorna();
+
+      // --- aula di uno studente, cambiata sul posto
+      tabella.addEventListener("change", function (ev) {
+        var sel = ev.target.closest(".sel-aula-presenze");
+        if (!sel) return;
+        var riga = sel.closest("tr");
+        var dati = new FormData();
+        dati.append("aula_id", sel.value);
+        sel.disabled = true;
+        fetch(sel.dataset.url, { method: "POST", body: dati, headers: { "X-Frammento": "1" } })
+          .then(function (r) {
+            sel.disabled = false;
+            if (!r.ok) throw new Error();
+            var scelta = sel.options[sel.selectedIndex];
+            riga.dataset.aula = scelta.dataset.nome || "—";
+            var testo = sel.parentNode.querySelector(".aula-attuale");
+            if (testo) testo.textContent = riga.dataset.aula;
+            sel.hidden = true;
+            // il riquadro degli ammessi (scheda Compiti d'esame) va ridisegnato
+            var riquadro = document.querySelector('.tab-pane[data-pane="compiti{{ pane_suffix }}"] .blocco-ammessi-aule');
+            if (riquadro && window.ridisegnaAmmessi) ridisegnaAmmessi(riquadro, "{{ url_appello }}", "{{ corso.tag }}");
+          })
+          .catch(function () { sel.disabled = false; alert("Non sono riuscito a cambiare l'aula"); });
+      });
 
       // --- presente/assente su una riga, senza ricaricare la pagina
       tabella.addEventListener("submit", function (ev) {

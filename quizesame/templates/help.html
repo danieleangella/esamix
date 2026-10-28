@@ -150,7 +150,15 @@
     corso specifico, argomento e testo). L'esercizio scelto viene copiato nella banca del corso
     (se ce n'è già uno identico si riusa quello) e aggiunto al compito. La pagina
     <a href="/esercizi">Tutti gli esercizi</a> (menu in alto) mostra invece gli esercizi di tutti i
-    corsi insieme, con gli stessi filtri, solo da consultare.
+    corsi insieme, con gli stessi filtri: ogni esercizio si può modificare (matita),
+    verificare con l'IA (✓) o far correggere all'IA (scintille). Un esercizio modificato
+    dopo una verifica con l'IA risulta da verificare di nuovo (↻).
+  </p>
+  <p>
+    Se un esercizio è già usato in compiti generati o in un testo chiuso, modificarlo non
+    cambia quei compiti: si salva una <strong>nuova versione</strong>, che prende il suo posto
+    nella banca e negli appelli ancora aperti, mentre la versione vecchia sparisce dagli
+    elenchi e resta solo per i compiti che la usano (correzioni e statistiche restano giuste).
   </p>
   <p>
     Nella scheda Testo, sotto l'elenco degli esercizi assegnati, una barra di pulsanti apre un
@@ -714,7 +722,8 @@ COMPITO DA CONVERTIRE
     complessivi e di ogni prova; poi verbalizzazione, esportazione per la segreteria ed
     elenco combinato), <strong>Orali</strong> (nella riga "Conclusione" del percorso, prima della Verbalizzazione; l'orale è unico per il
     raggruppamento: se richiesto durante la correzione di una prova, il suo voto
-    sostituisce la media delle prove parziali una volta svolto), <strong>Verbalizzati</strong>, <strong>Statistiche</strong> (per prova e combinate),
+    sostituisce la media delle prove parziali una volta svolto; i voti combinati si calcolano da
+    soli chiudendo la correzione dell'ultima prova), <strong>Verbalizzati</strong>, <strong>Statistiche</strong> (per prova e combinate),
     <strong>Chiusura</strong> e <strong>Impostazioni</strong>.
   </p>
   <p>
@@ -740,7 +749,10 @@ COMPITO DA CONVERTIRE
     si può riservare agli studenti <strong>DSA/L104</strong> con il pulsante con l'icona
     accanto all'aula. "Assegna automaticamente" distribuisce gli ammessi in ordine di cognome,
     in proporzione ai posti di ciascuna aula, aula DSA compresa, così che tutte siano piene
-    alla stessa percentuale (le assegnazioni fatte a mano non vengono mai toccate); se c'è un'aula DSA,
+    alla stessa percentuale; con la matita accanto a un'aula, nelle Impostazioni, si può
+    fissare a mano la percentuale di studenti che ci va (le aule senza percentuale si dividono
+    il resto in proporzione ai posti, e nessuna supera i suoi posti). Le assegnazioni fatte a
+    mano non vengono mai toccate; se c'è un'aula DSA,
     tutti i DSA/L104 vanno lì qualunque sia il cognome, e i posti che restano li occupano gli
     altri studenti, come nelle altre aule. Sotto, il <strong>riassunto da comunicare</strong>
     agli studenti, da copiare: per ogni aula l'intervallo di cognomi (es. "da A a Gal") e
@@ -749,7 +761,8 @@ COMPITO DA CONVERTIRE
     l'aula di chi non è stato spostato a mano). Le eccezioni si aggiungono senza toccare gli
     altri: "Aggiungi uno studente" mette uno studente arrivato all'ultimo momento (anche non
     registrato nel corso: allora con cognome e nome) nell'aula scelta o in quella del suo
-    cognome, ammettendolo alla prova se serve.
+    cognome, ammettendolo alla prova se serve. Anche dopo l'assegnazione, nell'elenco degli ammessi si può cambiare l'aula di un
+    singolo studente dal suo menu, senza toccare gli altri.
     Se gli studenti attesi superano una certa quota dei posti (50% di default, si cambia nelle
     Impostazioni del corso, sezione Aule) compare un avviso. Uno studente che non soddisfa i requisiti si può
     comunque ammettere con "Aggiungi uno studente", nel riquadro degli ammessi della prova: comparirà con l'avviso
@@ -771,7 +784,8 @@ COMPITO DA CONVERTIRE
     il voto finale, cioè la media approssimata per eccesso solo se la media esatta è già sufficiente ("non superato" se sotto il voto
     minimo dell'esame: con soglia 18, 17 e 18 danno 17,5, non superato; il voto con "(orale)" accanto per chi deve sostenerlo).
     Se qualcuno deve fare l'orale, in testa al foglio dei risultati compaiono data, ora e aula
-    dell'orale (dalle impostazioni dell'appello o del raggruppamento); se non sono indicate,
+    dell'orale (dalle impostazioni dell'appello o del raggruppamento, dove come aula si può
+    scegliere con un clic lo studio del docente, indicato nelle Impostazioni dell'app); se non sono indicate,
     la frase "Orale senza data" delle impostazioni del corso (di serie "Per l'orale contattare
     il docente ({email})"), dove {docente} ed {email} sono quelli delle Impostazioni dell'app. A correzione chiusa, ogni prova ha
     anche il pulsante <strong>Voti per Moodle</strong>: un CSV con la stessa struttura del

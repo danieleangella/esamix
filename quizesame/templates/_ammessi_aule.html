@@ -44,7 +44,7 @@
     <form class="inline" method="post" action="{{ url }}/aule/assegna">
       <button type="submit" class="pulsante-piccolo">Assegna automaticamente</button>
     </form>
-    {{ info("Distribuisce in ordine di cognome, in proporzione ai posti di ciascuna aula (aula DSA compresa: tutte piene alla stessa percentuale), gli ammessi che non hai già spostato a mano (quelli restano dove li hai messi). Se c'è un'aula DSA, tutti i DSA/L104 vanno lì qualunque sia il cognome, e i posti che restano li occupano gli altri come nelle altre aule.") }}
+    {{ info("Distribuisce in ordine di cognome, in proporzione ai posti di ciascuna aula (aula DSA compresa: tutte piene alla stessa percentuale) o secondo le percentuali scelte nelle Impostazioni, gli ammessi che non hai già spostato a mano (quelli restano dove li hai messi). Se c'è un'aula DSA, tutti i DSA/L104 vanno lì qualunque sia il cognome, e i posti che restano li occupano gli altri come nelle altre aule.") }}
     {% endif %}
   </div>
   {% if md.aule and md.ammessi and md.ammessi|length * 100 > posti * corso.soglia_occupazione_aule %}
@@ -74,8 +74,11 @@
         <td>{{ s.nome }}</td>
         <td>{% if s.dsa %}<span class="badge badge-info">{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
         <td>
-          {% if md.aule and not md.appello.chiuso and not (md.appello.aule_chiuse and s.aula_id) %}
-          <form class="inline" method="post" action="{{ url }}/aule/{{ s.matricola }}/assegna-manuale">
+          {# anche ad aule assegnate: spostare uno studente è un'eccezione, gli altri restano #}
+          {% if md.aule and not md.appello.chiuso %}
+          <span class="aula-attuale">{{ s.aula_nome or '—' }}</span>
+          <button type="button" class="pulsante-icona pulsante-neutro btn-cambia-aula" data-info="Cambia l'aula (solo per questo studente)" aria-label="Cambia l'aula di {{ s.cognome }} {{ s.nome }}">{{ icona("matita", 13) }}</button>
+          <form class="inline scelta-aula" method="post" action="{{ url }}/aule/{{ s.matricola }}/assegna-manuale" hidden>
             <select name="aula_id" style="width:auto" onchange="this.form.requestSubmit()" aria-label="Aula di {{ s.cognome }} {{ s.nome }}">
               <option value="">non assegnata</option>
               {% for a in md.aule %}<option value="{{ a.id }}" {% if s.aula_id == a.id %}selected{% endif %}>{{ a.nome }}{% if a.dsa %} (DSA){% endif %}</option>{% endfor %}

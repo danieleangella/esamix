@@ -132,7 +132,17 @@
         <div><label>Data</label><input type="date" name="data" value="{{ appello.data | data_iso }}" min="2001-01-01" max="2099-12-31"></div>
         <div><label>Data orale {{ info("Data, ora e aula dell'orale vengono mostrate in testa al foglio dei risultati, se qualcuno è in attesa di orale.") }}</label><input type="date" name="orale_data" value="{{ appello.orale_data | data_iso }}" min="2001-01-01" max="2099-12-31"></div>
         <div><label>Ora orale</label><input name="orale_ora" value="{{ appello.orale_ora or '' }}" placeholder="es. 9:00"></div>
-        <div class="campo-largo"><label>Aula orale</label><input name="orale_aula" value="{{ appello.orale_aula or '' }}"></div>
+        {% set studio = get_app_settings().studio_docente %}
+        <div class="campo-largo"><label>Aula orale {{ info("Dove si svolge l'orale: un'aula, oppure lo studio del docente (indicato nelle Impostazioni dell'app). Data, ora e aula compaiono in testa al foglio dei risultati, se qualcuno deve fare l'orale.") }}</label>
+          <div class="barra-aggiungi" style="margin:0">
+            <input name="orale_aula" id="orale-aula-{{ appello.id }}" value="{{ appello.orale_aula or '' }}" placeholder="es. Aula 005" style="flex:1">
+            {% if studio %}
+            <button type="button" class="secondary pulsante-piccolo" style="margin:0" onclick="var c=document.getElementById('orale-aula-{{ appello.id }}'); c.value={{ ('Studio del docente (' ~ studio ~ ')')|tojson }}; c.dispatchEvent(new Event('input', {bubbles:true}));">Studio del docente</button>
+            {% else %}
+            <a class="icona-azione" href="/impostazioni" data-info="Indica lo studio del docente nelle Impostazioni dell'app per poterlo scegliere qui con un clic">studio del docente…</a>
+            {% endif %}
+          </div>
+        </div>
       </div>
       <div class="barra-pulsanti">
         <button type="submit">Salva</button>
@@ -164,10 +174,6 @@
         <button type="submit" class="secondary">Salva</button>
         <button type="button" class="secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate">Annulla</button>
       </div>
-    </form>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/calcola-raggruppamento" style="margin-top:0.75rem">
-      <input type="hidden" name="raggruppamento_id" value="{{ raggruppamento.id }}">
-      <button type="submit" class="icona-azione">{{ icona("grafico", 14) }} Calcola i voti combinati</button>
     </form>
   </section>
 
@@ -430,6 +436,12 @@
 </div>
 
 <div class="tab-pane" data-pane="orali" style="display:none">
+  <div class="card barra-strumenti" style="margin-bottom:0.75rem">
+    <span>{{ icona("orale", 14) }} <strong>Orale:</strong>
+      {% if appello.orale_data or appello.orale_ora or appello.orale_aula %}{{ [appello.orale_data, appello.orale_ora, appello.orale_aula]|select|join(", ") }}
+      {% else %}<span class="muted">data, ora e aula non ancora indicate</span>{% endif %}</span>
+    <a class="icona-azione" href="#impostazioni" data-tab="impostazioni">{{ icona("matita", 13) }} imposta</a>
+  </div>
   {# cliccando sul nome si apre il dettaglio delle prove svolte, con le risposte sbagliate #}
   {% set prove_orale = raggruppamento.membri if raggruppamento else [appello] %}
   <details class="card" open>

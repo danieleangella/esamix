@@ -161,7 +161,7 @@ def _varianti_di(conn, esercizio_ids: list[int]) -> dict[int, list[Variante]]:
 def list_esercizi(tag: str) -> list[Esercizio]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
-        rows = conn.execute("SELECT * FROM esercizi ORDER BY id").fetchall()
+        rows = conn.execute("SELECT * FROM esercizi WHERE nascosto=0 ORDER BY id").fetchall()
         varianti = _varianti_di(conn, [r["id"] for r in rows])
         return [
             Esercizio(
@@ -327,6 +327,29 @@ def _valida_varianti(varianti: list[dict], aperta: bool = False) -> list[dict]:
             )
         v["risposte"] = risposte
     return varianti
+
+
+def sostituisci_con_copia(
+    tag: str, esercizio_id: int, appelli_aperti: list[int], nome: str, note: str, varianti: list[dict],
+    argomento: str = "", difficolta: Optional[int] = None, soluzione: str = "", aperta: bool = False,
+) -> "Esercizio":
+    """Modifica di un esercizio già usato in compiti generati (o in un testo chiuso): quei
+    compiti non devono cambiare, quindi si crea una copia con le modifiche, che prende il
+    suo posto nella banca e negli appelli ancora aperti (`appelli_aperti`), mentre il vecchio
+    diventa invisibile e resta solo per i compiti che lo usano. La copia non eredita la
+    verifica con l'IA: va verificata di nuovo."""
+    nuovo = create_esercizio(tag, nome, note, varianti, argomento=argomento, difficolta=difficolta,
+                             soluzione=soluzione, aperta=aperta)
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute("UPDATE esercizi SET nascosto=1 WHERE id=?", (esercizio_id,))
+        for appello_id in appelli_aperti:
+            conn.execute("UPDATE appello_esercizi SET esercizio_id=? WHERE appello_id=? AND esercizio_id=?",
+                         (nuovo.id, appello_id, esercizio_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return nuovo
 
 
 def create_esercizio(
