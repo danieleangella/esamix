@@ -1,7 +1,7 @@
 """Aule per una singola prova (membro di un raggruppamento) e assegnazione degli
 studenti ammessi: le aule si definiscono da zero per ogni prova, e l'assegnazione
-automatica distribuisce gli ammessi non ancora fissati a mano in ordine di cognome, lo
-stesso numero in ogni aula nei limiti della capienza residua. Un'aula può essere riservata agli
+automatica distribuisce gli ammessi non ancora fissati a mano in ordine di cognome, in
+proporzione alla capienza residua di ciascuna aula (aula DSA compresa). Un'aula può essere riservata agli
 studenti DSA/L104: se ce n'è almeno una, tutti i DSA vanno lì e gli altri nelle restanti."""
 from dataclasses import dataclass
 from typing import Optional
@@ -102,36 +102,37 @@ def assegna_manuale(tag: str, appello_id: int, matricola: str, aula_id: Optional
         conn.close()
 
 
-def _ripartizione_uniforme(capienze: list[int], n: int) -> list[int]:
-    """Quanti studenti in ciascuna aula: lo stesso numero in tutte (al più uno di
-    differenza), senza superare i posti di nessuna; chi non ci sta in un'aula piccola va
-    nelle altre. Si parte dalle aule più piccole, che si riempiono per prime."""
-    quantita = [0] * len(capienze)
-    restanti = n
-    ordine = sorted(range(len(capienze)), key=lambda i: capienze[i])
-    for k, i in enumerate(ordine):
-        aule_rimaste = len(ordine) - k
-        quantita[i] = min(capienze[i], -(-restanti // aule_rimaste))
-        restanti -= quantita[i]
-    return quantita
+def _ripartizione_proporzionale(capienze: list[int], n: int) -> list[int]:
+    """Quanti studenti in ciascuna aula, in proporzione ai posti (tutte le aule piene
+    alla stessa percentuale), arrotondando col metodo dei resti più alti perché la somma
+    sia esattamente `n`. Con n non oltre i posti totali, nessuna aula supera i suoi."""
+    totale = sum(capienze)
+    if totale <= 0 or n <= 0:
+        return [0] * len(capienze)
+    quote = [c / totale * n for c in capienze]
+    basi = [int(q) for q in quote]
+    ordine_resti = sorted(range(len(quote)), key=lambda i: quote[i] - basi[i], reverse=True)
+    for i in ordine_resti[:n - sum(basi)]:
+        basi[i] += 1
+    return basi
 
 
 def _distribuisci(conn, appello_id: int, aule: list, capienze: list[int], pool: list[str], dsa: set[str]) -> None:
     """Riempie `aule` (con le rispettive capienze residue) con gli studenti di `pool`
-    (in ordine di cognome): lo stesso numero in ogni aula, nei limiti dei posti. Se
-    un'aula è riservata ai DSA/L104, quelli di `dsa` vanno tutti lì, qualunque sia il
-    cognome, e i posti che restano li occupano gli altri, come nelle aule normali."""
+    (in ordine di cognome) in proporzione ai posti di ciascuna, aula DSA compresa: se
+    c'è un'aula per i DSA/L104, quelli di `dsa` vanno tutti lì, qualunque sia il cognome,
+    e i posti che restano della sua quota li occupano gli altri, come nelle aule normali."""
     n = min(len(pool), sum(capienze))
-    quantita = _ripartizione_uniforme(capienze, n)
+    quantita = _ripartizione_proporzionale(capienze, n)
     i_dsa = next((i for i, a in enumerate(aule) if a["dsa"]), None)
     da_dsa = [m for m in pool if m in dsa] if i_dsa is not None else []
     if i_dsa is not None:
         da_dsa = da_dsa[:capienze[i_dsa]]
         if quantita[i_dsa] < len(da_dsa):
-            # più DSA della quota uniforme: l'aula DSA ne prende tutti, le altre si
-            # dividono gli altri studenti sempre in modo uniforme
+            # più DSA della quota dell'aula: li prende tutti, le altre si dividono gli
+            # altri studenti sempre in proporzione ai posti
             altre = [k for k in range(len(aule)) if k != i_dsa]
-            ripartite = _ripartizione_uniforme([capienze[k] for k in altre], n - len(da_dsa))
+            ripartite = _ripartizione_proporzionale([capienze[k] for k in altre], n - len(da_dsa))
             quantita = [0] * len(aule)
             quantita[i_dsa] = len(da_dsa)
             for k, q in zip(altre, ripartite):
@@ -163,8 +164,8 @@ def assegna_automatica(
     (già filtrati sugli ammessi e ordinati per cognome dal chiamante) che non hanno già
     un'assegnazione manuale: le assegnazioni manuali restano fisse, e la capienza usata per
     il calcolo è quella residua (capienza totale meno le assegnazioni manuali già presenti
-    in ciascuna aula). Tutte le aule si riempiono in modo uniforme (vedi
-    _ripartizione_uniforme); gli studenti di `matricole_dsa` vanno nell'aula riservata ai
+    in ciascuna aula). Tutte le aule si riempiono in proporzione ai posti (vedi
+    _ripartizione_proporzionale); gli studenti di `matricole_dsa` vanno nell'aula riservata ai
     DSA/L104, se c'è, insieme ad altri studenti nei posti che restano. Chi eccede la
     capienza residua resta senza aula."""
     matricole_dsa = matricole_dsa or set()

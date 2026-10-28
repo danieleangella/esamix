@@ -33,7 +33,7 @@
     <form class="inline" method="post" action="{{ url }}/aule/assegna">
       <button type="submit" class="pulsante-piccolo">Assegna automaticamente</button>
     </form>
-    {{ info("Distribuisce in ordine di cognome, lo stesso numero in ogni aula (senza superarne i posti), gli ammessi che non hai già spostato a mano (quelli restano dove li hai messi). Se c'è un'aula DSA, tutti i DSA/L104 vanno lì qualunque sia il cognome, e i posti che restano li occupano gli altri come nelle altre aule.") }}
+    {{ info("Distribuisce in ordine di cognome, in proporzione ai posti di ciascuna aula (aula DSA compresa: tutte piene alla stessa percentuale), gli ammessi che non hai già spostato a mano (quelli restano dove li hai messi). Se c'è un'aula DSA, tutti i DSA/L104 vanno lì qualunque sia il cognome, e i posti che restano li occupano gli altri come nelle altre aule.") }}
     {% endif %}
   </div>
   {% if md.aule and md.ammessi and md.ammessi|length * 100 > posti * corso.soglia_occupazione_aule %}
