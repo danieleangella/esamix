@@ -1,5 +1,14 @@
+{% from "_icone.html" import icona %}
 {% set tag = corso.tag if corso is defined else corso_tag %}
-<div class="card">
+{# Due schede: il compito di questo appello e la carriera dello studente (in questo corso e
+   negli altri); il passaggio è gestito in app.js (.schede-risultato), anche quando il
+   frammento è caricato nella tendina di una tabella. #}
+<div class="card schede-risultato">
+  <div class="tabs tabs-servizio" role="tablist">
+    <a href="#" class="active" data-scheda-risultato="compito" role="tab">Compito</a>
+    <a href="#" data-scheda-risultato="carriera" role="tab">Carriera</a>
+  </div>
+  <div data-pannello-risultato="compito">
   {% if risultato.esito == 'annullato' %}
   <p><span class="badge badge-err">Compito annullato</span>{% if risultato.annullamento_nota %} — {{ risultato.annullamento_nota }}{% endif %}</p>
   {% if risultato.codice %}<p class="muted">Codice compito: <strong>{{ risultato.codice }}</strong></p>{% endif %}
@@ -64,15 +73,23 @@
   </table>
   {% endif %}
 
+  {% if not chiuso and risultato.esito in ('voto', 'rifiutato') and not risultato.verbalizzato %}
+  <p style="margin:1rem 0 0">
+    <a href="/corsi/{{ tag }}/appelli/{{ risultato.appello_id }}/risultati/{{ risultato.matricola }}/modifica" class="icona-azione">{{ icona("matita", 13) }} Modifica</a>
+  </p>
+  {% endif %}
+  </div>
+
+  <div data-pannello-risultato="carriera" hidden>
   {% if storico %}
-  <h3 style="margin-top:1.5rem">Storico in questo corso</h3>
+  <h3 style="margin-top:0">In questo corso</h3>
   <table>
     <tr><th>Appello</th><th>Esito</th><th>Orale</th></tr>
     {% for s in storico %}
     <tr {% if s.corrente %}style="background:var(--accent-bg, #eef2ff)"{% endif %}>
       <td>
-        <a href="/corsi/{{ tag }}/appelli/{{ s.appello_id }}/risultati/{{ risultato.matricola }}">{{ s.appello_nome }}</a>
-        {% if s.corrente %} <span class="badge badge-info">questo compito</span>{% endif %}
+        {% if s.corrente %}{{ s.appello_nome }} <span class="badge badge-info">questo compito</span>
+        {% else %}<a href="/corsi/{{ tag }}/appelli/{{ s.appello_id }}/risultati/{{ risultato.matricola }}">{{ s.appello_nome }}</a>{% endif %}
       </td>
       <td>
         {% if s.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if s.annullamento_nota %} <span class="muted">— {{ s.annullamento_nota }}</span>{% endif %}
@@ -96,11 +113,33 @@
   </table>
   {% endif %}
 
-  <p style="margin-top:1rem">
-    <a href="/corsi/{{ tag }}/appelli/{{ risultato.appello_id }}/risultati/{{ risultato.matricola }}" class="button secondary">Pagina del compito</a>
-    <a href="/corsi/{{ tag }}/studenti/{{ risultato.matricola }}" class="button secondary">Pagina dello studente</a>
-    {% if not chiuso and risultato.esito in ('voto', 'rifiutato') and not risultato.verbalizzato %}
-    <a href="/corsi/{{ tag }}/appelli/{{ risultato.appello_id }}/risultati/{{ risultato.matricola }}/modifica" class="muted" style="margin-left:0.75rem; font-size:0.85rem">Modifica</a>
-    {% endif %}
-  </p>
+  {% if not storico %}<p class="muted">Nessun altro risultato in questo corso.</p>{% endif %}
+  {% for c in altri_corsi %}
+  <h3>{{ c.corso.nome }} <span class="muted">{{ c.corso.anno }}</span></h3>
+  {% if c.risultati %}
+  <table>
+    <tr><th>Appello</th><th>Esito</th><th>Orale</th></tr>
+    {% for s in c.risultati %}
+    <tr>
+      <td><a href="/corsi/{{ c.corso.tag }}/appelli/{{ s.appello_id }}/risultati/{{ risultato.matricola }}">{{ s.appello_nome }}</a></td>
+      <td>
+        {% if s.esito == 'annullato' %}<span class="badge badge-err">annullato</span>
+        {% elif s.esito != 'voto' %}{{ s.esito }}
+        {% else %}{{ s.voto }}{% endif %}
+        {% if s.verbalizzato %}<span class="badge {{ 'badge-err' if s.superato == false else 'badge-ok' }}">{{ 'insufficiente ' if s.superato == false else '' }}verbalizzato</span>{% endif %}
+      </td>
+      <td>
+        {% if s.richiede_orale and not s.orale_svolto %}<span class="badge badge-warn">in attesa</span>
+        {% elif s.richiede_orale %}{{ s.esito_orale or 'svolto' }}
+        {% else %}-{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Registrato nel corso, ma senza risultati.</p>
+  {% endif %}
+  {% endfor %}
+  <p style="margin:1rem 0 0"><a href="/corsi/{{ tag }}/studenti/{{ risultato.matricola }}" class="button secondary">Pagina dello studente</a></p>
+  </div>
 </div>

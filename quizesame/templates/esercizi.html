@@ -30,9 +30,7 @@
         <button type="submit" class="pulsante-icona" data-info="Elimina dalla banca" aria-label="Elimina {{ e.nome or ('#' ~ e.id) }}">{{ icona("cestino") }}</button>
       </form>
     </div>
-    <div class="riga-anteprima-esercizio" data-esercizio="{{ e.id }}" style="display:none; padding:0.25rem 0 0.5rem">
-      <p class="muted" style="margin-top:0.5rem">Anteprima di tutte le varianti:</p>
-    </div>
+    <div class="riga-anteprima-esercizio" data-esercizio="{{ e.id }}" style="display:none; padding:0.25rem 0 0.5rem"></div>
     {% endfor %}
   </div>
   {% endfor %}
@@ -84,7 +82,7 @@
       </td>
     </tr>
     <tr class="riga-anteprima-esercizio" data-esercizio="{{ e.id }}" style="display:none">
-      <td colspan="5"><p class="muted" style="margin-top:0.5rem">Anteprima di tutte le varianti:</p></td>
+      <td colspan="5"></td>
     </tr>
     <tr class="riga-modifica-esercizio" data-esercizio="{{ e.id }}" style="display:none">
       <td colspan="5"></td>
@@ -142,7 +140,7 @@
   function collega(selettoreBottone, selettoreRiga, alApertura) {
     document.querySelectorAll(selettoreBottone).forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var riga = document.querySelector(selettoreRiga + '[data-esercizio="' + btn.dataset.esercizio + '"]');
+        var riga = (btn.closest("table") || document).querySelector(selettoreRiga + '[data-esercizio="' + btn.dataset.esercizio + '"]');
         var giaAperta = riga.style.display !== "none";
         chiudiTutte(giaAperta ? null : riga);
         riga.style.display = giaAperta ? "none" : "";
@@ -166,6 +164,14 @@
   collega(".btn-modifica-esercizio", ".riga-modifica-esercizio", function (riga, btn) {
     caricaInRiga(riga, "/corsi/{{ corso.tag }}/esercizi/" + btn.dataset.esercizio + "/form", inizializzaFormEsercizi);
   });
+
+  // esercizio appena salvato: si riapre in lettura nella banca
+  var aperto = new URLSearchParams(location.search).get("aperto");
+  var btnAperto = aperto && document.querySelector('.tabella-banca-esercizi .btn-anteprima-esercizio[data-esercizio="' + aperto + '"]');
+  if (btnAperto) {
+    btnAperto.click();
+    btnAperto.scrollIntoView({ block: "center" });
+  }
 
   var ricercaBanca = document.querySelector(".filtro-ricerca-banca");
   if (ricercaBanca) {

@@ -383,15 +383,34 @@ def home(request: Request, q: str = ""):
             ragg = corsi_service.get_raggruppamento_by_appello(c.tag, a.id)
             # percorso e prossimo passo, come nella pagina dell'appello
             contesto = _contesto_appello(c.tag, c, a)
-            prove = ([{"nome": m.nome, "suffisso": f"-{m.id}", "data": m.data} for m in ragg.membri]
-                     if ragg else [{"nome": "", "suffisso": "", "data": a.data}])
+            prove = ([{"nome": m.nome, "suffisso": f"-{m.id}", "data": m.data, "appello": m} for m in ragg.membri]
+                     if ragg else [{"nome": "", "suffisso": "", "data": a.data, "appello": a}])
             oggi = __import__("datetime").date.today()
             for p in prove:
                 giorno = _data_prova(p["data"])
                 p["tra_giorni"] = (giorno - oggi).days if giorno else None
+                # prova a breve: cosa manca ancora prima di poterla svolgere; testo e stampa
+                # dei compiti sono "critici" (avviso arancione, rosso negli ultimi due giorni)
+                p["mancanti"] = []
+                if p["tra_giorni"] is not None and 0 <= p["tra_giorni"] <= 14:
+                    p["mancanti"] = [
+                        {**f, "critico": True, "breve": "il testo" if f["nome"] == "Testo" else "la stampa dei compiti"}
+                        for f in contesto["percorso"]
+                        if f["prova"] == p["nome"] and f["nome"] in ("Testo", "Compiti d'esame") and f["stato"] != "fatta"
+                    ]
+                    m = p["appello"]
+                    if m.membro_raggruppamento and not m.aule_chiuse and not m.chiuso:
+                        n_aule = len(aule_service.list_aule(c.tag, m.id))
+                        p["mancanti"].append({
+                            "nome": "Aule", "breve": "l'assegnazione delle aule", "scheda": f"compiti-{m.id}" if n_aule else "impostazioni",
+                            "dettaglio": f"{n_aule} aule" if n_aule else "nessuna aula",
+                            "azione": "Assegna gli studenti alle aule" if n_aule else "Aggiungi le aule della prova e assegna gli studenti",
+                            "critico": False,
+                        })
+                p["critico"] = any(f["critico"] for f in p["mancanti"])
             in_lavorazione.append({
                 "corso": c, "appello": a, "url": f"/corsi/{c.tag}/appelli/{a.id}", "prove": prove,
-                "raggruppamento": bool(ragg), "prossimo": contesto["prossimo_passo"],
+                "raggruppamento": bool(ragg),
                 "percentuale": contesto["percentuale_percorso"],
             })
     risultati_ricerca = studenti_service.cerca_in_tutti_i_corsi(q.strip()) if q.strip() else None
@@ -1708,10 +1727,13 @@ def scarica_griglia_html(request: Request, tag: str, appello_id: int, numero: in
     })
 
 
-def _esito_testo(request: Request, tag: str, appello_id: int, messaggio: str, tipo: str = "success"):
+def _esito_testo(
+    request: Request, tag: str, appello_id: int, messaggio: str, tipo: str = "success", aperto: Optional[int] = None,
+):
     """Esito di un'azione sugli esercizi assegnati (scheda Testo): se la richiesta arriva
     dal riquadro degli esercizi (fetch con X-Frammento, vedi attivaTesto in app.js) si
-    restituisce solo il riquadro ridisegnato, altrimenti si torna alla pagina."""
+    restituisce solo il riquadro ridisegnato, altrimenti si torna alla pagina. `aperto`:
+    l'esercizio appena salvato, che si riapre in lettura."""
     appello = corsi_service.get_appello(tag, appello_id)
     if not request.headers.get("x-frammento"):
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", messaggio, tipo, anchor=_anchor_membro(appello, "creazione"))
@@ -1725,7 +1747,7 @@ def _esito_testo(request: Request, tag: str, appello_id: int, messaggio: str, ti
         "consegna_effettivo": corsi_service.effective_consegna(corso, appello),
     }
     return templates.TemplateResponse(request, "_testo_esercizi.html", {
-        "corso": corso, "md": md, "messaggio": messaggio, "tipo": tipo,
+        "corso": corso, "md": md, "messaggio": messaggio, "tipo": tipo, "aperto": aperto,
         "raggruppamento": corsi_service.get_raggruppamento_by_membro(tag, appello_id),
         "pane_suffix": f"-{appello_id}" if appello.membro_raggruppamento else "",
     })
@@ -1868,7 +1890,7 @@ async def nuovo_esercizio_appello(tag: str, appello_id: int, request: Request, b
     extra = _parse_esercizio_extra_form(form)
     try:
         _proteggi_modifica_esercizi(tag, appello_id)
-        esercizi_service.crea_e_assegna(
+        creato = esercizi_service.crea_e_assegna(
             tag, appello_id, nome=(form.get("nome") or "").strip(),
             note=(form.get("note") or "").strip(), varianti=varianti,
             obbligatorio=bool(form.get("obbligatorio")), argomento=(form.get("argomento") or "").strip(),
@@ -1877,7 +1899,7 @@ async def nuovo_esercizio_appello(tag: str, appello_id: int, request: Request, b
         msg = "Esercizio creato e assegnato" + _rigenera_se_necessario(tag, appello_id, background_tasks)
     except ValueError as e:
         return _esito_testo(request, tag, appello_id, str(e), "error")
-    return _esito_testo(request, tag, appello_id, msg)
+    return _esito_testo(request, tag, appello_id, msg, aperto=creato.id)
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/esercizi/esporta")
@@ -2676,6 +2698,7 @@ def dettaglio_risultato(request: Request, tag: str, appello_id: int, matricola: 
         "corso": corso, "appello": appello, "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
         "storico": dettaglio["storico"], "chiuso": appello.chiuso,
         "dettaglio_esercizi_disponibile": dettaglio["dettaglio_esercizi_disponibile"],
+        "altri_corsi": studenti_service.storico_altri_corsi(tag, matricola),
     })
 
 
@@ -2693,6 +2716,7 @@ def dettaglio_risultato_inline(request: Request, tag: str, appello_id: int, matr
         "corso_tag": tag, "risultato": dettaglio["risultato"], "righe": dettaglio["righe"],
         "storico": dettaglio["storico"], "chiuso": appello.chiuso,
         "dettaglio_esercizi_disponibile": dettaglio["dettaglio_esercizi_disponibile"],
+        "altri_corsi": studenti_service.storico_altri_corsi(tag, matricola),
     })
 
 
@@ -3404,6 +3428,20 @@ def assegna_aule(request: Request, tag: str, appello_id: int):
     )
 
 
+@app.post("/corsi/{tag}/appelli/{appello_id}/aule/togli-assegnazione")
+def togli_assegnazione_aule(tag: str, appello_id: int):
+    """Annulla l'assegnazione delle aule: nessuno ha più un'aula e l'elenco degli iscritti
+    torna modificabile (si può ricaricare), poi si riassegna da capo. Ricarica la pagina
+    intera, perché cambiano sia il riquadro degli ammessi sia quello degli iscritti."""
+    aule_service.togli_assegnazioni(tag, appello_id)
+    corsi_service.update_appello(tag, appello_id, aule_chiuse=False)
+    return flash_redirect(
+        f"/corsi/{tag}/appelli/{appello_id}",
+        "Assegnazione delle aule tolta: puoi modificare o ricaricare gli iscritti e poi riassegnare le aule",
+        anchor=f"compiti-{appello_id}",
+    )
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/aule/aggiungi-studente")
 def aggiungi_studente_in_aula(
     request: Request, tag: str, appello_id: int, matricola: str = Form(...), cognome: str = Form(""),
@@ -3868,13 +3906,14 @@ async def nuovo_esercizio(tag: str, request: Request):
     varianti = _parse_varianti_form(form)
     extra = _parse_esercizio_extra_form(form)
     try:
-        esercizi_service.create_esercizio(
+        creato = esercizi_service.create_esercizio(
             tag, nome=(form.get("nome") or "").strip(), note=(form.get("note") or "").strip(), varianti=varianti,
             argomento=(form.get("argomento") or "").strip(), **extra,
         )
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/esercizi", str(e), "error")
-    return flash_redirect(f"/corsi/{tag}/esercizi", "Esercizio creato")
+    # la banca si riapre con l'esercizio appena creato in lettura
+    return flash_redirect(f"/corsi/{tag}/esercizi", "Esercizio creato", extra={"aperto": creato.id})
 
 
 @app.post("/corsi/{tag}/esercizi/{esercizio_id}/modifica")
@@ -3884,6 +3923,8 @@ async def modifica_esercizio(tag: str, esercizio_id: int, request: Request, back
     extra = _parse_esercizio_extra_form(form)
     destinazione = (form.get("redirect_to") or "").strip() or f"/corsi/{tag}/esercizi"
     ancora = (form.get("redirect_anchor") or "").strip()
+    appello_frammento = request.headers.get("x-appello", "")
+    in_frammento = bool(request.headers.get("x-frammento")) and appello_frammento.isdigit()
     appelli_coinvolti = esercizi_service.appelli_che_usano(tag, esercizio_id)
     # usato in compiti già generati o in un testo chiuso: quei compiti restano com'erano e
     # si salva una copia modificata al posto del vecchio esercizio (che diventa invisibile)
@@ -3900,10 +3941,10 @@ async def modifica_esercizio(tag: str, esercizio_id: int, request: Request, back
         nomi = _nomi_appelli(tag, fissati)
         msg = (f"Esercizio salvato come nuova versione (#{nuovo.id}): i compiti già generati ({nomi}) restano "
                "com'erano. La nuova versione va verificata di nuovo con l'IA.")
-        appello_frammento = request.headers.get("x-appello", "")
-        if request.headers.get("x-frammento") and appello_frammento.isdigit():
-            return _esito_testo(request, tag, int(appello_frammento), msg)
-        return flash_redirect(destinazione, msg, anchor=ancora)
+        # salvato, si riapre in lettura: la nuova versione, al posto di quella diventata invisibile
+        if in_frammento:
+            return _esito_testo(request, tag, int(appello_frammento), msg, aperto=nuovo.id)
+        return flash_redirect(destinazione, msg, anchor=ancora, extra={"aperto": nuovo.id})
     try:
         for appello_id in appelli_coinvolti:
             _proteggi_modifica_esercizi(tag, appello_id)
@@ -3920,11 +3961,12 @@ async def modifica_esercizio(tag: str, esercizio_id: int, request: Request, back
         msg, kind = str(e), "error"
     else:
         kind = "success"
-    # modificato dalla scheda Testo di un appello: si ridisegna solo il riquadro degli esercizi
-    appello_frammento = request.headers.get("x-appello", "")
-    if request.headers.get("x-frammento") and appello_frammento.isdigit():
-        return _esito_testo(request, tag, int(appello_frammento), msg, kind)
-    return flash_redirect(destinazione, msg, kind, anchor=ancora)
+    # modificato dalla scheda Testo di un appello: si ridisegna solo il riquadro degli esercizi;
+    # in entrambi i casi l'esercizio salvato si riapre in lettura
+    aperto = esercizio_id if kind == "success" else None
+    if in_frammento:
+        return _esito_testo(request, tag, int(appello_frammento), msg, kind, aperto=aperto)
+    return flash_redirect(destinazione, msg, kind, anchor=ancora, extra={"aperto": aperto} if aperto else None)
 
 
 @app.post("/corsi/{tag}/esercizi/{esercizio_id}/elimina")

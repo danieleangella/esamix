@@ -88,6 +88,16 @@ def elimina_aula(tag: str, appello_id: int, aula_id: int) -> None:
         conn.close()
 
 
+def togli_assegnazioni(tag: str, appello_id: int) -> None:
+    """Toglie l'aula a tutti gli studenti della prova (anche a quelli spostati a mano)."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        conn.execute("DELETE FROM aula_assegnazioni WHERE appello_id=?", (appello_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def assegna_manuale(tag: str, appello_id: int, matricola: str, aula_id: Optional[int]) -> None:
     """Fissa a mano l'aula di uno studente; con `aula_id` None lo toglie dall'aula e lo
     restituisce all'assegnazione automatica."""

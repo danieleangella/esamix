@@ -26,8 +26,9 @@ body {
 
 /* --- Struttura della pagina: barra superiore (app), briciole (dove sono), intestazione
    (livello + titolo), schede della sezione, contenuto ------------------------------- */
+.testata-fissa { position: sticky; top: 0; z-index: 50; }
+html { scroll-padding-top: 6rem; } /* le ancore non finiscono sotto la testata fissa */
 .topbar {
-  position: sticky; top: 0; z-index: 50;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -529,7 +530,7 @@ details.card.esito-dubbio { border-left: 4px solid #d97706; }
 
 /* stampa: solo il contenuto, senza menu, barre e comandi */
 @media print {
-  .topbar, .breadcrumb-bar, .non-stampare, .flash, .salta-al-contenuto { display: none !important; }
+  .testata-fissa, .topbar, .breadcrumb-bar, .non-stampare, .flash, .salta-al-contenuto { display: none !important; }
   body { background: #fff; }
   .container { max-width: none; padding: 0; }
   .card { box-shadow: none; break-inside: avoid; }
@@ -881,11 +882,31 @@ button.pulsante-presenza:hover:not(:disabled) { filter: brightness(0.95); }
 .box-appello-corso { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
 .box-appello-corso a { color: inherit; text-decoration: none; }
 .box-appello-prove { list-style: none; margin: 0; padding: 0; font-size: 0.88rem; }
-.box-appello-prove li { display: flex; gap: 0.5rem; align-items: baseline; flex-wrap: wrap; padding: 0.1rem 0; }
-.box-appello-prove li .muted { white-space: nowrap; }
+.box-appello-prove li { display: flex; gap: 0.5rem; align-items: baseline; padding: 0.1rem 0; }
+.box-appello-prove li > span:first-child:not(.muted) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.box-appello-prove li .muted, .box-appello-prove li .badge { white-space: nowrap; flex-shrink: 0; }
 .barra-avanzamento { height: 0.45rem; background: var(--border); border-radius: 999px; overflow: hidden; }
 .barra-avanzamento > div { height: 100%; background: var(--ok-text); }
 .box-appello-pct { font-size: 0.78rem; margin-top: -0.2rem; }
-.box-appello-prossimo { display: flex; flex-direction: column; gap: 0.1rem; font-size: 0.9rem; background: var(--accent-soft); border-radius: 8px; padding: 0.45rem 0.6rem; }
-.box-appello-prossimo .muted { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+/* prova a breve con testo o compiti ancora da fare: arancione, rosso negli ultimi due giorni */
+.avviso-mancanti { font-size: 0.85rem; border-radius: 8px; padding: 0.4rem 0.6rem; background: #fff7e6; color: #92400e; border: 1px solid #f5d9a8; }
+.avviso-mancanti summary { cursor: pointer; font-weight: 600; display: flex; gap: 0.35rem; align-items: center; }
+.avviso-mancanti ul { margin: 0.4rem 0 0; padding-left: 1.1rem; color: var(--text); }
+.avviso-mancanti li { margin: 0.15rem 0; }
+.avviso-mancanti-lieve { background: #dbeafe; color: #1d4ed8; border-color: #bfd4f6; }
+.avviso-mancanti-urgente { background: var(--err-bg); color: var(--err-text); border-color: #f1b4b4; }
 .box-appello .button { align-self: flex-start; margin-top: auto; }
+
+/* varianti di un esercizio in schede (lettura e modulo di modifica) */
+.barra-lettura { display: flex; align-items: flex-end; gap: 0.5rem; margin: 0.4rem 0 0; }
+.barra-lettura .btn-modifica-da-lettura { margin-left: auto; }
+.schede-varianti { display: flex; flex-wrap: wrap; gap: 0.2rem; border-bottom: 1px solid var(--border-strong); margin: 0.75rem 0 0.75rem; flex: 1; }
+.barra-lettura .schede-varianti { margin: 0 0 0.6rem; }
+.scheda-variante {
+  margin: 0 0 -1px; padding: 0.3rem 0.75rem; font-size: 0.85rem; font-weight: 500;
+  background: transparent; color: var(--muted); border: 1px solid transparent; border-radius: 6px 6px 0 0;
+}
+.scheda-variante:hover { color: var(--text); background: var(--bg); }
+.scheda-variante.attiva { color: var(--accent); background: var(--panel); border-color: var(--border-strong); border-bottom-color: var(--panel); }
+.scheda-variante.scheda-aggiungi { font-weight: 700; padding: 0.3rem 0.6rem; }
+.variante-block .btn-rimuovi-variante { margin-top: 0.75rem; }

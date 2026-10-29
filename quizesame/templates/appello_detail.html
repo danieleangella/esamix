@@ -632,10 +632,6 @@ document.querySelectorAll(".btn-mostra-testo").forEach(function (btn) {
       }
     });
     panes.forEach(function (p) { p.style.display = (p.dataset.pane === nome) ? "" : "none"; });
-    // il riquadro "Prossimo passo" serve a portare alla scheda giusta: se è già aperta, sparisce
-    document.querySelectorAll(".prossimo-passo[data-scheda]").forEach(function (b) {
-      b.hidden = b.dataset.scheda === nome;
-    });
     // riporta subito il cursore sul campo matricola: con centinaia di studenti da
     // correggere in fila, non dover ricliccare ogni volta sul campo fa risparmiare
     // un bel po' di movimenti ripetuti.

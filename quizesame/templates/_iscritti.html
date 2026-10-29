@@ -181,8 +181,13 @@
   </div>
   {% elif md.iscritti %}
   {% if md.appello.aule_chiuse and not md.appello.chiuso %}
-  <p class="muted" style="margin:0.5rem 0">{{ icona("lucchetto", 13) }} Aule già assegnate: l'elenco degli iscritti non si modifica più.
-    Per chi si aggiunge, usa "Aggiungi uno studente" nel riquadro degli ammessi, più in basso.</p>
+  <div class="muted" style="margin:0.5rem 0">{{ icona("lucchetto", 13) }} Aule già assegnate: l'elenco degli iscritti non si modifica più.
+    Per chi si aggiunge, usa "Aggiungi uno studente" nel riquadro degli ammessi, più in basso;
+    per ricaricare gli iscritti, togli prima l'assegnazione.
+    <form class="inline" method="post" action="{{ url }}/aule/togli-assegnazione" data-pagina-intera
+          onsubmit="return confirm('Togliere l\'assegnazione delle aule a tutti gli studenti (anche a quelli spostati a mano)? L\'elenco degli iscritti torna modificabile; poi le aule andranno riassegnate.')">
+      <button type="submit" class="secondary pulsante-piccolo">{{ icona("chiudi", 12) }} Togli assegnazione…</button>
+  </form></div>
   {% endif %}
   <p>{{ icona("stampa", 14) }} {{ formati(url ~ "/iscritti", pdf=True, html=True, tex=True, csv=True) }}</p>
   {% endif %}

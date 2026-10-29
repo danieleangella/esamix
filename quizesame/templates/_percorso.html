@@ -42,13 +42,7 @@
   {% endfor %}
 </nav>
 
-{% if prossimo_passo %}
-<div class="prossimo-passo" data-scheda="{{ prossimo_passo.scheda }}">
-  <span class="prossimo-passo-etichetta">Prossimo passo{% if prossimo_passo.prova %} · {{ prossimo_passo.prova }}{% endif %}</span>
-  <span class="prossimo-passo-azione">{{ prossimo_passo.azione }}</span>
-  <a class="button" href="#{{ prossimo_passo.scheda }}">Vai a {{ prossimo_passo.nome }} &rarr;</a>
-</div>
-{% elif appello.chiuso %}
+{% if appello.chiuso %}
 <div class="prossimo-passo prossimo-passo-fatto">
   <span class="prossimo-passo-azione">{{ icona("lucchetto", 14) }} Appello chiuso: non sono più possibili modifiche.</span>
   <a class="icona-azione" href="#chiusura" data-info="Per modificare qualcosa riapri l'appello dalla scheda Chiusura">Riapri…</a>

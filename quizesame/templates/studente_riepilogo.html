@@ -8,7 +8,7 @@
 
 {% for c in riepilogo %}
 <div class="card">
-  <h2><a href="/corsi/{{ c.corso_tag }}/studenti">{{ c.corso_nome }}</a> <span class="muted">({{ c.corso_anno }})</span></h2>
+  <h2><a href="/corsi/{{ c.corso_tag }}/studenti/{{ matricola }}">{{ c.corso_nome }}</a> <span class="muted">({{ c.corso_anno }})</span></h2>
   {% if c.risultati %}
   <table>
     <tr><th>Appello</th><th>Esito</th><th>Orale</th><th>Verbalizzato</th><th></th></tr>

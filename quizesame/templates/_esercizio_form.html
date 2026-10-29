@@ -1,3 +1,4 @@
+{% from "_icone.html" import icona %}
 <form method="post" action="{{ action }}" class="form-esercizio" {% if avvisa_rigenerazione is defined and avvisa_rigenerazione %}data-avvisa-rigenerazione="1"{% endif %}>
   {% if redirect_to is defined and redirect_to %}<input type="hidden" name="redirect_to" value="{{ redirect_to }}">{% endif %}
   {% if redirect_anchor is defined and redirect_anchor %}<input type="hidden" name="redirect_anchor" value="{{ redirect_anchor }}">{% endif %}
@@ -43,14 +44,14 @@
 
   <div class="flash flash-error errore-form-esercizio" style="display:none; margin-top:0.75rem"></div>
 
+  {# varianti in schede: la barra (una scheda per variante più "+" per aggiungerne una) la
+     costruisce inizializzaFormEsercizi in app.js; si vede una variante alla volta #}
+  <div class="con-schede-varianti">
+  <div class="schede-varianti" role="tablist" aria-label="Varianti"></div>
   <div class="varianti-container">
     {% for v in (esercizio.varianti if esercizio is defined else []) %}
     {% set vidx = loop.index0 %}
-    <div class="card variante-block" style="background:transparent">
-      <div style="display:flex; justify-content:space-between; align-items:center">
-        <h2 style="font-size:1rem">Variante</h2>
-        <button type="button" class="secondary btn-rimuovi-variante">Rimuovi variante</button>
-      </div>
+    <div class="variante-block pannello-variante" data-variante="{{ vidx }}">
       <input type="hidden" class="campo-vidx" name="variante_idx" value="{{ vidx }}">
       <label class="campo-obbligatorio">Testo del quesito</label>
       <textarea class="campo-testo" name="testo_{{ vidx }}" rows="2">{{ v.testo }}</textarea>
@@ -68,18 +69,20 @@
         </div>
         <button type="button" class="secondary btn-aggiungi-sbagliata">+ Aggiungi risposta sbagliata</button>
       </div>
+      <button type="button" class="secondary pulsante-piccolo btn-rimuovi-variante">{{ icona("cestino", 13) }} Rimuovi questa variante</button>
     </div>
     {% endfor %}
   </div>
-  <button type="button" class="secondary btn-aggiungi-variante">+ Aggiungi variante</button>
-  <button type="submit">Salva esercizio</button>
+  </div>
+  <div class="barra-strumenti" style="margin-top:0.75rem">
+    <button type="submit" style="margin:0">Salva esercizio</button>
+    {% if esercizio is defined %}
+    <button type="button" class="secondary btn-annulla-modifica" style="margin:0">Annulla</button>
+    {% endif %}
+  </div>
 
   <template class="tpl-variante">
-    <div class="card variante-block" style="background:transparent">
-      <div style="display:flex; justify-content:space-between; align-items:center">
-        <h2 style="font-size:1rem">Variante</h2>
-        <button type="button" class="secondary btn-rimuovi-variante">Rimuovi variante</button>
-      </div>
+    <div class="variante-block pannello-variante">
       <input type="hidden" class="campo-vidx">
       <label class="campo-obbligatorio">Testo del quesito</label>
       <textarea class="campo-testo" rows="2"></textarea>
@@ -90,6 +93,7 @@
         <div class="sbagliate-container"></div>
         <button type="button" class="secondary btn-aggiungi-sbagliata">+ Aggiungi risposta sbagliata</button>
       </div>
+      <button type="button" class="secondary pulsante-piccolo btn-rimuovi-variante">{{ icona("cestino", 13) }} Rimuovi questa variante</button>
     </div>
   </template>
 

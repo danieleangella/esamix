@@ -40,7 +40,10 @@ function inizializzaFormEsercizi(radice) {
         aggiungiSbagliata(sbagliateContainer, vidx);
       });
       node.querySelector(".btn-rimuovi-variante").addEventListener("click", function () {
+        var prima = node.previousElementSibling || node.nextElementSibling;
         node.remove();
+        if (!container.querySelector(".variante-block")) { aggiungiVariante(); return; }
+        aggiornaSchede(prima && prima.dataset.variante);
       });
       sbagliateContainer.querySelectorAll(".btn-rimuovi-sbagliata").forEach(function (btn) {
         btn.addEventListener("click", function () { btn.closest("div").remove(); });
@@ -53,13 +56,55 @@ function inizializzaFormEsercizi(radice) {
       var campoVidx = node.querySelector(".campo-vidx");
       campoVidx.name = "variante_idx";
       campoVidx.value = vidx;
+      node.dataset.variante = vidx;
       node.querySelector(".campo-testo").name = "testo_" + vidx;
       node.querySelector(".campo-corretta").name = "corretta_" + vidx;
       collegaVariante(node, vidx);
       container.appendChild(node);
       aggiungiSbagliata(node.querySelector(".sbagliate-container"), vidx);
       aggiornaVisibilitaRisposte();
+      aggiornaSchede(String(vidx));
+      var testo = node.querySelector(".campo-testo");
+      if (form.dataset.pronto) testo.focus();
     }
+
+    // una scheda per variante, più "+" per aggiungerne un'altra; si vede solo quella attiva
+    var schede = form.querySelector(".schede-varianti");
+    function aggiornaSchede(attiva) {
+      var blocchi = container.querySelectorAll(".variante-block");
+      if (attiva === undefined || !container.querySelector('.variante-block[data-variante="' + attiva + '"]')) {
+        var corrente = schede.querySelector(".scheda-variante.attiva");
+        attiva = corrente && container.querySelector('.variante-block[data-variante="' + corrente.dataset.variante + '"]')
+          ? corrente.dataset.variante : (blocchi[0] && blocchi[0].dataset.variante);
+      }
+      schede.innerHTML = "";
+      blocchi.forEach(function (b, i) {
+        var t = document.createElement("button");
+        t.type = "button";
+        t.className = "scheda-variante" + (b.dataset.variante === attiva ? " attiva" : "");
+        t.dataset.variante = b.dataset.variante;
+        t.setAttribute("role", "tab");
+        t.setAttribute("aria-selected", b.dataset.variante === attiva ? "true" : "false");
+        t.textContent = "Variante " + (i + 1);
+        schede.appendChild(t);
+        b.hidden = b.dataset.variante !== attiva;
+        // con una sola variante non c'è niente da rimuovere
+        b.querySelector(".btn-rimuovi-variante").hidden = blocchi.length < 2;
+      });
+      var piu = document.createElement("button");
+      piu.type = "button";
+      piu.className = "scheda-variante scheda-aggiungi";
+      piu.textContent = "+";
+      piu.dataset.info = "Aggiungi una variante";
+      piu.setAttribute("aria-label", "Aggiungi una variante");
+      schede.appendChild(piu);
+    }
+    schede.addEventListener("click", function (ev) {
+      var t = ev.target.closest(".scheda-variante");
+      if (!t) return;
+      if (t.classList.contains("scheda-aggiungi")) aggiungiVariante();
+      else aggiornaSchede(t.dataset.variante);
+    });
 
     blocchiEsistenti.forEach(function (node) {
       var vidx = parseInt(node.querySelector(".campo-vidx").value, 10);
@@ -79,8 +124,9 @@ function inizializzaFormEsercizi(radice) {
     campoAperta.addEventListener("change", aggiornaVisibilitaRisposte);
     aggiornaVisibilitaRisposte();
 
-    form.querySelector(".btn-aggiungi-variante").addEventListener("click", aggiungiVariante);
     if (blocchiEsistenti.length === 0) aggiungiVariante();
+    else aggiornaSchede();
+    form.dataset.pronto = "1";
 
     // Stessa regola del server (_valida_varianti): almeno una variante con un testo; per
     // ognuna di queste (a meno che l'esercizio sia una domanda aperta) serve anche la
@@ -92,6 +138,9 @@ function inizializzaFormEsercizi(radice) {
     function mostraErrore(msg, campoDaFocalizzare) {
       erroreDiv.textContent = msg;
       erroreDiv.style.display = "";
+      // il campo da completare può stare in un'altra scheda: prima si apre quella
+      var blocco = campoDaFocalizzare && campoDaFocalizzare.closest(".variante-block");
+      if (blocco) aggiornaSchede(blocco.dataset.variante);
       erroreDiv.scrollIntoView({ behavior: "smooth", block: "center" });
       if (campoDaFocalizzare) campoDaFocalizzare.focus();
     }
@@ -220,7 +269,8 @@ function attivaPannelloIA(radice) {
 function attivaRiquadro(contenitore, selettore, dopo) {
   contenitore.addEventListener("submit", function (ev) {
     var form = ev.target;
-    if (ev.defaultPrevented || !form.matches(selettore)) return;
+    // data-pagina-intera: il modulo cambia anche altro nella pagina, che si ricarica tutta
+    if (ev.defaultPrevented || form.hasAttribute("data-pagina-intera") || !form.matches(selettore)) return;
     ev.preventDefault();
     if (form.dataset.conferma && !window.confirm(form.dataset.conferma)) return;
     var aperti = {};
@@ -577,6 +627,12 @@ function _inizializzaTesto(sezione, tag, pannelloAperto) {
       if (!giaAperta) caricaInRiga(riga, riga.querySelector("td").dataset.url, inizializzaFormEsercizi);
     });
   });
+  // esercizio appena salvato: si riapre in lettura
+  var daAprire = sezione.querySelector(".riga-anteprima-assegnato[data-apri]");
+  if (daAprire) {
+    var btnAperto = sezione.querySelector('.btn-anteprima-assegnato[data-esercizio="' + daAprire.dataset.esercizio + '"]');
+    if (btnAperto) btnAperto.click();
+  }
 
   // banca del corso: filtri e anteprima
   var ricerca = sezione.querySelector(".filtro-ricerca");
@@ -855,3 +911,59 @@ document.addEventListener("click", function (ev) {
   scelta.hidden = !scelta.hidden;
   if (!scelta.hidden) { var sel = scelta.tagName === "SELECT" ? scelta : scelta.querySelector("select"); if (sel) sel.focus(); }
 });
+
+// Scheda del compito di uno studente (_risultato_dettaglio.html): due schede, il compito e
+// la carriera. Delegato al documento perché il frammento arriva anche via fetch.
+document.addEventListener("click", function (ev) {
+  var t = ev.target.closest("[data-scheda-risultato]");
+  if (!t) return;
+  ev.preventDefault();
+  var box = t.closest(".schede-risultato");
+  box.querySelectorAll("[data-scheda-risultato]").forEach(function (a) { a.classList.toggle("active", a === t); });
+  box.querySelectorAll("[data-pannello-risultato]").forEach(function (p) {
+    p.hidden = p.dataset.pannelloRisultato !== t.dataset.schedaRisultato;
+  });
+});
+
+// Esercizio in lettura (_esercizio_anteprima.html) e nel modulo di modifica: le varianti
+// stanno in schede. Il modulo costruisce da sé la sua barra (inizializzaFormEsercizi);
+// qui le schede della lettura, la matita che passa alla modifica e "Annulla" che torna
+// alla lettura. Matita e Annulla usano i pulsanti della riga dell'esercizio nella stessa
+// tabella (Testo dell'appello o banca del corso).
+function _pulsanteEsercizio(da, classi, id) {
+  var ambito = da.closest("table") || document;
+  return ambito.querySelector(classi.map(function (c) { return c + '[data-esercizio="' + id + '"]'; }).join(", "));
+}
+document.addEventListener("click", function (ev) {
+  var scheda = ev.target.closest(".esercizio-lettura .scheda-variante");
+  if (scheda) {
+    var box = scheda.closest(".con-schede-varianti");
+    box.querySelectorAll(".scheda-variante").forEach(function (t) {
+      t.classList.toggle("attiva", t === scheda);
+      t.setAttribute("aria-selected", t === scheda ? "true" : "false");
+    });
+    box.querySelectorAll(".pannello-variante").forEach(function (p) { p.hidden = p.dataset.variante !== scheda.dataset.variante; });
+    return;
+  }
+  var matita = ev.target.closest(".btn-modifica-da-lettura");
+  if (matita) {
+    var mod = _pulsanteEsercizio(matita, [".btn-modifica-assegnato", ".btn-modifica-esercizio"], matita.dataset.esercizio);
+    if (mod) mod.click();
+    return;
+  }
+  var annulla = ev.target.closest(".btn-annulla-modifica");
+  if (annulla) {
+    var riga = annulla.closest("[data-esercizio]");
+    var ant = riga && _pulsanteEsercizio(riga, [".btn-anteprima-assegnato", ".btn-anteprima-esercizio"], riga.dataset.esercizio);
+    if (ant) ant.click();
+    else if (riga) riga.style.display = "none";
+  }
+});
+// la matita compare solo dove l'esercizio si può modificare (riga con il suo pulsante di
+// modifica: non a testo chiuso, né per gli esercizi della banca o di altri corsi)
+new MutationObserver(function () {
+  document.querySelectorAll(".btn-modifica-da-lettura:not([data-controllata])").forEach(function (m) {
+    m.dataset.controllata = "1";
+    if (!_pulsanteEsercizio(m, [".btn-modifica-assegnato", ".btn-modifica-esercizio"], m.dataset.esercizio)) m.hidden = true;
+  });
+}).observe(document.documentElement, { childList: true, subtree: true });

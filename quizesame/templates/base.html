@@ -207,6 +207,8 @@
 <body>
   <a href="#contenuto" class="salta-al-contenuto">Salta al contenuto</a>
   {% set docente_globale = get_app_settings().docente %}
+  {# barra dell'app e briciole restano entrambe in vista mentre si scorre la pagina #}
+  <div class="testata-fissa">
   <header class="topbar" id="topbar">
     <span class="topbar-marchio">
       <a class="brand" href="/"><img src="/static/favicon.svg" alt="" width="22" height="22"> EsaMiX</a>
@@ -238,6 +240,7 @@
       {% block breadcrumb %}<a href="/">Corsi</a>{% endblock %}
     </div>
   </nav>
+  </div>
   {% if codice_aggiornato() %}
   <div class="avviso-riavvio" role="alert">
     <strong>EsaMiX è stato aggiornato:</strong> riavvialo per usare la nuova versione (nel terminale dove è

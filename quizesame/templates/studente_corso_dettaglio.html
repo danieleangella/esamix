@@ -9,7 +9,6 @@
 <div class="card">
   <p class="muted">
     Corso di laurea: <strong>{{ studente.laurea_nome or '-' }}</strong>
-    · <a href="/studenti/{{ studente.matricola }}">Riepilogo in tutti i corsi/anni accademici</a>
   </p>
   {% if orale_obbligatorio %}
   <p><span class="badge badge-warn">Orale sempre obbligatorio</span>

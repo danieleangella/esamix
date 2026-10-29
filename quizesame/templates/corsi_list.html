@@ -46,7 +46,7 @@
       <tr>
         <td><a href="/studenti/{{ s.matricola }}">{{ s.cognome }} {{ s.nome }}</a></td>
         <td>{{ s.matricola }}</td>
-        <td><a href="/corsi/{{ s.corso_tag }}/studenti">{{ s.corso_nome }}</a> <span class="muted">{{ s.corso_anno }}</span></td>
+        <td><a href="/corsi/{{ s.corso_tag }}/studenti/{{ s.matricola }}">{{ s.corso_nome }}</a> <span class="muted">{{ s.corso_anno }}</span></td>
         <td>
           {% if s.risultati %}
           {% for r in s.risultati %}
@@ -98,20 +98,22 @@
       </li>
       {% endfor %}
     </ul>
+    {% for p in r.prove if p.mancanti %}
+    <details class="avviso-mancanti {{ ('avviso-mancanti-urgente' if p.tra_giorni <= 2 else '') if p.critico else 'avviso-mancanti-lieve' }}">
+      <summary>{{ icona("avviso", 14) }} {% if p.nome %}{{ p.nome }}: {% endif %}{% set nomi = p.mancanti | map(attribute='breve') | list %}manca{{ 'no' if nomi|length > 1 else '' }} {{ (nomi[:-1] | join(', ') ~ ' e ' ~ nomi[-1]) if nomi|length > 1 else nomi[0] }}</summary>
+      <ul>
+        {% for f in p.mancanti %}
+        <li><a href="{{ r.url }}#{{ f.scheda }}">{{ f.nome }}</a> <span class="muted">({{ f.dettaglio }})</span>: {{ f.azione }}</li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endfor %}
     {% set pct = r.percentuale %}
     <div class="barra-avanzamento" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100" aria-label="Avanzamento">
       <div style="width:{{ pct }}%"></div>
     </div>
     <div class="muted box-appello-pct">{{ pct }}% del percorso</div>
-    {% if r.prossimo %}
-    <div class="box-appello-prossimo">
-      <span class="muted">Prossimo passo{% if r.prossimo.prova %} · {{ r.prossimo.prova }}{% endif %}</span>
-      <span>{{ r.prossimo.azione }}</span>
-    </div>
-    <a class="button" href="{{ r.url }}#{{ r.prossimo.scheda }}">Vai a {{ r.prossimo.nome }} &rarr;</a>
-    {% else %}
     <a class="button secondary" href="{{ r.url }}">Apri &rarr;</a>
-    {% endif %}
   </article>
   {% endfor %}
 </div>

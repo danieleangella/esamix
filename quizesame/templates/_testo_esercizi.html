@@ -104,7 +104,7 @@
         {% endif %}
       </td>
     </tr>
-    <tr class="riga-anteprima-assegnato" data-esercizio="{{ e.id }}" style="display:none">
+    <tr class="riga-anteprima-assegnato" data-esercizio="{{ e.id }}" style="display:none"{% if aperto is defined and aperto == e.id %} data-apri="1"{% endif %}>
       <td colspan="5"></td>
     </tr>
     <tr class="riga-modifica-assegnato" data-esercizio="{{ e.id }}" style="display:none">

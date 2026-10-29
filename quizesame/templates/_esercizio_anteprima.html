@@ -1,19 +1,35 @@
-{% for v in e.varianti %}
-<div class="card" style="background:var(--bg); margin-bottom:0.75rem">
-  <strong>Variante {{ loop.index }}</strong>
-  <p style="white-space:pre-wrap; margin:0.5rem 0">{{ v.testo | testo_web }}</p>
-  {% if e.aperta %}
-  <p class="muted" style="margin:0.2rem 0">Domanda aperta: nessuna risposta a scelta multipla.</p>
+{# Esercizio in lettura: varianti in schede (vedi .con-schede-varianti in app.js) e matita per
+   passare alla modifica, tolta da app.js dove l'esercizio non si può modificare. #}
+{% from "_icone.html" import icona %}
+<div class="con-schede-varianti esercizio-lettura" data-esercizio="{{ e.id }}">
+  <div class="barra-lettura">
+    {% if e.varianti %}
+    <div class="schede-varianti" role="tablist" aria-label="Varianti">
+      {% for v in e.varianti %}
+      <button type="button" class="scheda-variante{{ ' attiva' if loop.first }}" data-variante="{{ loop.index0 }}" role="tab"
+              aria-selected="{{ 'true' if loop.first else 'false' }}">Variante {{ loop.index }}</button>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <button type="button" class="pulsante-icona btn-modifica-da-lettura" data-esercizio="{{ e.id }}"
+            data-info="Modifica l'esercizio" aria-label="Modifica l'esercizio">{{ icona("matita") }}</button>
+  </div>
+  {% for v in e.varianti %}
+  <div class="card pannello-variante" data-variante="{{ loop.index0 }}" style="background:var(--bg); margin-bottom:0.75rem" {% if not loop.first %}hidden{% endif %}>
+    <p style="white-space:pre-wrap; margin:0 0 0.5rem">{{ v.testo | testo_web }}</p>
+    {% if e.aperta %}
+    <p class="muted" style="margin:0.2rem 0">Domanda aperta: nessuna risposta a scelta multipla.</p>
+    {% else %}
+    <p style="margin:0.2rem 0"><span class="badge badge-ok">Corretta</span> {{ v.risposte[0] | testo_web }}</p>
+    {% for r in v.risposte[1:] %}
+    <p style="margin:0.2rem 0"><span class="badge badge-err">x</span> {{ r | testo_web }}</p>
+    {% endfor %}
+    {% endif %}
+  </div>
   {% else %}
-  <p style="margin:0.2rem 0"><span class="badge badge-ok">Corretta</span> {{ v.risposte[0] | testo_web }}</p>
-  {% for r in v.risposte[1:] %}
-  <p style="margin:0.2rem 0"><span class="badge badge-err">x</span> {{ r | testo_web }}</p>
+  <p class="muted">Nessuna variante ancora inserita.</p>
   {% endfor %}
-  {% endif %}
 </div>
-{% else %}
-<p class="muted">Nessuna variante ancora inserita.</p>
-{% endfor %}
 {% if e.soluzione %}
 <div class="card" style="background:var(--bg)">
   <strong>Soluzione/suggerimento</strong>

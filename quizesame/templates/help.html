@@ -198,9 +198,13 @@
   </p>
   <p>
     Cliccando sul nome di un esercizio (nella banca del corso, o tra gli esercizi
-    assegnati/disponibili di un appello) si apre un'anteprima di tutte le sue varianti,
+    assegnati/disponibili di un appello) lo si vede in lettura, una scheda per variante,
     con la risposta corretta e quelle sbagliate ben distinte, le eventuali formule LaTeX
-    renderizzate, ed eventuali appelli a cui è già assegnato. Dalla banca esercizi si può
+    renderizzate, ed eventuali appelli a cui è già assegnato; la matita passa alla modifica
+    (anche lì una scheda per variante, e la scheda <strong>+</strong> ne aggiunge una) e,
+    dopo il salvataggio, l'esercizio torna in lettura. Se l'esercizio è già in compiti
+    generati o in un testo chiuso, la modifica crea una nuova versione e quella vecchia
+    resta, invisibile, nei compiti già fatti. Dalla banca esercizi si può
     anche cercare ed eliminare automaticamente eventuali <strong>doppioni</strong> (stesso
     testo e stesse risposte in ogni variante).
   </p>
@@ -360,15 +364,15 @@ COMPITO DA CONVERTIRE
     compiti, la Correzione dal giorno della prova, e la Conclusione (orali, verbalizzazione,
     chiusura) dopo aver chiuso la correzione — per un raggruppamento, di tutte le prove. Una
     fase già avviata non si blocca mai. In tutti gli elenchi di studenti, cliccando il nome si
-    apre sotto la riga la sua carriera in breve, con il link alla pagina completa. La <strong>Chiusura</strong>
+    apre sotto la riga la sua carriera in breve, con il link alla pagina completa.
+    Nella home, gli appelli dei prossimi giorni mostrano un avviso a scomparsa con quello che
+    manca prima della prova: rosso o arancione se mancano ancora il testo o i compiti stampati. La <strong>Chiusura</strong>
     dell'appello (e la sua riapertura) ha una scheda propria; le Impostazioni contengono
     nome, data, orale, aule ed eliminazione.
   </p>
   <p>
-    Sotto il percorso, il riquadro <strong>Prossimo passo</strong> dice cosa fare adesso
-    e porta direttamente alla scheda giusta (per un appello chiuso non propone nulla). Se la
-    correzione è iniziata senza usare il registro presenze, le Presenze restano "in corso" e il
-    prossimo passo è finire le correzioni, poi segnare gli assenti. Le presenze si completano chiudendo il registro
+    Se la correzione è iniziata senza usare il registro presenze, le Presenze restano "in
+    corso" e il prossimo passo è finire le correzioni, poi segnare gli assenti. Le presenze si completano chiudendo il registro
     il giorno della prova oppure, finite le correzioni, con "Segna assenti tutti i non
     corretti" (scheda Presenze): chi non ha un compito corretto risulta assente. La scheda
     <strong>Riepilogo</strong> mostra i numeri principali (compiti, iscritti, presenti,

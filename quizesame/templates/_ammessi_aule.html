@@ -39,6 +39,10 @@
           data-conferma="Riassegnare le aule a tutti gli studenti? Cambia l'aula di chiunque non sia stato spostato a mano: i file e la distribuzione già comunicati non varranno più.">
       <button type="submit" class="secondary pulsante-piccolo">Riassegna tutte…</button>
     </form>
+    <form class="inline" method="post" action="{{ url }}/aule/togli-assegnazione" data-pagina-intera
+          onsubmit="return confirm('Togliere l\'assegnazione delle aule a tutti gli studenti (anche a quelli spostati a mano)? L\'elenco degli iscritti torna modificabile; poi le aule andranno riassegnate.')">
+      <button type="submit" class="secondary pulsante-piccolo">{{ icona("chiudi", 12) }} Togli assegnazione…</button>
+    </form>
     {% endif %}
     {% elif md.aule and not md.appello.chiuso %}
     <form class="inline" method="post" action="{{ url }}/aule/assegna">
