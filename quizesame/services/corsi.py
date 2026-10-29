@@ -126,6 +126,9 @@ class Appello:
     testo_chiuso_il: Optional[str] = None
     rimanda_svolgimenti: bool = False
     aule_chiuse: bool = False
+    # "automatica" (in proporzione ai posti), "percentuali" (scelte per aula) o
+    # "intervalli" (di cognomi, scelti per aula): vedi aule.assegna_automatica
+    modo_aule: str = "automatica"
 
 
 @dataclass
@@ -550,6 +553,7 @@ def _row_to_appello(conn, row) -> Appello:
         testo_chiuso_il=row["testo_chiuso_il"] if "testo_chiuso_il" in chiavi else None,
         rimanda_svolgimenti=bool(row["rimanda_svolgimenti"]) if "rimanda_svolgimenti" in chiavi else False,
         aule_chiuse=bool(row["aule_chiuse"]) if "aule_chiuse" in chiavi else False,
+        modo_aule=(row["modo_aule"] if "modo_aule" in chiavi else None) or "automatica",
     )
 
 

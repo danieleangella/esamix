@@ -1,24 +1,21 @@
 {# Aule di una prova, nella scheda Impostazioni: frammento ridisegnato da solo dopo ogni
    modifica (vedi _risposta_aule e attivaAule in app.js). L'assegnazione degli studenti alle
-   aule resta nella scheda Compiti d'esame (_ammessi_aule.html). #}
+   aule (modo, percentuali, intervalli) è nella scheda Compiti d'esame (_ammessi_aule.html). #}
 {% from "_icone.html" import icona %}
 {% from "_info.html" import info %}
 {% set url = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
 {% set posti = md.aule|sum(attribute="capienza") %}
 {% set attesi = md.ammessi|length %}
 {% set soglia = corso.soglia_occupazione_aule %}
-{% set pesi = pesi_aule(md.aule|map(attribute="capienza")|list, md.aule|map(attribute="quota")|list) %}
-{% set somma_quote = md.aule|selectattr("quota", "ne", none)|sum(attribute="quota") %}
 <div class="riquadro-aule">
   {% if messaggio %}<div class="flash flash-{{ tipo or 'success' }}" style="margin:0.5rem 0">{{ messaggio }}</div>{% endif %}
   {% if md.aule %}
   <table style="margin-top:0.5rem">
-    <thead><tr><th>Aula</th><th>Posti</th><th>Studenti {{ info("Che parte degli studenti va in ciascuna aula nell'assegnazione automatica: di serie in proporzione ai posti (tutte piene alla stessa percentuale). Con la matita puoi fissare una percentuale a mano per un'aula; le aule senza percentuale si dividono il resto in proporzione ai posti. Un'aula non supera mai i suoi posti.") }}</th><th>DSA/L104 {{ info("Un'aula sola per prova può essere riservata agli studenti DSA/L104: nell'assegnazione automatica vanno tutti lì, e gli altri studenti nelle aule restanti. Clicca l'icona per riservare l'aula, o per togliere la riserva.") }}</th><th></th></tr></thead>
+    <thead><tr><th>Aula</th><th>Posti</th><th>DSA/L104 {{ info("Un'aula sola per prova può essere riservata agli studenti DSA/L104: nell'assegnazione vanno tutti lì, insieme ad altri studenti. Clicca l'icona per riservare l'aula, o per togliere la riserva.") }}</th><th></th></tr></thead>
     {% for a in md.aule %}
     <tr>
       <td>{{ a.nome }}</td>
       <td>{{ a.capienza }}</td>
-      <td>{% if a.quota is not none %}<strong>{{ a.quota }}%</strong> <span class="muted">scelta</span>{% else %}{{ pesi[loop.index0]|round|int }}% <span class="muted">dai posti</span>{% endif %}</td>
       <td>
         <form class="inline" method="post" action="{{ url }}/aule/{{ a.id }}/dsa">
           <input type="hidden" name="dsa" value="{{ '' if a.dsa else '1' }}">
@@ -34,7 +31,7 @@
       <td class="cella-azioni">
         {% if not md.appello.chiuso %}
         <button type="button" class="pulsante-icona" data-modifica="modifica-aula-{{ a.id }}" aria-expanded="false"
-                data-info="Modifica nome, posti e percentuale di studenti" aria-label="Modifica {{ a.nome }}">{{ icona("matita") }}</button>
+                data-info="Modifica nome e posti" aria-label="Modifica {{ a.nome }}">{{ icona("matita") }}</button>
         {% endif %}
         <form class="inline" method="post" action="{{ url }}/aule/{{ a.id }}/elimina"
               data-conferma="{{ 'Eliminare l\'aula ' ~ a.nome ~ '? Gli studenti già assegnati resteranno senza aula.' }}">
@@ -44,12 +41,10 @@
     </tr>
     {% if not md.appello.chiuso %}
     <tr id="modifica-aula-{{ a.id }}" data-riga-modifica hidden>
-      <td colspan="5">
+      <td colspan="4">
         <form class="barra-aggiungi" method="post" action="{{ url }}/aule/{{ a.id }}/modifica" style="margin:0">
           <input name="nome" value="{{ a.nome }}" aria-label="Nome dell'aula" required style="flex:2; min-width:10rem">
           <input type="number" name="capienza" min="1" value="{{ a.capienza }}" aria-label="Posti" required style="flex:1; min-width:6rem">
-          <input type="number" name="quota" min="0" max="100" value="{{ a.quota if a.quota is not none else '' }}" placeholder="% studenti (vuoto: dai posti)"
-                 aria-label="Percentuale di studenti in quest'aula, vuoto per la proporzione ai posti" style="flex:1; min-width:11rem">
           <button type="submit" style="margin:0">{{ icona("spunta") }} Salva</button>
           <button type="button" class="secondary" data-chiudi-modifica style="margin:0">Annulla</button>
         </form>
@@ -57,11 +52,9 @@
     </tr>
     {% endif %}
     {% endfor %}
-    <tr><td><strong>Totale</strong></td><td><strong>{{ posti }}</strong></td><td>100%</td><td colspan="2"></td></tr>
+    <tr><td><strong>Totale</strong></td><td><strong>{{ posti }}</strong></td><td colspan="2"></td></tr>
   </table>
-  {% if somma_quote > 100 %}
-  <div class="flash flash-warning" style="margin:0.5rem 0 0">Le percentuali scelte sommano {{ somma_quote }}%: vengono riproporzionate, e le aule senza percentuale non ricevono studenti.</div>
-  {% endif %}
+  <p class="muted" style="margin:0.4rem 0 0">L'assegnazione degli studenti alle aule (in proporzione ai posti, con percentuali o per intervalli di cognomi) si fa nella scheda Compiti d'esame.</p>
   {% if attesi and posti and attesi * 100 > posti * soglia %}
   <div class="flash flash-warning" style="margin:0.5rem 0 0">
     {{ attesi }} studenti attesi su {{ posti }} posti: è il {{ (attesi * 100 / posti)|round|int }}%, oltre il {{ soglia }}%

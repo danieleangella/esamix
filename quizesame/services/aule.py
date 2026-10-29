@@ -1,8 +1,10 @@
 """Aule per una singola prova (membro di un raggruppamento) e assegnazione degli
 studenti ammessi: le aule si definiscono da zero per ogni prova, e l'assegnazione
-automatica distribuisce gli ammessi non ancora fissati a mano in ordine di cognome, in
-proporzione alla capienza residua di ciascuna aula (aula DSA compresa). Un'aula può essere riservata agli
-studenti DSA/L104: se ce n'è almeno una, tutti i DSA vanno lì e gli altri nelle restanti."""
+automatica distribuisce gli ammessi non ancora fissati a mano in ordine di cognome, in uno
+dei modi di MODI: in proporzione alla capienza residua di ciascuna aula (aula DSA compresa),
+secondo percentuali scelte per aula, o secondo intervalli di cognomi scelti per aula. Un'aula
+può essere riservata agli studenti DSA/L104: se ce n'è almeno una, tutti i DSA vanno lì."""
+import unicodedata
 from dataclasses import dataclass
 from typing import Optional
 
@@ -17,6 +19,42 @@ class Aula:
     capienza: int
     dsa: bool = False
     quota: Optional[int] = None  # % degli studenti scelta a mano; None = in proporzione ai posti
+    cognome_da: Optional[str] = None  # intervallo di cognomi (modo "intervalli"); None = dall'inizio
+    cognome_a: Optional[str] = None  # None = fino alla fine
+
+    @property
+    def ha_intervallo(self) -> bool:
+        return bool(self.cognome_da or self.cognome_a)
+
+
+MODI = {
+    "automatica": "Automatica, in proporzione ai posti",
+    "percentuali": "Percentuali scelte per aula",
+    "intervalli": "Intervalli di cognomi scelti per aula",
+}
+
+
+def chiave_cognome(cognome: Optional[str]) -> str:
+    """Il cognome come si confronta con gli intervalli: minuscolo, senza accenti, spazi né
+    apostrofi (D'Angelo → dangelo, De Luca → deluca)."""
+    testo = unicodedata.normalize("NFKD", cognome or "")
+    return "".join(c for c in testo if c.isalpha() and not unicodedata.combining(c)).lower()
+
+
+def nell_intervallo(cognome: Optional[str], da: Optional[str], a: Optional[str]) -> bool:
+    """Se il cognome cade fra le iniziali `da` e `a`, estremi compresi: con a="Ca" ci sono
+    tutti i cognomi che iniziano per Ca (Cazzola compreso), con da="Cb" Cabras no."""
+    c, da_k, a_k = chiave_cognome(cognome), chiave_cognome(da), chiave_cognome(a)
+    return (not da_k or c >= da_k) and (not a_k or c[:len(a_k)] <= a_k)
+
+
+def _iniziali(testo: Optional[str]) -> Optional[str]:
+    testo = (testo or "").strip()
+    if not testo:
+        return None
+    if not chiave_cognome(testo) or any(ch.isdigit() for ch in testo):
+        raise ValueError(f"\"{testo}\" non va bene come inizio di cognome: usa solo lettere (es. A, Ca, Mor)")
+    return testo[:1].upper() + testo[1:].lower()
 
 
 def list_aule(tag: str, appello_id: int) -> list[Aula]:
@@ -27,7 +65,9 @@ def list_aule(tag: str, appello_id: int) -> list[Aula]:
         ).fetchall()
         return [
             Aula(id=r["id"], appello_id=r["appello_id"], nome=r["nome"], capienza=r["capienza"], dsa=bool(r["dsa"]),
-                 quota=r["quota"] if "quota" in r.keys() else None)
+                 quota=r["quota"] if "quota" in r.keys() else None,
+                 cognome_da=r["cognome_da"] if "cognome_da" in r.keys() else None,
+                 cognome_a=r["cognome_a"] if "cognome_a" in r.keys() else None)
             for r in rows
         ]
     finally:
@@ -59,17 +99,45 @@ def imposta_aula_dsa(tag: str, appello_id: int, aula_id: int, dsa: bool) -> None
         conn.close()
 
 
-def modifica_aula(tag: str, appello_id: int, aula_id: int, nome: str, capienza: int, quota: Optional[int] = None) -> None:
-    """Nome, posti e quota (% degli studenti, None = in proporzione ai posti) di un'aula;
-    gli studenti già assegnati restano dove sono."""
+def modifica_aula(tag: str, appello_id: int, aula_id: int, nome: str, capienza: int) -> None:
+    """Nome e posti di un'aula; gli studenti già assegnati restano dove sono."""
     if not nome.strip() or capienza < 1:
         raise ValueError("Servono il nome dell'aula e almeno un posto")
-    if quota is not None and not 0 <= quota <= 100:
-        raise ValueError("La quota è una percentuale, da 0 a 100")
     conn = db.get_connection(config.corso_db_path(tag))
     try:
-        conn.execute("UPDATE appello_aule SET nome=?, capienza=?, quota=? WHERE id=? AND appello_id=?",
-                     (nome.strip(), capienza, quota, aula_id, appello_id))
+        conn.execute("UPDATE appello_aule SET nome=?, capienza=? WHERE id=? AND appello_id=?",
+                     (nome.strip(), capienza, aula_id, appello_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def imposta_criteri(tag: str, appello_id: int, criteri: dict[int, dict]) -> None:
+    """Percentuale (`quota`, None = in proporzione ai posti) e/o intervallo di cognomi
+    (`cognome_da`/`cognome_a`, iniziali; None = dall'inizio / fino alla fine) di ciascuna
+    aula, {aula_id: {campo: valore}}: si salvano solo i campi indicati, tutti o nessuno
+    (alla prima aula sbagliata, ValueError)."""
+    aggiornamenti = []
+    nomi = {a.id: a.nome for a in list_aule(tag, appello_id)}
+    for aula_id, campi in criteri.items():
+        valori = {}
+        if "quota" in campi:
+            quota = campi["quota"]
+            if quota is not None and not 0 <= quota <= 100:
+                raise ValueError(f"Aula {nomi.get(aula_id, '')}: la percentuale va da 0 a 100")
+            valori["quota"] = quota
+        if "cognome_da" in campi or "cognome_a" in campi:
+            da, a = _iniziali(campi.get("cognome_da")), _iniziali(campi.get("cognome_a"))
+            if da and a and chiave_cognome(da)[:len(chiave_cognome(a))] > chiave_cognome(a):
+                raise ValueError(f"Aula {nomi.get(aula_id, '')}: l'intervallo da {da} a {a} è vuoto, l'inizio viene dopo la fine")
+            valori["cognome_da"], valori["cognome_a"] = da, a
+        if valori:
+            aggiornamenti.append((aula_id, valori))
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        for aula_id, valori in aggiornamenti:
+            conn.execute(f"UPDATE appello_aule SET {', '.join(f'{k}=?' for k in valori)} WHERE id=? AND appello_id=?",
+                         (*valori.values(), aula_id, appello_id))
         conn.commit()
     finally:
         conn.close()
@@ -83,16 +151,6 @@ def elimina_aula(tag: str, appello_id: int, aula_id: int) -> None:
             (appello_id, aula_id),
         )
         conn.execute("DELETE FROM appello_aule WHERE id=? AND appello_id=?", (aula_id, appello_id))
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def togli_assegnazioni(tag: str, appello_id: int) -> None:
-    """Toglie l'aula a tutti gli studenti della prova (anche a quelli spostati a mano)."""
-    conn = db.get_connection(config.corso_db_path(tag))
-    try:
-        conn.execute("DELETE FROM aula_assegnazioni WHERE appello_id=?", (appello_id,))
         conn.commit()
     finally:
         conn.close()
@@ -159,9 +217,9 @@ def _ripartizione_proporzionale(capienze: list[int], n: int, quote: Optional[lis
     return quantita
 
 
-def _distribuisci(conn, appello_id: int, aule: list, capienze: list[int], pool: list[str], dsa: set[str],
-                  quote: Optional[list] = None) -> None:
-    """Riempie `aule` (con le rispettive capienze residue) con gli studenti di `pool`
+def _distribuzione_proporzionale(aule: list, capienze: list[int], pool: list[str], dsa: set[str],
+                                 quote: Optional[list] = None) -> dict[str, int]:
+    """In che aula (indice in `aule`) va ciascuno studente: riempie `aule` (con le rispettive capienze residue) con gli studenti di `pool`
     (in ordine di cognome) in proporzione ai posti di ciascuna, aula DSA compresa: se
     c'è un'aula per i DSA/L104, quelli di `dsa` vanno tutti lì, qualunque sia il cognome,
     e i posti che restano della sua quota li occupano gli altri, come nelle aule normali."""
@@ -182,28 +240,87 @@ def _distribuisci(conn, appello_id: int, aule: list, capienze: list[int], pool: 
             for k, q in zip(altre, ripartite):
                 quantita[k] = q
 
-    def assegna(matricola, aula):
-        conn.execute(
-            "INSERT INTO aula_assegnazioni (matricola, appello_id, aula_id, manuale) VALUES (?,?,?,0) "
-            "ON CONFLICT(matricola, appello_id) DO UPDATE SET aula_id=excluded.aula_id, manuale=0",
-            (matricola, appello_id, aula["id"]),
-        )
-
-    for m in da_dsa:
-        assegna(m, aule[i_dsa])
+    risultato = {m: i_dsa for m in da_dsa}
     gia = set(da_dsa)
     altri = [m for m in pool if m not in gia]
     cursore = 0
-    for k, aula in enumerate(aule):
+    for k in range(len(aule)):
         posti = quantita[k] - (len(da_dsa) if k == i_dsa else 0)
         for m in altri[cursore:cursore + posti]:
-            assegna(m, aula)
+            risultato[m] = k
         cursore += posti
+    return risultato
+
+
+def ripartizione(modo: str, aule: list, capienze: list[int], pool: list[str], cognomi: dict[str, str],
+                 dsa: set[str]) -> dict[str, int]:
+    """In che aula (indice in `aule`, righe con dsa/quota/cognome_da/cognome_a) va
+    ciascuno studente di `pool` secondo il `modo` (vedi MODI); chi manca resta senza aula."""
+    if modo == "intervalli":
+        return ripartizione_intervalli(aule, capienze, pool, cognomi, dsa)[0]
+    quote = [a["quota"] for a in aule] if modo == "percentuali" else None
+    return _distribuzione_proporzionale(aule, capienze, pool, dsa, quote)
+
+
+def ripartizione_intervalli(aule: list, capienze: list[int], pool: list[str], cognomi: dict[str, str],
+                            dsa: set[str]) -> tuple[dict[str, int], list[str], dict[int, list[str]]]:
+    """Modo "intervalli": in che aula (indice in `aule`) va ciascuno studente di `pool`,
+    secondo l'intervallo di cognomi di ciascuna aula (la prima che lo comprende e ha
+    ancora posti in `capienze`); se c'è un'aula DSA, i DSA/L104 vanno tutti lì. Un'aula
+    senza intervallo riceve solo i DSA, se è la loro. Restituisce (assegnazioni, chi non
+    cade in nessun intervallo, {indice dell'aula: chi ci cadrebbe ma non ci sta})."""
+    i_dsa = next((i for i, a in enumerate(aule) if a["dsa"]), None)
+    liberi = list(capienze)
+    assegnati, fuori, oltre = {}, [], {}
+    def da_a(aula):
+        return aula["cognome_da"], aula["cognome_a"]
+    for m in pool:
+        if i_dsa is not None and m in dsa:
+            candidate = [i_dsa]
+        else:
+            candidate = [k for k, aula in enumerate(aule)
+                         if any(da_a(aula)) and nell_intervallo(cognomi.get(m), *da_a(aula))]
+        if not candidate:
+            fuori.append(m)
+            continue
+        k = next((k for k in candidate if liberi[k] > 0), None)
+        if k is None:
+            oltre.setdefault(candidate[0], []).append(m)
+            continue
+        assegnati[m] = k
+        liberi[k] -= 1
+    return assegnati, fuori, oltre
+
+
+def anteprima(ammessi: list[dict], aule: list[Aula], modo: str) -> dict:
+    """Cosa farebbe l'assegnazione con gli ammessi di ora, da mostrare prima di assegnare:
+    {"per_aula": {id: quanti}, "esclusi": [studenti senza aula], e nel modo "intervalli"
+    anche "fuori": [chi non cade in nessun intervallo], "oltre": {id: [chi non ci sta]}}
+    (senza contare gli spostamenti a mano, che restano comunque dove sono)."""
+    righe = [{"dsa": a.dsa, "quota": a.quota, "cognome_da": a.cognome_da, "cognome_a": a.cognome_a} for a in aule]
+    per_matricola = {s["matricola"]: s for s in ammessi}
+    argomenti = (righe, [a.capienza for a in aule], [s["matricola"] for s in ammessi],
+                 {s["matricola"]: s["cognome"] for s in ammessi}, {s["matricola"] for s in ammessi if s.get("dsa")})
+    fuori, oltre = [], {}
+    if modo == "intervalli":
+        assegnati, fuori, oltre = ripartizione_intervalli(*argomenti)
+    else:
+        assegnati = ripartizione(modo, *argomenti)
+    per_aula = {a.id: 0 for a in aule}
+    for k in assegnati.values():
+        per_aula[aule[k].id] += 1
+    return {
+        "per_aula": per_aula,
+        "esclusi": [s for s in ammessi if s["matricola"] not in assegnati],
+        "fuori": [per_matricola[m] for m in fuori],
+        "oltre": {aule[k].id: [per_matricola[m] for m in ms] for k, ms in oltre.items()},
+    }
 
 
 def assegna_automatica(
     tag: str, appello_id: int, matricole_ordinate: list[str], matricole_dsa: Optional[set[str]] = None,
-) -> None:
+    modo: str = "automatica", cognomi: Optional[dict[str, str]] = None,
+) -> list[str]:
     """Distribuisce su `list_aule(tag, appello_id)` gli studenti di `matricole_ordinate`
     (già filtrati sugli ammessi e ordinati per cognome dal chiamante) che non hanno già
     un'assegnazione manuale: le assegnazioni manuali restano fisse, e la capienza usata per
@@ -211,7 +328,9 @@ def assegna_automatica(
     in ciascuna aula). Tutte le aule si riempiono in proporzione ai posti (vedi
     _ripartizione_proporzionale); gli studenti di `matricole_dsa` vanno nell'aula riservata ai
     DSA/L104, se c'è, insieme ad altri studenti nei posti che restano. Chi eccede la
-    capienza residua resta senza aula."""
+    capienza residua resta senza aula. Con `modo` "percentuali" contano le quote scelte
+    per aula, con "intervalli" gli intervalli di cognomi (vedi ripartizione_intervalli,
+    che usa `cognomi`). Restituisce le matricole rimaste senza aula."""
     matricole_dsa = matricole_dsa or set()
     conn = db.get_connection(config.corso_db_path(tag))
     try:
@@ -219,7 +338,7 @@ def assegna_automatica(
             "SELECT * FROM appello_aule WHERE appello_id=? ORDER BY id", (appello_id,)
         ).fetchall()
         if not aule:
-            return
+            return []
         manuali = {
             r["matricola"]: r["aula_id"] for r in conn.execute(
                 "SELECT matricola, aula_id FROM aula_assegnazioni WHERE appello_id=? AND manuale=1", (appello_id,)
@@ -232,9 +351,15 @@ def assegna_automatica(
         residua = [max(0, aula["capienza"] - conteggio_manuali[aula["id"]]) for aula in aule]
         pool = [m for m in matricole_ordinate if m not in manuali]
         conn.execute("DELETE FROM aula_assegnazioni WHERE appello_id=? AND manuale=0", (appello_id,))
-        quote = [a["quota"] if "quota" in a.keys() else None for a in aule]
-        _distribuisci(conn, appello_id, list(aule), residua, pool, matricole_dsa, quote)
+        assegnati = ripartizione(modo, list(aule), residua, pool, cognomi or {}, matricole_dsa)
+        for m, k in assegnati.items():
+            conn.execute(
+                "INSERT INTO aula_assegnazioni (matricola, appello_id, aula_id, manuale) VALUES (?,?,?,0) "
+                "ON CONFLICT(matricola, appello_id) DO UPDATE SET aula_id=excluded.aula_id, manuale=0",
+                (m, appello_id, aule[k]["id"]),
+            )
         conn.commit()
+        return [m for m in pool if m not in assegnati]
     finally:
         conn.close()
 
@@ -248,12 +373,41 @@ def _prefisso_distintivo(a: str, b: str) -> int:
     return n + 1
 
 
-def riassunto_assegnazione(titolo: str, ammessi: list[dict], aule: list[Aula]) -> dict:
+def _riassunto_intervalli(titolo: str, ammessi: list[dict], aule: list[Aula]) -> dict:
+    """Riassunto nel modo "intervalli": gli intervalli scelti dal docente, così come sono."""
+    righe = [titolo, ""] if titolo else []
+    con_intervallo = sorted((a for a in aule if a.ha_intervallo), key=lambda a: chiave_cognome(a.cognome_da))
+    for aula in con_intervallo + [a for a in aule if a.dsa and not a.ha_intervallo]:
+        parti = [f"cognomi da {aula.cognome_da or 'A'} a {aula.cognome_a or 'Z'}"] if aula.ha_intervallo else []
+        if aula.dsa:
+            parti.append("più gli studenti DSA e L104" if parti else "studenti DSA e L104")
+        righe.append(f"Aula {aula.nome}: " + ", ".join(parti))
+    avvisi = []
+    senza = [s for s in ammessi if not s.get("aula_id")]
+    if senza:
+        nomi = ", ".join(f"{s['cognome']} {s['nome']}" for s in senza[:8]) + (", …" if len(senza) > 8 else "")
+        avvisi.append(f"{len(senza)} student{'e' if len(senza) == 1 else 'i'} ancora senza aula: {nomi}")
+    per_id = {a.id: a for a in aule}
+    aula_dsa_presente = any(a.dsa for a in aule)
+    fuori_ordine = sum(
+        1 for s in ammessi if s.get("aula_id") in per_id and not (aula_dsa_presente and s.get("dsa"))
+        and not nell_intervallo(s["cognome"], per_id[s["aula_id"]].cognome_da, per_id[s["aula_id"]].cognome_a)
+    )
+    if fuori_ordine:
+        avvisi.append(f"{fuori_ordine} student{'e è' if fuori_ordine == 1 else 'i sono'} in un'aula fuori "
+                      "dal suo intervallo di cognomi (spostati a mano): il riassunto non lo dice")
+    return {"testo": "\n".join(righe), "avvisi": avvisi}
+
+
+def riassunto_assegnazione(titolo: str, ammessi: list[dict], aule: list[Aula], modo: str = "automatica") -> dict:
     """Come sono distribuiti gli studenti nelle aule, da comunicare: {"testo", "avvisi"}.
     Il testo dà per ogni aula l'intervallo di cognomi (iniziali quanto basta per
     distinguere il confine con l'aula successiva, dalla A alla Z agli estremi) e quale
     aula accoglie i DSA/L104, senza numeri né nomi. Gli avvisi (studenti senza aula, o in
-    un'aula fuori dall'ordine di cognome) sono per il docente, fuori dal testo."""
+    un'aula fuori dall'ordine di cognome) sono per il docente, fuori dal testo. Nel modo
+    "intervalli" il testo riporta gli intervalli scelti."""
+    if modo == "intervalli":
+        return _riassunto_intervalli(titolo, ammessi, aule)
     aula_dsa_presente = any(a.dsa for a in aule)
     def in_ordine(s):  # i DSA nell'aula riservata non seguono l'ordine dei cognomi
         return not (aula_dsa_presente and s.get("dsa"))
@@ -295,14 +449,18 @@ def riassunto_assegnazione(titolo: str, ammessi: list[dict], aule: list[Aula]) -
     return {"testo": "\n".join(righe), "avvisi": avvisi}
 
 
-def aula_per_cognome(cognome: str, ammessi: list[dict], aule: list[Aula], dsa: bool = False) -> Optional[int]:
+def aula_per_cognome(cognome: str, ammessi: list[dict], aule: list[Aula], dsa: bool = False,
+                     modo: str = "automatica") -> Optional[int]:
     """L'aula in cui mettere uno studente aggiunto dopo l'assegnazione, senza toccare gli
     altri: quella dei DSA/L104 se lo è, altrimenti quella dell'intervallo di cognomi in cui
-    cade (fra due intervalli, la prima dopo); None se non si può dedurre."""
+    cade (quello scelto nel modo "intervalli", se no quello degli studenti già assegnati:
+    fra due intervalli, la prima dopo); None se non si può dedurre."""
     if dsa:
         aula_dsa = next((a for a in aule if a.dsa), None)
         if aula_dsa:
             return aula_dsa.id
+    if modo == "intervalli":
+        return next((a.id for a in aule if a.ha_intervallo and nell_intervallo(cognome, a.cognome_da, a.cognome_a)), None)
     aula_dsa_presente = any(a.dsa for a in aule)
     intervalli = []
     for aula in aule:

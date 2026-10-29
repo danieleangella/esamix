@@ -1,73 +1,125 @@
 {% from "_studente.html" import nome_studente %}
 {# frammento di _tab_compiti.html, ridisegnato da solo dopo ogni modifica (vedi _risposta_ammessi_aule).
-   Qui si assegnano gli studenti alle aule; le aule stesse si definiscono nella scheda
-   Impostazioni (_aule.html). #}
+   Qui si assegnano gli studenti alle aule: finché l'assegnazione è aperta si scelgono il
+   modo e i criteri (con l'anteprima di quanti vanno in ciascuna aula), poi "Assegna e
+   chiudi" la blocca, e si riapre solo con "Riapri". Le aule stesse (nome, posti, aula DSA)
+   si definiscono nella scheda Impostazioni (_aule.html). #}
 {% from "_formati.html" import formati %}
 {% from "_icone.html" import icona %}
 {% from "_info.html" import info %}
 {% set url = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
 {% set posti = md.aule|sum(attribute="capienza") %}
-{% set aula_dsa = md.aule|selectattr("dsa")|first %}
+{% set chiusa = md.appello.aule_chiuse %}
+{% set modo = md.appello.modo_aule %}
   <summary><strong>Studenti ammessi e aule ({{ md.ammessi|length }})</strong></summary>
   {% if messaggio %}<div class="flash flash-{{ tipo or 'success' }}" style="margin:0.75rem 0 0">{{ messaggio }}</div>{% endif %}
   <div class="barra-strumenti" style="margin-top:0.75rem">
     <span>{{ icona("stampa", 14) }} Elenco ammessi</span>
     {{ formati(url ~ "/ammessi", pdf=True, html=True, tex=True, csv=True) }}
   </div>
-  {% if md.aule %}
-  <div class="barra-strumenti file-aule">
-    {% for a in md.aule %}
-    {% set n_aula = md.ammessi|selectattr("aula_id", "equalto", a.id)|list|length %}
-    <span>Aula {{ a.nome }}{% if a.dsa %} (DSA){% endif %}: {{ n_aula }}/{{ a.capienza }} posti, <strong>{{ (100 * n_aula / a.capienza)|round|int if a.capienza else 0 }}%</strong></span>
-    {{ formati(url ~ "/ammessi-aula-" ~ a.id, pdf=True, html=True) }}
-    {% endfor %}
-  </div>
-  {% endif %}
-  <div class="barra-strumenti">
-    {% if md.aule %}
-    {% set n_assegnati = md.ammessi|selectattr("aula_id")|list|length %}
-    <span>{{ md.aule|length }} aul{{ 'a' if md.aule|length == 1 else 'e' }}, {{ posti }} posti{% if posti %}, occupati {{ (100 * n_assegnati / posti)|round|int }}%{% endif %}{% if aula_dsa %} · aula DSA: <strong>{{ aula_dsa.nome }}</strong>{% endif %}</span>
-    {% else %}
-    <span class="muted">Nessuna aula per questa prova.</span>
-    {% endif %}
-    <a class="icona-azione icona-sola" href="#impostazioni" data-info="{{ 'Gestisci le aule (nome, posti, aula DSA) nella scheda Impostazioni' if md.aule else 'Aggiungi le aule di questa prova nella scheda Impostazioni' }}"
-       aria-label="{{ 'Gestisci le aule' if md.aule else 'Aggiungi le aule' }}">{{ icona("ingranaggio", 14) }}</a>
-    {% if md.aule and md.appello.aule_chiuse %}
-    <span class="badge badge-ok">{{ icona("lucchetto", 12) }} aule assegnate</span>
-    {% if not md.appello.chiuso %}
-    <form class="inline" method="post" action="{{ url }}/aule/assegna"
-          data-conferma="Riassegnare le aule a tutti gli studenti? Cambia l'aula di chiunque non sia stato spostato a mano: i file e la distribuzione già comunicati non varranno più.">
-      <button type="submit" class="secondary pulsante-piccolo">Riassegna tutte…</button>
-    </form>
-    <form class="inline" method="post" action="{{ url }}/aule/togli-assegnazione" data-pagina-intera
-          onsubmit="return confirm('Togliere l\'assegnazione delle aule a tutti gli studenti (anche a quelli spostati a mano)? L\'elenco degli iscritti torna modificabile; poi le aule andranno riassegnate.')">
-      <button type="submit" class="secondary pulsante-piccolo">{{ icona("chiudi", 12) }} Togli assegnazione…</button>
-    </form>
-    {% endif %}
-    {% elif md.aule and not md.appello.chiuso %}
-    <form class="inline" method="post" action="{{ url }}/aule/assegna">
-      <button type="submit" class="pulsante-piccolo">Assegna automaticamente</button>
-    </form>
-    {{ info("Distribuisce in ordine di cognome, in proporzione ai posti di ciascuna aula (aula DSA compresa: tutte piene alla stessa percentuale) o secondo le percentuali scelte nelle Impostazioni, gli ammessi che non hai già spostato a mano (quelli restano dove li hai messi). Se c'è un'aula DSA, tutti i DSA/L104 vanno lì qualunque sia il cognome, e i posti che restano li occupano gli altri come nelle altre aule.") }}
-    {% endif %}
-  </div>
-  {% if md.aule and md.ammessi and md.ammessi|length * 100 > posti * corso.soglia_occupazione_aule %}
-  <div class="flash flash-warning" style="margin:0.25rem 0 0">
-    {{ md.ammessi|length }} ammessi su {{ posti }} posti: oltre il {{ corso.soglia_occupazione_aule }}% dei posti disponibili.
-    Aggiungi un'aula nelle Impostazioni.
-  </div>
-  {% endif %}
 
-  {% if md.aule and md.ammessi|selectattr("aula_id")|list %}
-  {% set riassunto = riassunto_aule(md.appello.nome ~ (" · " ~ md.appello.data if md.appello.data else "") ~ " — distribuzione nelle aule", md.ammessi, md.aule) %}
-  <details style="margin-top:0.5rem" data-chiave="riassunto" open>
-    <summary>Riassunto da comunicare agli studenti {{ info("Come sono distribuiti nelle aule: per ogni aula l'intervallo di cognomi (con le lettere che bastano a distinguere il confine), e l'aula che accoglie i DSA/L104, senza nomi né numeri. Copialo in un avviso o in un'email.") }}</summary>
-    <pre class="riassunto-aule">{{ riassunto.testo }}</pre>
-    <button type="button" class="secondary pulsante-piccolo btn-copia-riassunto" style="margin-top:0.4rem"
-            onclick="var b=this; copiaTesto(b.previousElementSibling.textContent, b.parentElement).then(function (ok) { if (ok) { b.textContent='Copiato!'; setTimeout(function () { b.textContent='Copia'; }, 1500); } });">{{ icona("copia", 13) }} Copia</button>
-    {% for a in riassunto.avvisi %}<div class="stato-campo stato-warn">⚠ {{ a }}</div>{% endfor %}
-  </details>
+  <div class="assegnazione-aule">
+  {% if not md.aule %}
+    <p class="muted" style="margin:0.5rem 0">Nessuna aula per questa prova:
+      <a href="#impostazioni">aggiungile nella scheda Impostazioni</a>, poi torna qui ad assegnarle.</p>
+  {% elif chiusa %}
+    <div class="barra-strumenti">
+      <span class="badge badge-ok">{{ icona("lucchetto", 12) }} aule assegnate</span>
+      <span class="muted">{{ modi_aule[modo]|lower }}</span>
+      {% if not md.appello.chiuso %}
+      <form class="inline" method="post" action="{{ url }}/aule/riapri" data-pagina-intera
+            onsubmit="return confirm('Riaprire l\'assegnazione delle aule? Gli studenti restano dove sono finché non riassegni; se riassegni, la distribuzione già comunicata non varrà più.')">
+        <button type="submit" class="secondary pulsante-piccolo">{{ icona("matita", 12) }} Riapri</button>
+      </form>
+      {% endif %}
+    </div>
+    <div class="barra-strumenti file-aule">
+      {% for a in md.aule %}
+      {% set n_aula = md.ammessi|selectattr("aula_id", "equalto", a.id)|list|length %}
+      <span>Aula {{ a.nome }}{% if a.dsa %} (DSA){% endif %}: {{ n_aula }}/{{ a.capienza }} posti</span>
+      {{ formati(url ~ "/ammessi-aula-" ~ a.id, pdf=True, html=True) }}
+      {% endfor %}
+    </div>
+    {% if md.ammessi|selectattr("aula_id")|list %}
+    {% set riassunto = riassunto_aule(md.appello.nome ~ (" · " ~ md.appello.data if md.appello.data else "") ~ " — distribuzione nelle aule", md.ammessi, md.aule, modo) %}
+    {% for a in riassunto.avvisi %}<div class="flash flash-warning" style="margin:0.4rem 0 0">⚠ {{ a }}</div>{% endfor %}
+    <details style="margin-top:0.5rem" data-chiave="riassunto">
+      <summary>Riassunto da comunicare agli studenti {{ info("Come sono distribuiti nelle aule: per ogni aula l'intervallo di cognomi e l'aula che accoglie i DSA/L104, senza nomi né numeri. Copialo in un avviso o in un'email.") }}</summary>
+      <pre class="riassunto-aule">{{ riassunto.testo }}</pre>
+      <button type="button" class="secondary pulsante-piccolo btn-copia-riassunto" style="margin-top:0.4rem"
+              onclick="var b=this; copiaTesto(b.previousElementSibling.textContent, b.parentElement).then(function (ok) { if (ok) { b.textContent='Copiato!'; setTimeout(function () { b.textContent='Copia'; }, 1500); } });">{{ icona("copia", 13) }} Copia</button>
+    </details>
+    {% endif %}
+  {% else %}
+    {% set prev = anteprima_aule(md.ammessi, md.aule, modo) %}
+    {% set somma_quote = md.aule|selectattr("quota", "ne", none)|sum(attribute="quota") %}
+    <form class="form-assegnazione-aule" method="post" action="{{ url }}/aule/assegnazione">
+      <fieldset class="scelta-modo-aule" {% if md.appello.chiuso %}disabled{% endif %}>
+        <legend><strong>Come distribuire gli studenti</strong> <span class="muted">(in ordine di cognome)</span></legend>
+        {% for valore, etichetta in modi_aule.items() %}
+        <label class="etichetta-check"><input type="radio" name="modo" value="{{ valore }}" {% if valore == modo %}checked{% endif %}
+               onchange="this.form.requestSubmit(this.form.querySelector('[name=azione][value=anteprima]'))"> {{ etichetta }}</label>
+        {% endfor %}
+      </fieldset>
+      <table style="margin-top:0.5rem">
+        <thead><tr>
+          <th>Aula</th><th>Posti</th>
+          {% if modo == "percentuali" %}<th>Percentuale {{ info("La percentuale degli studenti da mettere in quest'aula; vuota = le aule senza percentuale si dividono il resto in proporzione ai posti.") }}</th>
+          {% elif modo == "intervalli" %}<th>Cognomi {{ info("Iniziali comprese: da A a Ca prende anche Cazzola; vuoto = dall'inizio o fino alla Z. Accenti, spazi e apostrofi non contano. I DSA/L104 vanno comunque nell'aula DSA, se c'è.") }}</th>{% endif %}
+          <th>Previsti</th>
+        </tr></thead>
+        {% for a in md.aule %}
+        {% set n = prev.per_aula[a.id] %}
+        <tr>
+          <td>{{ a.nome }}{% if a.dsa %} <span class="badge badge-info">DSA</span>{% endif %}</td>
+          <td>{{ a.capienza }}</td>
+          {% if modo == "percentuali" %}
+          <td><input type="number" name="quota-{{ a.id }}" min="0" max="100" value="{{ a.quota if a.quota is not none else '' }}"
+                     placeholder="dai posti" aria-label="Percentuale di studenti in {{ a.nome }}" style="width:7rem; margin:0"> %</td>
+          {% elif modo == "intervalli" %}
+          <td style="white-space:nowrap">da <input name="da-{{ a.id }}" value="{{ a.cognome_da or '' }}" placeholder="A" maxlength="20"
+                     aria-label="Cognomi in {{ a.nome }}: da" style="width:5rem; margin:0">
+              a <input name="a-{{ a.id }}" value="{{ a.cognome_a or '' }}" placeholder="{{ 'Z' if a.cognome_da else '—' }}" maxlength="20"
+                     aria-label="Cognomi in {{ a.nome }}: a" style="width:5rem; margin:0"></td>
+          {% endif %}
+          <td>{{ n }} <span class="muted">({{ (100 * n / a.capienza)|round|int if a.capienza else 0 }}% dei posti)</span>
+            {% if prev.oltre[a.id] %}<span class="badge badge-warn" data-info="Non ci stanno: {{ prev.oltre[a.id]|map(attribute='cognome')|join(', ') }}">+{{ prev.oltre[a.id]|length }} oltre i posti</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% if modo == "intervalli" and not md.aule|selectattr("ha_intervallo")|list %}
+      <div class="flash flash-warning" style="margin:0.5rem 0 0">Scrivi l'intervallo di cognomi di ciascuna aula (es. da A a Ca, da Ce a Mo, da Mu a Z) e premi "Aggiorna anteprima".</div>
+      {% elif prev.esclusi %}
+      <div class="flash flash-warning" style="margin:0.5rem 0 0">
+        ⚠ {{ prev.esclusi|length }} student{{ 'e resterebbe' if prev.esclusi|length == 1 else 'i resterebbero' }} senza aula
+        ({{ "fuori dagli intervalli o oltre i posti" if modo == "intervalli" else "posti insufficienti" }}):
+        {% for s in prev.esclusi[:15] %}{{ s.cognome }} {{ s.nome }}{{ ", " if not loop.last }}{% endfor %}{{ ", …" if prev.esclusi|length > 15 }}
+      </div>
+      {% endif %}
+      {% if modo == "percentuali" and somma_quote > 100 %}
+      <div class="flash flash-warning" style="margin:0.5rem 0 0">Le percentuali sommano {{ somma_quote }}%: vengono riproporzionate, e le aule senza percentuale non ricevono studenti.</div>
+      {% endif %}
+      {% if md.ammessi and md.ammessi|length * 100 > posti * corso.soglia_occupazione_aule %}
+      <div class="flash flash-warning" style="margin:0.5rem 0 0">
+        {{ md.ammessi|length }} ammessi su {{ posti }} posti: oltre il {{ corso.soglia_occupazione_aule }}% dei posti. Aggiungi un'aula nelle <a href="#impostazioni">Impostazioni</a>.
+      </div>
+      {% endif %}
+      {% if not md.appello.chiuso %}
+      <div class="barra-strumenti" style="margin-top:0.6rem">
+        {% if modo != "automatica" %}
+        <button type="submit" name="azione" value="anteprima" class="secondary pulsante-piccolo">Aggiorna anteprima</button>
+        {% else %}
+        <button type="submit" name="azione" value="anteprima" hidden></button>
+        {% endif %}
+        <button type="submit" name="azione" value="assegna" data-pagina-intera>{{ icona("lucchetto", 13) }} Assegna e chiudi</button>
+        {{ info("Mette gli studenti nelle aule come nell'anteprima (chi hai spostato a mano resta dove l'hai messo) e chiude l'assegnazione: da lì si aggiungono solo eccezioni, e per rifarla serve \"Riapri\".") }}
+        <a class="icona-azione icona-sola" href="#impostazioni" data-info="Aule della prova (nome, posti, aula DSA) nella scheda Impostazioni" aria-label="Gestisci le aule">{{ icona("ingranaggio", 14) }}</a>
+      </div>
+      {% endif %}
+    </form>
   {% endif %}
+  </div>
+
   {% macro tabella(righe) %}
     <table style="margin-top:0.5rem">
       <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Aula</th><th></th></tr>
@@ -106,16 +158,13 @@
   {% endmacro %}
 
   {% if not md.appello.chiuso %}
-  {% set con_aula = md.aule and md.appello.aule_chiuse %}
+  {% set con_aula = md.aule and chiusa %}
   <form class="barra-aggiungi form-aggiungi-in-aula" method="post" action="{{ url }}/aule/aggiungi-studente" autocomplete="off" style="margin-top:0.75rem">
-    <span><strong>Aggiungi uno studente</strong> {{ info("Per chi non è tra gli ammessi (es. non ha superato la prova precedente) o si aggiunge all'ultimo momento, anche se non è registrato nel corso: allora servono cognome e nome. Viene ammesso alla prova con l'etichetta \"deroga\"" ~ (" e messo nell'aula scelta o, con \"secondo il cognome\", in quella del suo intervallo di cognomi (i DSA/L104 nell'aula DSA): gli altri non cambiano aula." if con_aula else ".")) }}</span>
-    <div style="position:relative; flex:1; min-width:10rem">
-      <input name="matricola" class="campo-input-matricola-aula" placeholder="matricola o cognome" aria-label="Matricola o cognome" required>
+    <span><strong>Aggiungi uno studente</strong> {{ info("Uno studente del corso che non è tra gli ammessi (es. non ha superato la prova precedente): cercalo per cognome, nome o matricola. Viene ammesso con l'etichetta \"deroga\"" ~ (" e messo nell'aula scelta o, con \"secondo il cognome\", in quella del suo intervallo di cognomi (i DSA/L104 nell'aula DSA): gli altri non cambiano aula." if con_aula else ".")) }}</span>
+    <div style="position:relative; flex:1; min-width:12rem">
+      <input name="studente" class="campo-input-matricola-aula" placeholder="cognome, nome o matricola" aria-label="Cognome, nome o matricola" required>
       <div class="campo-suggerimenti-aula sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
     </div>
-    <input name="cognome" placeholder="cognome (se nuovo)" aria-label="Cognome, se non registrato" style="flex:1; min-width:8rem">
-    <input name="nome" placeholder="nome (se nuovo)" aria-label="Nome, se non registrato" style="flex:1; min-width:7rem">
-    <label class="etichetta-check" style="font-size:0.85rem"><input type="checkbox" name="dsa" value="1"> DSA/L104</label>
     {% if con_aula %}
     <select name="aula_id" style="width:auto" aria-label="Aula">
       <option value="">secondo il cognome</option>

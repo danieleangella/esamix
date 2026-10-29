@@ -120,7 +120,8 @@ templates.env.filters["js"] = lambda value: json.dumps(str(value))
 templates.env.globals["static_version"] = _static_version
 templates.env.globals["get_app_settings"] = app_config_service.get_settings
 templates.env.globals["riassunto_aule"] = aule_service.riassunto_assegnazione
-templates.env.globals["pesi_aule"] = aule_service.pesi_aule
+templates.env.globals["anteprima_aule"] = aule_service.anteprima
+templates.env.globals["modi_aule"] = aule_service.MODI
 
 @__import__("contextlib").asynccontextmanager
 async def _ciclo_di_vita(_app):
@@ -3389,18 +3390,16 @@ def imposta_aula_dsa(request: Request, tag: str, appello_id: int, aula_id: int, 
     return _risposta_aule(
         request, tag, appello_id,
         ("Aula riservata ai DSA/L104" if dsa else "L'aula non è più riservata ai DSA/L104")
-        + ": per aggiornare le assegnazioni usa \"Assegna automaticamente\" nella scheda Compiti d'esame",
+        + ": vale dalla prossima assegnazione, nella scheda Compiti d'esame",
     )
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/aule/{aula_id}/modifica")
 def modifica_aula(
     request: Request, tag: str, appello_id: int, aula_id: int, nome: str = Form(...), capienza: int = Form(...),
-    quota: str = Form(""),
 ):
     try:
-        quota_aula = int(quota.strip().rstrip("%")) if quota.strip() else None
-        aule_service.modifica_aula(tag, appello_id, aula_id, nome, capienza, quota_aula)
+        aule_service.modifica_aula(tag, appello_id, aula_id, nome, capienza)
     except ValueError as e:
         return _risposta_aule(request, tag, appello_id, str(e), "error")
     return _risposta_aule(request, tag, appello_id, f"Aula {nome.strip()} aggiornata")
@@ -3412,78 +3411,132 @@ def elimina_aula(request: Request, tag: str, appello_id: int, aula_id: int):
     return _risposta_aule(request, tag, appello_id, "Aula eliminata")
 
 
-@app.post("/corsi/{tag}/appelli/{appello_id}/aule/assegna")
-def assegna_aule(request: Request, tag: str, appello_id: int):
+@app.post("/corsi/{tag}/appelli/{appello_id}/aule/assegnazione")
+async def assegnazione_aule(request: Request, tag: str, appello_id: int):
+    """Il modulo di assegnazione della scheda Compiti d'esame: salva il modo (vedi
+    aule.MODI) e le percentuali o gli intervalli delle aule (campi quota-<id>, da-<id>,
+    a-<id>); con azione "assegna" distribuisce poi gli studenti e chiude l'assegnazione
+    (si riapre con "Riapri"), altrimenti ridisegna solo l'anteprima."""
+    form = await request.form()
     raggruppamento, indice = _membro_e_indice(tag, appello_id)
     if raggruppamento is None:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Questa prova non appartiene a un raggruppamento", "error")
-    ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
-    if not aule_service.list_aule(tag, appello_id):
+    aule = aule_service.list_aule(tag, appello_id)
+    if not aule:
         return _risposta_ammessi_aule(request, tag, appello_id, "Aggiungi prima le aule nella scheda Impostazioni", "error")
-    rifatte = corsi_service.get_appello(tag, appello_id).aule_chiuse
-    aule_service.assegna_automatica(
+    modo = str(form.get("modo") or corsi_service.get_appello(tag, appello_id).modo_aule)
+    if modo not in aule_service.MODI:
+        return _risposta_ammessi_aule(request, tag, appello_id, "Modo di assegnazione sconosciuto", "error")
+    criteri = {}
+    try:
+        for a in aule:
+            campi = {}
+            if f"quota-{a.id}" in form:
+                quota = str(form[f"quota-{a.id}"]).strip().rstrip("%").strip()
+                if quota and not quota.isdigit():
+                    raise ValueError(f"Aula {a.nome}: la percentuale è un numero da 0 a 100")
+                campi["quota"] = int(quota) if quota else None
+            if f"da-{a.id}" in form or f"a-{a.id}" in form:
+                campi["cognome_da"], campi["cognome_a"] = form.get(f"da-{a.id}"), form.get(f"a-{a.id}")
+            criteri[a.id] = campi
+        aule_service.imposta_criteri(tag, appello_id, criteri)
+    except ValueError as e:
+        return _risposta_ammessi_aule(request, tag, appello_id, str(e), "error")
+    corsi_service.update_appello(tag, appello_id, modo_aule=modo)
+    if form.get("azione") != "assegna":
+        return _risposta_ammessi_aule(request, tag, appello_id, "")
+    ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
+    esclusi = aule_service.assegna_automatica(
         tag, appello_id, [s["matricola"] for s in ammessi], matricole_dsa={s["matricola"] for s in ammessi if s["dsa"]},
+        modo=modo, cognomi={s["matricola"]: s["cognome"] for s in ammessi},
     )
-    # da qui l'assegnazione è chiusa: si aggiungono solo eccezioni, rifarla chiede conferma
+    # da qui l'assegnazione è chiusa: si aggiungono solo eccezioni, rifarla chiede "Riapri"
     corsi_service.update_appello(tag, appello_id, aule_chiuse=True)
-    return _risposta_ammessi_aule(
-        request, tag, appello_id,
-        "Aule riassegnate a tutti: ricomunica la distribuzione agli studenti" if rifatte else "Aule assegnate e bloccate",
-    )
+    messaggio = "Aule assegnate: assegnazione chiusa"
+    if esclusi:
+        per_matricola = {s["matricola"]: s for s in ammessi}
+        nomi = ", ".join(f"{per_matricola[m]['cognome']} {per_matricola[m]['nome']}" for m in esclusi[:10])
+        perche = ("fuori da tutti gli intervalli di cognomi o oltre i posti della loro aula"
+                  if modo == "intervalli" else "non ci sono abbastanza posti")
+        messaggio += (f". Attenzione: {len(esclusi)} student{'e è rimasto' if len(esclusi) == 1 else 'i sono rimasti'} "
+                      f"senza aula ({perche}): {nomi}{', …' if len(esclusi) > 10 else ''}. "
+                      "Mettili in un'aula a mano dall'elenco, o riapri e riassegna")
+        return _risposta_ammessi_aule(request, tag, appello_id, messaggio, "warning")
+    return _risposta_ammessi_aule(request, tag, appello_id, messaggio)
 
 
-@app.post("/corsi/{tag}/appelli/{appello_id}/aule/togli-assegnazione")
-def togli_assegnazione_aule(tag: str, appello_id: int):
-    """Annulla l'assegnazione delle aule: nessuno ha più un'aula e l'elenco degli iscritti
-    torna modificabile (si può ricaricare), poi si riassegna da capo. Ricarica la pagina
-    intera, perché cambiano sia il riquadro degli ammessi sia quello degli iscritti."""
-    aule_service.togli_assegnazioni(tag, appello_id)
+@app.post("/corsi/{tag}/appelli/{appello_id}/aule/riapri")
+def riapri_assegnazione_aule(tag: str, appello_id: int):
+    """Riapre l'assegnazione delle aule: gli studenti restano dove sono finché non si
+    riassegna, ma si possono cambiare modo e criteri, e l'elenco degli iscritti torna
+    modificabile. Ricarica la pagina intera, perché cambiano entrambi i riquadri."""
     corsi_service.update_appello(tag, appello_id, aule_chiuse=False)
     return flash_redirect(
         f"/corsi/{tag}/appelli/{appello_id}",
-        "Assegnazione delle aule tolta: puoi modificare o ricaricare gli iscritti e poi riassegnare le aule",
+        "Assegnazione delle aule riaperta: gli studenti restano nelle loro aule finché non riassegni",
         anchor=f"compiti-{appello_id}",
     )
 
 
+def _trova_studente(tag: str, testo: str):
+    """Lo studente del corso indicato per matricola, o per nome e/o cognome purché uno solo
+    corrisponda; ValueError altrimenti."""
+    testo = " ".join(testo.split())
+    if not testo:
+        raise ValueError("Indica la matricola o il nome dello studente")
+    studente = studenti_service.get_studente(tag, testo)
+    if studente:
+        return studente
+    parole = testo.lower().split()
+    trovati = [s for s in studenti_service.list_studenti(tag, parole[0])
+               if all(p in f"{s.cognome} {s.nome} {s.matricola}".lower() for p in parole)]
+    esatti = [s for s in trovati if f"{s.cognome} {s.nome}".lower() == testo.lower()
+              or f"{s.nome} {s.cognome}".lower() == testo.lower()]
+    if len(esatti) == 1 or len(trovati) == 1:
+        return (esatti or trovati)[0]
+    if not trovati:
+        raise ValueError(f"Nessuno studente del corso corrisponde a \"{testo}\"")
+    raise ValueError(f"{len(trovati)} studenti corrispondono a \"{testo}\": sceglilo dall'elenco dei suggerimenti")
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/aule/aggiungi-studente")
 def aggiungi_studente_in_aula(
-    request: Request, tag: str, appello_id: int, matricola: str = Form(...), cognome: str = Form(""),
-    nome: str = Form(""), dsa: str = Form(""), aula_id: str = Form(""),
+    request: Request, tag: str, appello_id: int, studente: str = Form(...), aula_id: str = Form(""),
 ):
-    """Eccezione ad aule già assegnate (chi arriva all'ultimo momento, anche non ancora
-    registrato nel corso): lo registra se serve, lo ammette alla prova se non lo è, e lo
-    mette nell'aula scelta o in quella del suo cognome, senza toccare gli altri."""
+    """Ammette alla prova uno studente del corso (cercato per matricola o nome) che non lo
+    è, es. chi non ha superato la prova precedente; ad aule già assegnate lo mette anche
+    nell'aula scelta o in quella del suo cognome, senza toccare gli altri."""
     raggruppamento, indice = _membro_e_indice(tag, appello_id)
     if raggruppamento is None:
         return _risposta_ammessi_aule(request, tag, appello_id, "Questa prova non appartiene a un raggruppamento", "error")
-    matricola = matricola.strip()
     try:
-        studente = studenti_service.get_studente(tag, matricola)
-        if studente is None:
-            if not cognome.strip() or not nome.strip():
-                raise ValueError(f"La matricola {matricola} non è nel corso: indica anche cognome e nome per registrarlo")
-            studenti_service.crea_studente(tag, matricola, nome, cognome, dsa_tipo="DSA" if dsa else "")
-            studente = studenti_service.get_studente(tag, matricola)
+        trovato = _trova_studente(tag, studente)
         ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
-        if matricola not in {s["matricola"] for s in ammessi}:
-            corsi_service.ammetti_manualmente(tag, appello_id, matricola)
+        gia_ammesso = trovato.matricola in {s["matricola"] for s in ammessi}
         aule = aule_service.list_aule(tag, appello_id)
-        if not (aule and corsi_service.get_appello(tag, appello_id).aule_chiuse):
-            # aule non ancora assegnate: lo farà l'assegnazione automatica, con gli altri
-            return _risposta_ammessi_aule(request, tag, appello_id, f"{studente.cognome} {studente.nome} ammesso alla prova")
+        appello = corsi_service.get_appello(tag, appello_id)
+        if not (aule and appello.aule_chiuse):
+            if gia_ammesso:
+                raise ValueError(f"{trovato.cognome} {trovato.nome} è già ammesso alla prova")
+            corsi_service.ammetti_manualmente(tag, appello_id, trovato.matricola)
+            # aule non ancora assegnate: lo farà l'assegnazione, con gli altri
+            return _risposta_ammessi_aule(request, tag, appello_id, f"{trovato.cognome} {trovato.nome} ammesso alla prova")
         if aula_id.strip():
             scelta = int(aula_id)
         else:
-            scelta = aule_service.aula_per_cognome(studente.cognome, ammessi, aule, dsa=bool(studente.dsa))
+            scelta = aule_service.aula_per_cognome(trovato.cognome, ammessi, aule, dsa=bool(trovato.dsa), modo=appello.modo_aule)
             if scelta is None:
-                raise ValueError("Non so in che aula metterlo: scegli l'aula")
-        aule_service.assegna_manuale(tag, appello_id, matricola, scelta)
+                raise ValueError(f"{trovato.cognome} non cade in nessun intervallo di cognomi: scegli l'aula"
+                                 if appello.modo_aule == "intervalli" else "Non so in che aula metterlo: scegli l'aula")
+        if not gia_ammesso:
+            corsi_service.ammetti_manualmente(tag, appello_id, trovato.matricola)
+        aule_service.assegna_manuale(tag, appello_id, trovato.matricola, scelta)
     except ValueError as e:
         return _risposta_ammessi_aule(request, tag, appello_id, str(e), "error")
     nome_aula = next((a.nome for a in aule if a.id == scelta), "")
     return _risposta_ammessi_aule(
-        request, tag, appello_id, f"{studente.cognome} {studente.nome} ammesso e messo nell'aula {nome_aula}: gli altri non cambiano",
+        request, tag, appello_id,
+        f"{trovato.cognome} {trovato.nome} {'messo' if gia_ammesso else 'ammesso e messo'} nell'aula {nome_aula}: gli altri non cambiano",
     )
 
 
@@ -3505,6 +3558,7 @@ def aggiungi_ammesso_manuale(request: Request, tag: str, appello_id: int, matric
             aula = aule_service.aula_per_cognome(
                 studente.cognome, corsi_service.list_ammessi_prova(tag, raggruppamento, indice),
                 aule_service.list_aule(tag, appello_id), dsa=bool(studente.dsa),
+                modo=corsi_service.get_appello(tag, appello_id).modo_aule,
             )
             if aula is not None:
                 aule_service.assegna_manuale(tag, appello_id, matricola.strip(), aula)

@@ -269,14 +269,20 @@ function attivaPannelloIA(radice) {
 function attivaRiquadro(contenitore, selettore, dopo) {
   contenitore.addEventListener("submit", function (ev) {
     var form = ev.target;
-    // data-pagina-intera: il modulo cambia anche altro nella pagina, che si ricarica tutta
-    if (ev.defaultPrevented || form.hasAttribute("data-pagina-intera") || !form.matches(selettore)) return;
+    // data-pagina-intera (sul modulo o sul pulsante premuto): cambia anche altro nella
+    // pagina, che si ricarica tutta
+    var pulsante = ev.submitter;
+    if (ev.defaultPrevented || form.hasAttribute("data-pagina-intera") || !form.matches(selettore)
+        || (pulsante && pulsante.hasAttribute("data-pagina-intera"))) return;
     ev.preventDefault();
     if (form.dataset.conferma && !window.confirm(form.dataset.conferma)) return;
     var aperti = {};
     contenitore.querySelectorAll("details[data-chiave]").forEach(function (d) { aperti[d.dataset.chiave] = d.open; });
     var focus = document.activeElement && document.activeElement.name;
-    var dati = new FormData(form);  // prima di disabilitare: i campi disabilitati non vengono inviati
+    // prima di disabilitare: i campi disabilitati non vengono inviati; col pulsante premuto
+    // (name/value), se il modulo ne ha più d'uno con azioni diverse
+    var dati = new FormData(form);
+    if (pulsante && pulsante.name) dati.append(pulsante.name, pulsante.value);
     form.querySelectorAll("button, select").forEach(function (el) { el.disabled = true; });
     fetch(form.action, { method: "POST", body: dati, headers: { "X-Frammento": "1" } })
       .then(function (r) {

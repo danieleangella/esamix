@@ -340,6 +340,9 @@ ADDITIVE_COLUMNS = {
         ("dsa", "BOOLEAN NOT NULL DEFAULT 0"),
         # percentuale degli studenti da mettere in quest'aula; vuota = in proporzione ai posti
         ("quota", "INTEGER"),
+        # intervallo di cognomi dell'aula (modo "intervalli"): iniziali, vuote = dall'inizio / fino alla fine
+        ("cognome_da", "TEXT"),
+        ("cognome_a", "TEXT"),
     ],
     "appelli": [
         ("orale_data", "TEXT"),
@@ -360,6 +363,8 @@ ADDITIVE_COLUMNS = {
         ("rimanda_svolgimenti", "BOOLEAN NOT NULL DEFAULT 0"),
         # aule assegnate e bloccate: rifarle chiede conferma, si aggiungono solo eccezioni
         ("aule_chiuse", "BOOLEAN NOT NULL DEFAULT 0"),
+        # come si distribuiscono gli studenti nelle aule (vedi aule.MODI): vuoto = automatica
+        ("modo_aule", "TEXT"),
     ],
 }
 
@@ -380,6 +385,12 @@ def _ensure_schema_current(conn: sqlite3.Connection) -> None:
                     # le prove con le aule già assegnate nascono con le aule chiuse
                     conn.execute(
                         "UPDATE appelli SET aule_chiuse=1 WHERE id IN (SELECT appello_id FROM aula_assegnazioni)"
+                    )
+                if (tabella, nome) == ("appelli", "modo_aule"):
+                    # le prove con percentuali già scelte a mano continuano a usarle
+                    conn.execute(
+                        "UPDATE appelli SET modo_aule='percentuali'"
+                        " WHERE id IN (SELECT appello_id FROM appello_aule WHERE quota IS NOT NULL)"
                     )
                 if (tabella, nome) == ("appelli", "testo_chiuso"):
                     # negli appelli già esistenti il testo con compiti generati (o di un
