@@ -3032,7 +3032,7 @@ def _elenco_studenti(tag: str, appello_id: int, tipo: str):
         tex_path = compiti_service.path_ammessi(tag, appello_id, "tex", appello=appello)
         tex_path = tex_path.with_name(f"{tex_path.stem}-aula-{aula.id}.tex")
         ctx = risultati_service.ctx_for(tag, corsi_service.get_corso(tag), appello)
-        tex_path.write_text(latex_service.crea_tex_ammessi(ctx, titolo, elenco, []), encoding="utf-8")
+        tex_path.write_text(latex_service.crea_tex_ammessi(ctx, titolo, elenco, [], aula_singola=aula.nome), encoding="utf-8")
         return appello, titolo, elenco, [], tex_path
     corso = corsi_service.get_corso(tag)
     if tipo == "iscritti":
@@ -3069,9 +3069,13 @@ def elenco_studenti_html(request: Request, tag: str, appello_id: int, tipo: str)
     if elenco is None:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Elenco non disponibile per questa prova", "error",
                               anchor=_anchor_membro(appello, "compiti"))
+    # a quale aula si riferisce l'elenco (o se è quello completo): ripetuto su ogni foglio stampato
+    aula_id = _TIPO_ELENCO_RE.match(tipo).group(2)
+    aula = next((a for a in aule_service.list_aule(tag, appello_id) if a.id == int(aula_id)), None) if aula_id else None
+    etichetta = f"Aula {aula.nome}" if aula else ("Elenco completo (tutte le aule)" if aule else "Elenco completo")
     return templates.TemplateResponse(request, "elenco_studenti.html", {
         "corso": corsi_service.get_corso(tag), "appello": appello, "titolo": titolo, "elenco": elenco,
-        "aule": aule, "tipo": tipo, "anchor": _anchor_membro(appello, "compiti"),
+        "aule": aule, "tipo": tipo, "anchor": _anchor_membro(appello, "compiti"), "etichetta": etichetta,
     })
 
 

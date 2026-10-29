@@ -542,6 +542,10 @@ details.card.esito-dubbio { border-left: 4px solid #d97706; }
 /* elenchi (iscritti, ammessi, risultati): righe alternate, più facili da seguire */
 .tabella-elenco tbody tr:nth-child(even), .tabella-elenco tr:nth-child(even) { background: var(--bg); }
 .tabella-elenco td { padding: 0.55rem 0.5rem; }
+/* elenchi da stampare: a quale aula si riferisce il foglio (o se è l'elenco completo) */
+.tabella-elenco .etichetta-foglio { text-align: right; background: transparent; padding: 0.25rem 0 0.5rem; }
+.tabella-elenco .etichetta-foglio span { display: inline-block; border: 2px solid currentColor; border-radius: 4px; padding: 0.15rem 0.6rem; font-size: 1.1rem; font-weight: 700; }
+@media print { .nuovo-foglio { break-before: page; } }
 /* correzione con l'IA: prima e dopo affiancati (uno sotto l'altro su schermi stretti) */
 .confronto-correzione { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .confronto-correzione .proposta { border-color: var(--accent-border); background: var(--accent-soft); }

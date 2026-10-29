@@ -19,10 +19,12 @@
     <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">Stampa</button>
   </span>
 </div>
-{% macro tabella(righe, con_aula=False) %}
+{% macro tabella(righe, etichetta, con_aula=False) %}
 <div class="card" style="padding:0.5rem 1rem">
   <table class="tabella-elenco">
-    <thead><tr><th>Presente</th><th>Matricola</th><th>Cognome</th><th>Nome</th>{% if con_aula %}<th>Aula</th>{% endif %}<th>Note</th></tr></thead>
+    {# l'etichetta sta nell'intestazione della tabella: stampando, si ripete in cima a ogni foglio #}
+    <thead><tr><th colspan="{{ 6 if con_aula else 5 }}" class="etichetta-foglio"><span>{{ etichetta }}</span></th></tr>
+      <tr><th>Presente</th><th>Matricola</th><th>Cognome</th><th>Nome</th>{% if con_aula %}<th>Aula</th>{% endif %}<th>Note</th></tr></thead>
     {% for s in righe %}
     <tr>
       <td style="font-size:1.3rem">☐</td>
@@ -38,10 +40,10 @@
   </table>
 </div>
 {% endmacro %}
-{{ tabella(elenco, con_aula=aule|length > 0) }}
+{{ tabella(elenco, etichetta, con_aula=aule|length > 0) }}
 {% for aula in aule %}
 {% set righe_aula = elenco | selectattr("aula_id", "equalto", aula.id) | list %}
-<h2 style="margin-top:1.5rem">Aula {{ aula.nome }} <span class="muted" style="font-weight:400">· {{ righe_aula|length }} studenti (capienza {{ aula.capienza }})</span></h2>
-{{ tabella(righe_aula) }}
+<h2 class="nuovo-foglio" style="margin-top:1.5rem">Aula {{ aula.nome }} <span class="muted" style="font-weight:400">· {{ righe_aula|length }} studenti (capienza {{ aula.capienza }})</span></h2>
+{{ tabella(righe_aula, "Aula " ~ aula.nome) }}
 {% endfor %}
 {% endblock %}

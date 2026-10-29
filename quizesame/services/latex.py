@@ -650,7 +650,7 @@ def crea_tex_risultati(ctx: LatexContext, righe: list[dict], prove: list[str] = 
     return tex
 
 
-def _tabella_ammessi(righe: list[dict], con_aula: bool = False) -> str:
+def _tabella_ammessi(righe: list[dict], con_aula: bool = False, etichetta: str = "") -> str:
     """Righe ben distanziate (spazio a sufficienza per segnare a penna presenza/assenza
     durante l'appello), con una riga di separazione tra uno studente e l'altro. La
     casella "Presente" è la prima colonna (senza intestazione, da spuntare a penna); la
@@ -659,15 +659,22 @@ def _tabella_ammessi(righe: list[dict], con_aula: bool = False) -> str:
     invisibile dentro ogni riga (non da un salto riga finale tipo '\\\\[0.9cm]'): messo
     dopo l'ultima riga, quest'ultimo lascerebbe la prima riga incollata all'intestazione,
     con uno spazio diverso (più stretto) da quello, uniforme, fra tutte le altre righe.
-    `con_aula`: colonna in più con l'aula assegnata (nell'elenco generale, se ci sono aule)."""
+    `con_aula`: colonna in più con l'aula assegnata (nell'elenco generale, se ci sono aule).
+    `etichetta`: a quale aula si riferisce il foglio (o "elenco completo"), ripetuta in un
+    riquadro in cima a ogni pagina della tabella: i fogli stampati restano riconoscibili
+    anche una volta separati e distribuiti nelle aule."""
     if con_aula:
         colonne = "c >{\\ttfamily}l >{\\bfseries}p{0.24\\textwidth} p{0.2\\textwidth} l l"
         intestazione = ("Presente", "Matricola", "Cognome", "Nome", "Aula", "Note")
     else:
         colonne = "c >{\\ttfamily}l >{\\bfseries}p{0.3\\textwidth} p{0.25\\textwidth} l"
         intestazione = ("Presente", "Matricola", "Cognome", "Nome", "Note")
+    riga_etichetta = (
+        f"\\rowcolor{{white}}\\multicolumn{{{len(intestazione)}}}{{r}}"
+        f"{{\\setlength{{\\fboxsep}}{{5pt}}\\fbox{{\\Large\\bfseries {etichetta}}}}} \\\\[4pt]\n"
+    ) if etichetta else ""
     tex = _RIGHE_ALTERNATE + (
-        f"\\begin{{longtable}}{{{colonne}}}\n\\toprule\n"
+        f"\\begin{{longtable}}{{{colonne}}}\n{riga_etichetta}\\toprule\n"
         + _riga_intestazione(*intestazione, altezza="0.75cm") + "\\midrule\n\\endhead\n"
     )
     for i, r in enumerate(righe):
@@ -683,20 +690,37 @@ def _tabella_ammessi(righe: list[dict], con_aula: bool = False) -> str:
     return tex
 
 
-def crea_tex_ammessi(ctx: LatexContext, titolo: str, lista: list[dict], aule: list) -> str:
+def _piede_elenco(etichetta: str) -> str:
+    """Stile di pagina con `etichetta` a piè di ogni pagina (da qui in poi: dopo un
+    \\clearpage vale per le pagine successive)."""
+    return (
+        "\\makeatletter\\def\\ps@elenco{\\let\\@oddhead\\@empty\\let\\@evenhead\\@empty"
+        f"\\def\\@oddfoot{{\\hfil{{\\bfseries {etichetta}}}\\hfil}}\\let\\@evenfoot\\@oddfoot}}"
+        "\\makeatother\\pagestyle{elenco}\n"
+    )
+
+
+def crea_tex_ammessi(ctx: LatexContext, titolo: str, lista: list[dict], aule: list, aula_singola: str = "") -> str:
     """Elenco degli studenti ammessi a sostenere una prova (matricola per intero, non
     oscurata: serve a fare l'appello in aula, non va pubblicata come i risultati). `lista`:
     dict con matricola/nome/cognome/dsa/aula_nome. `aule`: le aule di questa prova (oggetti
     con .id/.nome/.capienza); se presenti, la tabella generale indica l'aula di ciascuno e
-    dopo segue una tabella per aula con solo gli studenti assegnati a quella specifica aula."""
+    dopo segue una tabella per aula con solo gli studenti assegnati a quella specifica aula.
+    `aula_singola`: nome dell'aula se l'elenco è già quello di un'aula sola.
+    Ogni pagina dice, in cima alla tabella e a piè di pagina, a quale aula si riferisce o se
+    è l'elenco completo."""
+    etichetta = f"Aula {_escape_testo_semplice(aula_singola)}" if aula_singola else (
+        "Elenco completo (tutte le aule)" if aule else "Elenco completo")
     tex = BEGIN_DOCUMENT
+    tex += _piede_elenco(etichetta)
     tex += intestazione_breve(ctx)
     tex += _titolo_documento(titolo, _quanti(len(lista), "studente", "studenti"))
-    tex += _tabella_ammessi(lista, con_aula=bool(aule))
+    tex += _tabella_ammessi(lista, con_aula=bool(aule), etichetta=etichetta)
     for aula in aule:
         righe_aula = [r for r in lista if r.get("aula_id") == aula.id]
-        tex += "\\newpage\n"
-        tex += _titolo_documento(f"Aula {aula.nome}", _quanti(len(righe_aula), "studente", "studenti") + f" (capienza {aula.capienza})")
-        tex += _tabella_ammessi(righe_aula)
+        etichetta_aula = f"Aula {_escape_testo_semplice(aula.nome)}"
+        tex += "\\clearpage\n" + _piede_elenco(etichetta_aula)
+        tex += _titolo_documento(etichetta_aula, _quanti(len(righe_aula), "studente", "studenti") + f" (capienza {aula.capienza})")
+        tex += _tabella_ammessi(righe_aula, etichetta=etichetta_aula)
     tex += "\\end{document}"
     return tex
