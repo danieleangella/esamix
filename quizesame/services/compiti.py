@@ -168,6 +168,20 @@ def compiti_oltre_due_pagine(tag: str, tex_path: Path, pagine: int | None) -> in
     return None
 
 
+def _totali_blocchi(tag: str, appello_id: int) -> tuple[int, int]:
+    """(compiti stampati in tutti i blocchi della prova, numero di blocchi): per la copertina
+    delle griglie."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        r = conn.execute(
+            "SELECT COALESCE(SUM(numero_studenti), 0) AS totale, COUNT(*) AS n FROM blocchi WHERE appello_id=?",
+            (appello_id,),
+        ).fetchone()
+        return r["totale"], r["n"]
+    finally:
+        conn.close()
+
+
 def ricostruisci_documenti(tag: str, appello_id: int) -> list[Path]:
     """Riscrive con la grafica attuale i .tex dei documenti dell'appello — fogli di
     riferimento, anteprima e, se ci sono, testo e griglia di ogni blocco — mantenendo gli stessi codici,
@@ -179,6 +193,7 @@ def ricostruisci_documenti(tag: str, appello_id: int) -> list[Path]:
     appello = corsi_service.get_appello(tag, appello_id)
     blocchi = list_blocchi(tag, appello_id)  # anche nessuno: si rigenerano riferimenti e anteprima
     ctx = _crea_contesto(corsi_service.get_corso(tag), appello)
+    totale, n_blocchi = _totali_blocchi(tag, appello_id)
     _salva_riferimenti(tag, appello_id, ctx, _esercizi_per_generazione(tag, appello_id))
     da_compilare = [path_riferimento(tag, appello_id, "tex"), path_riferimento_soluzioni(tag, appello_id, "tex")]
     conn = db.get_connection(config.corso_db_path(tag))
@@ -206,7 +221,7 @@ def ricostruisci_documenti(tag: str, appello_id: int) -> list[Path]:
             _salva_testo(path_blocco(tag, appello_id, b["numero"], "tex", appello=appello), tex)
             _salva_testo(
                 path_griglia(tag, appello_id, b["numero"], "tex", appello=appello),
-                crea_file_griglia(ctx, [(c["codice"], c["soluzioni"]) for c in compiti]),
+                crea_file_griglia(ctx, [(c["codice"], c["soluzioni"]) for c in compiti], b["numero"], totale, n_blocchi),
             )
             da_compilare += [path_blocco(tag, appello_id, b["numero"], "tex", appello=appello),
                              path_griglia(tag, appello_id, b["numero"], "tex", appello=appello)]
@@ -242,6 +257,11 @@ def path_risultati(tag: str, appello_id: int, ext: str, appello=None) -> Path:
 def path_ammessi(tag: str, appello_id: int, ext: str, appello=None) -> Path:
     appello = appello or corsi_service.get_appello(tag, appello_id)
     return _out_dir(tag) / f"ammessi-{appello.slug}.{ext}"
+
+
+def path_orali(tag: str, appello_id: int, ext: str, appello=None) -> Path:
+    appello = appello or corsi_service.get_appello(tag, appello_id)
+    return _out_dir(tag) / f"orali-{appello.slug}.{ext}"
 
 
 def path_iscritti(tag: str, appello_id: int, ext: str, appello=None) -> Path:
@@ -315,7 +335,8 @@ def _recupera_compiti_orfani(tag: str, appello_id: int) -> None:
         if vecchio_pdf.exists():
             path_blocco(tag, appello_id, numero, "pdf").write_bytes(vecchio_pdf.read_bytes())
     ctx = _crea_contesto(corso, appello)
-    tex_griglia = crea_file_griglia(ctx, [(r["codice"], r["soluzioni"]) for r in orfani])
+    tex_griglia = crea_file_griglia(ctx, [(r["codice"], r["soluzioni"]) for r in orfani], numero,
+                                    *_totali_blocchi(tag, appello_id))
     _salva_testo(path_griglia(tag, appello_id, numero, "tex"), tex_griglia)
     compila_pdf(path_griglia(tag, appello_id, numero, "tex"))
 
@@ -440,7 +461,8 @@ def genera_blocco(tag: str, appello_id: int, numero_studenti: int) -> BloccoResu
         conn.close()
 
     _salva_testo(path_blocco(tag, appello_id, numero, "tex"), tex_blocco)
-    tex_griglia = crea_file_griglia(ctx, [(codice, griglia) for codice, griglia, _ in studenti])
+    tex_griglia = crea_file_griglia(ctx, [(codice, griglia) for codice, griglia, _ in studenti], numero,
+                                    *_totali_blocchi(tag, appello_id))
     _salva_testo(path_griglia(tag, appello_id, numero, "tex"), tex_griglia)
 
     return BloccoResult(
@@ -504,6 +526,7 @@ def rigenera_tutto(tag: str, appello_id: int) -> RigenerazioneResult | None:
     ctx = _crea_contesto(corso, appello)
 
     _salva_riferimenti(tag, appello_id, ctx, esercizi_struct)
+    totale, n_blocchi = sum(b["numero_studenti"] for b in blocchi), len(blocchi)
 
     conn = db.get_connection(config.corso_db_path(tag))
     try:
@@ -532,7 +555,8 @@ def rigenera_tutto(tag: str, appello_id: int) -> RigenerazioneResult | None:
                     pass
 
             _salva_testo(path_blocco(tag, appello_id, b["numero"], "tex"), tex_blocco)
-            tex_griglia = crea_file_griglia(ctx, [(codice, griglia) for codice, griglia, _ in studenti])
+            tex_griglia = crea_file_griglia(ctx, [(codice, griglia) for codice, griglia, _ in studenti], b["numero"],
+                                            totale, n_blocchi)
             _salva_testo(path_griglia(tag, appello_id, b["numero"], "tex"), tex_griglia)
         conn.commit()
     finally:

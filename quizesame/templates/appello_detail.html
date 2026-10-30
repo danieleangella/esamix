@@ -442,6 +442,18 @@
       {% else %}<span class="muted">data, ora e aula non ancora indicate</span>{% endif %}</span>
     <a class="icona-azione" href="#impostazioni" data-tab="impostazioni">{{ icona("matita", 13) }} imposta</a>
   </div>
+  {% if orali_da_svolgere or orali_svolti %}
+  {% from "_formati.html" import formati %}
+  <div class="card barra-strumenti" style="margin-bottom:0.75rem">
+    <span>{{ icona("stampa", 14) }} <strong>Foglio per gli orali</strong>
+      {{ info("Chi deve fare l'orale, con le caselle per la presenza e per il voto; poi, per ciascuno, " ~ ("i voti delle prove e la media" if raggruppamento else "il voto dello scritto") ~ ", gli errori fatti e le note sul compito.") }}</span>
+    {% if appello.correzione_scritti_conclusa %}
+    {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/orali", pdf=True, html=True, tex=True, md=True, csv=True) }}
+    {% else %}
+    <span class="muted">pronto quando chiudi la correzione{{ ' di tutte le prove' if raggruppamento else '' }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
   {# cliccando sul nome si apre il dettaglio delle prove svolte, con le risposte sbagliate #}
   {% set prove_orale = raggruppamento.membri if raggruppamento else [appello] %}
   <details class="card" open>

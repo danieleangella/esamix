@@ -13,6 +13,56 @@
 {% set modo = md.appello.modo_aule %}
   <summary><strong>Studenti ammessi e aule ({{ md.ammessi|length }})</strong></summary>
   {% if messaggio %}<div class="flash flash-{{ tipo or 'success' }}" style="margin:0.75rem 0 0">{{ messaggio }}</div>{% endif %}
+  {% if md.indice %}
+  {# dopo la prima prova: chi è ammesso (chi ha superato la precedente, gli iscritti, o gli
+     iscritti controllati sui voti delle precedenti) #}
+  {% set bloccata = md.appello.chiuso or md.appello.aule_chiuse %}
+  {% set precedente = md.prove_precedenti[-1] %}
+  <form class="form-ammissione" method="post" action="{{ url }}/ammissione" style="margin-top:0.75rem">
+    <fieldset {% if bloccata %}disabled{% endif %}>
+      <legend><strong>Chi è ammesso a questa prova</strong>
+        {% if md.appello.aule_chiuse and not md.appello.chiuso %}<span class="muted">(aule assegnate: riapri l'assegnazione per cambiarlo)</span>{% endif %}</legend>
+      {% set testi = {
+        "superati": "chi ha superato «" ~ precedente ~ "» con almeno " ~ corso.votomin_raggruppamento,
+        "iscritti": "gli iscritti a questa prova, così come sono (file della segreteria, Moodle o aggiunti a mano, nel riquadro Iscritti)",
+        "iscritti_controllo": "gli iscritti a questa prova, solo se hanno superato " ~ ("la prova precedente" if md.prove_precedenti|length == 1 else "tutte le prove precedenti") ~ " con almeno " ~ corso.votomin_raggruppamento,
+      } %}
+      {% for valore, testo in testi.items() %}
+      <label class="etichetta-check"><input type="radio" name="modo" value="{{ valore }}" {% if valore == md.appello.ammissione %}checked{% endif %}
+             onchange="this.form.requestSubmit()"> {{ testo }}</label>
+      {% endfor %}
+    </fieldset>
+  </form>
+  {% if md.appello.ammissione != "superati" and not md.appello.chiuso and md.ammessi|length == 0 and not md.non_ammessi %}
+  <p class="muted" style="margin:0.4rem 0 0">Nessun iscritto: caricali nel riquadro Iscritti, più in alto.</p>
+  {% endif %}
+  {% if md.non_ammessi %}
+  <div class="flash flash-warning" style="margin:0.5rem 0 0">
+    ⚠ {{ md.non_ammessi|length }} iscritt{{ 'o non ha' if md.non_ammessi|length == 1 else 'i non hanno' }} superato
+    {{ 'la prova precedente' if md.prove_precedenti|length == 1 else 'tutte le prove precedenti' }} con almeno {{ corso.votomin_raggruppamento }}:
+    non {{ 'è ammesso' if md.non_ammessi|length == 1 else 'sono ammessi' }} (puoi ammetterli in deroga).
+    <table style="margin-top:0.4rem">
+      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th>{% for p in md.prove_precedenti %}<th>{{ p }}</th>{% endfor %}<th></th></tr>
+      {% for s in md.non_ammessi %}
+      <tr>
+        <td>{{ s.matricola }}</td><td>{{ s.cognome }}</td><td>{{ s.nome }}</td>
+        {% for v in s.voti_precedenti %}<td>{{ v }}</td>{% endfor %}
+        <td class="cella-azioni">
+          {% if not md.appello.chiuso %}
+          <form class="inline" method="post" action="{{ url }}/aule/aggiungi-studente"
+                data-conferma="{{ 'Ammettere ' ~ s.cognome ~ ' ' ~ s.nome ~ ' in deroga?' }}">
+            <input type="hidden" name="studente" value="{{ s.matricola }}">
+            <button type="submit" class="pulsante-icona pulsante-ok" data-info="Ammetti in deroga"
+                    aria-label="Ammetti in deroga {{ s.cognome }} {{ s.nome }}">{{ icona("utente-spunta") }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+  {% endif %}
   <div class="barra-strumenti" style="margin-top:0.75rem">
     <span>{{ icona("stampa", 14) }} Elenco ammessi</span>
     {{ formati(url ~ "/ammessi", pdf=True, html=True, tex=True, csv=True) }}
@@ -122,12 +172,13 @@
 
   {% macro tabella(righe) %}
     <table style="margin-top:0.5rem">
-      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Aula</th><th></th></tr>
+      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th>{% for p in md.prove_precedenti or [] %}<th>{{ p }}</th>{% endfor %}<th>DSA/L104</th><th>Aula</th><th></th></tr>
       {% for s in righe %}
       <tr>
         <td>{{ s.matricola }}</td>
         <td>{{ nome_studente(corso.tag, s.matricola, s.cognome) }}{% if s.in_deroga %} <span class="badge badge-warn" data-info="Ammesso in deroga, senza i requisiti della prova">deroga</span>{% endif %}</td>
         <td>{{ s.nome }}</td>
+        {% for v in s.voti_precedenti or [] %}<td>{{ v }}</td>{% endfor %}
         <td>{% if s.dsa %}<span class="badge badge-info">{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}</td>
         <td>
           {# anche ad aule assegnate: spostare uno studente è un'eccezione, gli altri restano #}

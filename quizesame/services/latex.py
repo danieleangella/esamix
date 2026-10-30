@@ -588,10 +588,49 @@ def crea_file_blocco(ctx: LatexContext, esercizi_struct: list[dict], numero_stud
     return studenti, tex
 
 
-def crea_file_griglia(ctx: LatexContext, studenti_codici_griglie) -> str:
+def _copertina_griglia(ctx: LatexContext, numero_blocco: int, n_blocco: int, totale: int, n_blocchi: int) -> str:
+    """Prima pagina del fascicolo con le griglie: il corso e la prova nella metà superiore;
+    sotto, quanti compiti sono stati stampati (in questo blocco e in tutto) e gli spazi per
+    scrivere a mano iscritti, presenti e assenti. Le griglie cominciano su un nuovo fronte."""
+    universita_anno = ", a.a. ".join(p for p in (ctx.universita, ctx.anno) if p)
+    sotto = "".join(f"{{\\large {r}}}\\par\\smallskip\n" for r in (ctx.facolta, universita_anno) if r)
+    prova = _escape_testo_semplice(ctx.appello_nome) + (f" --- {_escape_testo_semplice(ctx.appello_data)}" if ctx.appello_data else "")
+
+    def campo(etichetta: str, valore: str = "") -> str:
+        contenuto = f"{{\\Large\\bfseries {valore}}}" if valore else "\\rule{4cm}{0.4pt}"
+        return f"{{\\large {etichetta}}} & {contenuto} \\\\[0.9cm]\n"
+    return (
+        "\\thispagestyle{empty}\n"
+        "\\noindent\\begin{minipage}[t][0.45\\textheight][c]{\\textwidth}\\centering\n"
+        f"{{\\Huge\\bfseries {ctx.corso}}}\\par\\bigskip\n"
+        + sotto +
+        "\\vspace{1cm}\n"
+        f"{{\\LARGE {prova}}}\\par\\bigskip\n"
+        "{\\large Griglie delle risposte corrette}\\par\n"
+        "\\end{minipage}\\par\n"
+        "\\noindent\\rule{\\textwidth}{0.6pt}\\par\\vspace{1cm}\n"
+        "\\begin{center}\n\\renewcommand{\\arraystretch}{1}\n\\begin{tabular}{l@{\\qquad}l}\n"
+        + campo(f"Compiti stampati in questo blocco (n.~{numero_blocco})", str(n_blocco))
+        + campo(f"Compiti stampati in totale ({_quanti(n_blocchi, 'blocco', 'blocchi')})", str(totale))
+        + campo("Studenti iscritti")
+        + campo("Studenti presenti")
+        + campo("Studenti assenti")
+        + "\\end{tabular}\n\\end{center}\n"
+        + NUOVA_PAGINA_DISPARI
+    )
+
+
+def crea_file_griglia(ctx: LatexContext, studenti_codici_griglie, numero_blocco: int | None = None,
+                      totale_compiti: int | None = None, n_blocchi: int | None = None) -> str:
     """Griglia delle soluzioni per un singolo blocco: studenti_codici_griglie è
-    [(codice, griglia), ...]."""
+    [(codice, griglia), ...]. Con `numero_blocco` si apre con una copertina (vedi
+    _copertina_griglia) che riporta anche i compiti stampati in tutto (`totale_compiti`,
+    in `n_blocchi` blocchi)."""
     tex = BEGIN_DOCUMENT
+    if numero_blocco is not None:
+        tex += _copertina_griglia(ctx, numero_blocco, len(studenti_codici_griglie),
+                                  totale_compiti if totale_compiti is not None else len(studenti_codici_griglie),
+                                  n_blocchi or 1)
     tex += stampa_codici(ctx, studenti_codici_griglie)
     tex += "\n\n\\end{document}"
     return tex
@@ -650,7 +689,7 @@ def crea_tex_risultati(ctx: LatexContext, righe: list[dict], prove: list[str] = 
     return tex
 
 
-def _tabella_ammessi(righe: list[dict], con_aula: bool = False, etichetta: str = "") -> str:
+def _tabella_ammessi(righe: list[dict], con_aula: bool = False, etichetta: str = "", prove: list[str] = ()) -> str:
     """Righe ben distanziate (spazio a sufficienza per segnare a penna presenza/assenza
     durante l'appello), con una riga di separazione tra uno studente e l'altro. La
     casella "Presente" è la prima colonna (senza intestazione, da spuntare a penna); la
@@ -662,13 +701,18 @@ def _tabella_ammessi(righe: list[dict], con_aula: bool = False, etichetta: str =
     `con_aula`: colonna in più con l'aula assegnata (nell'elenco generale, se ci sono aule).
     `etichetta`: a quale aula si riferisce il foglio (o "elenco completo"), ripetuta in un
     riquadro in cima a ogni pagina della tabella: i fogli stampati restano riconoscibili
-    anche una volta separati e distribuiti nelle aule."""
+    anche una volta separati e distribuiti nelle aule.
+    `prove`: le prove precedenti dello stesso raggruppamento, con una colonna ciascuna per
+    il voto preso ('voti_precedenti' di ogni riga)."""
+    # con i voti delle prove precedenti, cognome e nome si stringono per fare posto
+    stretto = 0.03 * min(len(prove), 3)
+    voti_col = _colonne_voti(len(prove))
     if con_aula:
-        colonne = "c >{\\ttfamily}l >{\\bfseries}p{0.24\\textwidth} p{0.2\\textwidth} l l"
-        intestazione = ("Presente", "Matricola", "Cognome", "Nome", "Aula", "Note")
+        colonne = f"c >{{\\ttfamily}}l >{{\\bfseries}}p{{{0.24 - stretto:.2f}\\textwidth}} p{{{0.2 - stretto:.2f}\\textwidth}}{voti_col} l l"
+        intestazione = ("Presente", "Matricola", "Cognome", "Nome", *map(_testo_piccolo, prove), "Aula", "Note")
     else:
-        colonne = "c >{\\ttfamily}l >{\\bfseries}p{0.3\\textwidth} p{0.25\\textwidth} l"
-        intestazione = ("Presente", "Matricola", "Cognome", "Nome", "Note")
+        colonne = f"c >{{\\ttfamily}}l >{{\\bfseries}}p{{{0.3 - stretto:.2f}\\textwidth}} p{{{0.25 - stretto:.2f}\\textwidth}}{voti_col} l"
+        intestazione = ("Presente", "Matricola", "Cognome", "Nome", *map(_testo_piccolo, prove), "Note")
     riga_etichetta = (
         f"\\rowcolor{{white}}\\multicolumn{{{len(intestazione)}}}{{r}}"
         f"{{\\setlength{{\\fboxsep}}{{5pt}}\\fbox{{\\Large\\bfseries {etichetta}}}}} \\\\[4pt]\n"
@@ -685,7 +729,10 @@ def _tabella_ammessi(righe: list[dict], con_aula: bool = False, etichetta: str =
             note_parti.append("deroga")
         note = ", ".join(note_parti)
         aula = f" & {_escape_testo_semplice(r.get('aula_nome') or '--')}" if con_aula else ""
-        tex += f"\\rule{{0pt}}{{0.75cm}}{{\\Large $\\square$}} & {r['matricola']} & {r['cognome']} & {r['nome']}{aula} & {note} \\\\\n"
+        voti = list(r.get("voti_precedenti") or [])
+        voti = "".join(f" & {_escape_testo_semplice(str(v))}" for v in (voti + ["--"] * len(prove))[:len(prove)])
+        tex += (f"\\rule{{0pt}}{{0.75cm}}{{\\Large $\\square$}} & {r['matricola']} & {_escape_testo_semplice(r['cognome'])}"
+                f" & {_escape_testo_semplice(r['nome'])}{voti}{aula} & {note} \\\\\n")
     tex += "\\bottomrule\n\\end{longtable}\n\n"
     return tex
 
@@ -700,7 +747,24 @@ def _piede_elenco(etichetta: str) -> str:
     )
 
 
-def crea_tex_ammessi(ctx: LatexContext, titolo: str, lista: list[dict], aule: list, aula_singola: str = "") -> str:
+def _testo_piccolo(testo: str) -> str:
+    """Intestazione di una colonna stretta (es. il nome di una prova), in corpo piccolo:
+    va in una colonna a larghezza fissa (vedi _colonne_voti), dove va a capo."""
+    return f"\\small {_escape_testo_semplice(testo)}"
+
+
+def _colonne_voti(n: int) -> str:
+    """Colonne dei voti delle prove: larghezza fissa, il nome della prova va a capo."""
+    return " >{\\centering\\arraybackslash}p{1.7cm}" * n
+
+
+# nuova pagina che sia sempre dispari (un fronte nella stampa fronte-retro), lasciando
+# bianco il retro dell'ultima pagina se serve
+NUOVA_PAGINA_DISPARI = "\\clearpage\n\\ifodd\\value{page}\\else\\null\\thispagestyle{empty}\\clearpage\\fi\n"
+
+
+def crea_tex_ammessi(ctx: LatexContext, titolo: str, lista: list[dict], aule: list, aula_singola: str = "",
+                     prove: list[str] = ()) -> str:
     """Elenco degli studenti ammessi a sostenere una prova (matricola per intero, non
     oscurata: serve a fare l'appello in aula, non va pubblicata come i risultati). `lista`:
     dict con matricola/nome/cognome/dsa/aula_nome. `aule`: le aule di questa prova (oggetti
@@ -708,19 +772,94 @@ def crea_tex_ammessi(ctx: LatexContext, titolo: str, lista: list[dict], aule: li
     dopo segue una tabella per aula con solo gli studenti assegnati a quella specifica aula.
     `aula_singola`: nome dell'aula se l'elenco è già quello di un'aula sola.
     Ogni pagina dice, in cima alla tabella e a piè di pagina, a quale aula si riferisce o se
-    è l'elenco completo."""
+    è l'elenco completo. L'elenco di ciascuna aula comincia sempre su una pagina dispari,
+    così stampando fronte-retro i fogli di un'aula non stanno sul retro di quelli di un'altra.
+    `prove`: vedi _tabella_ammessi."""
     etichetta = f"Aula {_escape_testo_semplice(aula_singola)}" if aula_singola else (
         "Elenco completo (tutte le aule)" if aule else "Elenco completo")
     tex = BEGIN_DOCUMENT
     tex += _piede_elenco(etichetta)
     tex += intestazione_breve(ctx)
     tex += _titolo_documento(titolo, _quanti(len(lista), "studente", "studenti"))
-    tex += _tabella_ammessi(lista, con_aula=bool(aule), etichetta=etichetta)
+    tex += _tabella_ammessi(lista, con_aula=bool(aule), etichetta=etichetta, prove=prove)
     for aula in aule:
         righe_aula = [r for r in lista if r.get("aula_id") == aula.id]
         etichetta_aula = f"Aula {_escape_testo_semplice(aula.nome)}"
-        tex += "\\clearpage\n" + _piede_elenco(etichetta_aula)
+        tex += NUOVA_PAGINA_DISPARI + _piede_elenco(etichetta_aula)
         tex += _titolo_documento(etichetta_aula, _quanti(len(righe_aula), "studente", "studenti") + f" (capienza {aula.capienza})")
-        tex += _tabella_ammessi(righe_aula, etichetta=etichetta_aula)
+        tex += _tabella_ammessi(righe_aula, etichetta=etichetta_aula, prove=prove)
+    tex += "\\end{document}"
+    return tex
+
+
+def crea_tex_orali(ctx: LatexContext, dati: dict, note_studente) -> str:
+    """Foglio per gli orali (vedi orali.foglio_orali): prima l'elenco di chi deve sostenerlo,
+    con la casella della presenza, il voto dello scritto (per un raggruppamento i voti
+    delle prove e la media) e lo spazio per il voto dell'orale (o l'esito, se già
+    registrato); poi, da una nuova pagina dispari, una scheda per studente con gli errori
+    fatti in ogni prova, le note e uno spazio per gli appunti. `note_studente(s,
+    raggruppamento)`: le note da elencare per uno studente (testo semplice)."""
+    prove = dati["prove"]
+    studenti = dati["studenti"]
+    e = _escape_testo_semplice
+    tex = BEGIN_DOCUMENT
+    tex += intestazione_breve(ctx)
+    tex += _titolo_documento("Orali", _quanti(len(studenti), "studente", "studenti"))
+    tex += _intestazione_orale(ctx)
+    voti_col = _colonne_voti(len(prove))
+    stretto = 0.03 * min(len(prove), 3)
+    intestazione = ("Presente", "Matricola", "Cognome", "Nome", *map(_testo_piccolo, prove),
+                    "Media" if prove else "Scritto", "Voto orale")
+    tex += _RIGHE_ALTERNATE + (
+        f"\\begin{{longtable}}{{c >{{\\ttfamily}}l >{{\\bfseries}}p{{{0.22 - stretto:.2f}\\textwidth}} "
+        f"p{{{0.18 - stretto:.2f}\\textwidth}}{voti_col} c c}}\n\\toprule\n"
+        + _riga_intestazione(*intestazione, altezza="0.85cm") + "\\midrule\n\\endhead\n"
+    )
+    for s in studenti:
+        voti = "".join(f" & {e(str(v))}" for v in s["voti_prove"])
+        scritto = str(s["scritto"]) if s["scritto"] is not None else "--"
+        orale = (f"\\textit{{{e(s['esito_orale'])}}}" if s["esito_orale"]
+                 else "\\setlength{\\fboxsep}{0pt}\\fbox{\\rule{0pt}{0.6cm}\\hspace{1.6cm}}")
+        tex += (f"\\rule{{0pt}}{{0.85cm}}{{\\Large $\\square$}} & {e(s['matricola'])} & {e(s['cognome'])} & "
+                f"{e(s['nome'])}{voti} & {scritto} & {orale} \\\\\n")
+    tex += "\\bottomrule\n\\end{longtable}\n\n"
+
+    if studenti:
+        tex += NUOVA_PAGINA_DISPARI
+        tex += _titolo_documento("Gli scritti, studente per studente")
+    for s in studenti:
+        tex += "\\noindent\\begin{minipage}{\\textwidth}\n"
+        voto = f"scritto {s['scritto']}" if s["scritto"] is not None else "scritto --"
+        if prove and s["media_esatta"] is not None:
+            voto = f"media {str(s['media_esatta']).replace('.', ',')} (voto {s['scritto']})"
+        tex += (
+            "\\noindent\\colorbox{black!10}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep}{\\strut"
+            f"{{\\large\\bfseries {e(s['cognome'])} {e(s['nome'])}}}\\quad{{\\ttfamily {e(s['matricola'])}}}"
+            f"\\hfill{{\\bfseries {voto}}}}}}}\\par\\smallskip\n"
+        )
+        for sc in s["scritti"]:
+            dettagli = [f"voto {sc['voto']}" if sc["voto"] is not None else e(sc["esito"])]
+            if sc["codice"]:
+                dettagli.append(f"compito {e(str(sc['codice']))}")
+            if sc["n_esercizi"]:
+                dettagli.append(f"{len(sc['errori'])} errori su {sc['n_esercizi']} esercizi"
+                                if len(sc["errori"]) != 1 else f"1 errore su {sc['n_esercizi']} esercizi")
+            titolo = f"{{\\bfseries {e(sc['prova'])}}}: " if prove else ""
+            tex += f"\\noindent {titolo}{', '.join(dettagli)}\\par\n"
+            if sc["errori"]:
+                tex += "\\begin{itemize}\\setlength{\\itemsep}{0pt}\n"
+                for err in sc["errori"]:
+                    etichetta = e(err["esercizio_nome"]) + (" (obbligatorio)" if err["obbligatorio"] else "")
+                    nota = f" --- \\textit{{{e(err['nota'])}}}" if err["nota"] else ""
+                    tex += f"\\item {etichetta}: {e(err['descrizione'])}{nota}\n"
+                tex += "\\end{itemize}\n"
+        note = note_studente(s, bool(prove))
+        if note:
+            tex += "\\noindent{\\small\\bfseries Note:}\\begin{itemize}\\setlength{\\itemsep}{0pt}\n"
+            tex += "".join(f"\\item {{\\small {e(n)}}}\n" for n in note)
+            tex += "\\end{itemize}\n"
+        tex += ("\\smallskip\\noindent{\\small Appunti dell'orale:}\\par\\vspace{0.7cm}"
+                "\\noindent\\rule{\\textwidth}{0.3pt}\\par\\vspace{0.7cm}\\noindent\\rule{\\textwidth}{0.3pt}\\par\n")
+        tex += "\\end{minipage}\\par\\bigskip\\bigskip\n\n"
     tex += "\\end{document}"
     return tex

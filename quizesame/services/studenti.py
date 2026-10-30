@@ -90,16 +90,19 @@ def esporta_csv(studenti: list[Studente], stato_esame: dict) -> bytes:
     return buffer.getvalue().encode("utf-8-sig")
 
 
-def esporta_ammessi_csv(lista: list[dict]) -> bytes:
+def esporta_ammessi_csv(lista: list[dict], prove: list[str] = ()) -> bytes:
     """CSV dell'elenco ammessi a una prova (vedi corsi_service.list_ammessi_prova):
-    matricola, cognome, nome, indicazione DSA, aula assegnata e se ammesso in deroga
-    (aggiunto a mano pur non soddisfacendo i requisiti automatici)."""
+    matricola, cognome, nome, il voto in ciascuna delle `prove` precedenti dello stesso
+    raggruppamento ('voti_precedenti'), indicazione DSA, aula assegnata e se ammesso in
+    deroga (aggiunto a mano pur non soddisfacendo i requisiti automatici)."""
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\r\n")
-    writer.writerow(["Matricola", "Cognome", "Nome", "DSA/L104", "Aula", "In deroga"])
+    writer.writerow(["Matricola", "Cognome", "Nome", *prove, "DSA/L104", "Aula", "In deroga"])
     for s in lista:
+        voti = list(s.get("voti_precedenti") or [])[:len(prove)]
         writer.writerow([
-            s["matricola"], s["cognome"], s["nome"], tipo_dsa(s.get("dsa"), s.get("dsa_tipo")),
+            s["matricola"], s["cognome"], s["nome"], *voti, *[""] * (len(prove) - len(voti)),
+            tipo_dsa(s.get("dsa"), s.get("dsa_tipo")),
             s.get("aula_nome") or "non assegnata", "Sì" if s.get("in_deroga") else "",
         ])
     return buffer.getvalue().encode("utf-8-sig")

@@ -23,14 +23,15 @@
 <div class="card" style="padding:0.5rem 1rem">
   <table class="tabella-elenco">
     {# l'etichetta sta nell'intestazione della tabella: stampando, si ripete in cima a ogni foglio #}
-    <thead><tr><th colspan="{{ 6 if con_aula else 5 }}" class="etichetta-foglio"><span>{{ etichetta }}</span></th></tr>
-      <tr><th>Presente</th><th>Matricola</th><th>Cognome</th><th>Nome</th>{% if con_aula %}<th>Aula</th>{% endif %}<th>Note</th></tr></thead>
+    <thead><tr><th colspan="{{ (6 if con_aula else 5) + prove|length }}" class="etichetta-foglio"><span>{{ etichetta }}</span></th></tr>
+      <tr><th>Presente</th><th>Matricola</th><th>Cognome</th><th>Nome</th>{% for p in prove %}<th>{{ p }}</th>{% endfor %}{% if con_aula %}<th>Aula</th>{% endif %}<th>Note</th></tr></thead>
     {% for s in righe %}
     <tr>
       <td style="font-size:1.3rem">☐</td>
       <td style="font-family:monospace">{{ s.matricola }}</td>
       <td><strong>{{ s.cognome }}</strong></td>
       <td>{{ s.nome }}</td>
+      {% for p in prove %}<td>{{ (s.voti_precedenti or [])[loop.index0] or '—' }}</td>{% endfor %}
       {% if con_aula %}<td>{{ s.aula_nome or '—' }}</td>{% endif %}
       <td>{% if s.dsa %}<span class="badge badge-info">{{ s.dsa_tipo or 'DSA' }}</span>{% endif %}
         {% if s.in_deroga %}<span class="badge badge-warn">deroga</span>{% endif %}

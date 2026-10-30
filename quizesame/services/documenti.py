@@ -65,3 +65,46 @@ def risultati_md(tag: str, appello_id: int) -> str:
         voti = "".join(f"{v} | " for v in r["voti_prove"])
         righe.append(f"| `{r['matricola']}` | {iniziali} | {voti}**{r['etichetta']}** |")
     return "\n".join(righe) + "\n"
+
+
+def orali_md(tag: str, appello, dati: dict) -> str:
+    """Il foglio per gli orali (vedi orali.foglio_orali): l'elenco con le colonne da
+    compilare (presente, voto orale), poi gli scritti di ciascuno con errori e note."""
+    from quizesame.services import orali as orali_service
+    corso = dati["corso"]
+    prove = dati["prove"]
+    studenti = dati["studenti"]
+    righe = _intestazione(corso, appello, "Orali")
+    righe += [f"**{risultati_service.frase_orale(tag, corso, appello)}**", ""]
+    righe += [
+        "| Presente | Matricola | Cognome | Nome | " + "".join(f"{p} | " for p in prove)
+        + ("Media | " if prove else "Scritto | ") + "Voto orale |",
+        "|:---:|:---:|---|---|" + ":---:|" * len(prove) + ":---:|:---:|",
+    ]
+    for s in studenti:
+        voti = "".join(f"{v} | " for v in s["voti_prove"])
+        scritto = s["scritto"] if s["scritto"] is not None else "—"
+        righe.append(f"| ☐ | `{s['matricola']}` | **{s['cognome']}** | {s['nome']} | {voti}{scritto} | {s['esito_orale']} |")
+    if studenti:
+        righe += ["", "---", "", "## Gli scritti, studente per studente", ""]
+    for s in studenti:
+        voto = f"scritto {s['scritto']}" if s["scritto"] is not None else "scritto —"
+        if prove and s["media_esatta"] is not None:
+            voto = f"media {str(s['media_esatta']).replace('.', ',')} (voto {s['scritto']})"
+        righe += [f"### {s['cognome']} {s['nome']} (`{s['matricola']}`) — {voto}", ""]
+        for sc in s["scritti"]:
+            dettagli = [f"voto {sc['voto']}" if sc["voto"] is not None else sc["esito"]]
+            if sc["codice"]:
+                dettagli.append(f"compito {sc['codice']}")
+            if sc["n_esercizi"]:
+                dettagli.append(f"{len(sc['errori'])} errori su {sc['n_esercizi']} esercizi")
+            righe += [(f"**{sc['prova']}**: " if prove else "") + ", ".join(dettagli), ""]
+            for e in sc["errori"]:
+                nota = f" — *{e['nota']}*" if e["nota"] else ""
+                righe.append(f"- {e['esercizio_nome']}{' (obbligatorio)' if e['obbligatorio'] else ''}: {e['descrizione']}{nota}")
+            if sc["errori"]:
+                righe.append("")
+        note = orali_service.note_studente(s, bool(prove))
+        if note:
+            righe += ["**Note:**", ""] + [f"- {n}" for n in note] + [""]
+    return "\n".join(righe).rstrip() + "\n"

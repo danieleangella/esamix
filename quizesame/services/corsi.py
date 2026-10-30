@@ -129,6 +129,8 @@ class Appello:
     # "automatica" (in proporzione ai posti), "percentuali" (scelte per aula) o
     # "intervalli" (di cognomi, scelti per aula): vedi aule.assegna_automatica
     modo_aule: str = "automatica"
+    # solo per le prove di un raggruppamento dopo la prima: vedi MODI_AMMISSIONE
+    ammissione: str = "superati"
 
 
 @dataclass
@@ -554,6 +556,7 @@ def _row_to_appello(conn, row) -> Appello:
         rimanda_svolgimenti=bool(row["rimanda_svolgimenti"]) if "rimanda_svolgimenti" in chiavi else False,
         aule_chiuse=bool(row["aule_chiuse"]) if "aule_chiuse" in chiavi else False,
         modo_aule=(row["modo_aule"] if "modo_aule" in chiavi else None) or "automatica",
+        ammissione=(row["ammissione"] if "ammissione" in chiavi else None) or "superati",
     )
 
 
@@ -928,27 +931,103 @@ def applica_filtro_cognome_alle_prove(tag: str, vecchio: str, nuovo: str) -> int
         conn.close()
 
 
+# Chi è ammesso a una prova di un raggruppamento dopo la prima (colonna appelli.ammissione)
+MODI_AMMISSIONE = {
+    "superati": "Chi ha superato la prova precedente",
+    "iscritti": "Gli iscritti a questa prova",
+    "iscritti_controllo": "Gli iscritti che hanno superato le prove precedenti",
+}
+
+
+def _righe_iscritti(tag: str, appello_id: int) -> list[dict]:
+    # import locale: esportazione importa già questo modulo
+    from quizesame.services import esportazione as esportazione_service
+    return [
+        {"matricola": s["matricola"], "nome": s["nome"], "cognome": s["cognome"], "dsa": s["dsa"],
+         "dsa_tipo": s.get("dsa_tipo") or ""}
+        for s in (esportazione_service.list_iscritti(tag, appello_id) or [])
+    ]
+
+
+def _etichetta_voto_prova(r) -> str:
+    if r["esito"] == "voto":
+        if r["valutazione_sospesa"]:
+            return "in sospeso"
+        return str(r["voto"]) if r["voto"] is not None else "—"
+    return r["esito"]
+
+
+def _voti_prove_precedenti(conn, raggruppamento: Raggruppamento, indice: int) -> dict[str, list[dict]]:
+    """Per ogni studente con un risultato in una delle prove prima di `indice`, una voce per
+    ciascuna di quelle prove: 'voto' (numero, solo per un voto definitivo) ed 'etichetta'
+    (il voto, o l'esito: assente, ritirato, ...; "—" se non ha svolto quella prova)."""
+    precedenti = raggruppamento.membri[:indice]
+    voti: dict[str, list[dict]] = {}
+    for i, m in enumerate(precedenti):
+        for r in conn.execute(
+            "SELECT matricola, esito, voto, valutazione_sospesa FROM risultati WHERE appello_id=?", (m.id,),
+        ):
+            voti.setdefault(r["matricola"], [{"voto": None, "etichetta": "—"} for _ in precedenti])[i] = {
+                "voto": r["voto"] if r["esito"] == "voto" and not r["valutazione_sospesa"] else None,
+                "etichetta": _etichetta_voto_prova(r),
+            }
+    return voti
+
+
+def voti_prove_precedenti(tag: str, raggruppamento: Raggruppamento, indice: int) -> dict[str, list[dict]]:
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        return _voti_prove_precedenti(conn, raggruppamento, indice)
+    finally:
+        conn.close()
+
+
+def _superate(voti: Optional[list[dict]], soglia: int) -> bool:
+    return voti is not None and all(v["voto"] is not None and v["voto"] >= soglia for v in voti)
+
+
+def list_non_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) -> list[dict]:
+    """Con l'ammissione "iscritti_controllo": gli iscritti alla prova che non hanno superato
+    tutte le prove precedenti (né sono stati ammessi in deroga), ciascuno con i voti
+    presi ('voti_precedenti'). Vuoto con le altre modalità."""
+    membro = raggruppamento.membri[indice]
+    if indice == 0 or membro.ammissione != "iscritti_controllo":
+        return []
+    soglia = get_corso(tag).votomin_raggruppamento
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        voti = _voti_prove_precedenti(conn, raggruppamento, indice)
+        in_deroga = {r["matricola"] for r in conn.execute(
+            "SELECT matricola FROM ammissioni_manuali WHERE appello_id=?", (membro.id,))}
+    finally:
+        conn.close()
+    vuoti = [{"voto": None, "etichetta": "—"}] * indice
+    return [
+        {**s, "voti_precedenti": [v["etichetta"] for v in voti.get(s["matricola"], vuoti)]}
+        for s in _righe_iscritti(tag, membro.id)
+        if not _superate(voti.get(s["matricola"]), soglia) and s["matricola"] not in in_deroga
+    ]
+
+
 def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) -> list[dict]:
     """Studenti ammessi a sostenere la prova `raggruppamento.membri[indice]`: per la prima
     prova (indice 0), quelli dell'elenco iscritti della prima prova (nessuno se l'elenco è
     vuoto) — oppure, se fonte_ammessi è "corso", tutti gli studenti del corso — con matricola >= l'eventuale soglia
     impostata sul raggruppamento (chi ha una matricola non numerica, o se la soglia non è
     impostata/non è un numero valido, resta ammesso: non si filtrano casi ambigui); per le
-    successive, solo chi ha superato (voto >= voto minimo delle prove parziali) la prova
-    immediatamente precedente. Ogni voce include anche l'eventuale aula già assegnata per
-    la prova `indice`."""
+    successive, secondo l'ammissione scelta per quella prova (MODI_AMMISSIONE): chi ha
+    superato (voto >= voto minimo delle prove parziali) la prova immediatamente
+    precedente, gli iscritti alla prova così come sono, oppure gli iscritti che hanno
+    superato tutte le prove precedenti. Ogni voce include anche l'eventuale aula già
+    assegnata per la prova `indice` e, dopo la prima prova, i voti presi nelle precedenti
+    ('voti_precedenti', etichette come in _voti_prove_precedenti)."""
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         membro = raggruppamento.membri[indice]
+        voti = _voti_prove_precedenti(conn, raggruppamento, indice) if indice > 0 else {}
         if indice == 0:
             if raggruppamento.fonte_ammessi == "iscritti":
-                # import locale: esportazione importa già questo modulo
-                from quizesame.services import esportazione as esportazione_service
-                righe = [
-                    {"matricola": s["matricola"], "nome": s["nome"], "cognome": s["cognome"], "dsa": s["dsa"],
-                     "dsa_tipo": s.get("dsa_tipo") or ""}
-                    for s in (esportazione_service.list_iscritti(tag, membro.id) or [])
-                ]
+                righe = _righe_iscritti(tag, membro.id)
             else:
                 righe = [dict(r) for r in conn.execute(
                     "SELECT matricola, nome, cognome, dsa, dsa_tipo FROM studenti ORDER BY cognome COLLATE NOCASE, nome COLLATE NOCASE"
@@ -957,6 +1036,11 @@ def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) ->
             if raggruppamento.fonte_ammessi != "iscritti":
                 # l'elenco iscritti è già filtrato; tutto il corso va filtrato qui
                 ammessi = [r for r in ammessi if cognome_ammesso(r["cognome"], membro.cognome_iscritti)]
+        elif membro.ammissione in ("iscritti", "iscritti_controllo"):
+            ammessi = _righe_iscritti(tag, membro.id)
+            if membro.ammissione == "iscritti_controllo":
+                soglia = get_corso(tag).votomin_raggruppamento
+                ammessi = [s for s in ammessi if _superate(voti.get(s["matricola"]), soglia)]
         else:
             corso = get_corso(tag)
             membro_precedente = raggruppamento.membri[indice - 1]
@@ -996,6 +1080,10 @@ def list_ammessi_prova(tag: str, raggruppamento: Raggruppamento, indice: int) ->
             info = assegnazioni.get(s["matricola"], {})
             s["aula_id"] = info.get("aula_id")
             s["aula_nome"] = info.get("aula_nome")
+        if indice > 0:
+            vuoti = [{"voto": None, "etichetta": "—"}] * indice
+            for s in ammessi:
+                s["voti_precedenti"] = [v["etichetta"] for v in voti.get(s["matricola"], vuoti)]
         return ammessi
     finally:
         conn.close()

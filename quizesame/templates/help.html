@@ -426,7 +426,11 @@ COMPITO DA CONVERTIRE
     risposte corrette, senza e con soluzioni) è invece unico per l'appello, comune a tutti i
     blocchi, e si trova nella scheda Testo. Oltre ai file <code>.tex</code>/<code>.pdf</code>
     da scaricare, un link <strong>.html</strong> apre subito in pagina un'anteprima (per il
-    blocco, del primo compito generato) senza dover scaricare né compilare nulla.
+    blocco, del primo compito generato) senza dover scaricare né compilare nulla. Il PDF delle
+    <strong>griglie</strong> si apre con una copertina: il corso e la prova nella metà superiore,
+    sotto i compiti stampati in quel blocco e in tutto (al momento della generazione: "Rigenera
+    tutti i documenti" aggiorna il totale anche sulle griglie dei blocchi precedenti) e gli spazi
+    per scrivere a mano iscritti, presenti e assenti.
   </p>
   <p class="muted">
     Se si riapre il testo e si modificano gli esercizi dopo aver già generato un blocco, l'app
@@ -624,6 +628,15 @@ COMPITO DA CONVERTIRE
     ("obbligatorio dopo N compiti con voto sotto M", con la possibilità di contare anche
     i ritirati).
   </p>
+  <p>
+    Chiusa la correzione (di tutte le prove, per un raggruppamento), in cima alla scheda c'è il
+    <strong>foglio per gli orali</strong> (PDF, HTML, .tex, .md, .csv): l'elenco di chi deve
+    sostenerlo, con la casella per la presenza e quella per il voto dell'orale (o l'esito, se già
+    registrato); poi, da una nuova pagina dispari, una scheda per ciascuno con il voto dello scritto
+    (per un raggruppamento i voti delle prove e la media), gli errori fatti in ogni prova (risposte
+    sbagliate o mancanti, punteggi degli svolgimenti con le note), le note sul compito, il motivo
+    dell'orale, l'eventuale DSA/L104 e qualche riga per gli appunti.
+  </p>
 </details>
 
 <details class="card dettaglio-fisarmonica">
@@ -731,8 +744,14 @@ COMPITO DA CONVERTIRE
     <strong>Chiusura</strong> e <strong>Impostazioni</strong>.
   </p>
   <p>
-    Alla seconda prova (e successive) può partecipare solo chi ha superato la prova
-    precedente con il voto minimo delle prove parziali. Per la prima prova, in Impostazioni
+    Per la seconda prova (e le successive), nel riquadro degli ammessi della sua scheda Compiti
+    d'esame si sceglie chi è ammesso: <em>chi ha superato la prova precedente</em> con il voto
+    minimo delle prove parziali (la scelta predefinita), <em>gli iscritti a questa prova</em> così
+    come sono (file della segreteria, Moodle o aggiunti a mano), oppure <em>gli iscritti che hanno
+    superato le prove precedenti</em>: in questo caso gli iscritti che non le hanno superate tutte
+    sono elencati a parte, con i voti presi, e si possono ammettere in deroga. Negli elenchi di
+    iscritti e ammessi di queste prove (a schermo, PDF e .csv) compare anche il voto preso in
+    ciascuna prova precedente del raggruppamento. Per la prima prova, in Impostazioni
     si sceglie se ammettere solo gli <strong>iscritti</strong> della prova (file della
     segreteria o aggiunti a mano: è la scelta predefinita, e finché non si aggiunge nessun
     iscritto l'elenco degli ammessi resta vuoto) oppure <strong>tutti gli studenti del
@@ -770,7 +789,8 @@ COMPITO DA CONVERTIRE
     altri: "Aggiungi uno studente" cerca uno studente del corso per cognome, nome o matricola e
     lo mette nell'aula scelta o in quella del suo
     cognome, ammettendolo alla prova se serve. Anche dopo l'assegnazione, nell'elenco degli ammessi si può cambiare l'aula di un
-    singolo studente dal suo menu, senza toccare gli altri.
+    singolo studente dal suo menu, senza toccare gli altri. Nel PDF degli ammessi l'elenco di
+    ciascuna aula comincia sempre su una pagina dispari, per la stampa fronte-retro.
     Se gli studenti attesi superano una certa quota dei posti (50% di default, si cambia nelle
     Impostazioni del corso, sezione Aule) compare un avviso. Uno studente che non soddisfa i requisiti si può
     comunque ammettere con "Aggiungi uno studente", nel riquadro degli ammessi della prova: comparirà con l'avviso

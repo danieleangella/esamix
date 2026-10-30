@@ -32,6 +32,7 @@ from quizesame.services import aggiornamenti as aggiornamenti_service
 from quizesame.services import aule as aule_service
 from quizesame.services import latex as latex_service
 from quizesame.services import presenze as presenze_service
+from quizesame.services import orali as orali_service
 from quizesame.services import ia as ia_service
 from quizesame.services import documenti as documenti_service
 from quizesame.services import registro as registro_service
@@ -1229,14 +1230,17 @@ def _contesto_appello(tag: str, corso, appello) -> dict:
             # non la singola prova.
             dati_membro["numero_studenti_suggerito"] = _numero_studenti_suggerito(len(ammessi), len(dati_membro["compiti"]))
             # senza elenco iscritti, per una prova del raggruppamento si attendono gli ammessi
-            if dati_membro["riepilogo_presenze"] is None:
+            # (anche con l'elenco, se ne sono ammessi solo quelli che hanno superato le precedenti)
+            solo_ammessi = i > 0 and m.ammissione == "iscritti_controllo"
+            if dati_membro["riepilogo_presenze"] is None or solo_ammessi:
                 dati_membro["riepilogo_presenze"] = presenze_service.riepilogo(tag, m.id, ammessi)
-            if dati_membro["non_valutati"] is None:
+            if dati_membro["non_valutati"] is None or solo_ammessi:
                 dati_membro["non_valutati"] = presenze_service.non_valutati(tag, m.id, ammessi)
                 # la fase Presenze dipende da chi è ancora senza esito: va ricalcolata
                 dati_membro["riepilogo_home"] = _calcola_riepilogo_home(corso, m, dati_membro)
             membri_dati.append({
-                **dati_membro, "aule": aule_service.list_aule(tag, m.id), "ammessi": ammessi, "indice": i,
+                **dati_membro, **_dati_ammissione(tag, raggruppamento, i, ammessi),
+                "aule": aule_service.list_aule(tag, m.id), "indice": i,
                 "aula_di": {s["matricola"]: s.get("aula_nome") for s in ammessi},
             })
         contesto["membri_dati"] = membri_dati
@@ -2401,10 +2405,15 @@ def _render_correggi_revisione(
         if raggruppamento is not None and indice > 0:
             ammessi = {s["matricola"] for s in corsi_service.list_ammessi_prova(tag, raggruppamento, indice)}
             if valutazione.matricola not in ammessi:
+                motivo = {
+                    "iscritti": "non è nell'elenco iscritti",
+                    "iscritti_controllo": "non è iscritto o non ha superato tutte le prove precedenti "
+                                          "con il voto minimo delle prove parziali",
+                }.get(appello.ammissione, f"non risulta aver superato {raggruppamento.membri[indice - 1].nome} "
+                                          "con il voto minimo delle prove parziali")
                 avviso_idoneita = (
-                    f"Attenzione: questo studente non risulta tra gli ammessi a questa prova (non "
-                    f"risulta aver superato {raggruppamento.membri[indice - 1].nome} con il voto minimo "
-                    "delle prove parziali). Puoi comunque salvare la correzione."
+                    f"Attenzione: questo studente non risulta tra gli ammessi a questa prova ({motivo}). "
+                    "Puoi comunque salvare la correzione."
                 )
 
     return templates.TemplateResponse(request, "correggi_revisione.html", {
@@ -2812,6 +2821,78 @@ def risultati_anteprima(request: Request, tag: str, appello_id: int):
     })
 
 
+def _foglio_orali(tag: str, appello_id: int):
+    """(appello, dati del foglio per gli orali) se la correzione scritta è conclusa,
+    altrimenti (appello, None): il foglio si prepara solo a correzione chiusa."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    if appello is None or not appello.correzione_scritti_conclusa:
+        return appello, None
+    return appello, orali_service.foglio_orali(tag, appello_id)
+
+
+def _tex_orali(tag: str, appello, dati) -> Path:
+    ctx = risultati_service.ctx_for(tag, dati["corso"], appello)
+    path = compiti_service.path_orali(tag, appello.id, "tex", appello=appello)
+    path.write_text(latex_service.crea_tex_orali(ctx, dati, orali_service.note_studente), encoding="utf-8")
+    return path
+
+
+_FOGLIO_ORALI_NON_PRONTO = "Il foglio per gli orali si prepara quando concludi la correzione scritta"
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/orali.tex", response_class=PlainTextResponse)
+def orali_tex(tag: str, appello_id: int):
+    appello, dati = _foglio_orali(tag, appello_id)
+    if dati is None:
+        return PlainTextResponse(_FOGLIO_ORALI_NON_PRONTO, status_code=404)
+    return PlainTextResponse(_tex_orali(tag, appello, dati).read_text(encoding="utf-8"), media_type="application/x-tex")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/orali.pdf")
+def orali_pdf(tag: str, appello_id: int):
+    appello, dati = _foglio_orali(tag, appello_id)
+    if dati is None:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", _FOGLIO_ORALI_NON_PRONTO, "error", anchor="orali")
+    compilazione = compiti_service.compila_pdf(_tex_orali(tag, appello, dati))
+    if not compilazione.ok:
+        return flash_redirect(
+            f"/corsi/{tag}/appelli/{appello_id}", compilazione.messaggio, "error",
+            anchor="orali", dettaglio=compilazione.errore_dettagliato or "",
+        )
+    return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name)
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/orali.html", response_class=HTMLResponse)
+def orali_html(request: Request, tag: str, appello_id: int):
+    appello, dati = _foglio_orali(tag, appello_id)
+    if dati is None:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", _FOGLIO_ORALI_NON_PRONTO, "error", anchor="orali")
+    corso = dati["corso"]
+    return templates.TemplateResponse(request, "foglio_orali.html", {
+        **dati, "note_studente": orali_service.note_studente,
+        "frase_orale": risultati_service.frase_orale(tag, corso, appello),
+    })
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/orali.md", response_class=PlainTextResponse)
+def orali_md(tag: str, appello_id: int):
+    appello, dati = _foglio_orali(tag, appello_id)
+    if dati is None:
+        return PlainTextResponse(_FOGLIO_ORALI_NON_PRONTO, status_code=404)
+    return _markdown(documenti_service.orali_md(tag, appello, dati), "orali.md")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/orali.csv")
+def orali_csv(tag: str, appello_id: int):
+    appello, dati = _foglio_orali(tag, appello_id)
+    if dati is None:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", _FOGLIO_ORALI_NON_PRONTO, "error", anchor="orali")
+    return Response(
+        orali_service.foglio_orali_csv(dati), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="orali-{appello.slug}.csv"'},
+    )
+
+
 def _anchor_esporta(tag: str, appello) -> str:
     """Come _anchor_membro, ma per le route condivise fra la scheda Compiti d'esame di
     una singola prova e la scheda Risultati globale di un raggruppamento (che non ha una
@@ -3006,11 +3087,29 @@ def scarica_iscritti_csv(tag: str, appello_id: int):
     iscritti = esportazione_service.list_iscritti(tag, appello_id)
     if iscritti is None:
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Nessun elenco iscritti caricato", "error", anchor=anchor)
-    dati = studenti_service.esporta_ammessi_csv(iscritti)
+    dati = studenti_service.esporta_ammessi_csv(_con_voti_precedenti(tag, appello_id, iscritti), _prove_precedenti(tag, appello_id))
     return Response(
         dati, media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="iscritti-{appello.slug}.csv"'},
     )
+
+
+def _prove_precedenti(tag: str, appello_id: int) -> list[str]:
+    """Le prove del raggruppamento prima di questa (vuoto per un appello qualsiasi o per
+    la prima prova): negli elenchi di iscritti e ammessi compaiono i voti presi in ciascuna."""
+    raggruppamento, indice = _membro_e_indice(tag, appello_id)
+    return [m.nome for m in raggruppamento.membri[:indice]] if raggruppamento else []
+
+
+def _con_voti_precedenti(tag: str, appello_id: int, elenco: Optional[list[dict]]) -> Optional[list[dict]]:
+    """L'elenco iscritti di una prova dopo la prima, con i voti presi nelle precedenti
+    ('voti_precedenti', come per gli ammessi)."""
+    raggruppamento, indice = _membro_e_indice(tag, appello_id)
+    if elenco is None or not indice:
+        return elenco
+    voti = corsi_service.voti_prove_precedenti(tag, raggruppamento, indice)
+    vuoti = [{"etichetta": "—"}] * indice
+    return [{**s, "voti_precedenti": [v["etichetta"] for v in voti.get(s["matricola"], vuoti)]} for s in elenco]
 
 
 _TIPO_ELENCO_RE = re.compile(r"^(iscritti|ammessi)$|^ammessi-aula-(\d+)$")
@@ -3033,11 +3132,12 @@ def _elenco_studenti(tag: str, appello_id: int, tipo: str):
         tex_path = compiti_service.path_ammessi(tag, appello_id, "tex", appello=appello)
         tex_path = tex_path.with_name(f"{tex_path.stem}-aula-{aula.id}.tex")
         ctx = risultati_service.ctx_for(tag, corsi_service.get_corso(tag), appello)
-        tex_path.write_text(latex_service.crea_tex_ammessi(ctx, titolo, elenco, [], aula_singola=aula.nome), encoding="utf-8")
+        tex_path.write_text(latex_service.crea_tex_ammessi(ctx, titolo, elenco, [], aula_singola=aula.nome,
+                                                           prove=_prove_precedenti(tag, appello_id)), encoding="utf-8")
         return appello, titolo, elenco, [], tex_path
     corso = corsi_service.get_corso(tag)
     if tipo == "iscritti":
-        elenco, aule = esportazione_service.list_iscritti(tag, appello_id), []
+        elenco, aule = _con_voti_precedenti(tag, appello_id, esportazione_service.list_iscritti(tag, appello_id)), []
         titolo, tex_path = f"Studenti iscritti: {appello.nome}", compiti_service.path_iscritti(tag, appello_id, "tex", appello=appello)
     else:
         raggruppamento, indice = _membro_e_indice(tag, appello_id)
@@ -3048,7 +3148,8 @@ def _elenco_studenti(tag: str, appello_id: int, tipo: str):
         titolo, tex_path = f"Studenti ammessi: {appello.nome}", compiti_service.path_ammessi(tag, appello_id, "tex", appello=appello)
     if elenco is not None:
         ctx = risultati_service.ctx_for(tag, corso, appello)
-        tex_path.write_text(latex_service.crea_tex_ammessi(ctx, titolo, elenco, aule), encoding="utf-8")
+        tex_path.write_text(latex_service.crea_tex_ammessi(ctx, titolo, elenco, aule, prove=_prove_precedenti(tag, appello_id)),
+                            encoding="utf-8")
     return appello, titolo, elenco, aule, tex_path
 
 
@@ -3077,6 +3178,7 @@ def elenco_studenti_html(request: Request, tag: str, appello_id: int, tipo: str)
     return templates.TemplateResponse(request, "elenco_studenti.html", {
         "corso": corsi_service.get_corso(tag), "appello": appello, "titolo": titolo, "elenco": elenco,
         "aule": aule, "tipo": tipo, "anchor": _anchor_membro(appello, "compiti"), "etichetta": etichetta,
+        "prove": _prove_precedenti(tag, appello_id),
     })
 
 
@@ -3343,13 +3445,42 @@ def _risposta_ammessi_aule(request: Request, tag: str, appello_id: int, messaggi
     if raggruppamento is None:
         return PlainTextResponse("Questa prova non appartiene a un raggruppamento", status_code=404)
     md = {
-        "appello": raggruppamento.membri[indice],
-        "ammessi": corsi_service.list_ammessi_prova(tag, raggruppamento, indice),
+        "appello": raggruppamento.membri[indice], "indice": indice,
+        **_dati_ammissione(tag, raggruppamento, indice),
         "aule": aule_service.list_aule(tag, appello_id),
     }
     return templates.TemplateResponse(request, "_ammessi_aule.html", {
         "corso": corsi_service.get_corso(tag), "md": md, "messaggio": messaggio, "tipo": tipo,
     })
+
+
+def _dati_ammissione(tag: str, raggruppamento, indice: int, ammessi: Optional[list[dict]] = None) -> dict:
+    """Per il riquadro degli ammessi di una prova: gli ammessi, le prove precedenti (i cui
+    voti compaiono accanto a ciascuno) e gli iscritti esclusi dal controllo sui voti."""
+    return {
+        "ammessi": ammessi if ammessi is not None else corsi_service.list_ammessi_prova(tag, raggruppamento, indice),
+        "prove_precedenti": [m.nome for m in raggruppamento.membri[:indice]],
+        "non_ammessi": corsi_service.list_non_ammessi_prova(tag, raggruppamento, indice),
+    }
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/ammissione")
+def imposta_ammissione(request: Request, tag: str, appello_id: int, modo: str = Form(...)):
+    """Chi è ammesso a una prova dopo la prima (vedi corsi.MODI_AMMISSIONE)."""
+    raggruppamento, indice = _membro_e_indice(tag, appello_id)
+    appello = corsi_service.get_appello(tag, appello_id)
+    try:
+        if raggruppamento is None or not indice:
+            raise ValueError("Si sceglie solo per le prove dopo la prima di un raggruppamento")
+        if modo not in corsi_service.MODI_AMMISSIONE:
+            raise ValueError(f"Modalità di ammissione non valida: {modo}")
+        corsi_service.verifica_appello_aperto(tag, appello_id)
+        if appello.aule_chiuse:
+            raise ValueError("Aule già assegnate: riapri prima l'assegnazione per cambiare chi è ammesso")
+    except ValueError as e:
+        return _risposta_ammessi_aule(request, tag, appello_id, str(e), "error")
+    corsi_service.update_appello(tag, appello_id, ammissione=modo)
+    return _risposta_ammessi_aule(request, tag, appello_id, f"Ammessi: {corsi_service.MODI_AMMISSIONE[modo].lower()}")
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/ammessi-aule", response_class=HTMLResponse)
@@ -3583,7 +3714,7 @@ def scarica_ammessi_csv(tag: str, appello_id: int):
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Questa prova non appartiene a un raggruppamento", "error")
     appello = corsi_service.get_appello(tag, appello_id)
     ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
-    dati = studenti_service.esporta_ammessi_csv(ammessi)
+    dati = studenti_service.esporta_ammessi_csv(ammessi, _prove_precedenti(tag, appello_id))
     return Response(
         dati, media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="ammessi-{appello.slug}.csv"'},

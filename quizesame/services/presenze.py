@@ -131,7 +131,12 @@ def chiudi(tag: str, appello_id: int, ammessi: Optional[list[dict]] = None) -> d
 def elenco_da_valutare(tag: str, appello_id: int, ammessi: Optional[list[dict]] = None) -> Optional[list[dict]]:
     """Gli studenti attesi a questa prova: l'elenco iscritti (file della segreteria o
     aggiunti a mano) o, se manca, gli ammessi passati dal chiamante (prove di un
-    raggruppamento). None se non c'è nessun elenco a cui fare riferimento."""
+    raggruppamento). None se non c'è nessun elenco a cui fare riferimento. Una prova che
+    ammette solo gli iscritti che hanno superato le precedenti attende gli ammessi."""
+    if ammessi is not None:
+        appello = corsi_service.get_appello(tag, appello_id)
+        if appello and appello.ammissione == "iscritti_controllo":
+            return ammessi
     iscritti = esportazione_service.list_iscritti(tag, appello_id)
     if iscritti is not None:
         return iscritti

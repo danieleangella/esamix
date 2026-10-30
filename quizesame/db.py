@@ -365,6 +365,9 @@ ADDITIVE_COLUMNS = {
         ("aule_chiuse", "BOOLEAN NOT NULL DEFAULT 0"),
         # come si distribuiscono gli studenti nelle aule (vedi aule.MODI): vuoto = automatica
         ("modo_aule", "TEXT"),
+        # chi è ammesso a una prova di un raggruppamento dopo la prima (vedi
+        # corsi.MODI_AMMISSIONE): vuoto = chi ha superato la prova precedente
+        ("ammissione", "TEXT"),
     ],
 }
 

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Orali · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
+<a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#orali">{{ appello.nome }}</a>
+<span class="sep">›</span> <span class="current">Orali</span>
+{% endblock %}
+{% block content %}
+{% from "_formati.html" import formati %}
+<header class="intestazione-pagina">
+  <div class="intestazione-livello">Foglio per gli orali ·
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#orali">{{ corso.nome }} ({{ corso.anno }})</a></div>
+  <h1>{{ appello.nome }}{% if appello.data %} <span class="muted">· {{ appello.data }}</span>{% endif %}</h1>
+</header>
+<div class="barra-riferimento non-stampare">
+  <p class="muted" style="margin:0">{{ studenti|length }} studenti. Spunta la presenza e scrivi il voto a penna sul foglio stampato.</p>
+  <span class="formati">
+    {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/orali", pdf=True, tex=True, md=True, csv=True) }}
+    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">Stampa</button>
+  </span>
+</div>
+{% if frase_orale %}<p><strong>{{ frase_orale }}</strong></p>{% endif %}
+<div class="card" style="padding:0.5rem 1rem">
+  <table class="tabella-elenco">
+    <thead><tr><th>Presente</th><th>Matricola</th><th>Cognome</th><th>Nome</th>{% for p in prove %}<th>{{ p }}</th>{% endfor %}
+      <th>{{ 'Media' if prove else 'Scritto' }}</th><th>Voto orale</th></tr></thead>
+    {% for s in studenti %}
+    <tr>
+      <td style="font-size:1.3rem">☐</td>
+      <td style="font-family:monospace">{{ s.matricola }}</td>
+      <td><a href="#studente-{{ s.matricola }}"><strong>{{ s.cognome }}</strong></a></td>
+      <td>{{ s.nome }}</td>
+      {% for v in s.voti_prove %}<td>{{ v }}</td>{% endfor %}
+      <td><strong>{{ s.scritto if s.scritto is not none else '—' }}</strong></td>
+      <td>{% if s.esito_orale %}<em>{{ s.esito_orale }}</em>{% else %}<span style="display:inline-block; width:5rem; height:1.6rem; border:1px solid var(--border)"></span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% if studenti %}
+<h2 class="nuovo-foglio" style="margin-top:1.5rem">Gli scritti, studente per studente</h2>
+{% endif %}
+{% for s in studenti %}
+<section class="card" id="studente-{{ s.matricola }}" style="break-inside:avoid">
+  <h3 style="margin-top:0">{{ s.cognome }} {{ s.nome }} <span class="muted" style="font-family:monospace; font-weight:400">{{ s.matricola }}</span>
+    <span style="float:right">{% if prove and s.media_esatta is not none %}media {{ s.media_esatta|string|replace('.', ',') }} (voto {{ s.scritto }}){% else %}scritto {{ s.scritto if s.scritto is not none else '—' }}{% endif %}</span></h3>
+  {% for sc in s.scritti %}
+  <p style="margin:0.4rem 0">{% if prove %}<strong>{{ sc.prova }}</strong>: {% endif %}{{ ('voto ' ~ sc.voto) if sc.voto is not none else sc.esito }}{% if sc.codice %}, compito {{ sc.codice }}{% endif %}{% if sc.n_esercizi %}, {{ sc.errori|length }} error{{ 'e' if sc.errori|length == 1 else 'i' }} su {{ sc.n_esercizi }} esercizi{% endif %}</p>
+  {% if sc.errori %}
+  <ul style="margin:0 0 0.4rem">
+    {% for e in sc.errori %}
+    <li>{{ e.esercizio_nome }}{% if e.obbligatorio %} <span class="badge">obbligatorio</span>{% endif %}: {{ e.descrizione }}{% if e.nota %} — <em>{{ e.nota }}</em>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% endfor %}
+  {% set note = note_studente(s, prove|length > 0) %}
+  {% if note %}
+  <p style="margin:0.4rem 0 0"><strong>Note:</strong></p>
+  <ul style="margin:0">{% for n in note %}<li>{{ n }}</li>{% endfor %}</ul>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}
