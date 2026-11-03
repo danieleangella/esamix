@@ -436,6 +436,14 @@
     </form>
     {% endif %}
   </div>
+  {# revisione del testo dopo la prova: un'eventualità rara, quindi solo un link discreto #}
+  {% if md.risultati or md.revisione_testo %}
+  <p class="muted" style="margin:0.5rem 0 0; text-align:right">
+    {% if md.revisione_testo %}<span class="badge badge-warn">testo rivisto: {{ md.revisione_testo|length }} eserciz{{ 'io' if md.revisione_testo|length == 1 else 'i' }}</span>{% endif %}
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/revisione-testo" class="link-con-icona"
+       data-info="Dopo la prova: annulla un esercizio sbagliato o rendi facoltativo un obbligatorio troppo difficile, vedendo prima come cambiano i voti">{{ icona("matita", 13) }} Rivedi il testo dopo la prova</a>
+  </p>
+  {% endif %}
   {# corrette tutte le prove del raggruppamento: anche l'elenco complessivo #}
   {% if raggruppamento and appello.correzione_scritti_conclusa and (risultati_tex_esiste or risultati_pdf_esiste) %}
   <div class="card barra-conclusione">

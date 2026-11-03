@@ -74,8 +74,10 @@
   <div class="griglia-risposte">
     {% for r in v.righe %}
     {% set esito = 'aperta' if r.aperta else ('ok' if r.corretta else ('err' if r.svolta else 'vuota')) %}
-    <div class="cella-risposta esito-{{ esito }}{% if r.obbligatorio %} obbligatoria{% endif %}{% if r.obbligatorio and not r.aperta and not r.svolta %} mancante{% endif %}"
-         title="{{ r.posizione + 1 }}. {{ r.esercizio_nome }}{% if r.obbligatorio %} (obbligatorio){% endif %}{% if not r.aperta %} — data {{ r.lettera_data }}, giusta {{ r.lettera_corretta }}{% endif %}">
+    {% set obbl = r.obbligatorio and not r.revisione %}
+    <div class="cella-risposta esito-{{ esito }}{% if obbl %} obbligatoria{% endif %}{% if obbl and not r.aperta and not r.svolta %} mancante{% endif %}"
+         {% if r.revisione == 'annullato' %}style="opacity:0.45"{% endif %}
+         title="{{ r.posizione + 1 }}. {{ r.esercizio_nome }}{% if obbl %} (obbligatorio){% elif r.revisione == 'facoltativo' %} (non più obbligatorio){% elif r.revisione == 'annullato' %} (annullato: punteggio pieno){% endif %}{% if not r.aperta %} — data {{ r.lettera_data }}, giusta {{ r.lettera_corretta }}{% endif %}">
       <span class="n">{{ r.posizione + 1 }}</span>
       <span class="data">{{ '✎' if r.aperta else r.lettera_data }}</span>
       <span class="giusta">{{ '' if r.aperta else r.lettera_corretta }}</span>

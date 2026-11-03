@@ -490,6 +490,15 @@ def _motivi_esclusione(studente: dict, appello) -> list[str]:
     return motivi
 
 
+def motivi_esclusione(tag: str, appello_id: int, matricola: str) -> list[str]:
+    """Perché lo studente `matricola` non passa i filtri sugli iscritti dell'appello (vuoto se li passa)."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    studente = studenti_service.get_studente(tag, matricola)
+    if not appello or not studente:
+        return []
+    return _motivi_esclusione({"matricola": matricola, "cognome": studente.cognome}, appello)
+
+
 def _decisioni_filtro(tag: str, appello_id: int) -> dict[str, bool]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:

@@ -63,6 +63,33 @@
   </div>
   {% endif %}
   {% endif %}
+  {% if md.da_confermare and not md.appello.chiuso %}
+  <div class="flash flash-warning" style="margin:0.5rem 0 0">
+    ⚠ {{ md.da_confermare|length }} iscritt{{ 'o è fuori' if md.da_confermare|length == 1 else 'i sono fuori' }} dai filtri sugli iscritti
+    e {{ 'è' if md.da_confermare|length == 1 else 'sono' }} ancora da confermare: non {{ 'è ammesso' if md.da_confermare|length == 1 else 'sono ammessi' }}
+    e non {{ 'avrà' if md.da_confermare|length == 1 else 'avranno' }} un'aula.
+    {% if md.appello.aule_chiuse %}Ad aule assegnate puoi ammetterli qui, nell'aula del loro cognome.
+    {% else %}Ammettili o conferma l'esclusione nel riquadro Iscritti, prima di assegnare le aule.{% endif %}
+    <table style="margin-top:0.4rem">
+      <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>Motivo</th><th></th></tr>
+      {% for s in md.da_confermare %}
+      <tr>
+        <td>{{ s.matricola }}</td><td>{{ s.cognome }}</td><td>{{ s.nome }}</td><td class="muted">{{ s.motivi|join(", ") }}</td>
+        <td class="cella-azioni">
+          {% if md.appello.aule_chiuse %}
+          <form class="inline" method="post" action="{{ url }}/aule/aggiungi-studente"
+                data-conferma="{{ 'Ammettere ' ~ s.cognome ~ ' ' ~ s.nome ~ ' in deroga?' }}">
+            <input type="hidden" name="studente" value="{{ s.matricola }}">
+            <button type="submit" class="pulsante-icona pulsante-ok" data-info="Ammetti in deroga e metti in aula"
+                    aria-label="Ammetti in deroga {{ s.cognome }} {{ s.nome }}">{{ icona("utente-spunta") }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
   <div class="barra-strumenti" style="margin-top:0.75rem">
     <span>{{ icona("stampa", 14) }} Elenco ammessi</span>
     {{ formati(url ~ "/ammessi", pdf=True, html=True, tex=True, csv=True) }}

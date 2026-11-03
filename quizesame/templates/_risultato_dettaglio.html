@@ -58,8 +58,8 @@
     <tr><th>Esercizio</th><th>Obbligatorio</th><th>Risposta data</th><th>Risposta corretta</th><th>Esito</th><th>Punteggio assegnato</th><th>Nota</th></tr>
     {% for r in righe %}
     <tr>
-      <td>{{ r.esercizio_nome }}</td>
-      <td>{{ 'sì' if r.obbligatorio else '-' }}</td>
+      <td>{{ r.esercizio_nome }}{% if r.revisione == 'annullato' %} <span class="badge" title="Annullato nella revisione del testo dopo la prova: punteggio pieno per tutti">annullato</span>{% endif %}</td>
+      <td>{{ 'sì' if r.obbligatorio and not r.revisione else ('non più' if r.obbligatorio else '-') }}</td>
       <td>{{ r.lettera_data }}</td>
       <td>{{ r.lettera_corretta }}</td>
       <td>

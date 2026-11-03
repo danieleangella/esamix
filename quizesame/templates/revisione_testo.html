@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "_studente.html" import nome_studente %}
+{% from "_info.html" import info %}
+{% from "_icone.html" import icona %}
+{% block title %}Revisione del testo · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Revisione del testo</span>
+{% endblock %}
+{% block content %}
+<div class="intestazione-pagina">
+  <div class="intestazione-livello">Correzione · <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }}</a></div>
+  <h1>Revisione del testo {{ info("Per i casi rari in cui, dopo la prova, un esercizio si rivela sbagliato (annullalo: vale il punteggio pieno per tutti, qualunque risposta) o un obbligatorio troppo difficile (rendilo non obbligatorio: chi non l'ha svolto non è più insufficiente per questo; chi l'ha svolto con la risposta giusta resta giudicato sullo svolgimento). Prima vedi come cambiano i voti, poi confermi. I voti verbalizzati e quelli cambiati a mano non si toccano.") }}</h1>
+</div>
+
+{% set modificabile = not appello.chiuso and not appello.correzione_scritti_conclusa %}
+{% if errore %}<div class="flash flash-error">{{ errore }}</div>{% endif %}
+{% if not modificabile %}
+<div class="flash flash-warning">
+  {{ 'Appello chiuso: riaprilo' if appello.chiuso else 'Correzione conclusa: riaprila dalla scheda Correzione' }} per applicare una revisione.
+  Puoi comunque vedere come cambierebbero i voti.
+</div>
+{% endif %}
+
+<div class="card">
+  {% if not esercizi %}
+  <p class="muted" style="margin:0">Nessun compito generato per questa prova.</p>
+  {% else %}
+  <form method="get" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/revisione-testo">
+    <table>
+      <tr><th>Esercizio</th><th></th><th>Nella valutazione</th></tr>
+      {% for e in esercizi %}
+      <tr>
+        <td>{{ e.nome }}</td>
+        <td>
+          {% if e.obbligatorio %}<span class="badge badge-ok">obbligatorio</span>{% endif %}
+          {% if e.aperta %}<span class="badge badge-info">aperta</span>{% endif %}
+        </td>
+        <td>
+          <select name="rev-{{ e.id }}">
+            <option value="">conta come previsto</option>
+            {% if e.obbligatorio %}<option value="facoltativo" {% if scelte[e.id] == 'facoltativo' %}selected{% endif %}>{{ revisioni.facoltativo }}</option>{% endif %}
+            <option value="annullato" {% if scelte[e.id] == 'annullato' %}selected{% endif %}>{{ revisioni.annullato }}</option>
+          </select>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <div class="barra-strumenti" style="margin-top:0.75rem">
+      <button type="submit" class="secondary">{{ icona("occhio", 14) }} Mostra come cambiano i voti</button>
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}" class="link-con-icona" style="margin-left:auto">{{ icona("indietro", 14) }} torna alla correzione</a>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+{% if esito %}
+{% set ricalcolati = esito.voci | selectattr('stato', 'equalto', 'ricalcolato') | list %}
+<div class="card">
+  <h2 style="margin-top:0">Come cambiano i voti</h2>
+  {% if not esito.voci %}
+  <p class="muted">Nessun compito ancora registrato: la revisione varrà per quelli che correggerai.</p>
+  {% else %}
+  <p>
+    <span class="badge badge-ok">{{ esito.aumentano }} aumentano</span>
+    {% if esito.diminuiscono %}<span class="badge badge-warn">{{ esito.diminuiscono }} diminuiscono</span>{% endif %}
+    <span class="badge">{{ esito.invariati }} invariati</span>
+    {% if esito.promossi %}<span class="badge badge-ok">{{ esito.promossi|length }} diventano sufficienti</span>{% endif %}
+    {% if esito.bocciati %}<span class="badge badge-warn">{{ esito.bocciati|length }} diventano insufficienti</span>{% endif %}
+    {% if esito.esclusi %}<span class="badge badge-warn">{{ esito.esclusi|length }} non toccati (verbalizzati o voto cambiato a mano)</span>{% endif %}
+  </p>
+  {% set cambiano = esito.voci | selectattr('differenza') | list %}
+  {% set da_mostrare = cambiano + esito.esclusi %}
+  {% if da_mostrare %}
+  <table>
+    <tr><th>Studente</th><th>Voto attuale</th><th>Voto nuovo</th><th></th><th>Note</th></tr>
+    {% for v in esito.voci if v.differenza or v in esito.esclusi %}
+    <tr>
+      <td>{{ v.cognome }} {{ v.nome }} <span class="muted">{{ v.matricola }}</span></td>
+      <td>{{ v.voto_attuale }}</td>
+      <td><strong>{{ v.voto_nuovo }}</strong></td>
+      <td>{% if v.differenza > 0 %}<span class="ok">+{{ v.differenza }}</span>{% elif v.differenza < 0 %}<span class="err">{{ v.differenza }}</span>{% endif %}</td>
+      <td class="muted">
+        {% if v.promosso %}<span class="badge badge-ok">diventa sufficiente</span>{% endif %}
+        {% if v.bocciato %}<span class="badge badge-warn">diventa insufficiente</span>{% endif %}
+        {% if v.non_piu_insufficiente_per_obbligatorio %}non più insufficiente per l'obbligatorio non svolto{% endif %}
+        {% if v.stato == 'verbalizzato' %}verbalizzato: non cambia (sarebbe {{ v.voto_calcolato }}){% endif %}
+        {% if v.stato == 'a_mano' %}voto cambiato a mano: non cambia (calcolato sarebbe {{ v.voto_calcolato }}){% endif %}
+        {% if v.sospesa %}voto provvisorio, svolgimenti da valutare{% endif %}
+        {% if v.orale_svolto and v.stato == 'ricalcolato' %}orale già svolto: cambia solo il voto scritto{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nessun voto cambia.</p>
+  {% endif %}
+  {% endif %}
+
+  {% if modificabile and esito.cambia_qualcosa %}
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/revisione-testo" style="margin-top:0.75rem"
+        onsubmit="return confirm('Applicare la revisione e ricalcolare {{ ricalcolati|length }} vot{{ 'o' if ricalcolati|length == 1 else 'i' }}?')">
+    {% for e in esercizi %}<input type="hidden" name="rev-{{ e.id }}" value="{{ scelte[e.id] or '' }}">{% endfor %}
+    <button type="submit">{{ icona("spunta", 14) }} Applica la revisione</button>
+    {% if appello.membro_raggruppamento %}<span class="muted">I risultati complessivi si aggiornano quando chiudi la correzione.</span>{% endif %}
+  </form>
+  {% elif not esito.cambia_qualcosa %}
+  <p class="muted" style="margin-bottom:0">È la revisione già applicata: niente da confermare.</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -107,22 +107,29 @@ def calcola_voto(corso, votomin: int, soluzioni: str, risposte: str, posizioni: 
     posizioni "manuali" (domande aperte, e obbligatori con la risposta multiple-choice
     corretta) valgono il punteggio assegnato dal docente; se manca (valutazione
     rimandata), provvisoriamente una domanda aperta vale 0 e un obbligatorio il massimo
-    (lo stesso che gli si assegna in automatico correggendo)."""
+    (lo stesso che gli si assegna in automatico correggendo). La revisione del testo dopo
+    la prova (p["revisione"]) conta così: un esercizio "annullato" vale il punteggio pieno
+    per tutti, qualunque risposta; uno "facoltativo" non svolto non rende più insufficiente
+    il compito (svolto con la risposta giusta resta giudicato sullo svolgimento)."""
     manuali = {}
+    annullati = {}
     insufficiente = False
     for p in posizioni:
         i = p["posizione"]
         lettera = risposte[i].upper() if i < len(risposte) else "X"
         corretta = soluzioni[i].upper() if i < len(soluzioni) else "?"
-        if p["aperta"]:
+        if p.get("revisione") == "annullato":
+            annullati[i] = punteggio_massimo(corso, bool(p["aperta"]))
+        elif p["aperta"]:
             manuali[i] = True
         elif p["obbligatorio"]:
             if lettera == "X":
-                insufficiente = True
+                insufficiente = insufficiente or p.get("revisione") != "facoltativo"
             elif lettera == corretta:
                 manuali[i] = False
     mancanti = [i for i in manuali if i not in punteggi]
     override = {i: punteggi.get(i, 0 if aperta else punteggio_massimo(corso, False)) for i, aperta in manuali.items()}
+    override.update(annullati)
     voto = valuta_con_override(
         soluzioni, risposte, corso.risposta_corretta, corso.risposta_sbagliata, corso.risposta_vuota, override=override,
     )
@@ -220,6 +227,7 @@ class RigaRisposta:
     lettera_corretta: str
     svolta: bool  # ha dato una risposta (diversa da 'X') in quella posizione
     corretta: bool  # la lettera scelta coincide con quella corretta
+    revisione: Optional[str] = None  # "annullato" o "facoltativo" (revisione del testo dopo la prova)
 
 
 @dataclass
@@ -282,6 +290,7 @@ def _righe_risposta(tag: str, compito_id: int, soluzioni: str, risposte: str) ->
             obbligatorio=bool(pos["obbligatorio"]), aperta=aperta,
             lettera_data=lettera_data, lettera_corretta=lettera_corretta,
             svolta=svolta, corretta=svolta and lettera_data == lettera_corretta,
+            revisione=pos.get("revisione"),
         ))
     return righe, True
 
@@ -377,15 +386,21 @@ def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, r
     try:
         studente, compito = _carica_dati_correzione(conn, matricola, appello_id, codice)
         soluzioni = compito["soluzioni"]
-        voto_base = valuta(soluzioni, risposte, corso.risposta_corretta, corso.risposta_sbagliata, corso.risposta_vuota)
-
         righe, dettaglio_disponibile = _righe_risposta(tag, compito["id"], soluzioni, risposte)
-        non_svolte = [r for r in righe if r.obbligatorio and not r.aperta and not r.svolta]
-        da_valutare = [r for r in righe if r.obbligatorio and not r.aperta and r.svolta and r.corretta]
-        domande_aperte = [r for r in righe if r.aperta]
+        # esercizi annullati nella revisione del testo: punteggio pieno, niente da giudicare
+        annullati = {r.posizione: punteggio_massimo(corso, r.aperta) for r in righe if r.revisione == "annullato"}
+        voto_base = valuta_con_override(
+            soluzioni, risposte, corso.risposta_corretta, corso.risposta_sbagliata, corso.risposta_vuota,
+            override=annullati,
+        )
+        righe_valide = [r for r in righe if r.revisione != "annullato"]
+        non_svolte = [r for r in righe_valide if r.obbligatorio and not r.aperta and not r.svolta
+                      and r.revisione != "facoltativo"]
+        da_valutare = [r for r in righe_valide if r.obbligatorio and not r.aperta and r.svolta and r.corretta]
+        domande_aperte = [r for r in righe_valide if r.aperta]
         voto_fisso = valuta_con_override(
             soluzioni, risposte, corso.risposta_corretta, corso.risposta_sbagliata, corso.risposta_vuota,
-            override={r.posizione: 0 for r in da_valutare + domande_aperte},
+            override={**annullati, **{r.posizione: 0 for r in da_valutare + domande_aperte}},
         )
 
         return ValutazionePreliminare(
@@ -797,8 +812,10 @@ def svolgimenti_appello(tag: str, appello_id: int, escludi_matricola: Optional[s
         posizioni_per_compito: dict[int, list[dict]] = {}
         for p in conn.execute(
             "SELECT ce.compito_id, ce.posizione, ce.obbligatorio, ce.aperta, e.id AS esercizio_id, "
-            "e.nome AS esercizio_nome FROM compito_esercizi ce JOIN esercizi e ON e.id = ce.esercizio_id "
-            "JOIN compiti c ON c.id = ce.compito_id WHERE c.appello_id=? ORDER BY ce.posizione",
+            "e.nome AS esercizio_nome, rv.revisione FROM compito_esercizi ce JOIN esercizi e ON e.id = ce.esercizio_id "
+            "JOIN compiti c ON c.id = ce.compito_id "
+            "LEFT JOIN appello_revisione_esercizi rv ON rv.appello_id = c.appello_id AND rv.esercizio_id = ce.esercizio_id "
+            "WHERE c.appello_id=? ORDER BY ce.posizione",
             (appello_id,),
         ):
             posizioni_per_compito.setdefault(p["compito_id"], []).append(dict(p))
@@ -1035,7 +1052,9 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
             lettera_data = risposte[i].upper() if i < len(risposte) else "X"
             lettera_corretta = soluzioni[i].upper() if i < len(soluzioni) else "?"
             corretta = lettera_data == lettera_corretta
-            if str(i) in punteggi:
+            if pos.get("revisione") == "annullato":
+                punteggio_assegnato = punteggio_massimo(corso, bool(pos["aperta"]))
+            elif str(i) in punteggi:
                 punteggio_assegnato = punteggi[str(i)]
             elif pos["aperta"]:
                 punteggio_assegnato = None
@@ -1049,6 +1068,7 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
                 "obbligatorio": bool(pos["obbligatorio"]), "lettera_data": lettera_data,
                 "lettera_corretta": lettera_corretta, "corretta": corretta,
                 "punteggio_assegnato": punteggio_assegnato, "nota": note.get(str(i), ""),
+                "revisione": pos.get("revisione"),
             })
 
         storico = studenti_service.risultati_studente(tag, matricola)

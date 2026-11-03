@@ -180,6 +180,16 @@ CREATE TABLE IF NOT EXISTS appello_iscritti_manuali (
     PRIMARY KEY (matricola, appello_id)
 );
 
+-- Revisione del testo dopo la prova: un esercizio rivelatosi sbagliato ("annullato": vale
+-- il punteggio pieno per tutti) o troppo difficile ("facoltativo": era obbligatorio, ma non
+-- svolgerlo non rende più insufficiente il compito). Vedi correzione.applica_revisione.
+CREATE TABLE IF NOT EXISTS appello_revisione_esercizi (
+    appello_id INTEGER NOT NULL REFERENCES appelli(id),
+    esercizio_id INTEGER NOT NULL REFERENCES esercizi(id),
+    revisione TEXT NOT NULL,
+    PRIMARY KEY (appello_id, esercizio_id)
+);
+
 -- Studenti tolti a mano dall'elenco iscritti ricavato dal file della segreteria (es. una
 -- prenotazione annullata): il file salvato resta intero, per restituirlo alla segreteria.
 CREATE TABLE IF NOT EXISTS appello_iscritti_rimossi (

@@ -39,6 +39,7 @@ from quizesame.services import registro as registro_service
 from quizesame.services import verifiche_ia as verifiche_ia_service
 from quizesame.services import controllo_correzioni as controllo_service
 from quizesame.services import corso_prova as corso_prova_service
+from quizesame.services import revisione_testo as revisione_testo_service
 from quizesame.services import testo_web
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -1179,6 +1180,7 @@ def _dati_appello(tag: str, corso, appello) -> dict:
         "segreteria_csv": esportazione_service.get_segreteria_csv(tag, appello.id),
         "moodle_file": esportazione_service.get_file_moodle(tag, appello.id),
         "esclusi_filtro": esportazione_service.list_esclusi_dal_filtro(tag, appello.id),
+        "revisione_testo": revisione_testo_service.revisione_attuale(tag, appello.id),
         "iscritti": iscritti,
         "iscritti_manuali": esportazione_service.list_iscritti_manuali(tag, appello.id),
         "numero_iscritti": numero_iscritti,
@@ -2619,6 +2621,49 @@ def pagina_svolgimenti(request: Request, tag: str, appello_id: int, esercizio: s
     })
 
 
+def _revisione_da_form(campi) -> dict[int, Optional[str]]:
+    """{esercizio_id: revisione} dai campi rev-<id> della pagina di revisione del testo."""
+    return {
+        int(k[4:]): (str(v) or None) for k, v in campi.items() if k.startswith("rev-") and k[4:].isdigit()
+    }
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/revisione-testo", response_class=HTMLResponse)
+def pagina_revisione_testo(request: Request, tag: str, appello_id: int):
+    """Revisione del testo dopo la prova (esercizi annullati o resi facoltativi): con i
+    campi rev-<id> nella query mostra anche come cambierebbero i voti, da confermare."""
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    esercizi = revisione_testo_service.esercizi_prova(tag, appello_id)
+    proposta = _revisione_da_form(request.query_params)
+    errore, esito = None, None
+    if proposta:
+        try:
+            esito = revisione_testo_service.analisi(tag, appello_id, proposta)
+        except ValueError as e:
+            errore = str(e)
+    scelte = {e["id"]: (proposta.get(e["id"]) if proposta else e["revisione"]) for e in esercizi}
+    return templates.TemplateResponse(request, "revisione_testo.html", {
+        "corso": corso, "appello": appello, "esercizi": esercizi, "scelte": scelte, "esito": esito,
+        "errore": errore, "revisioni": revisione_testo_service.REVISIONI,
+        "anchor": _anchor_membro(appello, "valutazione"),
+    })
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/revisione-testo")
+async def applica_revisione_testo(request: Request, tag: str, appello_id: int):
+    appello = corsi_service.get_appello(tag, appello_id)
+    try:
+        esito = revisione_testo_service.applica(tag, appello_id, _revisione_da_form(await request.form()))
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}/revisione-testo", str(e), "error")
+    n = sum(1 for v in esito["voci"] if v["stato"] == "ricalcolato" and v["differenza"])
+    msg = f"Revisione del testo applicata: {n} vot{'o cambiato' if n == 1 else 'i cambiati'}"
+    if esito["esclusi"]:
+        msg += f"; {len(esito['esclusi'])} non toccat{'o' if len(esito['esclusi']) == 1 else 'i'} (verbalizzati o cambiati a mano)"
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=_anchor_membro(appello, "valutazione"))
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/svolgimenti/valuta")
 def valuta_svolgimento(
     tag: str, appello_id: int, matricola: str = Form(...), posizione: int = Form(...),
@@ -2983,10 +3028,20 @@ def imposta_iscritti_manuale(request: Request, tag: str, appello_id: int, iscrit
 def aggiungi_iscritto_manuale(request: Request, tag: str, appello_id: int, matricola: str = Form(...)):
     try:
         esportazione_service.aggiungi_iscritto_manuale(tag, appello_id, matricola.strip())
+        # aggiungerlo a mano è già la scelta del docente: se non passa i filtri sugli
+        # iscritti è ammesso in deroga, invece di finire tra gli esclusi da confermare
+        motivi = esportazione_service.motivi_esclusione(tag, appello_id, matricola.strip())
+        if motivi:
+            esportazione_service.decidi_eccezione_filtro(tag, appello_id, matricola.strip(), "ammesso")
     except ValueError as e:
         return _risposta_iscritti(request, tag, appello_id, str(e), "error")
     studente = studenti_service.get_studente(tag, matricola.strip())
     nome = f"{studente.cognome} {studente.nome}" if studente else matricola.strip()
+    if motivi:
+        return _risposta_iscritti(
+            request, tag, appello_id,
+            f"{nome} aggiunto agli iscritti in deroga ai filtri ({', '.join(motivi)})", "warning",
+        )
     return _risposta_iscritti(request, tag, appello_id, f"{nome} aggiunto agli iscritti")
 
 
@@ -3476,11 +3531,20 @@ def _risposta_ammessi_aule(request: Request, tag: str, appello_id: int, messaggi
 
 def _dati_ammissione(tag: str, raggruppamento, indice: int, ammessi: Optional[list[dict]] = None) -> dict:
     """Per il riquadro degli ammessi di una prova: gli ammessi, le prove precedenti (i cui
-    voti compaiono accanto a ciascuno) e gli iscritti esclusi dal controllo sui voti."""
+    voti compaiono accanto a ciascuno), gli iscritti esclusi dal controllo sui voti e quelli
+    fuori dai filtri sugli iscritti ancora da confermare (non ammessi, quindi senza aula)."""
+    if ammessi is None:
+        ammessi = corsi_service.list_ammessi_prova(tag, raggruppamento, indice)
+    matricole_ammesse = {s["matricola"] for s in ammessi}
     return {
-        "ammessi": ammessi if ammessi is not None else corsi_service.list_ammessi_prova(tag, raggruppamento, indice),
+        "ammessi": ammessi,
         "prove_precedenti": [m.nome for m in raggruppamento.membri[:indice]],
         "non_ammessi": corsi_service.list_non_ammessi_prova(tag, raggruppamento, indice),
+        # chi è stato poi ammesso dal riquadro delle aule non va più segnalato
+        "da_confermare": [
+            s for s in esportazione_service.list_esclusi_dal_filtro(tag, raggruppamento.membri[indice].id)
+            if s["decisione"] is None and s["matricola"] not in matricole_ammesse
+        ],
     }
 
 
