@@ -455,6 +455,82 @@ class CorrezioneResult:
     svolgimenti_rimandati: int = 0
 
 
+def _sincronizza_convocazione(conn, raggruppamento, appello_id: int, matricola: str) -> None:
+    """Se `appello_id` è l'ultima prova del raggruppamento, la convocazione all'orale
+    confermata (o segnata) lì diventa l'orale da sostenere nei risultati complessivi;
+    tolta, o senza un compito valutato, lo studente non è convocato. Un orale già
+    svolto non si tocca."""
+    if raggruppamento is None or raggruppamento.membri[-1].id != appello_id:
+        return
+    r = conn.execute(
+        "SELECT convocazione_orale, orale_motivazione FROM risultati "
+        "WHERE appello_id=? AND matricola=? AND esito='voto' AND valutazione_sospesa=0",
+        (appello_id, matricola),
+    ).fetchone()
+    if r and r["convocazione_orale"]:
+        conn.execute(
+            "INSERT INTO risultati (matricola, appello_id, richiede_orale, orale_motivazione, esito) "
+            "VALUES (?,?,1,?,'voto') "
+            "ON CONFLICT(matricola, appello_id) DO UPDATE SET "
+            "richiede_orale=CASE WHEN risultati.orale_svolto=1 THEN risultati.richiede_orale ELSE 1 END, "
+            "orale_motivazione=CASE WHEN risultati.orale_svolto=1 THEN risultati.orale_motivazione ELSE excluded.orale_motivazione END",
+            (matricola, raggruppamento.appello_id, r["orale_motivazione"]),
+        )
+        return
+    # la riga complessiva creata solo per l'orale (media non ancora calcolata) sparisce
+    conn.execute(
+        "DELETE FROM risultati WHERE appello_id=? AND matricola=? AND voto IS NULL AND voto_scritto IS NULL "
+        "AND orale_svolto=0 AND verbalizzato=0",
+        (raggruppamento.appello_id, matricola),
+    )
+    conn.execute(
+        "UPDATE risultati SET richiede_orale=0, orale_motivazione=NULL "
+        "WHERE appello_id=? AND matricola=? AND orale_svolto=0",
+        (raggruppamento.appello_id, matricola),
+    )
+
+
+def convocazione_precedente(tag: str, appello_id: int, matricola: str) -> Optional[dict]:
+    """Per una prova di un raggruppamento dopo la prima: {prova, motivazione} se nella
+    prova precedente svolta dallo studente il docente l'ha convocato all'orale (va
+    confermata o tolta in questa), None altrimenti. Una convocazione tolta in una prova
+    non si ripropone nelle successive. Per le correzioni registrate prima delle
+    convocazioni per prova, vale l'orale già richiesto sui risultati complessivi."""
+    raggruppamento = corsi_service.get_raggruppamento_by_membro(tag, appello_id)
+    if raggruppamento is None:
+        return None
+    ids = [m.id for m in raggruppamento.membri]
+    if appello_id not in ids or ids.index(appello_id) == 0:
+        return None
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        for membro in reversed(raggruppamento.membri[:ids.index(appello_id)]):
+            r = conn.execute(
+                "SELECT convocazione_orale, orale_motivazione FROM risultati WHERE appello_id=? AND matricola=?",
+                (membro.id, matricola),
+            ).fetchone()
+            if r is None:
+                continue
+            if r["convocazione_orale"]:
+                return {"prova": membro.nome, "motivazione": r["orale_motivazione"] or ""}
+            break
+        vecchia = conn.execute(
+            "SELECT orale_motivazione FROM risultati WHERE appello_id=? AND matricola=? "
+            "AND richiede_orale=1 AND orale_svolto=0",
+            (raggruppamento.appello_id, matricola),
+        ).fetchone()
+        nuove = conn.execute(
+            f"SELECT 1 FROM risultati WHERE matricola=? AND convocazione_orale=1 "
+            f"AND appello_id IN ({','.join('?' * len(ids))})",
+            (matricola, *ids),
+        ).fetchone()
+        if vecchia and not nuove:
+            return {"prova": "una prova precedente", "motivazione": vecchia["orale_motivazione"] or ""}
+        return None
+    finally:
+        conn.close()
+
+
 def conferma_risultato(
     tag: str, appello_id: int, matricola: str, codice: str, risposte: str,
     voto_finale: Optional[int] = None,
@@ -491,8 +567,8 @@ def conferma_risultato(
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
     # Se questa prova è membro di un raggruppamento, l'orale è unico per l'intero
-    # raggruppamento (non per la singola prova parziale): la richiesta va quindi
-    # registrata sulla riga del raggruppamento invece che su quella della prova.
+    # raggruppamento (non per la singola prova parziale): sulla prova la richiesta è solo
+    # una convocazione segnalata, che l'ultima prova porta sulla riga del raggruppamento.
     raggruppamento_membro = (
         corsi_service.get_raggruppamento_by_membro(tag, appello_id) if appello.membro_raggruppamento else None
     )
@@ -527,6 +603,7 @@ def conferma_risultato(
             richiedi_orale = False
             voto_finale = None
         richiedi_orale_su_prova = richiedi_orale and raggruppamento_membro is None
+        ultima_prova = raggruppamento_membro is not None and raggruppamento_membro.membri[-1].id == appello_id
 
         voto = voto_finale if voto_finale is not None else calcolo.voto
         if richiedi_orale and (insufficiente or voto < votomin):
@@ -551,8 +628,9 @@ def conferma_risultato(
         conn.execute(
             "INSERT INTO risultati (matricola, appello_id, compito_id, risposte, voto, voto_scritto, esito, "
             "insufficiente_per_obbligatorio, punteggi_obbligatori, richiede_orale, orale_svolto, "
-            "orale_motivazione, esito_orale, valutazione_sospesa, note_svolgimenti, nota_correzione, voto_modificato) "
-            "VALUES (?,?,?,?,?,?,'voto',?,?,?,?,?,NULL,?,?,?,?) "
+            "orale_motivazione, esito_orale, valutazione_sospesa, note_svolgimenti, nota_correzione, voto_modificato, "
+            "convocazione_orale) "
+            "VALUES (?,?,?,?,?,?,'voto',?,?,?,?,?,NULL,?,?,?,?,?) "
             "ON CONFLICT(matricola, appello_id) DO UPDATE SET "
             "compito_id=excluded.compito_id, risposte=excluded.risposte, "
             "voto=CASE WHEN risultati.orale_svolto=1 THEN risultati.voto ELSE excluded.voto END, "
@@ -566,29 +644,20 @@ def conferma_risultato(
             "esito_orale=CASE WHEN risultati.orale_svolto=1 THEN risultati.esito_orale ELSE excluded.esito_orale END, "
             "valutazione_sospesa=excluded.valutazione_sospesa, "
             "note_svolgimenti=excluded.note_svolgimenti, nota_correzione=excluded.nota_correzione, "
-            "voto_modificato=excluded.voto_modificato",
+            "voto_modificato=excluded.voto_modificato, convocazione_orale=excluded.convocazione_orale",
             (
                 matricola, appello_id, compito["id"], risposte, voto, voto, insufficiente,
                 json.dumps(punteggi) if punteggi else None,
-                richiedi_orale_su_prova, False, orale_motivazione or None if richiedi_orale_su_prova else None,
+                richiedi_orale_su_prova, False,
+                orale_motivazione or None if richiedi_orale else None,
                 sospesa, json.dumps(note) if note else None, (nota_correzione or "").strip() or None,
-                voto_modificato,
+                voto_modificato, richiedi_orale and raggruppamento_membro is not None,
             ),
         )
-        if richiedi_orale and raggruppamento_membro is not None:
-            # L'orale richiesto su una prova membro va sulla riga "combinata" del
-            # raggruppamento (può non esistere ancora, se il voto combinato non è mai
-            # stato calcolato): CASE protegge un orale già svolto lì da una richiesta
-            # tardiva ripetuta su un'altra prova membro dello stesso raggruppamento.
-            conn.execute(
-                "INSERT INTO risultati (matricola, appello_id, richiede_orale, orale_motivazione, esito) "
-                "VALUES (?,?,1,?,'voto') "
-                "ON CONFLICT(matricola, appello_id) DO UPDATE SET "
-                "richiede_orale=CASE WHEN risultati.orale_svolto=1 THEN risultati.richiede_orale ELSE 1 END, "
-                "orale_motivazione=CASE WHEN risultati.orale_svolto=1 THEN risultati.orale_motivazione ELSE excluded.orale_motivazione END",
-                (matricola, raggruppamento_membro.appello_id, orale_motivazione or None),
-            )
-        if richiedi_orale and corso.orale_dopo_richiesta:
+        # In una prova di un raggruppamento l'orale è una convocazione segnalata sulla
+        # prova: decide l'ultima prova, che la porta (o la toglie) nei risultati complessivi
+        _sincronizza_convocazione(conn, raggruppamento_membro, appello_id, matricola)
+        if richiedi_orale and corso.orale_dopo_richiesta and (raggruppamento_membro is None or ultima_prova):
             conn.execute(
                 "INSERT INTO orale_obbligatorio (matricola, motivazione, origine) VALUES (?,?,?) "
                 "ON CONFLICT(matricola) DO NOTHING",
@@ -683,6 +752,11 @@ def valuta_svolgimento(
             sospesa = True
             avviso = (f"{r['cognome']} {r['nome']} deve fare l'orale in ogni appello: completa la "
                       "valutazione dalla pagina del compito per scegliere se richiederlo.")
+        elif (r["valutazione_sospesa"] and not sospesa and voto_scritto >= votomin
+              and (convocato := convocazione_precedente(tag, appello_id, matricola))):
+            sospesa = True
+            avviso = (f"{r['cognome']} {r['nome']} era convocato all'orale in {convocato['prova']}: completa la "
+                      "valutazione dalla pagina del compito per confermare o togliere la convocazione.")
         conn.execute(
             "UPDATE risultati SET punteggi_obbligatori=?, note_svolgimenti=?, voto=?, voto_scritto=?, "
             "valutazione_sospesa=?, insufficiente_per_obbligatorio=?, voto_modificato=? WHERE appello_id=? AND matricola=?",
@@ -1015,9 +1089,16 @@ def list_orali_da_svolgere(tag: str, appello_id: int) -> list[dict]:
             "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id,),
         ).fetchall()
-        return [dict(r) for r in rows]
     finally:
         conn.close()
+    # per un raggruppamento l'orale è solo di chi ha superato tutte le prove: una
+    # convocazione resta registrata, ma non si mostra finché lo studente non le supera
+    raggruppamento = corsi_service.get_raggruppamento_by_appello(tag, appello_id)
+    if raggruppamento is not None:
+        from quizesame.services import risultati as risultati_service
+        voti = risultati_service.voti_prove_raggruppamento(tag, raggruppamento)
+        rows = [r for r in rows if voti.get(r["matricola"], {}).get("superate")]
+    return [dict(r) for r in rows]
 
 
 def list_orali_svolti(tag: str, appello_id: int) -> list[dict]:

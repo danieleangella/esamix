@@ -123,7 +123,7 @@ def risultati_studente(tag: str, matricola: str) -> list[dict]:
             "r.orale_svolto, r.esito_orale, r.verbalizzato, r.data_verbalizzazione, r.annullamento_nota, "
             "EXISTS(SELECT 1 FROM raggruppamento_membri rm WHERE rm.appello_id = a.id) AS membro_raggruppamento "
             "FROM risultati r JOIN appelli a ON a.id = r.appello_id "
-            "WHERE r.matricola=? ORDER BY a.data IS NULL, a.data, a.id",
+            f"WHERE r.matricola=? ORDER BY {corsi_service.ordine_data('a.data')}, a.id",
             (matricola,),
         ).fetchall()
         risultati = []
@@ -199,7 +199,7 @@ def carriera_studente(tag: str, matricola: str) -> list[dict]:
             continue
         carriera.append(d)
     carriera.extend(righe_gruppo.values())
-    carriera.sort(key=lambda d: (d["appello_data"] is None, d["appello_data"] or "", d["appello_id"]))
+    carriera.sort(key=lambda d: (d["appello_data"] is None, corsi_service.data_ordinabile(d["appello_data"]), d["appello_id"]))
     return carriera
 
 

@@ -318,6 +318,10 @@ ADDITIVE_COLUMNS = {
         # voto finale scelto dal docente diverso da quello calcolato dai punteggi: non va
         # ricalcolato quando poi cambia un punteggio
         ("voto_modificato", "BOOLEAN NOT NULL DEFAULT 0"),
+        # prova di un raggruppamento: il docente vuole convocare lo studente all'orale.
+        # Vale solo se confermata nell'ultima prova, che la riporta sulla riga dei
+        # risultati complessivi (richiede_orale); nelle prove intermedie va riproposta
+        ("convocazione_orale", "BOOLEAN NOT NULL DEFAULT 0"),
     ],
     "esercizi": [
         ("argomento", "TEXT"),

@@ -57,6 +57,8 @@ def risultati_md(tag: str, appello_id: int) -> str:
     elenco = risultati_service.lista_risultati_html(tag, appello_id)
     if any(r["orale_in_attesa"] for r in elenco):
         righe += [f"**{risultati_service.frase_orale(tag, corso, appello)}**", ""]
+    if risultati_service.avviso_convocazioni(appello):
+        righe += [f"*{risultati_service.avviso_convocazioni(appello)}*", ""]
     righe += [
               "| Matricola | Iniziali | " + "".join(f"{p} | " for p in prove) + ("Voto finale |" if prove else "Esito |"),
               "|:---:|:---:|" + ":---:|" * len(prove) + ":---:|"]

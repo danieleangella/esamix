@@ -157,15 +157,24 @@
     <div class="stato-campo stato-warn" id="avviso-nota" hidden>Hai cambiato il voto a mano: scrivi qui il perché.</div>
   </details>
 
+  {% if convocazione and convocazione.precedente %}
+  <div class="stato-campo stato-warn" id="avviso-convocazione">
+    <strong>Convocato all'orale in {{ convocazione.precedente.prova }}</strong>{% if convocazione.precedente.motivazione %} ({{ convocazione.precedente.motivazione }}){% endif %}:
+    lascia la spunta per confermare la convocazione, toglila per rimuoverla.
+  </div>
+  {% endif %}
   <div class="riga-orale">
     <label class="etichetta-check">
       <input type="checkbox" id="checkbox-richiedi-orale" {% if richiedi_orale_checked and orale_possibile %}checked{% endif %} {% if not orale_possibile %}disabled{% endif %}>
-      Richiedi l'orale
+      {% if convocazione %}{{ "Conferma la convocazione all'orale" if convocazione.precedente else "Convoca all'orale" }}{% else %}Richiedi l'orale{% endif %}
     </label>
     <span class="muted" id="avviso-orale">{% if not orale_possibile %}non disponibile: compito insufficiente per un obbligatorio non svolto{% endif %}</span>
   </div>
+  {% if convocazione %}
+  <p class="muted" style="margin:0.2rem 0 0">{% if convocazione.ultima %}Ultima prova: la convocazione confermata qui comparirà nei risultati complessivi; senza spunta lo studente non è convocato.{% else %}La convocazione comparirà nei risultati complessivi solo se confermata nell'ultima prova: nella prossima ti verrà riproposta.{% endif %}</p>
+  {% endif %}
   <div id="box-motivazione-orale" hidden>
-    <label>Motivazione dell'orale (solo per il docente)</label>
+    <label>Motivazione {{ "della convocazione" if convocazione else "dell'orale" }} (solo per il docente)</label>
     <textarea name="orale_motivazione" rows="2" class="testo-normale">{{ orale_motivazione }}</textarea>
   </div>
   <input type="hidden" name="azione" id="azione-hidden" value="salva">

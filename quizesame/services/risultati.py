@@ -67,6 +67,15 @@ def frase_orale(tag: str, corso, appello) -> str:
     return _senza_vuoti(_safe_format(corso.frase_orale, docente=impostazioni.docente, email=impostazioni.email_docente))
 
 
+AVVISO_CONVOCAZIONI = "Le eventuali convocazioni all'orale saranno indicate nei risultati complessivi."
+
+
+def avviso_convocazioni(appello) -> str:
+    """Nei risultati di una prova di un raggruppamento l'orale non compare: la frase che
+    rimanda ai risultati complessivi (vuota per un appello qualsiasi)."""
+    return AVVISO_CONVOCAZIONI if appello.membro_raggruppamento else ""
+
+
 def _senza_vuoti(frase: str) -> str:
     """Senza email (o nome) impostati, niente "()" vuote o spazi prima della punteggiatura."""
     return re.sub(r"\s+([.,;:])", r"\1", re.sub(r"\s*\(\s*\)", "", frase)).strip()
@@ -141,10 +150,12 @@ def _righe_pubblicabili(tag: str, appello_id: int) -> list[dict]:
     rows = _righe_risultati(tag, appello_id, votomin)
     raggruppamento = corsi_service.get_raggruppamento_by_appello(tag, appello_id)
     if raggruppamento is None:
+        # in una prova di un raggruppamento l'orale si decide nei risultati complessivi
+        membro = appello.membro_raggruppamento
         return [
             {"matricola": r["matricola"], "nome": r["nome"], "cognome": r["cognome"], "voti_prove": [],
-             "etichetta": _etichetta_esito(r, votomin, corso.annullato_come),
-             "orale_in_attesa": _orale_in_attesa(r)}
+             "etichetta": _etichetta_esito({**dict(r), "richiede_orale": 0} if membro else r, votomin, corso.annullato_come),
+             "orale_in_attesa": not membro and _orale_in_attesa(r)}
             for r in rows
         ]
     combinati = {r["matricola"]: r for r in rows}
@@ -179,7 +190,8 @@ def stampa_risultati(tag: str, appello_id: int) -> str:
     appello = corsi_service.get_appello(tag, appello_id)
     # celamatr() è applicata da crea_tex_risultati stessa: qui la matricola resta in chiaro.
     righe = _righe_pubblicabili(tag, appello_id)
-    return crea_tex_risultati(ctx_for(tag, corso, appello), righe, nomi_prove(tag, appello_id))
+    return crea_tex_risultati(ctx_for(tag, corso, appello), righe, nomi_prove(tag, appello_id),
+                              avviso=avviso_convocazioni(appello))
 
 
 def lista_risultati_html(tag: str, appello_id: int) -> list[dict]:
@@ -216,7 +228,10 @@ def calcola_raggruppamento(tag: str, raggruppamento_id: int) -> RaggruppamentoRe
         for membro in membri:
             soglia = corsi_service.effective_votomin(corso, membro)
             rows = conn.execute(
-                "SELECT matricola, voto FROM risultati WHERE appello_id=? AND voto >= ?",
+                # come voti_prove_raggruppamento: un voto provvisorio (svolgimenti ancora
+                # da valutare) non conta
+                "SELECT matricola, voto FROM risultati WHERE appello_id=? AND voto >= ? "
+                "AND esito IN ('voto', 'rifiutato') AND valutazione_sospesa=0",
                 (membro.id, soglia),
             ).fetchall()
             matricole = set()
@@ -241,6 +256,18 @@ def calcola_raggruppamento(tag: str, raggruppamento_id: int) -> RaggruppamentoRe
                 (matricola, raggruppamento.appello_id, voto, voto),
             )
             n += 1
+        # chi non ha più superato tutte le prove (es. voto cambiato riaprendo una prova)
+        # non deve conservare la media calcolata prima: resterebbe tra gli idonei da
+        # verbalizzare. Si toglie solo la media (calcolata qui, non inserita dal docente):
+        # la riga e tutto il resto (convocazione all'orale, note) restano; un voto già
+        # verbalizzato o un orale già svolto non si toccano.
+        segnaposti = ",".join("?" * len(passanti))
+        conn.execute(
+            "UPDATE risultati SET voto=NULL, voto_scritto=NULL "
+            "WHERE appello_id=? AND esito='voto' AND verbalizzato=0 AND orale_svolto=0"
+            + (f" AND matricola NOT IN ({segnaposti})" if passanti else ""),
+            (raggruppamento.appello_id, *passanti),
+        )
         conn.commit()
     finally:
         conn.close()

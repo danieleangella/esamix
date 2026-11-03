@@ -661,17 +661,23 @@ def _intestazione_orale(ctx: LatexContext) -> str:
     )
 
 
-def crea_tex_risultati(ctx: LatexContext, righe: list[dict], prove: list[str] = ()) -> str:
+def crea_tex_risultati(ctx: LatexContext, righe: list[dict], prove: list[str] = (), avviso: str = "") -> str:
     """righe: dict con matricola/nome/cognome/etichetta (e voti_prove, uno per ciascuna
     delle `prove` di un raggruppamento) — etichetta è già il testo da stampare al posto del
     voto (un numero, "30lode", "non superato", "orale", "assente", "ritirato", ...): la
-    logica su quale etichetta usare vive in risultati.py."""
+    logica su quale etichetta usare vive in risultati.py. `avviso`: frase (testo semplice)
+    in un riquadro sopra l'elenco, es. dove trovare le convocazioni all'orale."""
     tex = BEGIN_DOCUMENT
     tex += intestazione_breve(ctx)
     titolo = "Risultati complessivi delle prove" if prove else "Risultati della prova scritta"
     tex += _titolo_documento(titolo, _quanti(len(righe), "studente", "studenti"))
     if any(r.get("orale_in_attesa") for r in righe):
         tex += _intestazione_orale(ctx)
+    if avviso:
+        tex += (
+            "\\noindent\\fbox{\\parbox{\\dimexpr\\textwidth-2\\fboxsep-2\\fboxrule}{\\strut "
+            f"{_escape_testo_semplice(avviso)}}}}}\\par\\vspace{{0.4cm}}\n\n"
+        )
     colonne_prove = " c" * len(prove)
     tex += (
         _RIGHE_ALTERNATE +

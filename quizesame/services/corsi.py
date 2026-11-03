@@ -560,19 +560,27 @@ def _row_to_appello(conn, row) -> Appello:
     )
 
 
+def ordine_data(colonna: str) -> str:
+    """ORDER BY cronologico su una colonna data: è testo in formato gg/mm/aaaa, va riletta
+    come aaaammgg (un ordinamento alfabetico sulla stringa originale metterebbe es.
+    "05/01/2027" prima di "20/12/2026", sbagliato); le date mancanti in fondo."""
+    return (f"{colonna} IS NULL, "
+            f"substr({colonna},7,4) || substr({colonna},4,2) || substr({colonna},1,2)")
+
+
+def data_ordinabile(data: Optional[str]) -> str:
+    """La stessa chiave di ordine_data, in Python: aaaammgg da gg/mm/aaaa."""
+    data = data or ""
+    return data[6:10] + data[3:5] + data[0:2]
+
+
 def list_appelli(tag: str, includi_raggruppamenti: bool = True) -> list[Appello]:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         query = "SELECT * FROM appelli"
         if not includi_raggruppamenti:
             query += " WHERE tipo != 'raggruppamento'"
-        # "data" è testo in formato gg/mm/aaaa: va riletta come aaaammgg per ordinare
-        # cronologicamente (un ordinamento alfabetico sulla stringa originale metterebbe
-        # es. "05/01/2027" prima di "20/12/2026", sbagliato).
-        query += (
-            " ORDER BY data IS NULL, "
-            "substr(data,7,4) || substr(data,4,2) || substr(data,1,2), id"
-        )
+        query += f" ORDER BY {ordine_data('data')}, id"
         rows = conn.execute(query).fetchall()
         return [_row_to_appello(conn, r) for r in rows]
     finally:
@@ -782,7 +790,7 @@ def upsert_corso_laurea(tag: str, ctype: str, nome: str) -> None:
 def _row_to_raggruppamento(conn, row) -> Raggruppamento:
     membri_rows = conn.execute(
         "SELECT a.* FROM raggruppamento_membri rm JOIN appelli a ON a.id = rm.appello_id "
-        "WHERE rm.raggruppamento_id=? ORDER BY a.data IS NULL, a.data, a.id",
+        f"WHERE rm.raggruppamento_id=? ORDER BY {ordine_data('a.data')}, a.id",
         (row["id"],),
     ).fetchall()
     return Raggruppamento(

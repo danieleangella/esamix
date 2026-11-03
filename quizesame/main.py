@@ -2396,12 +2396,24 @@ def _render_correggi_revisione(
         if r.posizione not in punteggi_proposti and r.posizione not in rimandati:
             punteggi_proposti[r.posizione] = corso.risposta_corretta
             automatici.add(r.posizione)
+    # prova di un raggruppamento: l'orale è una convocazione da confermare (o togliere)
+    # prova dopo prova, che conta solo se confermata nell'ultima
+    convocazione = None
+    if appello.membro_raggruppamento:
+        raggruppamento, indice = _membro_e_indice(tag, appello_id)
+        precedente = correzione_service.convocazione_precedente(tag, appello_id, valutazione.matricola)
+        convocazione = {
+            "precedente": precedente,
+            "ultima": raggruppamento is not None and indice == len(raggruppamento.membri) - 1,
+        }
+        if precedente and richiedi_orale_checked is None:
+            richiedi_orale_checked = True
+            orale_motivazione = orale_motivazione or precedente["motivazione"]
     if richiedi_orale_checked is None:
         richiedi_orale_checked = bool(valutazione.orale_obbligatorio)
 
     avviso_idoneita = None
     if appello.membro_raggruppamento:
-        raggruppamento, indice = _membro_e_indice(tag, appello_id)
         if raggruppamento is not None and indice > 0:
             ammessi = {s["matricola"] for s in corsi_service.list_ammessi_prova(tag, raggruppamento, indice)}
             if valutazione.matricola not in ammessi:
@@ -2425,7 +2437,7 @@ def _render_correggi_revisione(
         "modifica": modifica, "manuali": manuali, "automatici": automatici,
         "note_precedenti": correzione_service.note_precedenti(tag, appello_id, valutazione.matricola) if manuali else {},
         "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
-        "avviso_idoneita": avviso_idoneita,
+        "avviso_idoneita": avviso_idoneita, "convocazione": convocazione,
     })
 
 
@@ -2576,6 +2588,8 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
             f"{result.cognome} {result.nome} registrato con {n} svolgiment{'o' if n == 1 else 'i'} da valutare "
             f"(voto provvisorio: {result.voto}): li trovi in \"Svolgimenti\""
         )
+    elif result.richiede_orale and appello.membro_raggruppamento:
+        msg = f"{result.cognome} {result.nome}: voto {result.voto}, convocato all'orale"
     elif result.richiede_orale:
         msg = f"Orale richiesto per {result.cognome} {result.nome} (voto scritto di riferimento: {result.voto})"
     else:
@@ -2762,7 +2776,12 @@ def modifica_risultato_form(request: Request, tag: str, appello_id: int, matrico
         request, tag, appello_id, valutazione, voto_proposto=voto_scritto if voto_a_mano else None,
         punteggi_proposti=punteggi_proposti, modifica=True, note_proposte=note_proposte,
         nota_correzione=r["nota_correzione"] or "", voto_a_mano=voto_a_mano,
-        richiedi_orale_checked=bool(r["richiede_orale"]) or None, orale_motivazione=r["orale_motivazione"] or "",
+        # in una prova di un raggruppamento resta la scelta già fatta sulla convocazione
+        # (con la valutazione in sospeso non è ancora stata fatta: si ripropone la precedente)
+        richiedi_orale_checked=bool(r["convocazione_orale"]) or (None if r["valutazione_sospesa"] else False)
+        if corsi_service.get_appello(tag, appello_id).membro_raggruppamento
+        else bool(r["richiede_orale"]) or None,
+        orale_motivazione=r["orale_motivazione"] or "",
     )
 
 
@@ -2818,6 +2837,7 @@ def risultati_anteprima(request: Request, tag: str, appello_id: int):
     return templates.TemplateResponse(request, "risultati_anteprima.html", {
         "corso": corso, "appello": appello, "righe": righe, "prove": risultati_service.nomi_prove(tag, appello_id),
         "frase_orale": risultati_service.frase_orale(tag, corso, appello) if any(r["orale_in_attesa"] for r in righe) else "",
+        "avviso_convocazioni": risultati_service.avviso_convocazioni(appello),
     })
 
 
