@@ -284,6 +284,9 @@ CREATE TABLE IF NOT EXISTS bozze_correzione (
     codice TEXT NOT NULL,
     risposte TEXT NOT NULL,
     salvata_il TEXT DEFAULT CURRENT_TIMESTAMP,
+    -- JSON con quanto già fatto nella pagina di correzione (punteggi confermati, note,
+    -- rimandati, rivalutazioni, nota sul compito, voto e orale): si ritrova riprendendola
+    stato TEXT,
     PRIMARY KEY (appello_id, matricola)
 );
 """
@@ -332,6 +335,12 @@ ADDITIVE_COLUMNS = {
         # Vale solo se confermata nell'ultima prova, che la riporta sulla riga dei
         # risultati complessivi (richiede_orale); nelle prove intermedie va riproposta
         ("convocazione_orale", "BOOLEAN NOT NULL DEFAULT 0"),
+        # JSON {posizione: punteggio} degli esercizi a risposta chiusa rivalutati (o
+        # confermati) a mano dal docente, riproposti quando si modifica la correzione
+        ("rivalutazioni", "TEXT"),
+    ],
+    "bozze_correzione": [
+        ("stato", "TEXT"),
     ],
     "esercizi": [
         ("argomento", "TEXT"),

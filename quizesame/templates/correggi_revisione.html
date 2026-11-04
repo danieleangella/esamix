@@ -11,6 +11,9 @@
 <input type="hidden" name="matricola" value="{{ v.matricola }}">
 <input type="hidden" name="codice" value="{{ v.codice }}">
 <input type="hidden" name="modifica" value="{{ '1' if modifica else '' }}">
+<input type="hidden" name="risposte_valutate" value="{{ v.risposte }}">
+{# posizioni col punteggio ancora proposto in automatico (non confermato): aggiornato all'invio #}
+<input type="hidden" name="automatici" id="automatici-hidden" value="">
 
 <div class="card testata-correzione">
   <div>
@@ -110,12 +113,16 @@
 </div>
 
 {% if lunghezza_valida %}
-{# --- 2. svolgimenti da giudicare a mano --- #}
-{% if manuali %}
+{# --- 2. svolgimenti da giudicare a mano, con gli obbligatori sbagliati (in rosso: il
+   punteggio calcolato, da confermare o cambiare come nella rivalutazione in fondo) --- #}
+{% set sbagliati = v.righe | selectattr('obbligatorio') | rejectattr('revisione') | rejectattr('aperta') | selectattr('svolta') | rejectattr('corretta') | list %}
+{% set posizioni_sbagliati = sbagliati | map(attribute='posizione') | list %}
+{% set minimo_esercizio = [corso.risposta_sbagliata, corso.risposta_vuota] | min %}
+{% if manuali or sbagliati %}
 <div class="card{% if svolgimenti_superflui %} svolgimenti-superflui{% endif %}" id="card-svolgimenti">
   <div class="titolo-sezione-correzione">
-    <h2>Svolgimenti da valutare ({{ manuali|length }})</h2>
-    {{ info("Ogni svolgimento parte dal punteggio massimo (in grigio: " ~ corso.risposta_corretta ~ " per gli obbligatori con la risposta giusta, " ~ corso.punteggio_max_aperta ~ " per le domande aperte), da abbassare fino a " ~ corso.risposta_sbagliata ~ " se lo svolgimento non va: entrando nella casella il valore è già selezionato, basta scrivere il nuovo; se lo svolgimento è giusto, \"corretto\" conferma il massimo senza riscriverlo. La nota (facoltativa) descrive gli errori. \"Dopo\" rimanda la valutazione alla pagina Svolgimenti: il compito si registra con un voto provvisorio, e finché non è valutata una domanda aperta conta 0.") }}
+    <h2>Svolgimenti da valutare ({{ manuali|length }}){% if sbagliati %} <span class="muted" style="font-size:0.85rem; font-weight:normal">e {{ sbagliati|length }} obbligatori{{ 'o' if sbagliati|length == 1 else '' }} sbagliat{{ 'o' if sbagliati|length == 1 else 'i' }}</span>{% endif %}</h2>
+    {{ info("In rosso gli obbligatori con la risposta sbagliata: hanno il punteggio calcolato (" ~ corso.risposta_sbagliata ~ "), da confermare o cambiare se lo svolgimento merita di più; il voto si ricalcola e la nota sul compito riporta il punteggio calcolato e quello assegnato. Ogni svolgimento parte dal punteggio massimo (in grigio: " ~ corso.risposta_corretta ~ " per gli obbligatori con la risposta giusta, " ~ corso.punteggio_max_aperta ~ " per le domande aperte), da abbassare fino a " ~ corso.risposta_sbagliata ~ " se lo svolgimento non va: entrando nella casella il valore è già selezionato, basta scrivere il nuovo; se lo svolgimento è giusto, \"corretto\" conferma il massimo senza riscriverlo. La nota (facoltativa) descrive gli errori. \"Dopo\" rimanda la valutazione alla pagina Svolgimenti: il compito si registra con un voto provvisorio, e finché non è valutata una domanda aperta conta 0.") }}
     {% if svolgimenti_superflui %}
     <input type="hidden" name="svolgimenti_superflui" value="1">
     <span class="muted avviso-superflui">facoltativi: il compito è insufficiente comunque
@@ -125,11 +132,31 @@
   </div>
 
   <div class="elenco-svolgimenti">
-  {% for r in manuali %}
+  {% for r in (manuali + sbagliati) | sort(attribute='posizione') %}
+  {% if r.posizione in posizioni_sbagliati %}
+  {% set calcolato = corso.risposta_sbagliata %}
+  {% set valore = rivalutazioni.get(r.posizione, calcolato) %}
+  <div class="riga-svolgimento riga-sbagliata" data-default="{{ calcolato }}">
+    <div class="svolg-nome">
+      <strong>{{ r.posizione + 1 }}. {{ r.esercizio_nome }}</strong>
+      <span class="badge badge-err">obbligatorio sbagliato</span>
+    </div>
+    <div class="svolg-punteggio">
+      <input type="number" class="campo-punteggio campo-rivaluta{% if r.posizione not in rivalutazioni %} automatico{% endif %}" name="rivaluta_{{ r.posizione }}"
+             data-pos="{{ r.posizione }}" data-numero="{{ r.posizione + 1 }}" data-calcolato="{{ calcolato }}"
+             min="{{ minimo_esercizio }}" max="{{ corso.risposta_corretta }}" step="1" value="{{ valore }}"
+             aria-label="Punteggio di {{ r.esercizio_nome }}, calcolato {{ calcolato }}">
+      <span class="muted svolg-max">/ {{ corso.risposta_corretta }}</span>
+      <button type="button" class="secondary btn-massimo" data-info="Conferma il punteggio calcolato ({{ calcolato }}) e passa al successivo">{{ icona("spunta", 13) }} conferma</button>
+    </div>
+    <span class="muted svolg-lettere">risposta <strong>{{ r.lettera_data }}</strong>, giusta <strong>{{ r.lettera_corretta }}</strong></span>
+    <span></span>
+  </div>
+  {% else %}
   {% set massimo = corso.punteggio_max_aperta if r.aperta else corso.risposta_corretta %}
   {% set valore = punteggi_proposti.get(r.posizione, '') %}
   {% set rimandato = r.posizione in rimandati %}
-  <div class="riga-svolgimento{% if rimandato %} rimandato{% endif %}" data-pos="{{ r.posizione }}" data-max="{{ massimo }}"
+  <div class="riga-svolgimento riga-manuale{% if rimandato %} rimandato{% endif %}" data-pos="{{ r.posizione }}" data-max="{{ massimo }}" data-default="{{ massimo }}"
        data-aperta="{{ '1' if r.aperta else '' }}" data-esercizio="{{ r.esercizio_id if r.esercizio_id is not none else '' }}">
     <div class="svolg-nome">
       <strong>{{ r.posizione + 1 }}. {{ r.esercizio_nome }}</strong>
@@ -149,6 +176,7 @@
     </label>
     <div class="note-simili"></div>
   </div>
+  {% endif %}
   {% endfor %}
   </div>
   {% for es_id, note in note_precedenti.items() %}
@@ -177,10 +205,10 @@
      singoli esercizi a risposta chiusa (gli svolgimenti si cambiano già nel loro riquadro):
      il voto si ricalcola e la nota riporta esercizio, punteggio calcolato e assegnato #}
   {% set posizioni_manuali = manuali | map(attribute='posizione') | list %}
-  {% set rivalutabili = v.righe | rejectattr('aperta') | rejectattr('revisione', 'equalto', 'annullato') | rejectattr('posizione', 'in', posizioni_manuali) | list %}
-  {% set minimo_esercizio = [corso.risposta_sbagliata, corso.risposta_vuota] | min %}
+  {% set rivalutabili = v.righe | rejectattr('aperta') | rejectattr('revisione', 'equalto', 'annullato') | rejectattr('posizione', 'in', posizioni_manuali + posizioni_sbagliati) | list %}
+  {% set rivalutati_in_fondo = rivalutabili | selectattr('posizione', 'in', rivalutazioni) | list %}
   {% if rivalutabili %}
-  <details class="rivaluta-esercizi" id="rivaluta-esercizi">
+  <details class="rivaluta-esercizi" id="rivaluta-esercizi" {% if rivalutati_in_fondo %}open{% endif %}>
     <summary class="muted">Rivaluta esercizio per esercizio</summary>
     <p class="muted" style="margin:0.4rem 0 0.5rem; font-size:0.85rem">
       Cambia il punteggio di un esercizio (da {{ minimo_esercizio }} a {{ corso.risposta_corretta }}): il voto finale si
@@ -190,11 +218,13 @@
     <div class="griglia-rivaluta">
       {% for r in rivalutabili %}
       {% set calcolato = corso.risposta_vuota if not r.svolta else (corso.risposta_corretta if r.corretta else corso.risposta_sbagliata) %}
+      {% set valore = rivalutazioni.get(r.posizione, calcolato) %}
       <label class="voce-rivaluta" title="{{ r.posizione + 1 }}. {{ r.esercizio_nome }}">
         <span class="voce-rivaluta-nome"><strong>{{ r.posizione + 1 }}.</strong> {{ r.esercizio_nome }}</span>
         <span class="muted voce-rivaluta-lettere">{{ r.lettera_data }}/{{ r.lettera_corretta }}</span>
-        <input type="number" class="campo-punteggio automatico campo-rivaluta" data-numero="{{ r.posizione + 1 }}" data-calcolato="{{ calcolato }}"
-               min="{{ minimo_esercizio }}" max="{{ corso.risposta_corretta }}" step="1" value="{{ calcolato }}"
+        <input type="number" class="campo-punteggio campo-rivaluta{% if valore == calcolato %} automatico{% endif %}" name="rivaluta_{{ r.posizione }}"
+               data-pos="{{ r.posizione }}" data-numero="{{ r.posizione + 1 }}" data-calcolato="{{ calcolato }}"
+               min="{{ minimo_esercizio }}" max="{{ corso.risposta_corretta }}" step="1" value="{{ valore }}"
                aria-label="Punteggio dell'esercizio {{ r.posizione + 1 }}, calcolato {{ calcolato }}">
       </label>
       {% endfor %}
@@ -236,7 +266,7 @@
 <div class="barra-azioni-correzione">
   <button type="submit" id="btn-conferma-correzione">{{ icona("spunta", 17) }} <span class="etichetta-conferma">Conferma</span></button>
   <button type="submit" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/bozza" formnovalidate class="secondary"
-          data-info="Tiene da parte matricola, codice e risposte senza registrare nessun esito: la riprendi da &quot;Correzioni da completare&quot;">{{ icona("nota", 14) }} Salva come bozza</button>
+          data-info="Tiene da parte matricola, codice, risposte e quanto già valutato, senza registrare nessun esito: la riprendi da &quot;Correzioni da completare&quot;">{{ icona("nota", 14) }} Salva come bozza</button>
   <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione" class="muted link-con-icona">{{ icona("indietro", 14) }} Annulla</a>
   <span class="muted suggerimento-tastiera"><kbd>Invio</kbd> passa al campo successivo</span>
 </div>
@@ -283,7 +313,7 @@
   var superflui = {{ 'true' if svolgimenti_superflui else 'false' }};
   var cardSvolgimenti = document.getElementById("card-svolgimenti");
 
-  var righe = Array.prototype.slice.call(document.querySelectorAll(".riga-svolgimento"));
+  var righe = Array.prototype.slice.call(document.querySelectorAll(".riga-manuale"));
   function campo(riga) { return riga.querySelector(".campo-punteggio"); }
   function rimandata(riga) { return riga.querySelector(".check-rimanda").checked; }
   // senza punteggio (rimandato o ancora vuoto): una domanda aperta conta 0, un
@@ -346,7 +376,11 @@
   }
   // voto finale scritto direttamente (rivalutazione del totale): vale anche sopra le
   // rivalutazioni dei singoli esercizi, finché non si torna al calcolato
-  var totaleAMano = votoModificato.value === "1";
+  // (un voto spiegato dalle rivalutazioni salvate non è un totale cambiato a mano)
+  var totaleAMano = votoModificato.value === "1" && (function () {
+    var c = calcola();
+    return parseInt(votoFinale.value, 10) !== (rivalutati().length ? c.rivalutato : c.voto);
+  })();
   function aggiorna() {
     var c = calcola();
     votoCalcolatoEl.textContent = c.voto;
@@ -387,19 +421,23 @@
   btnUsaCalcolato.addEventListener("click", function () {
     totaleAMano = false;
     campiRivaluta.forEach(function (input) {
+      if (parseInt(input.value, 10) === parseInt(input.dataset.calcolato, 10)) return;  // anche se confermato
       input.value = input.dataset.calcolato;
       input.classList.add("automatico");
       segnalaIntervallo(input);
     });
+    righeSbagliate.forEach(function (riga) { riga.segnaDefault(); });
     aggiornaNotaRivalutazioni();
     aggiorna();
     votoFinale.focus();
   });
   // cambiare un esercizio torna alla rivalutazione per esercizi: il voto finale è di
-  // nuovo quello calcolato con i punteggi assegnati
+  // nuovo quello calcolato con i punteggi assegnati. Nel riquadro degli svolgimenti
+  // (obbligatori sbagliati) scrivere il punteggio lo conferma, come per gli svolgimenti
   campiRivaluta.forEach(function (input) {
     input.addEventListener("input", function () {
-      input.classList.toggle("automatico", parseInt(input.value, 10) === parseInt(input.dataset.calcolato, 10));
+      if (input.closest(".riga-sbagliata")) input.classList.remove("automatico");
+      else input.classList.toggle("automatico", parseInt(input.value, 10) === parseInt(input.dataset.calcolato, 10));
       segnalaIntervallo(input);
       totaleAMano = false;
       aggiornaNotaRivalutazioni();
@@ -437,6 +475,43 @@
     sincronizzaOrale();
   });
 
+  // --- pulsante "corretto" / "conferma": conferma il punteggio proposto (il massimo per
+  // gli svolgimenti, il calcolato per gli obbligatori sbagliati) senza riscriverlo, e passa
+  // al successivo; resta premuto finché il punteggio confermato è quello
+  function campiRiquadro() {
+    return Array.prototype.slice.call(document.querySelectorAll(".elenco-svolgimenti .campo-punteggio"))
+      .filter(function (input) { return !input.disabled; });
+  }
+  function vaiAlSuccessivo(input) {
+    var campi = campiRiquadro();
+    var i = campi.indexOf(input);
+    var prossimo = i !== -1 && i + 1 < campi.length ? campi[i + 1] : conferma;
+    prossimo.focus();
+    if (prossimo.select) prossimo.select();
+  }
+  function preparaConferma(riga, dopoConferma) {
+    var input = campo(riga);
+    var btn = riga.querySelector(".btn-massimo");
+    riga.segnaDefault = function () {
+      btn.classList.toggle("premuto", !input.classList.contains("automatico") && input.value.trim() === riga.dataset.default);
+    };
+    input.addEventListener("input", riga.segnaDefault);
+    btn.addEventListener("click", function () {
+      input.value = riga.dataset.default;
+      input.classList.remove("automatico");
+      riga.segnaDefault();
+      segnalaIntervallo(input);
+      valutaComunque();
+      dopoConferma();
+      vaiAlSuccessivo(input);
+    });
+    riga.segnaDefault();
+  }
+  var righeSbagliate = Array.prototype.slice.call(document.querySelectorAll(".riga-sbagliata"));
+  righeSbagliate.forEach(function (riga) {
+    preparaConferma(riga, function () { totaleAMano = false; aggiornaNotaRivalutazioni(); aggiorna(); });
+  });
+
   // --- svolgimenti: punteggio, nota con suggerimenti, "dopo"
   function suggerimento(riga) {
     // note simili scritte per lo stesso esercizio negli altri compiti, con studente e punteggio
@@ -448,35 +523,15 @@
   var btnValutaComunque = document.getElementById("btn-valuta-comunque");
   if (btnValutaComunque) btnValutaComunque.addEventListener("click", function () {
     valutaComunque();
-    var primo = campiAttivi()[0];
+    var primo = campiRiquadro()[0];
     if (primo) { primo.focus(); primo.select(); }
   });
-  function campiAttivi() { return righe.filter(function (r) { return !rimandata(r); }).map(campo); }
   righe.forEach(function (riga) {
     var input = campo(riga);
     var nota = riga.querySelector(".campo-nota");
     var btnMassimo = riga.querySelector(".btn-massimo");
-    // "corretto": confermato al massimo (non più grigio), già premuto finché resta lì
-    function segnaMassimo() {
-      btnMassimo.classList.toggle("premuto", !input.classList.contains("automatico") && input.value.trim() === riga.dataset.max);
-    }
-    input.addEventListener("input", function () { input.classList.remove("automatico"); segnaMassimo(); segnalaIntervallo(input); valutaComunque(); suggerimento(riga); aggiorna(); });
-    btnMassimo.addEventListener("click", function () {
-      input.value = riga.dataset.max;
-      input.classList.remove("automatico");
-      segnaMassimo();
-      segnalaIntervallo(input);
-      valutaComunque();
-      suggerimento(riga);
-      aggiorna();
-      // al prossimo svolgimento, dall'ultimo a Conferma
-      var campi = campiAttivi();
-      var i = campi.indexOf(input);
-      var prossimo = i !== -1 && i + 1 < campi.length ? campi[i + 1] : conferma;
-      prossimo.focus();
-      if (prossimo.select) prossimo.select();
-    });
-    segnaMassimo();
+    input.addEventListener("input", function () { input.classList.remove("automatico"); segnalaIntervallo(input); valutaComunque(); suggerimento(riga); aggiorna(); });
+    preparaConferma(riga, function () { suggerimento(riga); aggiorna(); });
     nota.addEventListener("input", function () { suggerimento(riga); });
     riga.querySelector(".check-rimanda").addEventListener("change", function (ev) {
       riga.classList.toggle("rimandato", ev.target.checked);
@@ -486,7 +541,7 @@
         input.value = riga.dataset.max;
         input.classList.add("automatico");
       }
-      segnaMassimo();
+      riga.segnaDefault();
       segnalaIntervallo(input);
       suggerimento(riga);
       aggiorna();
@@ -503,24 +558,31 @@
     if (ev.target.type === "checkbox") return;
     if (ev.target === inputRisposte) { if (!btnRicalcola.disabled) btnRicalcola.click(); return; }
     if (ev.target.classList.contains("campo-punteggio") && segnalaIntervallo(ev.target)) { avvisaFuoriIntervallo(ev.target); return; }
+    // nel riquadro degli svolgimenti: al punteggio successivo (anche dalla nota), dall'ultimo a Conferma
+    var rigaRiquadro = ev.target.closest(".riga-svolgimento");
+    if (rigaRiquadro) { vaiAlSuccessivo(campo(rigaRiquadro)); return; }
     if (ev.target.classList.contains("campo-rivaluta")) {
       // da un esercizio rivalutato al successivo, dall'ultimo al voto finale
-      var j = campiRivaluta.indexOf(ev.target);
-      var dopo = j + 1 < campiRivaluta.length ? campiRivaluta[j + 1] : votoFinale;
+      var inFondo = campiRivaluta.filter(function (input) { return input.closest(".rivaluta-esercizi"); });
+      var j = inFondo.indexOf(ev.target);
+      var dopo = j + 1 < inFondo.length ? inFondo[j + 1] : votoFinale;
       dopo.focus();
       if (dopo.select) dopo.select();
       return;
     }
-    var campi = campiAttivi();
-    var riga = ev.target.closest(".riga-svolgimento");
-    var i = riga ? campi.indexOf(campo(riga)) : -1;
-    var prossimo = (riga && i !== -1 && i + 1 < campi.length) ? campi[i + 1] : conferma;
-    prossimo.focus();
-    if (prossimo.select) prossimo.select();
+    conferma.focus();
   });
 
   var inviato = false;
   form.addEventListener("submit", function (ev) {
+    // punteggi ancora proposti in automatico: riproponendo la pagina (o riprendendo la
+    // bozza) restano da confermare, quelli confermati restano confermati
+    document.getElementById("automatici-hidden").value = Array.prototype.slice.call(
+      document.querySelectorAll(".campo-punteggio.automatico")
+    ).map(function (input) {
+      var riga = input.closest(".riga-manuale");
+      return riga ? riga.dataset.pos : input.dataset.pos;
+    }).filter(Boolean).join(",");
     var bottone = ev.submitter;
     if (bottone && bottone !== conferma) return;  // bozza o ricalcola: nessun controllo
     if (risposteCambiate()) {

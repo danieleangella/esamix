@@ -430,21 +430,39 @@ def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, r
         conn.close()
 
 
-def salva_bozza(tag: str, appello_id: int, matricola: str, codice: str, risposte: str) -> None:
+def salva_bozza(
+    tag: str, appello_id: int, matricola: str, codice: str, risposte: str, stato: Optional[dict] = None,
+) -> None:
     """Salva (o sovrascrive) una bozza di correzione per riprenderla più tardi: non tocca
-    'risultati', quindi non conta come esito né blocca il codice come duplicato."""
+    'risultati', quindi non conta come esito né blocca il codice come duplicato. `stato`
+    è quanto già fatto nella pagina di correzione (vedi stato_bozza)."""
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         conn.execute(
-            "INSERT INTO bozze_correzione (appello_id, matricola, codice, risposte, salvata_il) "
-            "VALUES (?,?,?,?,CURRENT_TIMESTAMP) "
+            "INSERT INTO bozze_correzione (appello_id, matricola, codice, risposte, salvata_il, stato) "
+            "VALUES (?,?,?,?,CURRENT_TIMESTAMP,?) "
             "ON CONFLICT(appello_id, matricola) DO UPDATE SET "
-            "codice=excluded.codice, risposte=excluded.risposte, salvata_il=excluded.salvata_il",
-            (appello_id, matricola, codice, risposte),
+            "codice=excluded.codice, risposte=excluded.risposte, salvata_il=excluded.salvata_il, "
+            "stato=excluded.stato",
+            (appello_id, matricola, codice, risposte, json.dumps(stato) if stato else None),
         )
         conn.commit()
     finally:
         conn.close()
+
+
+def stato_bozza(tag: str, appello_id: int, matricola: str, codice: str) -> Optional[dict]:
+    """Lo stato salvato con la bozza di questo studente, se è dello stesso compito."""
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        r = conn.execute(
+            "SELECT codice, stato FROM bozze_correzione WHERE appello_id=? AND matricola=?", (appello_id, matricola)
+        ).fetchone()
+    finally:
+        conn.close()
+    if not r or not r["stato"] or r["codice"] != codice:
+        return None
+    return json.loads(r["stato"])
 
 
 def list_bozze(tag: str, appello_id: int) -> list[dict]:
@@ -568,6 +586,7 @@ def conferma_risultato(
     modifica: bool = False,
     note_svolgimenti: Optional[dict[int, str]] = None,
     nota_correzione: str = "",
+    rivalutazioni: Optional[dict[int, int]] = None,
 ) -> CorrezioneResult:
     """Salva il risultato. `punteggi_obbligatori` sono i punteggi (tra risposta_sbagliata
     e risposta_corretta, o punteggio_max_aperta per le domande aperte) assegnati dal
@@ -578,7 +597,9 @@ def conferma_risultato(
     tardi da "Modifica" o dalla pagina degli svolgimenti, e intanto voto_finale (voto
     cambiato a mano) e la richiesta dell'orale vengono ignorati. `note_svolgimenti` sono
     le note del docente sugli errori di ciascuno svolgimento, `nota_correzione` una nota
-    libera sul compito (es. perché il voto finale è stato cambiato). Se `richiedi_orale`,
+    libera sul compito (es. perché il voto finale è stato cambiato), `rivalutazioni` i
+    punteggi dati a mano agli esercizi a risposta chiusa (già compresi in voto_finale:
+    si conservano solo per riproporli modificando la correzione). Se `richiedi_orale`,
     il voto scritto viene comunque salvato come riferimento ma l'esito resta "in attesa di
     orale" finché non si chiama completa_orale(). Se lo studente ha già una riga in
     orale_obbligatorio (imposta in un appello precedente, anche di un altro corso da cui è
@@ -656,8 +677,8 @@ def conferma_risultato(
             "INSERT INTO risultati (matricola, appello_id, compito_id, risposte, voto, voto_scritto, esito, "
             "insufficiente_per_obbligatorio, punteggi_obbligatori, richiede_orale, orale_svolto, "
             "orale_motivazione, esito_orale, valutazione_sospesa, note_svolgimenti, nota_correzione, voto_modificato, "
-            "convocazione_orale) "
-            "VALUES (?,?,?,?,?,?,'voto',?,?,?,?,?,NULL,?,?,?,?,?) "
+            "convocazione_orale, rivalutazioni) "
+            "VALUES (?,?,?,?,?,?,'voto',?,?,?,?,?,NULL,?,?,?,?,?,?) "
             "ON CONFLICT(matricola, appello_id) DO UPDATE SET "
             "compito_id=excluded.compito_id, risposte=excluded.risposte, "
             "voto=CASE WHEN risultati.orale_svolto=1 THEN risultati.voto ELSE excluded.voto END, "
@@ -671,7 +692,8 @@ def conferma_risultato(
             "esito_orale=CASE WHEN risultati.orale_svolto=1 THEN risultati.esito_orale ELSE excluded.esito_orale END, "
             "valutazione_sospesa=excluded.valutazione_sospesa, "
             "note_svolgimenti=excluded.note_svolgimenti, nota_correzione=excluded.nota_correzione, "
-            "voto_modificato=excluded.voto_modificato, convocazione_orale=excluded.convocazione_orale",
+            "voto_modificato=excluded.voto_modificato, convocazione_orale=excluded.convocazione_orale, "
+            "rivalutazioni=excluded.rivalutazioni",
             (
                 matricola, appello_id, compito["id"], risposte, voto, voto, insufficiente,
                 json.dumps(punteggi) if punteggi else None,
@@ -679,6 +701,7 @@ def conferma_risultato(
                 orale_motivazione or None if richiedi_orale else None,
                 sospesa, json.dumps(note) if note else None, (nota_correzione or "").strip() or None,
                 voto_modificato, richiedi_orale and raggruppamento_membro is not None,
+                json.dumps(rivalutazioni) if rivalutazioni and not sospesa else None,
             ),
         )
         # In una prova di un raggruppamento l'orale è una convocazione segnalata sulla
@@ -1013,7 +1036,7 @@ def annulla_compito(
             "ON CONFLICT(matricola, appello_id) DO UPDATE SET esito='annullato', voto=NULL, voto_scritto=NULL, "
             "annullamento_nota=excluded.annullamento_nota, insufficiente_per_obbligatorio=0, "
             "punteggi_obbligatori=NULL, richiede_orale=0, orale_svolto=0, orale_motivazione=NULL, "
-            "esito_orale=NULL, valutazione_sospesa=0, voto_modificato=0",
+            "esito_orale=NULL, valutazione_sospesa=0, voto_modificato=0, rivalutazioni=NULL",
             (matricola, appello_id, nota or None),
         )
         if rendi_orale_obbligatorio:

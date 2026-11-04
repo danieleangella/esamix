@@ -771,6 +771,10 @@ input.campo-punteggio.fuori-intervallo { border-color: var(--err-text); color: v
 .svolg-max { font-size: 0.85rem; }
 /* "corretto": conferma il punteggio massimo; premuto quando è confermato */
 .btn-massimo { display: inline-flex; align-items: center; gap: 0.25rem; margin: 0; padding: 0.25rem 0.55rem; font-size: 0.85rem; white-space: nowrap; }
+/* obbligatorio con la risposta sbagliata: punteggio calcolato, da confermare o cambiare */
+.riga-sbagliata { background: var(--err-bg); margin: 0 -0.6rem; padding-left: 0.6rem; padding-right: 0.6rem; border-radius: 6px; }
+.riga-sbagliata .badge-err { border: 1px solid currentColor; }
+.svolg-lettere { font-size: 0.88rem; }
 .btn-massimo.premuto { background: var(--ok-bg); color: var(--ok-text); border-color: var(--ok-text); }
 .svolg-dopo { display: inline-flex; align-items: center; gap: 0.3rem; margin: 0; color: var(--text); cursor: pointer; white-space: nowrap; }
 .svolg-dopo input { width: auto; margin: 0; }

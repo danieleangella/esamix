@@ -2516,6 +2516,7 @@ def _render_correggi_revisione(
     request: Request, tag: str, appello_id: int, valutazione, voto_proposto=None, punteggi_proposti=None,
     errore: str = "", richiedi_orale_checked=None, modifica: bool = False, note_proposte=None,
     nota_correzione: str = "", voto_a_mano: bool = False, rimandati=None, orale_motivazione: str = "",
+    rivalutazioni=None,
 ):
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
@@ -2576,6 +2577,7 @@ def _render_correggi_revisione(
         "corso": corso, "appello": appello, "v": valutazione, "voto_proposto": voto_proposto,
         "voto_a_mano": voto_a_mano and voto_proposto is not None,
         "punteggi_proposti": punteggi_proposti, "note_proposte": note_proposte or {},
+        "rivalutazioni": rivalutazioni or {},
         "nota_correzione": nota_correzione or "", "rimandati": rimandati, "errore": errore,
         "richiedi_orale_checked": richiedi_orale_checked, "orale_motivazione": orale_motivazione,
         "modifica": modifica, "manuali": manuali, "automatici": automatici,
@@ -2603,6 +2605,63 @@ def _errore_non_iscritto(tag: str, appello_id: int, matricola: str) -> Optional[
     )
 
 
+def _posizioni_automatiche(form) -> set[int]:
+    """Posizioni con il punteggio ancora proposto in automatico (in grigio): non sono
+    state confermate, e riproponendo la pagina restano tali."""
+    return {int(p) for p in (form.get("automatici") or "").split(",") if p.strip().isdigit()}
+
+
+def _rivalutazioni_da_form(form) -> dict[int, int]:
+    """{posizione: punteggio} degli esercizi a risposta chiusa rivalutati o confermati a mano."""
+    automatici = _posizioni_automatiche(form)
+    rivalutazioni = {}
+    for k, v in form.items():
+        if k.startswith("rivaluta_") and k[9:].isdigit() and int(k[9:]) not in automatici:
+            v = str(v).strip()
+            if v.lstrip("-").isdigit():
+                rivalutazioni[int(k[9:])] = int(v)
+    return rivalutazioni
+
+
+def _stato_pagina_correzione(form, valutazione) -> dict:
+    """Quanto già fatto nella pagina di correzione (per "Ricalcola" e per le bozze):
+    punteggi confermati (non quelli ancora in automatico), note, rimandati, rivalutazioni,
+    nota sul compito, voto scelto a mano e orale."""
+    automatici = _posizioni_automatiche(form)
+    punteggi, note, rimandati = {}, {}, []
+    for r in valutazione.da_valutare + valutazione.domande_aperte:
+        note[r.posizione] = form.get(f"nota_{r.posizione}") or ""
+        valore = (form.get(f"punteggio_{r.posizione}") or "").strip()
+        if form.get(f"rimanda_{r.posizione}"):
+            rimandati.append(r.posizione)
+        if valore.lstrip("-").isdigit() and r.posizione not in automatici:
+            punteggi[r.posizione] = int(valore)
+    voto_str = (form.get("voto_finale") or "").strip()
+    voto_a_mano = bool(form.get("voto_modificato")) and voto_str.lstrip("-").isdigit()
+    return {
+        "punteggi": punteggi, "note": {p: n for p, n in note.items() if n}, "rimandati": rimandati,
+        "rivalutazioni": _rivalutazioni_da_form(form),
+        "nota_correzione": form.get("nota_correzione") or "",
+        "orale_motivazione": form.get("orale_motivazione") or "",
+        "richiedi_orale": form.get("azione") == "richiedi_orale",
+        "voto": int(voto_str) if voto_a_mano else None,
+    }
+
+
+def _render_da_stato(request: Request, tag: str, appello_id: int, valutazione, stato: dict, modifica: bool):
+    def posizioni(d):
+        return {int(k): v for k, v in (d or {}).items()}
+    return _render_correggi_revisione(
+        request, tag, appello_id, valutazione, modifica=modifica,
+        punteggi_proposti=posizioni(stato.get("punteggi")), note_proposte=posizioni(stato.get("note")),
+        rimandati={int(p) for p in stato.get("rimandati") or []},
+        rivalutazioni=posizioni(stato.get("rivalutazioni")),
+        nota_correzione=stato.get("nota_correzione") or "", orale_motivazione=stato.get("orale_motivazione") or "",
+        richiedi_orale_checked=stato.get("richiedi_orale"),
+        voto_proposto=stato.get("voto"), voto_a_mano=stato.get("voto") is not None,
+    )
+
+
 @app.post("/corsi/{tag}/appelli/{appello_id}/correggi")
 async def correggi(
     request: Request, tag: str, appello_id: int, matricola: str = Form(...), codice: str = Form(...),
@@ -2626,23 +2685,17 @@ async def correggi(
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=anchor)
     # "Ricalcola" dal riepilogo: punteggi e note già scritti restano (le posizioni sono
     # quelle del compito, non cambiano correggendo una lettera)
+    # Ripresa di una bozza: si ritrova quanto già fatto (punteggi confermati, note, ...)
     form = await request.form()
     if "nota_correzione" not in form:
+        stato = None if modifica else correzione_service.stato_bozza(tag, appello_id, matricola, codice)
+        if stato:
+            return _render_da_stato(request, tag, appello_id, valutazione, stato, modifica=False)
         return _render_correggi_revisione(request, tag, appello_id, valutazione, modifica=bool(modifica))
-    manuali = valutazione.da_valutare + valutazione.domande_aperte
-    punteggi, note, rimandati = {}, {}, set()
-    for r in manuali:
-        note[r.posizione] = form.get(f"nota_{r.posizione}") or ""
-        valore = (form.get(f"punteggio_{r.posizione}") or "").strip()
-        if form.get(f"rimanda_{r.posizione}"):
-            rimandati.add(r.posizione)
-        if valore.lstrip("-").isdigit():
-            punteggi[r.posizione] = int(valore)
-    return _render_correggi_revisione(
-        request, tag, appello_id, valutazione, modifica=bool(modifica), punteggi_proposti=punteggi,
-        note_proposte=note, rimandati=rimandati, nota_correzione=form.get("nota_correzione") or "",
-        orale_motivazione=form.get("orale_motivazione") or "",
-    )
+    stato = _stato_pagina_correzione(form, valutazione)
+    # con le risposte cambiate il voto calcolato cambia: un voto scelto a mano non vale più
+    stato["voto"] = None
+    return _render_da_stato(request, tag, appello_id, valutazione, stato, modifica=bool(modifica))
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/correggi/conferma")
@@ -2708,12 +2761,16 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
 
     richiedi_orale = azione == "richiedi_orale"
 
+    rivalutazioni = _rivalutazioni_da_form(form)
+    automatici = _posizioni_automatiche(form)
+
     def riproponi(msg: str):
         return _render_correggi_revisione(
-            request, tag, appello_id, valutazione, voto_proposto=voto_finale, punteggi_proposti=punteggi,
+            request, tag, appello_id, valutazione, voto_proposto=voto_finale,
+            punteggi_proposti={p: v for p, v in punteggi.items() if p not in automatici},
             errore=msg, richiedi_orale_checked=richiedi_orale, modifica=modifica, note_proposte=note,
             nota_correzione=nota_correzione, voto_a_mano=voto_a_mano, rimandati=rimandati,
-            orale_motivazione=orale_motivazione,
+            orale_motivazione=orale_motivazione, rivalutazioni=rivalutazioni,
         )
 
     if errore:
@@ -2724,6 +2781,7 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
             punteggi_obbligatori=punteggi, richiedi_orale=richiedi_orale,
             orale_motivazione=orale_motivazione, conferma_orale_obbligatorio=conferma_orale_obbligatorio,
             modifica=modifica, note_svolgimenti=note, nota_correzione=nota_correzione,
+            rivalutazioni=rivalutazioni,
         )
     except correzione_service.OraleObbligatorioNonConfermato as e:
         richiedi_orale = True  # si ripropone spuntato: togliere la spunta chiede la conferma
@@ -2832,12 +2890,24 @@ def valuta_svolgimento(
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/correggi/bozza")
-def correggi_salva_bozza(
-    tag: str, appello_id: int, matricola: str = Form(...), codice: str = Form(...), risposte: str = Form(...),
+async def correggi_salva_bozza(
+    request: Request, tag: str, appello_id: int, matricola: str = Form(...), codice: str = Form(...),
+    risposte: str = Form(...),
 ):
     appello = corsi_service.get_appello(tag, appello_id)
     anchor = _anchor_membro(appello, "valutazione")
-    correzione_service.salva_bozza(tag, appello_id, matricola, codice, risposte.strip().replace(" ", "").upper())
+    risposte = risposte.strip().replace(" ", "").upper()
+    # con le risposte cambiate (senza "Ricalcola") le posizioni da valutare non sono più
+    # quelle della pagina: si tengono solo codice e risposte
+    stato = None
+    form = await request.form()
+    if "nota_correzione" in form and risposte == (form.get("risposte_valutate") or ""):
+        try:
+            valutazione = correzione_service.valuta_preliminare(tag, appello_id, matricola, codice, risposte)
+            stato = _stato_pagina_correzione(form, valutazione)
+        except Exception:
+            stato = None
+    correzione_service.salva_bozza(tag, appello_id, matricola, codice, risposte, stato=stato)
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Bozza salvata: puoi riprenderla più tardi", anchor=anchor)
 
 
@@ -2967,12 +3037,13 @@ def modifica_risultato_form(request: Request, tag: str, appello_id: int, matrico
         return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=_anchor_membro(appello, "valutazione"))
     punteggi_proposti = {int(k): v for k, v in json.loads(r["punteggi_obbligatori"] or "{}").items()}
     note_proposte = {int(k): v for k, v in json.loads(r["note_svolgimenti"] or "{}").items()}
+    rivalutazioni = {int(k): v for k, v in json.loads(r["rivalutazioni"] or "{}").items()}
     voto_scritto = r["voto_scritto"] if r["voto_scritto"] is not None else r["voto"]
     voto_a_mano = bool(r["voto_modificato"]) and not r["valutazione_sospesa"] and voto_scritto is not None
     return _render_correggi_revisione(
         request, tag, appello_id, valutazione, voto_proposto=voto_scritto if voto_a_mano else None,
         punteggi_proposti=punteggi_proposti, modifica=True, note_proposte=note_proposte,
-        nota_correzione=r["nota_correzione"] or "", voto_a_mano=voto_a_mano,
+        nota_correzione=r["nota_correzione"] or "", voto_a_mano=voto_a_mano, rivalutazioni=rivalutazioni,
         # in una prova di un raggruppamento resta la scelta già fatta sulla convocazione
         # (con la valutazione in sospeso non è ancora stata fatta: si ripropone la precedente)
         richiedi_orale_checked=bool(r["convocazione_orale"]) or (None if r["valutazione_sospesa"] else False)
