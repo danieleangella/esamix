@@ -725,10 +725,18 @@ td .link-simile, td.muted { overflow-wrap: anywhere; }
 .cella-risposta.esito-aperta .data { color: #1d4ed8; }
 .cella-risposta.obbligatoria { border-width: 2px; border-color: var(--text); }
 .cella-risposta.mancante { outline: 2px solid var(--err-text); outline-offset: 1px; }
-.riga-risposte-lette { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap; }
+/* risposte lette (modificabili) e, sotto, quelle corrette: stessa colonna e stesso
+   carattere, così le lettere restano allineate una sopra l'altra */
+.riga-risposte-lette { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.4rem 0.5rem; margin-top: 0.75rem; }
 .riga-risposte-lette label { margin: 0; }
-.riga-risposte-lette input { flex: 1; min-width: 12rem; font-family: monospace; font-size: 1.05rem; letter-spacing: 0.08em; }
+.riga-risposte-lette input { width: 100%; min-width: 0; margin: 0; font-family: monospace; font-size: 1.05rem; letter-spacing: 0.08em; }
+.riga-risposte-lette input.risposte-corrette { grid-column: 2; color: var(--text); font-weight: 700; background: var(--bg); }
 .riga-risposte-lette button { margin: 0; }
+@media (max-width: 560px) {
+  .riga-risposte-lette { grid-template-columns: minmax(0, 1fr) auto; }
+  .riga-risposte-lette label { grid-column: 1 / -1; }
+  .riga-risposte-lette input.risposte-corrette { grid-column: 1 / -1; }
+}
 
 .banner-rimanda, .domanda-rimanda {
   display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.55rem 0.75rem; margin-bottom: 0.6rem;
@@ -748,6 +756,15 @@ td .link-simile, td.muted { overflow-wrap: anywhere; }
 input.campo-punteggio { width: 4.2rem; font-size: 1.1rem; font-weight: 700; text-align: center; padding: 0.3rem; }
 /* punteggio assegnato in automatico (obbligatorio: il massimo), finché non lo si cambia */
 input.campo-punteggio.automatico { color: #9ca3af; font-weight: 500; }
+/* punteggio fuori dall'intervallo consentito */
+input.campo-punteggio.fuori-intervallo { border-color: var(--err-text); color: var(--err-text); background: var(--err-bg); }
+.rivaluta-esercizi { margin-top: 0.9rem; }
+.rivaluta-esercizi > summary { cursor: pointer; font-size: 0.9rem; }
+.griglia-rivaluta { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.35rem 1rem; }
+.voce-rivaluta { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-weight: normal; color: var(--text); }
+.voce-rivaluta-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.88rem; }
+.voce-rivaluta-lettere { font-family: monospace; font-size: 0.85rem; }
+.voce-rivaluta input.campo-punteggio { width: 3.6rem; font-size: 0.95rem; padding: 0.2rem; margin: 0; }
 .dettaglio-nota { margin-top: 0.9rem; }
 .dettaglio-nota > summary { cursor: pointer; font-size: 0.9rem; }
 .dettaglio-nota textarea { margin-top: 0.4rem; }

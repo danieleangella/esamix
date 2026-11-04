@@ -2530,14 +2530,15 @@ def _render_correggi_revisione(
         rimandati = (
             {r.posizione for r in valutazione.domande_aperte} if appello.rimanda_svolgimenti and not modifica else set()
         )
-    # un obbligatorio con la risposta giusta parte dal punteggio pieno, assegnato in
-    # automatico (in grigio: basta confermare se lo svolgimento è a posto); una domanda
-    # aperta parte da vuota
+    # ogni svolgimento parte dal punteggio pieno, assegnato in automatico (in grigio:
+    # basta confermare se lo svolgimento è a posto, o scrivere il punteggio più basso).
+    # Con il compito insufficiente comunque le domande aperte restano vuote: valutarle
+    # è facoltativo, e non valutate contano 0
     punteggi_proposti = dict(punteggi_proposti or {})
     automatici = set()
-    for r in valutazione.da_valutare:
+    for r in valutazione.da_valutare + ([] if superflui else valutazione.domande_aperte):
         if r.posizione not in punteggi_proposti and r.posizione not in rimandati:
-            punteggi_proposti[r.posizione] = corso.risposta_corretta
+            punteggi_proposti[r.posizione] = correzione_service.punteggio_massimo(corso, r.aperta)
             automatici.add(r.posizione)
     # prova di un raggruppamento: l'orale è una convocazione da confermare (o togliere)
     # prova dopo prova, che conta solo se confermata nell'ultima

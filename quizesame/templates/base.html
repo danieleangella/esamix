@@ -141,6 +141,23 @@
     });
   }
 
+  // Caselle di punteggio e di voto: entrando (Tab o clic) il contenuto è già tutto
+  // selezionato, così digitare 3 sostituisce il valore invece di scrivere 33. Il clic,
+  // al rilascio del mouse, toglierebbe la selezione appena fatta: lo si impedisce una volta.
+  (function () {
+    var SELETTORE = "input.campo-punteggio, input.seleziona-al-focus";
+    var appenaEntrato = null;
+    document.addEventListener("focusin", function (ev) {
+      if (!ev.target.matches || !ev.target.matches(SELETTORE)) return;
+      appenaEntrato = ev.target;
+      ev.target.select();
+    });
+    document.addEventListener("mouseup", function (ev) {
+      if (appenaEntrato && ev.target === appenaEntrato) ev.preventDefault();
+      appenaEntrato = null;
+    });
+  })();
+
   // Stringa risposte del compito: sempre maiuscola e raggruppata ogni 5 caratteri per
   // leggerla più facilmente (es. "ABCXB ADCEB A"), ma il valore inviato al server resta
   // sempre senza spazi (vedi anche lo strip lato server, per sicurezza).
