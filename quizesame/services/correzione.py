@@ -252,6 +252,18 @@ class ValutazionePreliminare:
     voto_fisso: int = 0
 
 
+def insufficiente_comunque(corso, votomin: int, valutazione: ValutazionePreliminare) -> bool:
+    """Il compito è insufficiente qualunque punteggio abbiano gli svolgimenti da giudicare
+    a mano: c'è un obbligatorio non svolto, oppure anche con tutti gli svolgimenti al
+    massimo il voto resterebbe sotto la soglia. Valutarli non cambia l'esito."""
+    manuali = valutazione.da_valutare + valutazione.domande_aperte
+    if not manuali:
+        return False
+    if valutazione.non_svolte_obbligatorie:
+        return True
+    return valutazione.voto_fisso + sum(punteggio_massimo(corso, r.aperta) for r in manuali) < votomin
+
+
 def _righe_da_soluzioni(soluzioni: str, risposte: str) -> list[RigaRisposta]:
     """Ripiego per i compiti a cui non è (ancora) collegato quale esercizio occupa
     ciascuna posizione (es. compiti importati da una migrazione dati legacy): la lettera

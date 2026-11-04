@@ -776,6 +776,11 @@ textarea.testo-normale { font-family: inherit; }
 }
 .barra-azioni-correzione button { margin: 0; }
 #btn-conferma-correzione { font-size: 1.1rem; padding: 0.6rem 1.6rem; font-weight: 600; }
+/* compito insufficiente comunque: svolgimenti facoltativi, in grigio finché non se ne valuta uno */
+#card-svolgimenti.svolgimenti-superflui .elenco-svolgimenti { opacity: 0.45; }
+#card-svolgimenti.svolgimenti-superflui .elenco-svolgimenti:focus-within { opacity: 1; }
+#card-svolgimenti:not(.svolgimenti-superflui) .avviso-superflui { display: none; }
+#btn-conferma-correzione.danger { background: var(--err-text); color: #fff; border-color: var(--err-text); }
 .suggerimento-tastiera { margin-left: auto; font-size: 0.8rem; }
 
 /* pagina Svolgimenti (svolgimenti.html): un esercizio alla volta, tutti gli studenti */

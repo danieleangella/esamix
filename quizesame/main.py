@@ -2520,6 +2520,11 @@ def _render_correggi_revisione(
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
     manuali = sorted(valutazione.da_valutare + valutazione.domande_aperte, key=lambda r: r.posizione)
+    votomin = corsi_service.effective_votomin(corso, appello)
+    # insufficiente qualunque punteggio abbiano gli svolgimenti: valutarli è facoltativo
+    superflui = correzione_service.insufficiente_comunque(corso, votomin, valutazione)
+    if rimandati is None and superflui:
+        rimandati = set()
     if rimandati is None:
         # "rimanda a dopo" riguarda le domande aperte: gli obbligatori hanno già il massimo
         rimandati = (
@@ -2574,7 +2579,9 @@ def _render_correggi_revisione(
         "richiedi_orale_checked": richiedi_orale_checked, "orale_motivazione": orale_motivazione,
         "modifica": modifica, "manuali": manuali, "automatici": automatici,
         "note_precedenti": correzione_service.note_precedenti(tag, appello_id, valutazione.matricola) if manuali else {},
-        "votomin_effettivo": corsi_service.effective_votomin(corso, appello),
+        "votomin_effettivo": votomin, "svolgimenti_superflui": superflui,
+        "voto_massimo": valutazione.voto_fisso + sum(
+            correzione_service.punteggio_massimo(corso, r.aperta) for r in manuali),
         "avviso_idoneita": avviso_idoneita, "convocazione": convocazione,
     })
 
@@ -2673,9 +2680,17 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
     # "dopo", o campo vuoto: il servizio la tratta comunque come rimandata)
     punteggi, note, rimandati = {}, {}, set()
     errore = ""
+    # compito insufficiente comunque: gli svolgimenti lasciati vuoti non restano in
+    # sospeso, ma valgono come da regola provvisoria (aperta 0, obbligatorio il massimo)
+    corso = corsi_service.get_corso(tag)
+    superflui = bool(form.get("svolgimenti_superflui")) and correzione_service.insufficiente_comunque(
+        corso, corsi_service.effective_votomin(corso, appello), valutazione)
     for r in valutazione.da_valutare + valutazione.domande_aperte:
         note[r.posizione] = form.get(f"nota_{r.posizione}") or ""
         valore = (form.get(f"punteggio_{r.posizione}") or "").strip()
+        if superflui and valore == "" and not form.get(f"rimanda_{r.posizione}"):
+            punteggi[r.posizione] = 0 if r.aperta else correzione_service.punteggio_massimo(corso, False)
+            continue
         if form.get(f"rimanda_{r.posizione}") or valore == "":
             rimandati.add(r.posizione)
             continue
