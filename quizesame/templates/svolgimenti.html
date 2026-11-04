@@ -59,7 +59,7 @@
       </label>
     </div>
     <datalist id="note-{{ es.chiave }}">{% for g in es.note %}<option value="{{ g.nota }}">{% endfor %}</datalist>
-    <table class="tabella-svolgimenti">
+    <table data-senza-filtri class="tabella-svolgimenti">
       <tr><th>Studente</th><th>Punteggio</th><th>Nota sullo svolgimento</th><th>Voto</th><th></th></tr>
       {% set gruppo = namespace(corrente="__inizio__") %}
       {% for voce in es.voci %}

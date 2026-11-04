@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icone.html" import icona %}
 {% set titolo_pagina = 'Anteprima di controllo' if tutte else ('Foglio di riferimento con soluzioni' if soluzioni else 'Foglio di riferimento') %}
 {% block title %}{{ titolo_pagina }} · {{ appello.nome }}{% endblock %}
 {% block breadcrumb %}
@@ -23,7 +24,7 @@
   <span class="formati">
     <label style="display:inline-flex; align-items:center; gap:0.35rem; margin:0; color:var(--text)">
       <input type="checkbox" id="mostra-soluzioni" style="width:auto; margin:0" {% if soluzioni %}checked{% endif %}> Mostra le soluzioni</label>
-    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">Stampa</button>
+    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">{{ icona("stampa", 14) }} Stampa</button>
   </span>
 </div>
 

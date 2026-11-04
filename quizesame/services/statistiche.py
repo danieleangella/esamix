@@ -181,6 +181,16 @@ def calcola(tag: str, appello_id: int, includi_esercizi: bool = True, corso=None
         promossi = [r for r in valutati if r["voto"] is not None and r["voto"] >= votomin]
         insufficienti = [r for r in valutati if r["voto"] is not None and r["voto"] < votomin]
 
+        # chi ha lo scritto sufficiente, e quanti di loro vanno all'orale (richiesto, o
+        # convocazione in una prova di un raggruppamento)
+        sufficienti_scritto = [
+            r for r in risultati
+            if r["esito"] in ("voto", "rifiutato") and not r["valutazione_sospesa"]
+            and (r["voto_scritto"] if r["voto_scritto"] is not None else r["voto"]) is not None
+            and (r["voto_scritto"] if r["voto_scritto"] is not None else r["voto"]) >= votomin
+        ]
+        all_orale = [r for r in sufficienti_scritto if r["richiede_orale"] or r["convocazione_orale"]]
+
         voti_scritti = []
         for r in risultati:
             v = r["voto_scritto"] if r["voto_scritto"] is not None else (r["voto"] if not r["richiede_orale"] else None)
@@ -203,6 +213,8 @@ def calcola(tag: str, appello_id: int, includi_esercizi: bool = True, corso=None
             "in_attesa_orale_pct": pct(len(in_attesa_orale)), "orali_svolti_pct": pct(len(voti_orali)),
             "media_scritto": media(voti_scritti), "media_orale": media(voti_orali), "media_finale": media(voti_finali),
             "media_variazione_orale": media(variazioni_orali), "n_variazioni_orali": len(variazioni_orali),
+            "sufficienti_scritto": len(sufficienti_scritto), "orale_tra_sufficienti": len(all_orale),
+            "orale_tra_sufficienti_pct": round(100 * len(all_orale) / len(sufficienti_scritto)) if sufficienti_scritto else None,
             "votomin": votomin, "distribuzione": _distribuzione_e_gaussiana(voti_finali),
             "esercizi": _statistiche_esercizi(tag, conn, risultati) if includi_esercizi else [],
             "voti_finali": voti_finali,

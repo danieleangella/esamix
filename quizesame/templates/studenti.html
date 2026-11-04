@@ -59,7 +59,7 @@
     if (voce) document.getElementById("input-cerca-studenti").closest("form").requestSubmit();
   });
   </script>
-  <table style="margin-top:0.75rem">
+  <table data-senza-filtri style="margin-top:0.75rem">
     <tr><th>Matricola</th><th>Cognome</th><th>Nome</th><th>DSA/L104</th><th>Risultato {{ info("Il voto migliore dello studente in questo corso: verde se verbalizzato, arancione se ancora da verbalizzare, rosso se insufficiente.") }}</th><th></th></tr>
     {% for s in studenti %}
     {% set st = stato_esame.get(s.matricola) %}

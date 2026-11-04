@@ -25,7 +25,7 @@
     </label>
     <div class="barra-pulsanti">
       <button type="submit">Salva</button>
-      <button type="button" class="secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate">Annulla</button>
+      <button type="button" class="secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate">{{ icona("annulla", 14) }} Annulla</button>
     </div>
   </form>
 </section>
@@ -139,7 +139,7 @@
         </div>
         <div class="barra-pulsanti">
           <button type="submit">{{ icona("spunta", 14) }} Salva</button>
-          <button type="button" class="secondary" data-chiudi-modifica>Annulla</button>
+          <button type="button" class="secondary" data-chiudi-modifica>{{ icona("annulla", 14) }} Annulla</button>
         </div>
       </form>
     </li>
@@ -181,7 +181,7 @@
       </div>
 
       <div class="ia-sezione" data-fornitore="ollama" style="margin-top:0.5rem">
-        <p class="muted" style="margin:0 0 0.4rem">Un modello che gira su un tuo server: i testi degli esercizi non escono
+        <p class="muted spiegazione sr-only" style="margin:0 0 0.4rem">Un modello che gira su un tuo server: i testi degli esercizi non escono
           dalla tua rete. Serve un modello abbastanza grande (i modelli piccoli sbagliano spesso i calcoli) e un
           contesto ampio: sul server imposta <code>OLLAMA_CONTEXT_LENGTH</code> ad almeno 32768.</p>
         <div class="form-grid">
@@ -193,7 +193,7 @@
           <div><label for="ia-ollama-token">Token (facoltativo)</label>
             <input type="password" id="ia-ollama-token" name="token" autocomplete="off" placeholder="solo se il server è dietro un proxy con login"></div>
         </div>
-        <button type="button" class="secondary" id="btn-verifica-ollama">Verifica connessione ed elenca i modelli</button>
+        <button type="button" class="secondary" id="btn-verifica-ollama">{{ icona("ricarica", 14) }} Verifica connessione ed elenca i modelli</button>
         <p class="muted" id="esito-verifica-ollama" role="status" style="margin-top:0.25rem"></p>
       </div>
 
@@ -203,7 +203,7 @@
       </label><br>
       <div class="barra-pulsanti">
         <button type="submit">Salva configurazione</button>
-        <button type="button" class="secondary btn-annulla" disabled data-info="Svuota il modulo">Annulla</button>
+        <button type="button" class="secondary btn-annulla" disabled data-info="Svuota il modulo">{{ icona("annulla", 14) }} Annulla</button>
       </div>
     </form>
   </details>

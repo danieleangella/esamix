@@ -156,13 +156,16 @@ dice cosa fare adesso. In tutti gli elenchi di studenti, cliccando il nome si ap
   "Segna assenti tutti i non corretti".
 - **Correzione**: inserimento delle risposte di ogni compito (solo le lettere delle domande
   chiuse: il "-" delle domande aperte lo aggiunge il campo da solo), con il voto in tempo
-  reale. Gli obbligatori svolti con la risposta giusta partono dal punteggio massimo, da
-  abbassare se lo svolgimento non va; le domande aperte ricevono un punteggio a mano (finché
-  manca contano 0). Per ogni svolgimento una nota degli errori, con le note simili già date ad
+  reale e una barra con la percentuale di compiti corretti (e di ammessi all'orale tra i
+  sufficienti). Gli obbligatori svolti con la risposta giusta partono dal punteggio massimo,
+  da confermare col pulsante «corretto» o da abbassare se lo svolgimento non va; quelli con la
+  risposta sbagliata compaiono in rosso col punteggio calcolato, da confermare o alzare; le
+  domande aperte ricevono un punteggio a mano (finché manca contano 0). Per ogni svolgimento una nota degli errori, con le note simili già date ad
   altri studenti come suggerimento, e una nota sul compito. Gli svolgimenti si possono
   rimandare e valutare poi esercizio per esercizio nella pagina **Svolgimenti e note**, che
   confronta punteggi e note per vedere se le correzioni sono coerenti. Bozze e compiti con
-  svolgimenti da valutare stanno nell'elenco **Correzioni da completare**; cancellare una
+  svolgimenti da valutare stanno nell'elenco **Correzioni da completare** (una bozza conserva
+  punteggi, note e rivalutazioni già fatti); cancellare una
   correzione riporta lo studente lì. In fondo "Chiudi la correzione", attivo quando tutti
   hanno un esito e non restano correzioni da completare; a correzione chiusa ci sono i
   risultati da pubblicare e i **voti per Moodle** (CSV con la struttura del file di
@@ -174,8 +177,10 @@ dice cosa fare adesso. In tutti gli elenchi di studenti, cliccando il nome si ap
   quota di posti impostata nel corso, 50% di default).
 
 Le azioni più frequenti (iscritti, esercizi, aule) si salvano senza ricaricare la pagina. Le
-spiegazioni meno usate sono nelle icone **i**, e i pulsanti a icona mostrano cosa fanno al
-passaggio del mouse. La voce **Guida** del menu descrive tutto nel dettaglio.
+azioni secondarie sono descrizioni con un'icona; le spiegazioni meno usate compaiono passando
+col mouse sul titolo della sezione, sull'etichetta del campo o sulla testata della colonna, e
+i pulsanti a icona mostrano così cosa fanno. Sopra le tabelle lunghe c'è un campo per
+filtrare le righe (e un menu per le colonne con pochi valori, come stato o esito). La voce **Guida** del menu descrive tutto nel dettaglio.
 
 Per le **prove parziali**, chiusa la correzione dell'ultima prova si generano i **risultati
 complessivi**: solo chi ha superato tutte le prove, con il voto di ciascuna e il voto finale,

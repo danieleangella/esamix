@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icone.html" import icona %}
 {% block title %}Controllo delle correzioni · {{ corso.nome }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
@@ -20,7 +21,7 @@
 
 <div class="card">
   <h2 style="margin-top:0">Controllo delle correzioni</h2>
-  <p class="muted">Ogni voto scritto viene ricalcolato dalle risposte registrate e dalle soluzioni del compito, e confrontato
+  <p class="muted spiegazione sr-only">Ogni voto scritto viene ricalcolato dalle risposte registrate e dalle soluzioni del compito, e confrontato
     con quello salvato. Vengono anche cercate le domande in cui una risposta sbagliata è stata scelta da più studenti di
     quella indicata come corretta: spesso è la soluzione a essere sbagliata. Non viene modificato nulla.</p>
   <div class="stats-grid">
@@ -77,7 +78,7 @@
 
   {% if e.domande_sospette %}
   <h3>Domande con soluzione sospetta</h3>
-  <p class="muted" style="margin-top:0">Una stessa risposta sbagliata è stata scelta da più studenti di quella indicata come corretta.
+  <p class="muted spiegazione sr-only" style="margin-top:0">Una stessa risposta sbagliata è stata scelta da più studenti di quella indicata come corretta.
     Può essere solo una domanda difficile, ma vale la pena ricontrollare la soluzione, anche con la verifica con l'IA.</p>
   {% for d in e.domande_sospette %}
   {% set seg = segnalazioni.get((d.esercizio_id, e.appello.id, d.corretta)) %}
@@ -92,10 +93,10 @@
     {% if not (seg and seg.risolta_il) %}
     <div class="azioni-rapide" style="margin-top:0.4rem">
       <a class="button" href="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/ia/verifica">Verifica con l'IA</a>
-      <a class="button secondary" href="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/ia/correggi?torna={{ ('/corsi/' ~ corso.tag ~ '/controllo-correzioni')|urlencode }}">Correggi l'esercizio</a>
+      <a class="button secondary" href="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/ia/correggi?torna={{ ('/corsi/' ~ corso.tag ~ '/controllo-correzioni')|urlencode }}">{{ icona("matita", 14) }} Correggi l'esercizio</a>
       <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/verificato">
         <input type="hidden" name="torna" value="/corsi/{{ corso.tag }}/controllo-correzioni#appello-{{ e.appello.id }}">
-        <button type="submit" class="secondary" style="margin:0" title="Hai ricontrollato tu: la soluzione è giusta">Segna come corretta</button>
+        <button type="submit" class="secondary" style="margin:0" title="Hai ricontrollato tu: la soluzione è giusta">{{ icona("spunta", 14) }} Segna come corretta</button>
       </form>
     </div>
     {% endif %}

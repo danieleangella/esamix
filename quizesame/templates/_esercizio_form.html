@@ -37,7 +37,7 @@
     </label>
   </div>
 
-  <p class="muted" style="margin-top:0.75rem">
+  <p class="muted spiegazione sr-only" style="margin-top:0.75rem">
     Ogni variante è un modo alternativo di porre lo stesso esercizio (la generazione dei
     compiti ne sceglie una a caso per ogni studente); testo in LaTeX.
   </p>
@@ -67,7 +67,7 @@
           </div>
           {% endfor %}
         </div>
-        <button type="button" class="secondary btn-aggiungi-sbagliata">+ Aggiungi risposta sbagliata</button>
+        <button type="button" class="secondary btn-aggiungi-sbagliata">{{ icona("piu", 14) }} Aggiungi risposta sbagliata</button>
       </div>
       <button type="button" class="secondary pulsante-piccolo btn-rimuovi-variante">{{ icona("cestino", 13) }} Rimuovi questa variante</button>
     </div>
@@ -77,7 +77,7 @@
   <div class="barra-strumenti" style="margin-top:0.75rem">
     <button type="submit" style="margin:0">Salva esercizio</button>
     {% if esercizio is defined %}
-    <button type="button" class="secondary btn-annulla-modifica" style="margin:0">Annulla</button>
+    <button type="button" class="secondary btn-annulla-modifica" style="margin:0">{{ icona("annulla", 14) }} Annulla</button>
     {% endif %}
   </div>
 
@@ -91,7 +91,7 @@
         <input class="campo-corretta">
         <label>Risposte sbagliate</label>
         <div class="sbagliate-container"></div>
-        <button type="button" class="secondary btn-aggiungi-sbagliata">+ Aggiungi risposta sbagliata</button>
+        <button type="button" class="secondary btn-aggiungi-sbagliata">{{ icona("piu", 14) }} Aggiungi risposta sbagliata</button>
       </div>
       <button type="button" class="secondary pulsante-piccolo btn-rimuovi-variante">{{ icona("cestino", 13) }} Rimuovi questa variante</button>
     </div>

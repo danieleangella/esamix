@@ -439,11 +439,176 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-// Le icone "i" (_info.html) stanno spesso nel titolo di una sezione a scomparsa: cliccarle
-// mostra la nota, senza aprire o chiudere la sezione.
-document.addEventListener("click", function (ev) {
-  var icona = ev.target.closest && ev.target.closest("summary .aiuto");
-  if (icona) { ev.preventDefault(); icona.focus(); }
+// --- Descrizioni a comparsa -----------------------------------------------------------
+// Passando col mouse (o col focus da tastiera) su un elemento con data-info, o su quello a
+// cui è agganciata una spiegazione di _info.html, compare un riquadro col testo: niente
+// icone in vista e niente cambio di puntatore. Un solo riquadro per tutta la pagina,
+// tenuto dentro la finestra.
+var _CONTENITORI = ["DIV", "TD", "LI", "P", "FORM", "SECTION", "FIELDSET", "SPAN"];
+// un paragrafo di spiegazione va sul titolo della sua sezione: il titolo che lo precede,
+// o quello della tendina o del riquadro che lo contiene
+var _TITOLI = "h1, h2, h3, h4, summary, legend";
+function _titoloVicino(el) {
+  for (var n = el.previousElementSibling; n; n = n.previousElementSibling) {
+    if (n.matches(_TITOLI)) return n;
+    var dentro = n.matches(".titolo-sezione-correzione, .intestazione-pagina") && n.querySelector(_TITOLI);
+    if (dentro) return dentro;
+  }
+  var tendina = el.parentElement.closest("details");
+  if (tendina && tendina.querySelector(":scope > summary")) return tendina.querySelector(":scope > summary");
+  var riquadro = el.parentElement.closest(".card, fieldset");
+  return riquadro && riquadro.querySelector(_TITOLI);
+}
+function attivaSpiegazioni(radice) {
+  (radice || document).querySelectorAll(".spiegazione:not([data-agganciata])").forEach(function (s) {
+    s.dataset.agganciata = "1";
+    // il titolo, l'etichetta o la testata: il genitore, o l'elemento subito prima se il
+    // genitore è solo un contenitore (es. la riga del titolo di una sezione)
+    var bersaglio = s.parentElement;
+    var prima = s.previousElementSibling;
+    while (prima && prima.classList.contains("sr-only")) prima = prima.previousElementSibling;
+    if (s.tagName === "P") bersaglio = _titoloVicino(s) || bersaglio;
+    else if (_CONTENITORI.indexOf(bersaglio.tagName) !== -1 && prima) bersaglio = prima;
+    var testo = s.textContent.trim();
+    bersaglio.dataset.spiegazione = bersaglio.dataset.spiegazione ? bersaglio.dataset.spiegazione + "\n\n" + testo : testo;
+  });
+}
+(function () {
+  var riquadro = null, timer = null, attuale = null;
+  function testo(el) {
+    var t = [el.dataset.info, el.dataset.spiegazione].filter(Boolean);
+    return t.join("\n\n");
+  }
+  function mostra(el) {
+    var t = testo(el);
+    if (!t) return;
+    if (!riquadro) {
+      riquadro = document.createElement("div");
+      riquadro.className = "suggerimento-comparsa";
+      riquadro.setAttribute("role", "tooltip");
+      document.body.appendChild(riquadro);
+    }
+    riquadro.textContent = t;
+    riquadro.classList.toggle("lungo", t.length > 140);
+    riquadro.style.left = "0px"; riquadro.style.top = "0px";
+    riquadro.hidden = false;
+    var r = el.getBoundingClientRect(), q = riquadro.getBoundingClientRect(), m = 8;
+    var x = Math.min(Math.max(m, r.left + r.width / 2 - q.width / 2), window.innerWidth - q.width - m);
+    var y = r.bottom + 6;
+    if (y + q.height > window.innerHeight - m && r.top - q.height - 6 > m) y = r.top - q.height - 6;
+    riquadro.style.left = Math.round(x + window.scrollX) + "px";
+    riquadro.style.top = Math.round(y + window.scrollY) + "px";
+  }
+  function nascondi() {
+    clearTimeout(timer);
+    attuale = null;
+    if (riquadro) riquadro.hidden = true;
+  }
+  function bersaglio(ev) {
+    return ev.target.closest && ev.target.closest("[data-info], [data-spiegazione]");
+  }
+  document.addEventListener("mouseover", function (ev) {
+    var el = bersaglio(ev);
+    if (el === attuale) return;
+    nascondi();
+    if (!el) return;
+    attuale = el;
+    timer = setTimeout(function () { mostra(el); }, el.dataset.spiegazione ? 350 : 200);
+  });
+  document.addEventListener("focusin", function (ev) {
+    var el = bersaglio(ev);
+    nascondi();
+    if (el && ev.target.matches(":focus-visible")) { attuale = el; mostra(el); }
+  });
+  document.addEventListener("focusout", nascondi);
+  document.addEventListener("scroll", nascondi, true);
+  document.addEventListener("click", nascondi);
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") nascondi(); });
+})();
+
+// --- Filtri nelle tabelle ---------------------------------------------------------------
+// Sopra ogni tabella con un po' di righe: un campo per cercare in tutte le colonne e, per
+// le colonne con pochi valori diversi (stato, esito, aula...), un menu per sceglierne uno.
+// Non per le tabelle con filtri propri o che non sono elenchi (data-senza-filtri).
+var _RIGHE_MINIME_FILTRO = 8;
+function attivaFiltriTabelle(radice) {
+  (radice || document).querySelectorAll("table:not([data-senza-filtri]):not([data-filtri-attivi])").forEach(function (tabella) {
+    if (tabella.closest("[data-senza-filtri]") || tabella.tBodies.length !== 1) return;
+    var righe = Array.prototype.slice.call(tabella.tBodies[0].rows).filter(function (tr) {
+      return tr.cells.length > 1 && !tr.querySelector("th") && !tr.hidden && tr.style.display !== "none";
+    });
+    if (righe.length < _RIGHE_MINIME_FILTRO) return;
+    tabella.dataset.filtriAttivi = "1";
+    var testata = tabella.tHead ? tabella.tHead.rows[0] : tabella.querySelector("tr");
+    var nomi = testata ? Array.prototype.map.call(testata.cells, function (c) { return c.textContent.trim(); }) : [];
+    var nColonne = Math.max.apply(null, righe.map(function (tr) { return tr.cells.length; }));
+    function valore(tr, i) { var c = tr.cells[i]; return c ? c.textContent.replace(/\s+/g, " ").trim() : ""; }
+
+    var barra = document.createElement("div");
+    barra.className = "filtri-tabella non-stampare";
+    var cerca = document.createElement("input");
+    cerca.type = "search";
+    cerca.placeholder = "Filtra…";
+    cerca.setAttribute("aria-label", "Filtra le righe della tabella");
+    cerca.setAttribute("autocomplete", "off");
+    barra.appendChild(cerca);
+    var menu = [];
+    for (var i = 0; i < nColonne; i++) {
+      if (!nomi[i]) continue;
+      var valori = {};
+      righe.forEach(function (tr) { var v = valore(tr, i); if (v) valori[v] = (valori[v] || 0) + 1; });
+      var chiavi = Object.keys(valori).sort(function (a, b) { return a.localeCompare(b, "it", { numeric: true }); });
+      if (chiavi.length < 2 || chiavi.length > 8 || chiavi.length > righe.length / 2
+          || chiavi.some(function (v) { return v.length > 30; })) continue;
+      var sel = document.createElement("select");
+      sel.dataset.colonna = i;
+      sel.setAttribute("aria-label", "Filtra per " + nomi[i]);
+      var tutte = document.createElement("option");
+      tutte.value = ""; tutte.textContent = nomi[i] + ": tutti";
+      sel.appendChild(tutte);
+      chiavi.forEach(function (v) {
+        var o = document.createElement("option");
+        o.value = v; o.textContent = v + " (" + valori[v] + ")";
+        sel.appendChild(o);
+      });
+      barra.appendChild(sel);
+      menu.push(sel);
+    }
+    var conteggio = document.createElement("span");
+    conteggio.className = "muted conteggio-filtro";
+    barra.appendChild(conteggio);
+    tabella.parentNode.insertBefore(barra, tabella);
+
+    function applica() {
+      var parole = cerca.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      var visibili = 0;
+      righe.forEach(function (tr) {
+        var t = tr.textContent.toLowerCase();
+        var ok = parole.every(function (p) { return t.indexOf(p) !== -1; })
+          && menu.every(function (s) { return !s.value || valore(tr, +s.dataset.colonna) === s.value; });
+        tr.classList.toggle("riga-filtrata", !ok);
+        // la riga di dettaglio aperta sotto (carriera, modifica) segue la sua riga
+        var dopo = tr.nextElementSibling;
+        if (dopo && righe.indexOf(dopo) === -1) dopo.classList.toggle("riga-filtrata", !ok);
+        visibili += ok ? 1 : 0;
+      });
+      var attivo = parole.length || menu.some(function (s) { return s.value; });
+      conteggio.textContent = attivo ? visibili + " su " + righe.length : "";
+    }
+    cerca.addEventListener("input", applica);
+    menu.forEach(function (s) { s.addEventListener("change", applica); });
+  });
+}
+document.addEventListener("DOMContentLoaded", function () {
+  attivaSpiegazioni();
+  attivaFiltriTabelle();
+  // riquadri ridisegnati o caricati dopo (fetch): spiegazioni e filtri anche lì
+  new MutationObserver(function (mutazioni) {
+    if (mutazioni.some(function (m) { return m.addedNodes.length; })) {
+      attivaSpiegazioni();
+      attivaFiltriTabelle();
+    }
+  }).observe(document.body, { childList: true, subtree: true });
 });
 
 // Matita accanto al cestino (aule, prove di un raggruppamento, configurazioni IA): apre e
@@ -470,22 +635,6 @@ document.addEventListener("click", function (ev) {
   }
 });
 
-// La nota si apre centrata sotto l'icona: vicino al bordo della finestra (es. un'icona
-// nell'ultima colonna di una tabella) uscirebbe di lato, quindi la si sposta all'interno.
-function _riposizionaNota(ev) {
-  var icona = ev.target.closest && ev.target.closest(".aiuto");
-  var nota = icona && icona.querySelector(".aiuto-testo");
-  if (!nota) return;
-  nota.style.transform = "";
-  var r = nota.getBoundingClientRect();
-  if (!r.width) return;  // non ancora visibile
-  var margine = 8, dx = 0;
-  if (r.right > window.innerWidth - margine) dx = window.innerWidth - margine - r.right;
-  if (r.left + dx < margine) dx = margine - r.left;
-  if (dx) nota.style.transform = "translateX(calc(-50% + " + Math.round(dx) + "px))";
-}
-document.addEventListener("mouseover", _riposizionaNota);
-document.addEventListener("focusin", _riposizionaNota);
 
 // --- Scheda Testo di un appello (_tab_creazione.html / _testo_esercizi.html) -----------
 // Le azioni sugli esercizi assegnati (assegna dalla banca, togli, obbligatorio, crea,

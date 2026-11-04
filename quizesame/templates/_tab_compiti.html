@@ -55,7 +55,7 @@
   {% set url_appello = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
   {% if md.esercizi_assegnati %}
   <form method="post" action="{{ url_appello }}/ricompila-pdf" class="barra-rigenera">
-    <button type="submit" class="secondary pulsante-piccolo" style="margin:0">↻ Rigenera tutti i documenti</button>
+    <button type="submit" class="secondary pulsante-piccolo" style="margin:0">{{ icona("ricarica", 14) }} Rigenera tutti i documenti</button>
     {{ info("Ricrea compiti, griglie, fogli da pubblicare (con e senza soluzioni, nella scheda Testo), elenchi e risultati, in PDF e negli altri formati, con la grafica attuale; stessi codici e stesso ordine di esercizi e risposte, quindi i compiti già stampati restano validi. I file qui sotto vengono sostituiti dalla versione rigenerata.") }}
   </form>
   {% endif %}

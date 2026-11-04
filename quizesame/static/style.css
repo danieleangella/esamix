@@ -1,10 +1,10 @@
 :root {
-  --bg: #f4f5f8;
+  --bg: #f6f7f9;
   --panel: #ffffff;
   --text: #1f2430;
   --muted: #6b7280;
-  --border: #e2e4e9;
-  --border-strong: #cfd3db;
+  --border: #e8eaee;
+  --border-strong: #d5d9e0;
   --accent: #2563eb;
   --accent-soft: #eff4ff;
   --accent-border: #c7d7fe;
@@ -112,7 +112,6 @@ html { scroll-padding-top: 6rem; } /* le ancore non finiscono sotto la testata f
   border-radius: var(--radius);
   padding: 1.1rem 1.25rem;
   margin-bottom: 1rem;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
 .card > h2:first-child { margin-top: 0; }
 
@@ -128,7 +127,7 @@ details.card > summary:hover { color: var(--accent); }
 details.card > summary::before,
 .card details > summary::before {
   content: "›"; display: inline-flex; align-items: center; justify-content: center; flex: none;
-  width: 1.3rem; height: 1.3rem; border-radius: 6px; background: var(--bg); color: var(--muted);
+  width: 1.1rem; height: 1.3rem; border-radius: 6px; background: none; color: var(--muted);
   font-size: 1.1rem; font-weight: 700; line-height: 1; transition: transform 0.15s ease;
 }
 details[open] > summary::before { transform: rotate(90deg); }
@@ -138,7 +137,7 @@ details.card[open] > summary { margin-bottom: 0.5rem; }
   display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
   font-weight: 500; color: var(--accent); padding: 0.35rem 0;
 }
-.card details > summary::before { width: 1.1rem; height: 1.1rem; font-size: 0.95rem; background: var(--accent-soft); color: var(--accent); }
+.card details > summary::before { width: 0.9rem; height: 1.1rem; font-size: 0.95rem; background: none; color: var(--accent); }
 .card details > summary:hover { text-decoration: underline; }
 .card details > summary.muted { color: var(--muted); }
 .card > details:not(.card) { border-top: 1px solid var(--border); padding-top: 0.35rem; }
@@ -148,7 +147,7 @@ details.card[open] > summary { margin-bottom: 0.5rem; }
    contenuto; aperti diventano una normale card con il modulo */
 details.card.pannello-azione:not([open]) { background: transparent; border-style: dashed; border-color: var(--border-strong); box-shadow: none; }
 details.card.pannello-azione > summary { color: var(--accent); font-weight: 600; font-size: 1rem; }
-details.card.pannello-azione > summary::before { content: "+"; background: var(--accent-soft); color: var(--accent); transform: none; }
+details.card.pannello-azione > summary::before { content: "+"; background: none; color: var(--accent); transform: none; }
 details.card.pannello-azione[open] > summary::before { content: "−"; }
 details.card.pannello-azione:not([open]):hover { border-color: var(--accent); background: var(--panel); }
 
@@ -166,7 +165,7 @@ h2 { font-size: 1.15rem; margin-top: 0; }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 0.82rem; white-space: nowrap; border-bottom-color: var(--border-strong); }
 td button, td input[type=submit] { margin-top: 0; }
 /* testate in diagonale e più piccole (tabelle delle statistiche): la colonna resta larga
    quanto i dati, il testo sale inclinato sopra quelle vicine */
@@ -211,17 +210,22 @@ button, input[type=submit], a.button {
   line-height: 1.25; font-family: inherit;
 }
 button:hover, input[type=submit]:hover, a.button:hover { filter: brightness(0.93); }
+/* azioni secondarie: una descrizione con l'icona, senza riquadro (sfondo leggero al passaggio) */
 button.secondary, a.button.secondary {
-  background: var(--panel); color: var(--text); border-color: var(--border-strong);
+  background: transparent; color: var(--accent); border-color: transparent; padding-left: 0.5rem; padding-right: 0.5rem;
+  display: inline-flex; align-items: center; gap: 0.35rem;
 }
-button.secondary:hover, a.button.secondary:hover { filter: none; background: var(--bg); border-color: var(--muted); }
-/* azioni distruttive (Elimina, Rimuovi...): scritta e bordo rossi, si riempiono al passaggio */
-button.danger, a.button.danger { background: var(--panel); color: var(--err-text); border-color: var(--err-text); font-weight: 600; }
-button.danger:hover:not(:disabled), a.button.danger:hover { background: var(--err-text); color: #fff; filter: none; }
+button.secondary:hover:not(:disabled), a.button.secondary:hover { filter: none; background: var(--accent-soft); }
+/* azioni distruttive (Elimina, Rimuovi...): scritta rossa, sfondo rosa al passaggio */
+button.danger, a.button.danger {
+  background: transparent; color: var(--err-text); border-color: transparent; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 0.35rem;
+}
+button.danger:hover:not(:disabled), a.button.danger:hover { background: var(--err-bg); filter: none; }
 button.warning, a.button.warning { background: #d97706; border-color: #d97706; }
 button:disabled, input[type=submit]:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
 button.link-simile { border: none; }
-a.button { display: inline-block; text-decoration: none; }
+a.button { display: inline-flex; align-items: center; gap: 0.35rem; text-decoration: none; }
 
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .tabs a:hover { border-color: var(--accent); }
@@ -272,7 +276,7 @@ code { background: #f1f2f4; padding: 0.1rem 0.3rem; border-radius: 4px; }
 }
 .stat-tile {
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 8px;
   padding: 0.9rem 0.5rem;
   text-align: center;
@@ -284,7 +288,7 @@ code { background: #f1f2f4; padding: 0.1rem 0.3rem; border-radius: 4px; }
 .stat-tile.stat-warn .stat-value { color: #92400e; }
 .stat-tile.stat-info .stat-value { color: #1d4ed8; }
 .stat-tile.stat-danger .stat-value { color: var(--err-text); }
-.stat-label-info { cursor: help; text-decoration: underline dotted; text-decoration-color: var(--muted); }
+.stat-label-info { text-decoration: underline dotted; text-decoration-color: var(--border-strong); }
 .campo-obbligatorio::after { content: " *"; color: var(--err-text); }
 
 @keyframes easter-egg-cade {
@@ -435,7 +439,6 @@ a.button.passo-link { margin: 0; padding: 0.25rem 0.6rem; font-size: 0.82rem; wh
   .barra-salva { margin-left: -0.75rem; margin-right: -0.75rem; border-radius: 0; padding: 0.5rem 0.75rem; gap: 0.5rem; }
   .barra-salva button { flex: none; }
   .barra-salva .stato-impostazioni { flex: 1; font-size: 0.8rem; line-height: 1.3; }
-  .aiuto-testo { position: fixed; left: 50%; top: 4rem; transform: translateX(-50%); }
   /* esercizi assegnati: ogni esercizio diventa una scheda impilata con tutte le azioni in
      vista; il trascinamento (non disponibile al tocco) e il campo posizione si nascondono */
   table.tabella-esercizi-assegnati { display: block; overflow: visible; }
@@ -471,38 +474,37 @@ tbody.esercizio-assegnato.trascinato { opacity: 0.5; }
 .barra-salva.modificata { border-color: #d4a017; }
 .barra-salva.modificata .stato-impostazioni { color: #8a6500; font-weight: 600; }
 
-/* icona "?" con istruzioni a comparsa (passaggio del puntatore o focus da tastiera) */
-.aiuto {
-  position: relative; display: inline-flex; align-items: center; justify-content: center;
-  width: 1.25rem; height: 1.25rem; border-radius: 50%; flex: none;
-  border: 1px solid var(--border); background: var(--panel);
-  font-size: 0.8rem; font-weight: 700; cursor: help; user-select: none;
+/* descrizione a comparsa (app.js): per data-info e per le spiegazioni di _info.html */
+.suggerimento-comparsa {
+  position: absolute; z-index: 1100; max-width: min(20rem, calc(100vw - 16px)); white-space: pre-line;
+  padding: 0.35rem 0.55rem; border-radius: 6px; background: #1f2937; color: #fff;
+  font-size: 0.8rem; font-weight: 400; line-height: 1.4; pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
 }
-.aiuto-testo {
-  display: none; position: absolute; z-index: 20; top: calc(100% + 6px); left: 50%;
-  transform: translateX(-50%); width: min(26rem, 85vw);
-  padding: 0.75rem 0.9rem; border: 1px solid var(--border); border-radius: 8px;
-  background: var(--panel); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  font-size: 0.85rem; font-weight: normal; line-height: 1.45; text-align: left; cursor: default;
-  /* dentro intestazioni di tabella, celle azioni o pulsanti (nowrap) deve comunque andare a capo */
-  white-space: normal; overflow-wrap: break-word;
+.suggerimento-comparsa.lungo {
+  max-width: min(28rem, calc(100vw - 16px)); padding: 0.6rem 0.8rem; background: var(--panel); color: var(--text);
+  border: 1px solid var(--border-strong); font-size: 0.84rem;
 }
-.aiuto-testo ol { margin: 0.4rem 0; padding-left: 1.2rem; }
-.aiuto:hover .aiuto-testo, .aiuto:focus .aiuto-testo, .aiuto:focus-within .aiuto-testo { display: block; }
+/* filtri sopra le tabelle (attivaFiltriTabelle in app.js) */
+.filtri-tabella { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0.25rem 0 0.5rem; }
+.filtri-tabella input[type=search] { flex: 0 1 16rem; width: auto; padding: 0.3rem 0.55rem; font-size: 0.88rem; }
+.filtri-tabella select { width: auto; max-width: 14rem; padding: 0.28rem 0.4rem; font-size: 0.85rem; color: var(--muted); }
+.conteggio-filtro { font-size: 0.82rem; }
+tr.riga-filtrata { display: none !important; }
 
 /* piccoli comandi a icona nel titolo di una sezione (es. anteprima di controllo del testo):
    restano utilizzabili anche quando la sezione è chiusa */
 .barra-anteprima { margin-left: auto; display: inline-flex; flex-wrap: wrap; gap: 0.25rem; font-size: 0.85rem; font-weight: 500; }
 .icona-azione {
-  display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.55rem; border-radius: 6px;
-  border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); text-decoration: none; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.45rem; border-radius: 6px;
+  border: 1px solid transparent; background: transparent; color: var(--accent); text-decoration: none; white-space: nowrap;
 }
-.icona-azione:hover { border-color: var(--accent); color: var(--accent); }
+.icona-azione:hover { background: var(--accent-soft); }
 
 /* documenti generati: pulsanti di formato (PDF in evidenza) ed elenco dei fogli */
 .formati { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; vertical-align: middle; }
 .formati .icona-azione, a.icona-azione.formato-pdf { font-size: 0.8rem; padding: 0.15rem 0.5rem; }
-.icona-azione.formato-pdf { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); font-weight: 600; }
+.icona-azione.formato-pdf { font-weight: 700; }
 .titoletto { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 1.25rem 0 0.4rem; }
 .elenco-documenti { list-style: none; margin: 0; padding: 0; }
 .elenco-documenti li {
@@ -571,7 +573,7 @@ details.card.esito-dubbio { border-left: 4px solid #d97706; }
   .tabella-registro .r-azione { width: auto; }
 }
 /* piccola icona dello stato della verifica con l'IA (lista di tutti gli esercizi) */
-.icona-ia { display: inline-flex; align-items: center; justify-content: center; width: 1.1rem; height: 1.1rem; border-radius: 50%; font-size: 0.7rem; font-weight: 700; vertical-align: middle; margin-left: 0.2rem; cursor: help; }
+.icona-ia { display: inline-flex; align-items: center; justify-content: center; width: 1.1rem; height: 1.1rem; border-radius: 50%; font-size: 0.7rem; font-weight: 700; vertical-align: middle; margin-left: 0.2rem; }
 .icona-ia-ok { background: var(--ok-bg); color: var(--ok-text); }
 .icona-ia-errore { background: var(--err-bg); color: var(--err-text); }
 .icona-ia-dubbio { background: #fff7e6; color: #92400e; }
@@ -613,24 +615,6 @@ button.pulsante-icona.pulsante-neutro:hover { color: var(--accent); border-color
 .riga-carriera > td { background: var(--accent-soft); }
 button svg, .icona-azione svg { vertical-align: -0.15em; }
 
-/* suggerimento al passaggio del mouse (o col focus da tastiera) per icone e pulsanti
-   compatti: data-info="testo" sull'elemento */
-[data-info] { position: relative; }
-[data-info]:hover::after, [data-info]:focus-visible::after {
-  content: attr(data-info); position: absolute; z-index: 40; top: calc(100% + 6px); left: 50%;
-  transform: translateX(-50%); width: max-content; max-width: 18rem; white-space: normal;
-  padding: 0.35rem 0.55rem; border-radius: 6px; background: #1f2937; color: #fff;
-  font-size: 0.78rem; font-weight: 400; line-height: 1.35; text-align: left;
-  text-transform: none; letter-spacing: normal; pointer-events: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-}
-/* icona "i" di _info.html: come l'icona "?" ma più discreta, per note da leggere ogni tanto */
-.aiuto.info {
-  width: 1.05rem; height: 1.05rem; font-size: 0.7rem; font-family: Georgia, serif; font-style: italic;
-  color: var(--accent); border-color: var(--accent-border); background: var(--accent-soft); vertical-align: middle;
-}
-.aiuto .aiuto-testo { text-transform: none; letter-spacing: normal; color: var(--text); font-style: normal;
-  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 /* aula riservata ai DSA/L104 (_aule.html) */
 button.pulsante-dsa {
   margin: 0; padding: 0.25rem 0.45rem; display: inline-flex; align-items: center; gap: 0.3rem; line-height: 1;
@@ -827,12 +811,12 @@ textarea.testo-normale { font-family: inherit; }
 .elenco-note-usate { list-style: none; margin: 0; padding: 0; }
 .elenco-note-usate li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
 .elenco-note-usate li.incoerente { color: #92400e; }
-.nota-risultato { margin-left: 0.35rem; font-size: 0.75rem; color: var(--accent); cursor: help; white-space: nowrap; }
+.nota-risultato { margin-left: 0.35rem; font-size: 0.75rem; color: var(--accent); white-space: nowrap; }
 /* note simili mentre si scrive la nota di uno svolgimento (mostraNoteSimili in app.js) */
 .note-simili { font-size: 0.78rem; color: var(--muted); }
 .note-simili:empty { display: none; }
 .note-simili.diverso { color: #92400e; }
-.note-simili-riga { position: relative; cursor: help; border-bottom: 1px dotted currentColor; }
+.note-simili-riga { position: relative; border-bottom: 1px dotted currentColor; }
 .note-simili-elenco {
   display: none; position: absolute; z-index: 45; left: 0; top: calc(100% + 4px); width: max-content; min-width: 18rem; max-width: min(34rem, 90vw);
   list-style: none; margin: 0; padding: 0.4rem 0.6rem; background: var(--panel); color: var(--text);
@@ -869,7 +853,7 @@ textarea.testo-normale { font-family: inherit; }
 /* Statistiche, esercizi più sbagliati: percentuali allineate e una barra giuste/sbagliate/non date */
 .tabella-esercizi-sbagliati .numero { text-align: right; white-space: nowrap; }
 .tabella-esercizi-sbagliati td { vertical-align: top; }
-.tabella-esercizi-sbagliati .esercizio-nome-hover { cursor: help; text-decoration: underline dotted; font-weight: 500; }
+.tabella-esercizi-sbagliati .esercizio-nome-hover { text-decoration: underline dotted; font-weight: 500; }
 .tabella-esercizi-sbagliati .valore-ok { color: var(--ok-text); }
 .tabella-esercizi-sbagliati .valore-err { color: var(--err-text); }
 .barra-esiti { display: flex; height: 6px; margin-top: 0.35rem; border-radius: 3px; overflow: hidden; background: var(--border); max-width: 16rem; }
@@ -920,6 +904,11 @@ button.pulsante-presenza:hover:not(:disabled) { filter: brightness(0.95); }
 .box-appello-prove li .muted, .box-appello-prove li .badge { white-space: nowrap; flex-shrink: 0; }
 .barra-avanzamento { height: 0.45rem; background: var(--border); border-radius: 999px; overflow: hidden; }
 .barra-avanzamento > div { height: 100%; background: var(--ok-text); }
+/* scheda Correzione: percentuale di compiti corretti (verde) e da completare (arancione) */
+.avanzamento-correzione { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.6rem; font-size: 0.92rem; }
+.avanzamento-correzione .barra-avanzamento { flex: 1; height: 0.6rem; }
+.barra-avanzamento-doppia { display: flex; }
+.barra-avanzamento-doppia > div.parziale { background: #f59e0b; }
 .box-appello-pct { font-size: 0.78rem; margin-top: -0.2rem; }
 /* prova a breve con testo o compiti ancora da fare: arancione, rosso negli ultimi due giorni */
 .avviso-mancanti { font-size: 0.85rem; border-radius: 8px; padding: 0.4rem 0.6rem; background: #fff7e6; color: #92400e; border: 1px solid #f5d9a8; }

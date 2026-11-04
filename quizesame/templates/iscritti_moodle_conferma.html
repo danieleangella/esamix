@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icone.html" import icona %}
 {% block title %}Importa prenotazioni Moodle · {{ appello.nome }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
@@ -7,7 +8,7 @@
 {% endblock %}
 {% block content %}
 <h1>Importa le prenotazioni da Moodle</h1>
-<p class="muted">
+<p class="muted spiegazione sr-only">
   Scegli chi aggiungere agli iscritti di questo appello. L'<em>ID number</em> di Moodle viene usato come
   matricola: chi non è ancora registrato nel corso viene registrato con nome e cognome del file.
   Le righe con un ID non numerico (spesso un docente o un account di prova) sono deselezionate:
@@ -18,8 +19,8 @@
   <textarea name="dati_json" style="display:none">{{ dati_json }}</textarea>
 
   <p style="margin-top:0">
-    <button type="button" id="btn-seleziona-tutti" class="secondary" style="margin-top:0">Seleziona tutti</button>
-    <button type="button" id="btn-deseleziona-tutti" class="secondary" style="margin-top:0">Deseleziona tutti</button>
+    <button type="button" id="btn-seleziona-tutti" class="secondary" style="margin-top:0">{{ icona("spunta", 14) }} Seleziona tutti</button>
+    <button type="button" id="btn-deseleziona-tutti" class="secondary" style="margin-top:0">{{ icona("chiudi", 14) }} Deseleziona tutti</button>
   </p>
 
   <div class="card">

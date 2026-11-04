@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icone.html" import icona %}
 {% block title %}{{ studente.cognome }} {{ studente.nome }} · {{ corso.nome }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a> <span class="sep">›</span> <span class="current">{{ studente.cognome }} {{ studente.nome }}</span>
@@ -78,8 +79,8 @@
   <span class="muted">— prima il corso attuale, poi gli altri dal più recente</span>
   {% if altri_corsi %}
   <span style="margin-left:auto; display:flex; gap:0.5rem">
-    <button type="button" class="secondary btn-sezioni-studente" data-apri="1" style="margin:0">Espandi tutto</button>
-    <button type="button" class="secondary btn-sezioni-studente" data-apri="" style="margin:0">Comprimi tutto</button>
+    <button type="button" class="secondary btn-sezioni-studente" data-apri="1" style="margin:0">{{ icona("giu", 14) }} Espandi tutto</button>
+    <button type="button" class="secondary btn-sezioni-studente" data-apri="" style="margin:0">{{ icona("su", 14) }} Comprimi tutto</button>
   </span>
   {% endif %}
 </div>

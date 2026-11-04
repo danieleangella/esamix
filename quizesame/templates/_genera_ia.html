@@ -1,7 +1,8 @@
+{% from "_icone.html" import icona %}
 {# Pannello "Genera con l'IA" della scheda Testo, caricato via fetch all'apertura. #}
 <div class="pannello-ia" style="margin-top:0.75rem">
   {% if riferimenti.prove %}
-  <p class="muted" style="margin-top:0">
+  <p class="muted spiegazione sr-only" style="margin-top:0">
     Claude prende a modello <strong>{{ riferimenti.prove|length }}</strong> prove precedenti
     ({{ riferimenti.tipo }}): stessi argomenti, in proporzione, e stessa difficoltà, con esercizi nuovi.
   </p>
@@ -36,7 +37,7 @@
       {% if fornitore_ia %}
       <button type="submit" class="btn-genera-ia" style="margin:0">Genera con l'IA</button>
       {% endif %}
-      <button type="button" class="secondary btn-prompt-ia" style="margin:0">{{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</button>
+      <button type="button" class="secondary btn-prompt-ia" style="margin:0">{{ icona("copia", 14) }} {{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</button>
       <span class="muted stato-ia" role="status"></span>
     </div>
     {% if not fornitore_ia %}

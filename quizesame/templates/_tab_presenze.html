@@ -25,7 +25,7 @@
       <div style="display:flex; gap:0.5rem">
         {% if md.appello.presenze_chiuse %}
         <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze/riapri">
-          <button type="submit" class="secondary">Riapri registro</button>
+          <button type="submit" class="secondary">{{ icona("lucchetto-aperto", 14) }} Riapri registro</button>
         </form>
         {% else %}
         <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze/chiudi"
@@ -66,7 +66,7 @@
     </div>
     {% endif %}
 
-    <table style="margin-top:0.5rem" class="tabella-presenze">
+    <table data-senza-filtri style="margin-top:0.5rem" class="tabella-presenze">
       <thead><tr>
         <th></th>
         <th class="th-ordina" data-campo="matricola">Matricola <span class="muted">⇅</span></th>
@@ -134,7 +134,7 @@
             <input type="hidden" name="cognome" value="{{ s.cognome }}">
             <input type="hidden" name="nome" value="{{ s.nome }}">
             <input type="hidden" name="next" value="{{ url_appello }}#presenze{{ pane_suffix }}">
-            <button type="submit" class="secondary" style="padding:0.1rem 0.5rem; font-size:0.85rem" title="Non è ancora uno studente registrato in questo corso">Registra come studente</button>
+            <button type="submit" class="secondary" style="padding:0.1rem 0.5rem; font-size:0.85rem" title="Non è ancora uno studente registrato in questo corso">{{ icona("utente-piu", 14) }} Registra come studente</button>
           </form>
           {% endif %}
         </td>

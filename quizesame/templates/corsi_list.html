@@ -75,7 +75,7 @@
 
 <section class="card box-home box-nuovo">
   <h2>{{ icona("piu", 18) }} Nuovo corso</h2>
-  <p class="muted" style="margin:0 0 0.6rem">Per un nuovo anno accademico o un nuovo insegnamento: le impostazioni si copiano dall'edizione precedente.</p>
+  <p class="muted spiegazione sr-only" style="margin:0 0 0.6rem">Per un nuovo anno accademico o un nuovo insegnamento: le impostazioni si copiano dall'edizione precedente.</p>
   <button type="button" onclick="var d=document.getElementById('pannello-nuovo-corso'); d.open=true; d.scrollIntoView({behavior:'smooth'}); document.getElementById('corso-nome').focus();">{{ icona("piu", 14) }} Crea un corso</button>
 </section>
 </div>
@@ -113,7 +113,7 @@
       <div style="width:{{ pct }}%"></div>
     </div>
     <div class="muted box-appello-pct">{{ pct }}% del percorso</div>
-    <a class="button secondary" href="{{ r.url }}">Apri &rarr;</a>
+    <a class="button secondary" href="{{ r.url }}">{{ icona("avanti", 14) }} Apri</a>
   </article>
   {% endfor %}
 </div>
@@ -201,7 +201,7 @@
     <datalist id="suggerimenti-universita">{% for v in corsi | map(attribute='universita') | select | unique | sort %}<option value="{{ v }}">{% endfor %}</datalist>
     <datalist id="suggerimenti-docente">{% for v in corsi | map(attribute='docente') | select | unique | sort %}<option value="{{ v }}">{% endfor %}</datalist>
 
-    <p class="muted" style="margin-top:1rem">
+    <p class="muted spiegazione sr-only" style="margin-top:1rem">
       Se esiste già un corso con lo stesso nome (es. l'anno precedente), il nuovo corso ne copia
       le impostazioni (voti, punteggi, orale, testo del compito, domande d'esame); altrimenti
       partono dai valori predefiniti. Dopo la creazione si apre la pagina delle impostazioni,

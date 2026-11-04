@@ -28,8 +28,33 @@
   {% set presenti_da_correggere = md.riepilogo_presenze.iscritti | selectattr('presente') | selectattr('registrato') | rejectattr('bloccato') | rejectattr('matricola', 'in', con_bozza) | list if md.riepilogo_presenze else [] %}
   {% set n_lunghezza_attesa = md.esercizi_assegnati|length %}
   {% set con_svolgimenti = md.esercizi_assegnati | selectattr('obbligatorio') | list or md.esercizi_assegnati | selectattr('aperta') | list %}
+  {# avanzamento: compiti corretti del tutto, da completare (bozze e svolgimenti in sospeso)
+     e presenti ancora da correggere (se c'è il registro presenze) #}
+  {% set n_sospese = md.valutazioni_sospese|length %}
+  {% set n_bozze = md.bozze_correzione|length %}
+  {% set n_completi = n_corretti - n_sospese %}
+  {% set n_da_fare = presenti_da_correggere|length if md.riepilogo_presenze else 0 %}
+  {% set n_totale = n_corretti + n_bozze + n_da_fare %}
+  {# convocati all'orale tra chi ha lo scritto sufficiente #}
+  {% set sufficienti = [] %}
+  {% for r in md.risultati if r.esito in ('voto', 'rifiutato') and not r.valutazione_sospesa %}
+    {% set scritto = r.voto_scritto if r.voto_scritto is not none else r.voto %}
+    {% if scritto is not none and scritto >= md.votomin_effettivo %}{% set _ = sufficienti.append(r) %}{% endif %}
+  {% endfor %}
+  {% set n_all_orale = sufficienti | selectattr('richiede_orale') | list | length + sufficienti | rejectattr('richiede_orale') | selectattr('convocazione_orale') | list | length %}
+  {% if n_totale %}
+  {% set pct_completi = (n_completi * 100 / n_totale)|round(1) %}
+  {% set pct_incompleti = ((n_sospese + n_bozze) * 100 / n_totale)|round(1) %}
+  <div class="avanzamento-correzione" data-info="{{ n_completi }} corretti del tutto{% if n_sospese + n_bozze %}, {{ n_sospese + n_bozze }} da completare{% endif %}{% if n_da_fare %}, {{ n_da_fare }} presenti ancora da correggere{% endif %}, su {{ n_totale }}{% if not md.riepilogo_presenze %} (senza registro presenze: solo i compiti già inseriti){% endif %}">
+    <div class="barra-avanzamento barra-avanzamento-doppia" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct_completi|round|int }}" aria-label="Compiti corretti">
+      <div style="width:{{ pct_completi }}%"></div><div class="parziale" style="width:{{ pct_incompleti }}%"></div>
+    </div>
+    <strong>{{ pct_completi|round|int }}%</strong> <span class="muted">corretti</span>
+  </div>
+  {% endif %}
   <div class="barra-avanzamento-correzione">
     <span><strong>{{ n_corretti }}</strong> corrett{{ 'o' if n_corretti == 1 else 'i' }}</span>
+    {% if sufficienti %}<span data-info="Tra chi ha lo scritto sufficiente, quanti sono {{ 'convocati' if md.appello.membro_raggruppamento else 'ammessi' }} all'orale"><strong>{{ (n_all_orale * 100 / sufficienti|length)|round|int }}%</strong> all'orale tra i sufficienti <span class="muted">({{ n_all_orale }} su {{ sufficienti|length }})</span></span>{% endif %}
     {% if n_assenti %}<span><strong>{{ n_assenti }}</strong> assent{{ 'e' if n_assenti == 1 else 'i' }}</span>{% endif %}
     {% if n_ritirati %}<span><strong>{{ n_ritirati }}</strong> ritirat{{ 'o' if n_ritirati == 1 else 'i' }}</span>{% endif %}
     {% if md.riepilogo_presenze %}<span><strong>{{ presenti_da_correggere|length }}</strong> presenti ancora da correggere</span>{% endif %}
@@ -252,10 +277,7 @@
   <details class="card" open>
     <summary><strong>Risultati inseriti ({{ md.risultati|length }})</strong>{% if n_assenti or n_ritirati %} <span class="muted">— {{ n_corretti }} corrett{{ 'o' if n_corretti == 1 else 'i' }}{% if n_assenti %}, {{ n_assenti }} assent{{ 'e' if n_assenti == 1 else 'i' }}{% endif %}{% if n_ritirati %}, {{ n_ritirati }} ritirat{{ 'o' if n_ritirati == 1 else 'i' }}{% endif %}</span>{% endif %}
       <span class="muted" style="font-size:0.85rem">· dal più recente</span></summary>
-    <div class="form-grid" style="margin-top:0.75rem">
-      <div><label>Cerca per cognome</label><input type="text" class="filtro-cognome-risultati" placeholder="cerca per cognome"></div>
-    </div>
-    <table class="tabella-risultati" style="margin-top:0.75rem">
+    <table class="tabella-risultati" style="margin-top:0.5rem">
       <tr>
         <th class="th-ordina-risultati" data-campo="cognome" style="cursor:pointer" title="Ordina per cognome">Studente <span class="muted">⇅</span></th>
         <th>Matricola</th>
@@ -280,7 +302,7 @@
               <input type="hidden" name="torna" value="valutazione">
               <input name="nota" value="{{ r.annullamento_nota or '' }}" placeholder="Motivo dell'annullamento" aria-label="Motivo dell'annullamento" style="flex:1; min-width:12rem">
               <button type="submit" style="margin:0">{{ icona("spunta") }} Salva</button>
-              <button type="button" class="secondary" data-chiudi-modifica style="margin:0">Annulla</button>
+              <button type="button" class="secondary" data-chiudi-modifica style="margin:0">{{ icona("annulla", 14) }} Annulla</button>
             </form>
           </div>
           {% endif %}
@@ -375,20 +397,8 @@
 
     var tabellaRisultati = root.querySelector(".tabella-risultati");
     if (tabellaRisultati) {
-      var filtroCognome = root.querySelector(".filtro-cognome-risultati");
+      // (la ricerca è quella generale sopra le tabelle, attivaFiltriTabelle in app.js)
       var righeRisultati = Array.prototype.slice.call(tabellaRisultati.querySelectorAll(".riga-risultato"));
-
-      filtroCognome.addEventListener("input", function () {
-        var q = filtroCognome.value.trim().toLowerCase();
-        righeRisultati.forEach(function (riga) {
-          var mostra = !q || riga.dataset.cognome.indexOf(q) !== -1;
-          riga.style.display = mostra ? "" : "none";
-          var dettaglio = riga.nextElementSibling;
-          if (!mostra && dettaglio && dettaglio.classList.contains("riga-dettaglio-risultato")) {
-            dettaglio.style.display = "none";
-          }
-        });
-      });
 
       var direzioneCorrente = {};
       tabellaRisultati.querySelectorAll(".th-ordina-risultati").forEach(function (th) {

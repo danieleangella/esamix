@@ -30,7 +30,7 @@
   </p>
   <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center">
     <button type="button" class="secondary" id="btn-copia-analisi" style="margin:0">{{ icona("copia", 14) }} Copia il testo</button>
-    <a class="button secondary" href="{{ qui }}" style="margin:0">Nuova analisi</a>
+    <a class="button secondary" href="{{ qui }}" style="margin:0">{{ icona("piu", 14) }} Nuova analisi</a>
     {% if analisi.id %}
     <form class="inline" method="post" action="{{ url }}/elimina{% if query %}?{{ query }}{% endif %}" onsubmit="return confirm('Eliminare questa analisi salvata?')">
       <input type="hidden" name="salvata" value="{{ analisi.id }}">
@@ -55,7 +55,7 @@
     {% if tipo != 'generale' %}una stima di quanti compiti sono stati probabilmente svolti con l'aiuto dell'IA o copiati tra studenti,{% endif %}
     la calibrazione della prova e suggerimenti per il corso.
   </p>
-  <p class="muted">
+  <p class="muted spiegazione sr-only">
     <strong>Dati anonimi:</strong> gli studenti compaiono solo come pseudonimi casuali (S001, S002, …); non vengono inviati matricole,
     nomi, corso di laurea, DSA, né le tue note e decisioni sui singoli studenti (motivazioni dell'orale, compiti annullati, note di
     correzione), così che la stima dei compiti svolti con l'IA si basi solo sui risultati. Vengono inviati i testi degli esercizi
@@ -102,7 +102,7 @@
 
 <details class="card" {% if not fornitore_ia and not analisi %}open{% endif %}>
   <summary><strong>Con un chatbot: salva qui la risposta</strong></summary>
-  <p class="muted" style="margin-top:0.5rem">Dopo aver usato il prompt in un chatbot, puoi incollare qui la sua risposta per conservarla insieme alle altre analisi.</p>
+  <p class="muted spiegazione sr-only" style="margin-top:0.5rem">Dopo aver usato il prompt in un chatbot, puoi incollare qui la sua risposta per conservarla insieme alle altre analisi.</p>
   <form method="post" action="{{ qui }}">
     <textarea name="risposta" rows="6" required placeholder="Incolla qui il rapporto del chatbot"></textarea>
     <button type="submit">Salva la risposta</button>

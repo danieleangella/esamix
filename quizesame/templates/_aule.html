@@ -46,7 +46,7 @@
           <input name="nome" value="{{ a.nome }}" aria-label="Nome dell'aula" required style="flex:2; min-width:10rem">
           <input type="number" name="capienza" min="1" value="{{ a.capienza }}" aria-label="Posti" required style="flex:1; min-width:6rem">
           <button type="submit" style="margin:0">{{ icona("spunta") }} Salva</button>
-          <button type="button" class="secondary" data-chiudi-modifica style="margin:0">Annulla</button>
+          <button type="button" class="secondary" data-chiudi-modifica style="margin:0">{{ icona("annulla", 14) }} Annulla</button>
         </form>
       </td>
     </tr>
@@ -54,7 +54,7 @@
     {% endfor %}
     <tr><td><strong>Totale</strong></td><td><strong>{{ posti }}</strong></td><td colspan="2"></td></tr>
   </table>
-  <p class="muted" style="margin:0.4rem 0 0">L'assegnazione degli studenti alle aule (in proporzione ai posti, con percentuali o per intervalli di cognomi) si fa nella scheda Compiti d'esame.</p>
+  <p class="muted spiegazione sr-only" style="margin:0.4rem 0 0">L'assegnazione degli studenti alle aule (in proporzione ai posti, con percentuali o per intervalli di cognomi) si fa nella scheda Compiti d'esame.</p>
   {% if attesi and posti and attesi * 100 > posti * soglia %}
   <div class="flash flash-warning" style="margin:0.5rem 0 0">
     {{ attesi }} studenti attesi su {{ posti }} posti: è il {{ (attesi * 100 / posti)|round|int }}%, oltre il {{ soglia }}%

@@ -146,7 +146,7 @@
       </div>
       <div class="barra-pulsanti">
         <button type="submit">Salva</button>
-        <button type="button" class="secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate">Annulla</button>
+        <button type="button" class="secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate">{{ icona("annulla", 14) }} Annulla</button>
       </div>
     </form>
     <p class="muted" style="margin:0.75rem 0 0; font-size:0.85rem">
@@ -171,8 +171,8 @@
         <input type="number" name="matricola_minima_prima_prova" value="{{ raggruppamento.matricola_minima_prima_prova or '' }}" placeholder="nessun limite" style="width:9rem">
       </div>
       <div class="barra-pulsanti">
-        <button type="submit" class="secondary">Salva</button>
-        <button type="button" class="secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate">Annulla</button>
+        <button type="submit" class="secondary">{{ icona("spunta", 14) }} Salva</button>
+        <button type="button" class="secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate">{{ icona("annulla", 14) }} Annulla</button>
       </div>
     </form>
   </section>
@@ -215,7 +215,7 @@
             <input name="nome" value="{{ m.nome }}" aria-label="Nome della prova" required style="flex:2; min-width:10rem">
             <input type="date" name="data" value="{{ m.data | data_iso }}" min="2001-01-01" max="2099-12-31" aria-label="Data della prova" style="flex:1; min-width:9rem">
             <button type="submit" style="margin:0">{{ icona("spunta") }} Salva</button>
-            <button type="button" class="secondary" data-chiudi-modifica style="margin:0">Annulla</button>
+            <button type="button" class="secondary" data-chiudi-modifica style="margin:0">{{ icona("annulla", 14) }} Annulla</button>
           </form>
         </td>
       </tr>
@@ -365,7 +365,7 @@
     <span><span class="badge badge-ok">✓ correzione conclusa</span> <span class="muted">— i file da pubblicare sono in cima alla scheda</span></span>
     {% if not appello.chiuso %}
     <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riapri-correzione-scritto" style="margin-left:auto">
-      <button type="submit" class="secondary pulsante-piccolo">Riapri la correzione</button>
+      <button type="submit" class="secondary pulsante-piccolo">{{ icona("lucchetto-aperto", 14) }} Riapri la correzione</button>
     </form>
     {% endif %}
     {% elif not appello.chiuso %}

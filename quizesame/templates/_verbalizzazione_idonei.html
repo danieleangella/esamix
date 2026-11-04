@@ -1,3 +1,4 @@
+{% from "_icone.html" import icona %}
 {% from "_studente.html" import nome_studente %}
   <div class="card">
     <h2>Verbalizzazione ({{ idonei|length }} idonei non ancora verbalizzati)</h2>
@@ -16,7 +17,7 @@
           <td>{{ r.voto }}</td>
           <td style="white-space:nowrap">
             <button type="submit" form="form-verbalizza-{{ r.matricola }}" style="margin-top:0">Verbalizza</button>
-            <button type="submit" form="form-rifiuta-{{ r.matricola }}" class="secondary" style="margin-top:0">Rifiuta</button>
+            <button type="submit" form="form-rifiuta-{{ r.matricola }}" class="secondary" style="margin-top:0">{{ icona("annulla", 14) }} Rifiuta</button>
           </td>
         </tr>
         {% endfor %}
@@ -55,7 +56,7 @@
     {% if not orali_da_svolgere and not appello.chiuso %}
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/chiudi"
           onsubmit="return confirm({{ ('Chiudere l\'appello ' ~ appello.nome ~ '? Non sarà più possibile correggere, verbalizzare o modificare gli esercizi assegnati finché non lo riapri.')|js }});">
-      <button type="submit" class="secondary">Chiudi appello</button>
+      <button type="submit" class="secondary">{{ icona("lucchetto", 14) }} Chiudi appello</button>
     </form>
     {% endif %}
     {% endif %}

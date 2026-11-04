@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icone.html" import icona %}
 {% block title %}{{ titolo }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
@@ -16,7 +17,7 @@
   <p class="muted" style="margin:0">{{ elenco|length }} studenti. Spunta "presente" a penna sul foglio stampato.</p>
   <span class="formati">
     {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/" ~ tipo, pdf=True, tex=True, csv=not tipo.startswith("ammessi-aula")) }}
-    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">Stampa</button>
+    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">{{ icona("stampa", 14) }} Stampa</button>
   </span>
 </div>
 {% macro tabella(righe, etichetta, con_aula=False) %}

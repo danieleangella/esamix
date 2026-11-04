@@ -1,6 +1,8 @@
-{# Piccola icona "i" che mostra una spiegazione al passaggio del mouse (o col focus da
-   tastiera): per le note che servono solo ogni tanto, invece di un paragrafo sempre visibile.
+{# Spiegazione che compare passando col mouse sull'elemento vicino (il titolo della
+   sezione, l'etichetta del campo, la testata della colonna), senza icone in vista: per le
+   note che servono solo ogni tanto, invece di un paragrafo sempre visibile. Il testo resta
+   leggibile dagli screen reader; app.js (attivaSpiegazioni) lo aggancia all'elemento.
    Uso: {% from "_info.html" import info %} {{ info("testo della spiegazione") }} #}
 {% macro info(testo) -%}
-<span class="aiuto info" tabindex="0" role="button" aria-label="Informazioni">i<span class="aiuto-testo" role="tooltip">{{ testo }}</span></span>
+<span class="spiegazione sr-only">{{ testo }}</span>
 {%- endmacro %}

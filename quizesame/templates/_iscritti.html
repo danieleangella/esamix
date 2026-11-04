@@ -99,7 +99,7 @@
     <details class="strumento" data-chiave="segreteria">
       <summary class="icona-azione">{{ icona("carica") }} File della segreteria</summary>
       <div class="pannello-strumento">
-        <p class="muted" style="margin-top:0">Il file "Lista Studenti Esame" (.csv, .xls, .xlsx). Serve anche, dalla scheda
+        <p class="muted spiegazione sr-only" style="margin-top:0">Il file "Lista Studenti Esame" (.csv, .xls, .xlsx). Serve anche, dalla scheda
           Valutazione, a compilare il file da restituire alla segreteria.
           {% if md.segreteria_csv %}Caricarne uno nuovo sostituisce l'attuale.{% endif %}</p>
         <form class="form-frammento" method="post" action="{{ url }}/segreteria-csv" enctype="multipart/form-data">
@@ -118,7 +118,7 @@
     <details class="strumento" data-chiave="moodle">
       <summary class="icona-azione">{{ icona("carica") }} Prenotazioni Moodle</summary>
       <div class="pannello-strumento">
-        <p class="muted" style="margin-top:0">
+        <p class="muted spiegazione sr-only" style="margin-top:0">
           Esporta da Moodle l'elenco delle prenotazioni dell'attività (Scarica → CSV o Excel) e caricalo qui così com'è.
           Servono le colonne <em>ID number</em> (la matricola), <em>First name</em> e <em>Last name</em>
           (o <em>Codice identificativo</em>, <em>Nome</em>, <em>Cognome</em>). Prima di importare vedrai l'elenco,
@@ -136,7 +136,7 @@
         <form class="form-frammento" method="post" action="{{ url }}/iscritti-manuale/tutti">
           <label>Solo con matricola &ge; (facoltativo)</label>
           <input type="number" name="matricola_minima" placeholder="vuoto = tutti">
-          <p class="muted" style="margin:0.5rem 0 0">Aggiunge all'elenco tutti gli studenti registrati nel corso; poi puoi
+          <p class="muted spiegazione sr-only" style="margin:0.5rem 0 0">Aggiunge all'elenco tutti gli studenti registrati nel corso; poi puoi
             togliere quelli che non servono.</p>
           <button type="submit">{{ icona("persone") }} Aggiungi tutti</button>
         </form>
@@ -152,7 +152,7 @@
           <label>Tieni solo i cognomi</label>
           <input type="text" name="cognome" value="{{ md.appello.cognome_iscritti or '' }}"
                  placeholder="es. A-D, E-N, O-Z (vuoto = tutti)">
-          <p class="muted" style="margin:0.5rem 0 0">Es. per una prova riservata al primo anno, o per un corso diviso per
+          <p class="muted spiegazione sr-only" style="margin:0.5rem 0 0">Es. per una prova riservata al primo anno, o per un corso diviso per
             cognome{% if corso.filtro_cognome %} (questo corso: <strong>{{ corso.filtro_cognome }}</strong>, dalle impostazioni){% endif %}:
             chi non rientra non compare nell'elenco, nel registro presenze e non può essere corretto, finché non lo ammetti
             in deroga. Il file restituito alla segreteria resta intero.</p>
@@ -168,7 +168,7 @@
         <form class="form-frammento" method="post" action="{{ url }}/iscritti-manuale">
           <label>Numero di iscritti</label>
           <input type="number" name="iscritti_manuale" min="0" value="{{ md.appello.iscritti_manuale or '' }}">
-          <p class="muted" style="margin:0.5rem 0 0">Senza elenco nominale: serve solo a suggerire quanti compiti generare.</p>
+          <p class="muted spiegazione sr-only" style="margin:0.5rem 0 0">Senza elenco nominale: serve solo a suggerire quanti compiti generare.</p>
           <button type="submit">Salva</button>
         </form>
       </div>
@@ -196,7 +196,7 @@
   <div class="card" style="margin-top:0.75rem">
     <strong>Esclusi dai filtri ({{ non_ammessi|length }})</strong>
     {% if da_confermare %}<span class="badge badge-warn">{{ da_confermare|length }} da confermare</span>{% endif %}
-    <p class="muted" style="margin:0.25rem 0 0.5rem">Non rientrano nei filtri sugli iscritti: conferma l'esclusione, oppure
+    <p class="muted spiegazione sr-only" style="margin:0.25rem 0 0.5rem">Non rientrano nei filtri sugli iscritti: conferma l'esclusione, oppure
       ammetti comunque (es. DSA, L104, casi particolari). Finché non decidi restano esclusi.</p>
     {% if non_ammessi %}{{ tabella_esclusi(non_ammessi) }}{% endif %}
     {% if in_deroga %}

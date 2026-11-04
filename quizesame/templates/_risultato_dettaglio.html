@@ -48,7 +48,7 @@
 
   {% if righe %}
   {% if dettaglio_esercizi_disponibile is defined and not dettaglio_esercizi_disponibile %}
-  <p class="muted">
+  <p class="muted spiegazione sr-only">
     Per questo compito non è noto quale esercizio corrisponda a ciascuna posizione (dati
     storici incompleti, tipicamente da una migrazione): sotto, posizione per posizione,
     la risposta data a confronto con quella corretta.
@@ -140,6 +140,6 @@
   <p class="muted">Registrato nel corso, ma senza risultati.</p>
   {% endif %}
   {% endfor %}
-  <p style="margin:1rem 0 0"><a href="/corsi/{{ tag }}/studenti/{{ risultato.matricola }}" class="button secondary">Pagina dello studente</a></p>
+  <p style="margin:1rem 0 0"><a href="/corsi/{{ tag }}/studenti/{{ risultato.matricola }}" class="button secondary">{{ icona("utente-spunta", 14) }} Pagina dello studente</a></p>
   </div>
 </div>

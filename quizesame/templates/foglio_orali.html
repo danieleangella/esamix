@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icone.html" import icona %}
 {% block title %}Orali · {{ appello.nome }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
@@ -16,7 +17,7 @@
   <p class="muted" style="margin:0">{{ studenti|length }} studenti. Spunta la presenza e scrivi il voto a penna sul foglio stampato.</p>
   <span class="formati">
     {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/orali", pdf=True, tex=True, md=True, csv=True) }}
-    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">Stampa</button>
+    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">{{ icona("stampa", 14) }} Stampa</button>
   </span>
 </div>
 {% if frase_orale %}<p><strong>{{ frase_orale }}</strong></p>{% endif %}

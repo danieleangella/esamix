@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% from "_icone.html" import icona %}
 {% block title %}Migrazione dati legacy{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <span class="current">Migrazione dati legacy</span>
 {% endblock %}
 {% block content %}
 <h1>Migrazione dati legacy</h1>
-<p class="muted">
+<p class="muted spiegazione sr-only">
   Importa un corso gestito con la vecchia CLI a riga di comando. I file originali non
   vengono mai modificati né cancellati: si legge tutto in sola lettura.
 </p>
@@ -24,7 +25,7 @@
   secondo-appello/
     esercizi/
       ...</pre>
-  <p class="muted">
+  <p class="muted spiegazione sr-only">
     Vengono importati studenti, appelli, compiti e risultati dal database, e per ogni
     appello anche gli esercizi trovati nella sua sottocartella <code>esercizi/</code>
     (se presente).
@@ -36,7 +37,7 @@
         <label class="campo-obbligatorio">Cartella principale del corso legacy</label>
         <div class="input-with-button">
           <input name="cartella" id="cartella-legacy" autocomplete="new-password" required placeholder="{{ legacy_root }}/NomeCartellaCorso">
-          <button type="button" class="secondary" data-sfoglia-cartella="cartella-legacy">Sfoglia&hellip;</button>
+          <button type="button" class="secondary" data-sfoglia-cartella="cartella-legacy">{{ icona("file", 14) }} Sfoglia&hellip;</button>
         </div>
       </div>
     </div>

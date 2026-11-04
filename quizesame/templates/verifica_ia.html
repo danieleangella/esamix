@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icone.html" import icona %}
 {% block title %}Verifica con l'IA · {{ titolo }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
@@ -66,7 +67,7 @@
     <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-top:0.75rem">
       {% if fornitore_ia %}<button type="submit" style="margin:0" {% if not esercizi %}disabled{% endif %}>Avvia la verifica</button>{% endif %}
       <button type="button" class="secondary btn-copia-prompt-verifica" style="margin:0" {% if not esercizi %}disabled{% endif %}>
-        {{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</button>
+        {{ icona("copia", 14) }} {{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</button>
       <span class="muted stato-verifica" role="status"></span>
     </div>
     <p class="muted" style="margin-bottom:0">
@@ -125,7 +126,7 @@
     · <a href="{{ qui }}.json">scarica il file</a></p>
   <form class="inline" method="post" action="{{ qui }}/elimina" onsubmit="return confirm('Eliminare questa verifica salvata? Gli esiti degli esercizi restano.')">
     <input type="hidden" name="torna" value="{{ url }}">
-    <button type="submit" class="secondary" style="margin:0.5rem 0 0">Elimina questa verifica salvata</button>
+    <button type="submit" class="secondary" style="margin:0.5rem 0 0">{{ icona("cestino", 14) }} Elimina questa verifica salvata</button>
   </form>
   {% else %}
   <p class="muted" style="margin-bottom:0">Verifica fatta con {{ conf_usata.nome }} ({{ conf_usata.modello }}); esiti salvati.
@@ -174,7 +175,7 @@
     {% endif %}
     <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/verificato">
       <input type="hidden" name="torna" value="{{ qui }}">
-      <button type="submit" class="secondary" style="margin:0" title="Hai ricontrollato tu: il dubbio era infondato">Segna come corretto</button>
+      <button type="submit" class="secondary" style="margin:0" title="Hai ricontrollato tu: il dubbio era infondato">{{ icona("spunta", 14) }} Segna come corretto</button>
     </form>
   </div>
   {% endif %}
