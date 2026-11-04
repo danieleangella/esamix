@@ -769,6 +769,9 @@ input.campo-punteggio.fuori-intervallo { border-color: var(--err-text); color: v
 .dettaglio-nota > summary { cursor: pointer; font-size: 0.9rem; }
 .dettaglio-nota textarea { margin-top: 0.4rem; }
 .svolg-max { font-size: 0.85rem; }
+/* "corretto": conferma il punteggio massimo; premuto quando è confermato */
+.btn-massimo { display: inline-flex; align-items: center; gap: 0.25rem; margin: 0; padding: 0.25rem 0.55rem; font-size: 0.85rem; white-space: nowrap; }
+.btn-massimo.premuto { background: var(--ok-bg); color: var(--ok-text); border-color: var(--ok-text); }
 .svolg-dopo { display: inline-flex; align-items: center; gap: 0.3rem; margin: 0; color: var(--text); cursor: pointer; white-space: nowrap; }
 .svolg-dopo input { width: auto; margin: 0; }
 .riga-svolgimento .note-simili { grid-column: 3 / -1; }

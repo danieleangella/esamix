@@ -115,7 +115,7 @@
 <div class="card{% if svolgimenti_superflui %} svolgimenti-superflui{% endif %}" id="card-svolgimenti">
   <div class="titolo-sezione-correzione">
     <h2>Svolgimenti da valutare ({{ manuali|length }})</h2>
-    {{ info("Ogni svolgimento parte dal punteggio massimo (in grigio: " ~ corso.risposta_corretta ~ " per gli obbligatori con la risposta giusta, " ~ corso.punteggio_max_aperta ~ " per le domande aperte), da abbassare fino a " ~ corso.risposta_sbagliata ~ " se lo svolgimento non va: entrando nella casella il valore è già selezionato, basta scrivere il nuovo. La nota (facoltativa) descrive gli errori. \"Dopo\" rimanda la valutazione alla pagina Svolgimenti: il compito si registra con un voto provvisorio, e finché non è valutata una domanda aperta conta 0.") }}
+    {{ info("Ogni svolgimento parte dal punteggio massimo (in grigio: " ~ corso.risposta_corretta ~ " per gli obbligatori con la risposta giusta, " ~ corso.punteggio_max_aperta ~ " per le domande aperte), da abbassare fino a " ~ corso.risposta_sbagliata ~ " se lo svolgimento non va: entrando nella casella il valore è già selezionato, basta scrivere il nuovo; se lo svolgimento è giusto, \"corretto\" conferma il massimo senza riscriverlo. La nota (facoltativa) descrive gli errori. \"Dopo\" rimanda la valutazione alla pagina Svolgimenti: il compito si registra con un voto provvisorio, e finché non è valutata una domanda aperta conta 0.") }}
     {% if svolgimenti_superflui %}
     <input type="hidden" name="svolgimenti_superflui" value="1">
     <span class="muted avviso-superflui">facoltativi: il compito è insufficiente comunque
@@ -139,6 +139,7 @@
       <input type="number" class="campo-punteggio{% if r.posizione in automatici %} automatico{% endif %}" name="punteggio_{{ r.posizione }}" aria-label="Punteggio di {{ r.esercizio_nome }}"
              min="{{ corso.risposta_sbagliata }}" max="{{ massimo }}" step="1" value="{{ valore }}" {% if rimandato %}disabled{% endif %}>
       <span class="muted svolg-max">/ {{ massimo }}</span>
+      <button type="button" class="secondary btn-massimo" data-info="Svolgimento corretto: conferma il punteggio massimo ({{ massimo }}) e passa al successivo" {% if rimandato %}disabled{% endif %}>{{ icona("spunta", 13) }} corretto</button>
     </div>
     <input class="campo-nota" name="nota_{{ r.posizione }}" value="{{ note_proposte.get(r.posizione, '') }}"
            {% if r.esercizio_id is not none and note_precedenti.get(r.esercizio_id) %}list="note-es-{{ r.esercizio_id }}"{% endif %}
@@ -454,16 +455,38 @@
   righe.forEach(function (riga) {
     var input = campo(riga);
     var nota = riga.querySelector(".campo-nota");
-    input.addEventListener("input", function () { input.classList.remove("automatico"); segnalaIntervallo(input); valutaComunque(); suggerimento(riga); aggiorna(); });
+    var btnMassimo = riga.querySelector(".btn-massimo");
+    // "corretto": confermato al massimo (non più grigio), già premuto finché resta lì
+    function segnaMassimo() {
+      btnMassimo.classList.toggle("premuto", !input.classList.contains("automatico") && input.value.trim() === riga.dataset.max);
+    }
+    input.addEventListener("input", function () { input.classList.remove("automatico"); segnaMassimo(); segnalaIntervallo(input); valutaComunque(); suggerimento(riga); aggiorna(); });
+    btnMassimo.addEventListener("click", function () {
+      input.value = riga.dataset.max;
+      input.classList.remove("automatico");
+      segnaMassimo();
+      segnalaIntervallo(input);
+      valutaComunque();
+      suggerimento(riga);
+      aggiorna();
+      // al prossimo svolgimento, dall'ultimo a Conferma
+      var campi = campiAttivi();
+      var i = campi.indexOf(input);
+      var prossimo = i !== -1 && i + 1 < campi.length ? campi[i + 1] : conferma;
+      prossimo.focus();
+      if (prossimo.select) prossimo.select();
+    });
+    segnaMassimo();
     nota.addEventListener("input", function () { suggerimento(riga); });
     riga.querySelector(".check-rimanda").addEventListener("change", function (ev) {
       riga.classList.toggle("rimandato", ev.target.checked);
-      input.disabled = ev.target.checked;
+      input.disabled = btnMassimo.disabled = ev.target.checked;
       // valutato subito: parte dal massimo, come gli altri
       if (!ev.target.checked && input.value === "" && !superflui) {
         input.value = riga.dataset.max;
         input.classList.add("automatico");
       }
+      segnaMassimo();
       segnalaIntervallo(input);
       suggerimento(riga);
       aggiorna();
