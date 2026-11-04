@@ -37,6 +37,7 @@ from quizesame.services import ia as ia_service
 from quizesame.services import documenti as documenti_service
 from quizesame.services import registro as registro_service
 from quizesame.services import verifiche_ia as verifiche_ia_service
+from quizesame.services import analisi_ia as analisi_ia_service
 from quizesame.services import controllo_correzioni as controllo_service
 from quizesame.services import corso_prova as corso_prova_service
 from quizesame.services import revisione_testo as revisione_testo_service
@@ -115,6 +116,8 @@ templates.env.filters["accenti_tex"] = testo_web.accenti
 templates.env.filters["anteprima_testo"] = lambda t: statistiche_service._anteprima(t or "", 90)
 # testo di un esercizio (LaTeX) in una pagina con KaTeX: accenti, grassetti, eqnarray
 templates.env.filters["testo_web"] = testo_web.testo_html
+# risposta in Markdown di un'analisi con l'IA
+templates.env.filters["markdown_ia"] = analisi_ia_service.markdown_html
 # contrassegno nei link ai documenti, diverso a ogni apertura della pagina: il browser scarica
 # sempre la versione attuale di un PDF rigenerato invece di mostrarne una copia conservata
 templates.env.globals["versione_link"] = lambda: str(int(__import__("time").time()))
@@ -2254,6 +2257,139 @@ def segna_verificato(tag: str, esercizio_id: int, torna: str = Form("")):
         return flash_redirect(torna or f"/corsi/{tag}/esercizi", "Esercizio non trovato", "error")
     esercizi_service.registra_verifica(tag, e, "ok", origine="manuale")
     return flash_redirect(torna or f"/corsi/{tag}/esercizi", f"Esercizio «{e.nome or e.id}» segnato come verificato")
+
+
+# --- Analisi delle statistiche con l'IA: per un appello, un corso o più corsi -------------
+
+def _ambito_analisi(tag: str = "", appello_id: Optional[int] = None, corsi: Optional[list[str]] = None) -> dict:
+    if appello_id is not None:
+        return analisi_ia_service.ambito_appello(tag, appello_id)
+    if tag:
+        return analisi_ia_service.ambito_corso(tag)
+    return analisi_ia_service.ambito_generale(corsi or [])
+
+
+def _url_analisi(ambito: dict, suffisso: str = "") -> str:
+    return ambito["url"] + suffisso + (f"?{ambito['query']}" if ambito.get("query") else "")
+
+
+def _pagina_analisi(request: Request, ambito: dict, salvata: str = "", **extra):
+    if salvata and "analisi" not in extra:
+        extra["analisi"] = analisi_ia_service.carica(ambito, salvata)
+        if extra["analisi"] is None:
+            extra["errore"] = "Analisi salvata non trovata"
+    opzioni = extra.pop("opzioni", {"compiti": True, "note": True, "storico": True, "istruzioni": ""})
+    try:
+        prompt = analisi_ia_service.costruisci_prompt(
+            ambito, opzioni["compiti"], opzioni["note"], opzioni["storico"], opzioni["istruzioni"])
+        caratteri, n_compiti = len(prompt["sistema"]) + len(prompt["richiesta"]), prompt["n_compiti"]
+    except Exception:
+        caratteri, n_compiti = None, 0
+    return templates.TemplateResponse(request, "analisi_ia.html", {
+        **ambito, "ambito": ambito, "qui": _url_analisi(ambito), "opzioni": opzioni,
+        "caratteri": caratteri, "n_compiti": n_compiti, "salvate": analisi_ia_service.elenco(ambito),
+        "fornitore_ia": ia_service.fornitore(extra.pop("profilo", "")), "profili_ia": ia_service.profili(), **extra,
+    })
+
+
+def _esegui_analisi(request: Request, ambito: dict, form: dict):
+    """Avvia l'analisi con la configurazione IA scelta (o salva la risposta incollata da un
+    chatbot) e mostra il rapporto, che resta salvato."""
+    opzioni = {"compiti": bool(form.get("compiti")), "note": bool(form.get("note")), "storico": bool(form.get("storico")),
+               "istruzioni": form.get("istruzioni", "")}
+    risposta = (form.get("risposta") or "").strip()
+    try:
+        if risposta:
+            esito = {"testo": risposta, "conf": {"nome": "risposta incollata", "modello": "chatbot"}}
+        else:
+            esito = analisi_ia_service.analizza(ambito, opzioni["compiti"], opzioni["note"], opzioni["storico"],
+                                                opzioni["istruzioni"], profilo_id=form.get("profilo", ""))
+    except ValueError as e:
+        return _pagina_analisi(request, ambito, errore=str(e), opzioni=opzioni, profilo=form.get("profilo", ""))
+    try:
+        salvata = analisi_ia_service.salva(ambito, esito["testo"], esito["conf"], opzioni)
+        analisi = analisi_ia_service.carica(ambito, salvata)
+    except OSError:
+        analisi = {"id": "", "quando": "", "conf": esito["conf"], "testo": esito["testo"]}
+    registro_service.registra("ia", f"Analisi delle statistiche con l'IA: {ambito['titolo']}", tag=ambito["tag"],
+                              appello_id=ambito.get("appello_id"), esito=esito["conf"]["nome"])
+    return _pagina_analisi(request, ambito, analisi=analisi, opzioni=opzioni)
+
+
+def _prompt_analisi(ambito: dict, compiti: str, note: str, storico: str, istruzioni: str) -> PlainTextResponse:
+    prompt = analisi_ia_service.costruisci_prompt(ambito, bool(compiti), bool(note), bool(storico), istruzioni)
+    return PlainTextResponse(analisi_ia_service.prompt_come_testo(prompt))
+
+
+def _elimina_analisi(ambito: dict, salvata: str):
+    if not analisi_ia_service.elimina(ambito, salvata):
+        return flash_redirect(_url_analisi(ambito), "Analisi salvata non trovata", "error")
+    return flash_redirect(_url_analisi(ambito), "Analisi eliminata")
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/ia/analisi", response_class=HTMLResponse)
+def pagina_analisi_appello(request: Request, tag: str, appello_id: int, salvata: str = ""):
+    return _pagina_analisi(request, _ambito_analisi(tag, appello_id), salvata)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/ia/analisi", response_class=HTMLResponse)
+def esegui_analisi_appello(request: Request, tag: str, appello_id: int, compiti: str = Form(""), note: str = Form(""), storico: str = Form(""), istruzioni: str = Form(""), risposta: str = Form(""), profilo: str = Form("")):
+    return _esegui_analisi(request, _ambito_analisi(tag, appello_id), dict(compiti=compiti, note=note, storico=storico, istruzioni=istruzioni, risposta=risposta, profilo=profilo))
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/ia/analisi/prompt", response_class=PlainTextResponse)
+def prompt_analisi_appello(tag: str, appello_id: int, compiti: str = "", note: str = "", storico: str = "", istruzioni: str = ""):
+    return _prompt_analisi(_ambito_analisi(tag, appello_id), compiti, note, storico, istruzioni)
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/ia/analisi/elimina")
+def elimina_analisi_appello(tag: str, appello_id: int, salvata: str = Form("")):
+    return _elimina_analisi(_ambito_analisi(tag, appello_id), salvata)
+
+
+@app.get("/corsi/{tag}/ia/analisi", response_class=HTMLResponse)
+def pagina_analisi_corso(request: Request, tag: str, salvata: str = ""):
+    return _pagina_analisi(request, _ambito_analisi(tag), salvata)
+
+
+@app.post("/corsi/{tag}/ia/analisi", response_class=HTMLResponse)
+def esegui_analisi_corso(request: Request, tag: str, compiti: str = Form(""), note: str = Form(""), storico: str = Form(""), istruzioni: str = Form(""), risposta: str = Form(""), profilo: str = Form("")):
+    return _esegui_analisi(request, _ambito_analisi(tag), dict(compiti=compiti, note=note, storico=storico, istruzioni=istruzioni, risposta=risposta, profilo=profilo))
+
+
+@app.get("/corsi/{tag}/ia/analisi/prompt", response_class=PlainTextResponse)
+def prompt_analisi_corso(tag: str, compiti: str = "", note: str = "", storico: str = "", istruzioni: str = ""):
+    return _prompt_analisi(_ambito_analisi(tag), compiti, note, storico, istruzioni)
+
+
+@app.post("/corsi/{tag}/ia/analisi/elimina")
+def elimina_analisi_corso(tag: str, salvata: str = Form("")):
+    return _elimina_analisi(_ambito_analisi(tag), salvata)
+
+
+@app.get("/ia/analisi", response_class=HTMLResponse)
+def pagina_analisi_generale(request: Request, corsi: list[str] = Query(None), salvata: str = ""):
+    try:
+        ambito = _ambito_analisi(corsi=corsi)
+    except ValueError as e:
+        return flash_redirect("/statistiche-generali", str(e), "error")
+    return _pagina_analisi(request, ambito, salvata)
+
+
+@app.post("/ia/analisi", response_class=HTMLResponse)
+def esegui_analisi_generale(request: Request, corsi: list[str] = Query(None), compiti: str = Form(""), note: str = Form(""), storico: str = Form(""), istruzioni: str = Form(""), risposta: str = Form(""), profilo: str = Form("")):
+    return _esegui_analisi(request, _ambito_analisi(corsi=corsi), dict(compiti=compiti, note=note, storico=storico, istruzioni=istruzioni, risposta=risposta, profilo=profilo))
+
+
+@app.get("/ia/analisi/prompt", response_class=PlainTextResponse)
+def prompt_analisi_generale(corsi: list[str] = Query(None), compiti: str = "", note: str = "", storico: str = "",
+                            istruzioni: str = ""):
+    return _prompt_analisi(_ambito_analisi(corsi=corsi), compiti, note, storico, istruzioni)
+
+
+@app.post("/ia/analisi/elimina")
+def elimina_analisi_generale(corsi: list[str] = Query(None), salvata: str = Form("")):
+    return _elimina_analisi(_ambito_analisi(corsi=corsi), salvata)
 
 
 # --- Correzione con l'IA: proposta, confronto, conferma ------------------------------------

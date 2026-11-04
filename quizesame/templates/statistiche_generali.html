@@ -6,6 +6,10 @@
 {% block content %}
 <h1>Statistiche generali</h1>
 <p class="muted"><a href="/controllo-correzioni">Controllo delle correzioni in tutti i corsi</a> — voti che non corrispondono al ricalcolo e domande con una soluzione sospetta.</p>
+{% if tags_selezionati %}
+<p class="muted"><a href="/ia/analisi?{% for t in tags_selezionati %}corsi={{ t|urlencode }}{% if not loop.last %}&amp;{% endif %}{% endfor %}">Analizza con l'IA i corsi selezionati</a> —
+  argomenti capiti meno e come cambiano negli anni accademici, esercizi problematici, suggerimenti per il corso (dati anonimi).</p>
+{% endif %}
 
 <details class="card">
   <summary><strong>Corsi inclusi</strong></summary>

@@ -8,7 +8,9 @@
 {% include "_intestazione_corso.html" %}
 {% from "_icone.html" import icona %}
 {% from "_info.html" import info %}
-<p style="margin:0 0 1rem"><a class="icona-azione" href="/corsi/{{ corso.tag }}/controllo-correzioni">{{ icona("spunta", 14) }} Controllo delle correzioni</a>
+<p style="margin:0 0 1rem"><a class="icona-azione" href="/corsi/{{ corso.tag }}/ia/analisi">{{ icona("scintille", 14) }} Analizza con l'IA</a>
+  {{ info("Un rapporto sulle criticità di tutte le prove del corso: argomenti capiti meno, anche rispetto agli altri anni accademici, esercizi problematici, stima dei compiti svolti con l'IA o copiati. Con i dati resi anonimi; senza chiave API, copi il prompt in un chatbot.") }}
+  &nbsp; <a class="icona-azione" href="/corsi/{{ corso.tag }}/controllo-correzioni">{{ icona("spunta", 14) }} Controllo delle correzioni</a>
   {{ info("Ricalcola i voti già assegnati e cerca le domande con una soluzione sospetta" ~ ("; da lì puoi anche ricostruire il dettaglio dei compiti importati, necessario per le statistiche sugli esercizi" if corso.importato_da_legacy else "") ~ ".") }}</p>
 
 <details class="card" open>
