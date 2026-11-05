@@ -92,7 +92,7 @@
              aria-label="Aggiungi un iscritto: matricola o cognome" autocomplete="off" required>
       <div class="campo-suggerimenti-studenti-iscritto sfoglia-lista" style="position:absolute; z-index:10; width:100%; display:none; background:var(--panel)"></div>
     </div>
-    <button type="submit" style="margin:0">{{ icona("piu") }} Aggiungi</button>
+    <button type="submit" style="margin:0" data-info="Aggiungi" aria-label="Aggiungi" class="solo-icona">{{ icona("piu", 16) }}</button>
   </form>
 
   <div class="barra-strumenti">
@@ -104,12 +104,12 @@
           {% if md.segreteria_csv %}Caricarne uno nuovo sostituisce l'attuale.{% endif %}</p>
         <form class="form-frammento" method="post" action="{{ url }}/segreteria-csv" enctype="multipart/form-data">
           <input type="file" name="file" accept=".csv,.xls,.xlsx" required>
-          <button type="submit">{{ icona("carica") }} Carica</button>
+          <button type="submit" data-info="Carica il file" aria-label="Carica il file" class="solo-icona">{{ icona("carica", 16) }}</button>
         </form>
         {% if md.segreteria_csv %}
         <form class="form-frammento" method="post" action="{{ url }}/segreteria-csv/elimina"
               data-conferma="Rimuovere il file della segreteria? Restano solo gli iscritti aggiunti a mano, e non sarà più possibile compilare il file per la segreteria finché non ne carichi uno nuovo.">
-          <button type="submit" class="danger">{{ icona("cestino") }} Rimuovi il file</button>
+          <button type="submit" class="pulsante-icona" data-info="Rimuovi il file" aria-label="Rimuovi il file">{{ icona("cestino", 16) }}</button>
         </form>
         {% endif %}
       </div>
@@ -125,7 +125,7 @@
           per scegliere chi aggiungere.</p>
         <form method="post" action="{{ url }}/iscritti-moodle" enctype="multipart/form-data">
           <input type="file" name="file" accept=".csv,.xlsx,.xls,text/csv" required>
-          <button type="submit">Carica e controlla</button>
+          <button type="submit" data-info="Carica e controlla" aria-label="Carica e controlla" class="solo-icona">{{ icona("carica", 16) }}</button>
         </form>
       </div>
     </details>
@@ -138,7 +138,7 @@
           <input type="number" name="matricola_minima" placeholder="vuoto = tutti">
           <p class="muted spiegazione sr-only" style="margin:0.5rem 0 0">Aggiunge all'elenco tutti gli studenti registrati nel corso; poi puoi
             togliere quelli che non servono.</p>
-          <button type="submit">{{ icona("persone") }} Aggiungi tutti</button>
+          <button type="submit" data-info="Aggiungi tutti gli studenti del corso" aria-label="Aggiungi tutti gli studenti del corso" class="solo-icona">{{ icona("persone", 16) }}</button>
         </form>
       </div>
     </details>
@@ -156,7 +156,7 @@
             cognome{% if corso.filtro_cognome %} (questo corso: <strong>{{ corso.filtro_cognome }}</strong>, dalle impostazioni){% endif %}:
             chi non rientra non compare nell'elenco, nel registro presenze e non può essere corretto, finché non lo ammetti
             in deroga. Il file restituito alla segreteria resta intero.</p>
-          <button type="submit">Salva filtri</button>
+          <button type="submit" data-info="Salva i filtri" aria-label="Salva i filtri" class="solo-icona">{{ icona("salva", 16) }}</button>
         </form>
       </div>
     </details>
@@ -169,7 +169,7 @@
           <label>Numero di iscritti</label>
           <input type="number" name="iscritti_manuale" min="0" value="{{ md.appello.iscritti_manuale or '' }}">
           <p class="muted spiegazione sr-only" style="margin:0.5rem 0 0">Senza elenco nominale: serve solo a suggerire quanti compiti generare.</p>
-          <button type="submit">Salva</button>
+          <button type="submit" data-info="Salva" aria-label="Salva" class="solo-icona">{{ icona("salva", 16) }}</button>
         </form>
       </div>
     </details>
@@ -241,7 +241,7 @@
           <input type="hidden" name="cognome" value="{{ s.cognome }}">
           <input type="hidden" name="nome" value="{{ s.nome }}">
           <input type="hidden" name="next" value="{{ url }}#compiti">
-          <button type="submit" class="secondary pulsante-piccolo">{{ icona("utente-piu", 13) }} Registra</button>
+          <button type="submit" class="solo-icona secondary pulsante-piccolo" data-info="Registra come studente del corso" aria-label="Registra come studente del corso">{{ icona("utente-piu", 16) }}</button>
         </form>
         {% endif %}
         {% endif %}

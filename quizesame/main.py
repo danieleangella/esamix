@@ -534,12 +534,23 @@ def modifica_impostazioni_app(
     email_docente: str = Form(""),
     studio_docente: str = Form(""),
     mostra_riepilogo_home: str = Form(""),
+    tema: str = Form("auto"),
 ):
     app_config_service.update_settings(
         docente=docente.strip(), email_docente=email_docente.strip(), studio_docente=studio_docente.strip(),
         mostra_riepilogo_home=bool(mostra_riepilogo_home),
+        tema=tema if tema in app_config_service.TEMI else "auto",
     )
     return flash_redirect("/impostazioni", "Impostazioni salvate")
+
+
+@app.post("/impostazioni/tema")
+def imposta_tema(tema: str = Form("auto")):
+    """Tema scelto dall'icona nella barra in alto: si salva nelle impostazioni dell'app."""
+    if tema not in app_config_service.TEMI:
+        return JSONResponse({"errore": f"Tema non valido: {tema}"}, status_code=400)
+    app_config_service.update_settings(tema=tema)
+    return JSONResponse({"tema": tema})
 
 
 def _url_ollama(url: str) -> str:
@@ -2581,7 +2592,8 @@ def _render_correggi_revisione(
         "nota_correzione": nota_correzione or "", "rimandati": rimandati, "errore": errore,
         "richiedi_orale_checked": richiedi_orale_checked, "orale_motivazione": orale_motivazione,
         "modifica": modifica, "manuali": manuali, "automatici": automatici,
-        "note_precedenti": correzione_service.note_precedenti(tag, appello_id, valutazione.matricola) if manuali else {},
+        # note scritte su ciascun esercizio negli altri compiti: suggerimenti e confronto
+        "note_precedenti": correzione_service.note_esercizi(tag, appello_id, escludi_matricola=valutazione.matricola),
         "votomin_effettivo": votomin, "svolgimenti_superflui": superflui,
         "voto_massimo": valutazione.voto_fisso + sum(
             correzione_service.punteggio_massimo(corso, r.aperta) for r in manuali),
@@ -2623,14 +2635,19 @@ def _rivalutazioni_da_form(form) -> dict[int, int]:
     return rivalutazioni
 
 
+def _note_da_form(form, valutazione) -> dict[int, str]:
+    """{posizione: nota} scritte sugli esercizi del compito (su qualunque esercizio)."""
+    return {r.posizione: n.strip() for r in valutazione.righe if (n := form.get(f"nota_{r.posizione}") or "").strip()}
+
+
 def _stato_pagina_correzione(form, valutazione) -> dict:
     """Quanto già fatto nella pagina di correzione (per "Ricalcola" e per le bozze):
     punteggi confermati (non quelli ancora in automatico), note, rimandati, rivalutazioni,
     nota sul compito, voto scelto a mano e orale."""
     automatici = _posizioni_automatiche(form)
-    punteggi, note, rimandati = {}, {}, []
+    punteggi, rimandati = {}, []
+    note = _note_da_form(form, valutazione)
     for r in valutazione.da_valutare + valutazione.domande_aperte:
-        note[r.posizione] = form.get(f"nota_{r.posizione}") or ""
         valore = (form.get(f"punteggio_{r.posizione}") or "").strip()
         if form.get(f"rimanda_{r.posizione}"):
             rimandati.append(r.posizione)
@@ -2639,7 +2656,7 @@ def _stato_pagina_correzione(form, valutazione) -> dict:
     voto_str = (form.get("voto_finale") or "").strip()
     voto_a_mano = bool(form.get("voto_modificato")) and voto_str.lstrip("-").isdigit()
     return {
-        "punteggi": punteggi, "note": {p: n for p, n in note.items() if n}, "rimandati": rimandati,
+        "punteggi": punteggi, "note": note, "rimandati": rimandati,
         "rivalutazioni": _rivalutazioni_da_form(form),
         "nota_correzione": form.get("nota_correzione") or "",
         "orale_motivazione": form.get("orale_motivazione") or "",
@@ -2732,7 +2749,8 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
 
     # svolgimenti: ogni posizione da giudicare ha un punteggio, o è rimandata (spunta
     # "dopo", o campo vuoto: il servizio la tratta comunque come rimandata)
-    punteggi, note, rimandati = {}, {}, set()
+    punteggi, rimandati = {}, set()
+    note = _note_da_form(form, valutazione)
     errore = ""
     # compito insufficiente comunque: gli svolgimenti lasciati vuoti non restano in
     # sospeso, ma valgono come da regola provvisoria (aperta 0, obbligatorio il massimo)
@@ -2740,7 +2758,6 @@ async def correggi_conferma(request: Request, tag: str, appello_id: int):
     superflui = bool(form.get("svolgimenti_superflui")) and correzione_service.insufficiente_comunque(
         corso, corsi_service.effective_votomin(corso, appello), valutazione)
     for r in valutazione.da_valutare + valutazione.domande_aperte:
-        note[r.posizione] = form.get(f"nota_{r.posizione}") or ""
         valore = (form.get(f"punteggio_{r.posizione}") or "").strip()
         if superflui and valore == "" and not form.get(f"rimanda_{r.posizione}"):
             punteggi[r.posizione] = 0 if r.aperta else correzione_service.punteggio_massimo(corso, False)
@@ -2828,6 +2845,23 @@ def pagina_svolgimenti(request: Request, tag: str, appello_id: int, esercizio: s
     return templates.TemplateResponse(request, "svolgimenti.html", {
         "corso": corso, "appello": appello, "dati": dati, "esercizio_scelto": esercizio,
         "solo_da_valutare": bool(solo), "anchor": _anchor_membro(appello, "valutazione"),
+    })
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/note-esercizio/{esercizio_id}", response_class=HTMLResponse)
+def pagina_note_esercizio(request: Request, tag: str, appello_id: int, esercizio_id: int, escludi: str = ""):
+    """Tutte le note scritte su un esercizio nei compiti dell'appello, con studente,
+    compito, risposta e punteggio: aperta in un'altra scheda accanto alla nota che si sta
+    scrivendo, per dare lo stesso giudizio agli stessi errori."""
+    corso = corsi_service.get_corso(tag)
+    appello = corsi_service.get_appello(tag, appello_id)
+    esercizio = esercizi_service.get_esercizio(tag, esercizio_id)
+    voci = correzione_service.note_esercizi(
+        tag, appello_id, escludi_matricola=escludi or None, esercizio_id=esercizio_id).get(esercizio_id, [])
+    voci.sort(key=lambda v: (v["nota"].strip().lower(), v["studente"].lower()))
+    return templates.TemplateResponse(request, "note_esercizio.html", {
+        "corso": corso, "appello": appello, "esercizio": esercizio, "voci": voci,
+        "anchor": _anchor_membro(appello, "valutazione"),
     })
 
 

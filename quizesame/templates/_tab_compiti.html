@@ -72,7 +72,7 @@
         {% if not md.appello.chiuso %}
         <form class="inline" method="post" action="{{ url_appello }}/blocchi/{{ b.numero }}/elimina"
               onsubmit="return confirm('Eliminare il blocco {{ b.numero }} ({{ b.numero_studenti }} compiti)? Possibile solo se non ha già risultati registrati.');">
-          <button type="submit" class="danger pulsante-piccolo" title="Elimina il blocco {{ b.numero }}">Elimina</button>
+          <button type="submit" class="pulsante-icona" data-info="Elimina il blocco {{ b.numero }}" aria-label="Elimina il blocco {{ b.numero }}">{{ icona("cestino", 16) }}</button>
         </form>
         {% endif %}
       </td>

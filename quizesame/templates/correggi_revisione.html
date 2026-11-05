@@ -5,6 +5,121 @@
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">{{ 'Modifica correzione' if modifica else 'Correzione' }}</span>
 {% endblock %}
+{% block katex %}
+<link rel="stylesheet" href="/static/katex/katex.min.css">
+<script defer src="/static/katex/katex.min.js"></script>
+<script defer src="/static/katex/contrib/auto-render.min.js"></script>
+{% endblock %}
+
+{# Un esercizio del compito, in una delle sezioni (domande aperte, obbligatori, altri):
+   nome (cliccando, il testo con la risposta data e quella giusta), punteggio e nota.
+   tipo: "manuale" (svolgimento da giudicare: parte dal massimo, da confermare),
+   "sbagliato" (obbligatorio con la risposta sbagliata: parte dal calcolato, da confermare),
+   "altro" (punteggio calcolato, già confermato: la matita lo cambia), "annullato". #}
+{% macro riga_esercizio(r, tipo) %}
+{% set esito = 'aperta' if r.aperta else ('ok' if r.corretta else ('err' if r.svolta else 'vuota')) %}
+{% set calcolato = corso.risposta_vuota if not r.svolta else (corso.risposta_corretta if r.corretta else corso.risposta_sbagliata) %}
+{% set minimo_esercizio = [corso.risposta_sbagliata, corso.risposta_vuota] | min %}
+{% set nota = note_proposte.get(r.posizione, '') %}
+{% set note_altri = note_precedenti.get(r.esercizio_id, []) if r.esercizio_id is not none else [] %}
+{% set rimandato = tipo == 'manuale' and r.posizione in rimandati %}
+<div class="riga-esercizio esito-{{ esito }}{% if tipo == 'manuale' %} riga-manuale{% elif tipo == 'sbagliato' %} riga-sbagliata{% endif %}{% if rimandato %} rimandato{% endif %}"
+     id="es-{{ r.posizione }}" data-pos="{{ r.posizione }}" data-esercizio="{{ r.esercizio_id if r.esercizio_id is not none else '' }}"
+     {% if tipo == 'manuale' %}{% set massimo = corso.punteggio_max_aperta if r.aperta else corso.risposta_corretta %}data-max="{{ massimo }}" data-default="{{ massimo }}" data-aperta="{{ '1' if r.aperta else '' }}"{% elif tipo == 'sbagliato' %}data-default="{{ calcolato }}"{% endif %}>
+  <div class="es-nome">
+    <button type="button" class="link-simile btn-testo-esercizio" aria-expanded="false" aria-controls="testo-es-{{ r.posizione }}"
+            data-info="Mostra il testo con la risposta data e quella giusta">
+      <span class="es-numero">{{ r.posizione + 1 }}.</span> {{ r.esercizio_nome }}
+    </button>
+    <span class="es-dettagli">
+      {% if r.aperta %}<span class="badge badge-info">aperta</span>
+      {% else %}<span class="es-lettere" data-info="Risposta data / risposta giusta">{{ r.lettera_data }}<span class="muted">/{{ r.lettera_corretta }}</span></span>{% endif %}
+      {% if r.revisione == 'annullato' %}<span class="badge">annullato</span>
+      {% elif r.revisione == 'facoltativo' %}<span class="badge">non più obbligatorio</span>
+      {% elif r.obbligatorio and not r.aperta and not r.svolta %}<span class="badge badge-err">non svolto</span>{% endif %}
+    </span>
+  </div>
+
+  <div class="es-punteggio">
+    {% if tipo == 'manuale' %}
+    <input type="number" class="campo-punteggio da-confermare{% if r.posizione in automatici %} automatico{% endif %}" name="punteggio_{{ r.posizione }}"
+           aria-label="Punteggio di {{ r.esercizio_nome }}" min="{{ corso.risposta_sbagliata }}" max="{{ massimo }}" step="1"
+           value="{{ punteggi_proposti.get(r.posizione, '') }}" {% if rimandato %}disabled{% endif %}>
+    <span class="muted es-max">/ {{ massimo }}</span>
+    <button type="button" class="pulsante-icona pulsante-ok btn-conferma-punteggio" {% if rimandato %}disabled{% endif %}
+            data-info="Svolgimento corretto: conferma il punteggio massimo ({{ massimo }}) e passa al successivo"
+            aria-label="Conferma il punteggio massimo di {{ r.esercizio_nome }}">{{ icona("spunta", 16) }}</button>
+    <label class="es-dopo" data-info="Valuta più tardi dalla pagina Svolgimenti: il compito resta in sospeso con un voto provvisorio">
+      <input type="checkbox" class="check-rimanda" name="rimanda_{{ r.posizione }}" value="1" {% if rimandato %}checked{% endif %}
+             aria-label="Valuta {{ r.esercizio_nome }} più tardi">{{ icona("orologio", 15) }}
+    </label>
+    {% elif tipo == 'sbagliato' %}
+    {% set valore = rivalutazioni.get(r.posizione, calcolato) %}
+    <input type="number" class="campo-punteggio campo-rivaluta da-confermare{% if r.posizione not in rivalutazioni %} automatico{% endif %}" name="rivaluta_{{ r.posizione }}"
+           data-pos="{{ r.posizione }}" data-numero="{{ r.posizione + 1 }}" data-calcolato="{{ calcolato }}"
+           min="{{ minimo_esercizio }}" max="{{ corso.risposta_corretta }}" step="1" value="{{ valore }}"
+           aria-label="Punteggio di {{ r.esercizio_nome }}, calcolato {{ calcolato }}">
+    <span class="muted es-max">/ {{ corso.risposta_corretta }}</span>
+    <button type="button" class="pulsante-icona pulsante-ok btn-conferma-punteggio"
+            data-info="Conferma il punteggio calcolato ({{ calcolato }}) e passa al successivo; o scrivi quello che merita lo svolgimento"
+            aria-label="Conferma il punteggio calcolato di {{ r.esercizio_nome }}">{{ icona("spunta", 16) }}</button>
+    {% elif tipo == 'altro' %}
+    {% set valore = rivalutazioni.get(r.posizione, calcolato) %}
+    {% set aperto = r.posizione in rivalutazioni and valore != calcolato %}
+    <span class="es-valore{% if aperto %} rivalutato{% endif %}" {% if aperto %}hidden{% endif %}>{{ valore }}</span>
+    <input type="number" class="campo-punteggio campo-rivaluta{% if valore == calcolato %} automatico{% endif %}" name="rivaluta_{{ r.posizione }}"
+           data-pos="{{ r.posizione }}" data-numero="{{ r.posizione + 1 }}" data-calcolato="{{ calcolato }}"
+           min="{{ minimo_esercizio }}" max="{{ corso.risposta_corretta }}" step="1" value="{{ valore }}" {% if not aperto %}hidden{% endif %}
+           aria-label="Punteggio di {{ r.esercizio_nome }}, calcolato {{ calcolato }}">
+    <span class="muted es-max">/ {{ corso.risposta_corretta }}</span>
+    <button type="button" class="pulsante-icona pulsante-neutro btn-modifica-punteggio" {% if aperto %}hidden{% endif %}
+            data-info="Cambia il punteggio (calcolato: {{ calcolato }}): il voto si ricalcola e la nota sul compito lo riporta"
+            aria-label="Cambia il punteggio di {{ r.esercizio_nome }}">{{ icona("matita", 15) }}</button>
+    {% else %}
+    <span class="es-valore">{{ corso.punteggio_max_aperta if r.aperta else corso.risposta_corretta }}</span>
+    <span class="muted es-max" data-info="Annullato nella revisione del testo: punteggio pieno per tutti">pieno</span>
+    {% endif %}
+  </div>
+
+  <div class="es-nota{% if tipo in ('altro', 'annullato') and not nota %} chiusa{% endif %}">
+    {% if tipo in ('altro', 'annullato') %}
+    <button type="button" class="pulsante-icona pulsante-neutro btn-apri-nota" data-info="Aggiungi una nota su questo esercizio"
+            aria-label="Nota su {{ r.esercizio_nome }}">{{ icona("nota", 15) }}</button>
+    {% endif %}
+    <input class="campo-nota" name="nota_{{ r.posizione }}" value="{{ nota }}" {% if note_altri %}list="note-es-{{ r.esercizio_id }}"{% endif %}
+           placeholder="Nota (facoltativa)" aria-label="Nota su {{ r.esercizio_nome }}">
+    {% if r.esercizio_id is not none %}
+    <a class="pulsante-icona pulsante-neutro link-note-esercizio" target="_blank" rel="noopener"
+       href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/note-esercizio/{{ r.esercizio_id }}?escludi={{ v.matricola }}"
+       data-info="{{ ('Tutte le note su questo esercizio negli altri compiti (' ~ note_altri|length ~ '), con studente, compito e punteggio') if note_altri else 'Note su questo esercizio negli altri compiti (ancora nessuna)' }}"
+       aria-label="Note su {{ r.esercizio_nome }} negli altri compiti">{{ icona("elenco", 15) }}{% if note_altri %}<span class="conteggio-note">{{ note_altri|length }}</span>{% endif %}</a>
+    {% endif %}
+    <div class="note-simili"></div>
+  </div>
+
+  <div class="testo-esercizio" id="testo-es-{{ r.posizione }}" hidden>
+    {% if r.testo %}
+    <div class="testo-esercizio-quesito">{{ r.testo | testo_web }}</div>
+    {% if r.risposte %}
+    <ol class="risposte-esercizio" type="A">
+      {% for risposta in r.risposte %}
+      {% set lettera = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[loop.index0] %}
+      <li class="{% if lettera == r.lettera_corretta %}giusta{% endif %}{% if lettera == r.lettera_data %} data{% endif %}">
+        {{ risposta | testo_web }}
+        {% if lettera == r.lettera_data %}<span class="badge {{ 'badge-ok' if r.corretta else 'badge-err' }}">risposta data</span>{% endif %}
+        {% if lettera == r.lettera_corretta and not r.corretta %}<span class="badge badge-ok">giusta</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% if r.lettera_data == 'X' %}<p class="muted" style="margin:0.3rem 0 0">Nessuna risposta data.</p>{% endif %}
+    {% endif %}
+    {% else %}
+    <p class="muted" style="margin:0">Testo non disponibile per questo compito.</p>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
 {% block content %}
 {% set lunghezza_valida = v.risposte|length == v.lunghezza_attesa %}
 <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/conferma" id="form-riepilogo" autocomplete="off" novalidate>
@@ -14,6 +129,7 @@
 <input type="hidden" name="risposte_valutate" value="{{ v.risposte }}">
 {# posizioni col punteggio ancora proposto in automatico (non confermato): aggiornato all'invio #}
 <input type="hidden" name="automatici" id="automatici-hidden" value="">
+{% if svolgimenti_superflui %}<input type="hidden" name="svolgimenti_superflui" value="1">{% endif %}
 
 <div class="card testata-correzione">
   <div>
@@ -21,31 +137,26 @@
     <h1>{{ v.cognome }} {{ v.nome }}</h1>
     <div class="muted">matricola {{ v.matricola }} · compito <strong class="codice-compito">{{ v.codice }}</strong></div>
   </div>
-  {% if lunghezza_valida %}
-  <div class="voto-testata" aria-live="polite">
-    <div class="voto-testata-etichetta">Voto</div>
-    <div class="voto-testata-valore" id="voto-mostrato">{{ voto_proposto if voto_proposto is not none else v.voto_base }}</div>
-    <div class="voto-testata-stato" id="stato-voto"></div>
-  </div>
-  {% endif %}
 </div>
 
 {% if errore %}<div class="flash flash-error">{{ errore }}</div>{% endif %}
 {% if not lunghezza_valida %}
 <div class="flash flash-error">
   Le risposte inserite sono {{ v.risposte|length }}, ma questo compito ne ha {{ v.lunghezza_attesa }}:
-  correggile qui sotto e premi "Ricalcola" prima di poter salvare.
+  correggile qui sotto e ricalcola prima di poter salvare.
 </div>
 {% endif %}
 {% if v.non_svolte_obbligatorie %}
 <div class="flash flash-error">
   Obbligatori<strong> non svolti</strong>: {{ v.non_svolte_obbligatorie | map(attribute='esercizio_nome') | join(', ') }}.
-  Il compito sarà <strong>insufficiente</strong>, qualunque sia il voto{% if manuali %}: non serve valutare gli svolgimenti{% endif %}.
+  Il compito sarà <strong>insufficiente</strong>, qualunque sia il voto{% if manuali %}: non serve valutare gli svolgimenti
+  <button type="button" class="link-simile btn-valuta-comunque">valutali comunque</button>{% endif %}.
 </div>
 {% elif svolgimenti_superflui and lunghezza_valida %}
 <div class="flash flash-warning">
   Il compito è <strong>insufficiente</strong> qualunque punteggio abbiano gli svolgimenti: anche tutti al massimo
-  darebbero {{ voto_massimo }}, sotto il minimo di {{ votomin_effettivo }}. Non serve valutarli.
+  darebbero {{ voto_massimo }}, sotto il minimo di {{ votomin_effettivo }}. Non serve valutarli
+  (<button type="button" class="link-simile btn-valuta-comunque">valutali comunque</button>).
 </div>
 {% endif %}
 {% if v.codice_duplicato %}
@@ -61,9 +172,39 @@
 </div>
 {% endif %}
 {% if v.risposte_simili %}
-<div class="flash flash-warning">
+<div class="flash flash-warning avviso-simili">
   Risposte molto simili a:
-  {% for s in v.risposte_simili %}{{ s.cognome }} {{ s.nome }} ({{ s.matricola }}) {{ s.percentuale }}%{% if s.identica %}, identiche{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}.
+  {% for s in v.risposte_simili %}{{ s.cognome }} {{ s.nome }} ({{ s.matricola }}) {{ s.percentuale }}%{% if s.identica %}, identiche{% endif %}{% if s.vicinanza and s.vicinanza.vicini %}, <strong>vicini nella stampa</strong>{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}.
+  <details class="dettaglio-simili">
+    <summary>Dettagli e confronto</summary>
+    {% for s in v.risposte_simili %}
+    <div class="confronto-simile">
+      <div><strong>{{ s.cognome }} {{ s.nome }}</strong> <span class="muted">({{ s.matricola }})</span>
+        · compito <span class="codice-compito">{{ s.codice or '?' }}</span>
+        · voto {{ s.voto if s.voto is not none else '–' }}</div>
+      <ul>
+        <li><strong>{{ s.uguali }}</strong> lettere uguali nella stessa posizione su {{ s.posizioni_confrontabili }} confrontabili
+          ({{ s.percentuale }}%, senza le risposte non date): <strong>{{ s.errori_comuni }}</strong> sono gli stessi errori, {{ s.giuste_comuni }} risposte giuste per entrambi.</li>
+        {% if s.stesse_scelte %}
+        <li>Stessa risposta allo stesso esercizio (confronto indipendente dall'ordine di esercizi e risposte): <strong>{{ s.stesse_scelte.uguali }}</strong>
+          su {{ s.stesse_scelte.esercizi }} esercizi a cui hanno risposto entrambi{% if s.stesse_scelte.sbagliate %}, di cui <strong>{{ s.stesse_scelte.sbagliate }} sbagliate</strong>{% endif %}.</li>
+        {% endif %}
+        {% if s.vicinanza %}
+        <li class="{{ 'vicinanza-sospetta' if s.vicinanza.vicini else '' }}">{{ s.vicinanza.testo }}.</li>
+        {% else %}
+        <li class="muted">Posto nella stampa non disponibile.</li>
+        {% endif %}
+      </ul>
+      <div class="griglia-confronto" aria-label="Le due griglie a confronto">
+        <span class="etichetta">questo</span>
+        <span class="lettere">{% for c in s.confronto %}<span class="{{ 'errore' if c.errore else ('uguale' if c.uguale else '') }}">{{ c.mia }}</span>{% if loop.index % 5 == 0 %} {% endif %}{% endfor %}</span>
+        <span class="etichetta">{{ s.cognome }}</span>
+        <span class="lettere">{% for c in s.confronto %}<span class="{{ 'errore' if c.errore else ('uguale' if c.uguale else '') }}">{{ c.sua }}</span>{% if loop.index % 5 == 0 %} {% endif %}{% endfor %}</span>
+      </div>
+    </div>
+    {% endfor %}
+    <p class="muted legenda-confronto"><span class="uguale">A</span> stessa lettera · <span class="errore">A</span> stesso errore</p>
+  </details>
 </div>
 {% endif %}
 
@@ -77,19 +218,19 @@
     <span class="muted riassunto-risposte">
       <span class="ok">✓ {{ n_giuste }}</span> · <span class="err">✗ {{ v.righe|length - n_giuste - n_vuote - n_aperte }}</span> · – {{ n_vuote }} non date{% if n_aperte %} · {{ n_aperte }} apert{{ 'a' if n_aperte == 1 else 'e' }}{% endif %}
     </span>
-    {{ info("Sopra la lettera letta dal foglio, sotto quella giusta. Verde: giusta; rosso: sbagliata; grigio: non data; blu: domanda aperta (punteggio da assegnare). Il bordo spesso indica un esercizio obbligatorio. Passa sopra a una casella per il nome dell'esercizio.") }}
+    {{ info("Sopra la lettera letta dal foglio, sotto quella giusta. Verde: giusta; rosso: sbagliata; grigio: non data; blu: domanda aperta. Il bordo spesso indica un esercizio obbligatorio. Un clic su una casella porta all'esercizio, qui sotto.") }}
   </div>
   <div class="griglia-risposte">
     {% for r in v.righe %}
     {% set esito = 'aperta' if r.aperta else ('ok' if r.corretta else ('err' if r.svolta else 'vuota')) %}
     {% set obbl = r.obbligatorio and not r.revisione %}
-    <div class="cella-risposta esito-{{ esito }}{% if obbl %} obbligatoria{% endif %}{% if obbl and not r.aperta and not r.svolta %} mancante{% endif %}"
+    <a href="#es-{{ r.posizione }}" class="cella-risposta esito-{{ esito }}{% if obbl %} obbligatoria{% endif %}{% if obbl and not r.aperta and not r.svolta %} mancante{% endif %}"
          {% if r.revisione == 'annullato' %}style="opacity:0.45"{% endif %}
          title="{{ r.posizione + 1 }}. {{ r.esercizio_nome }}{% if obbl %} (obbligatorio){% elif r.revisione == 'facoltativo' %} (non più obbligatorio){% elif r.revisione == 'annullato' %} (annullato: punteggio pieno){% endif %}{% if not r.aperta %} — data {{ r.lettera_data }}, giusta {{ r.lettera_corretta }}{% endif %}">
       <span class="n">{{ r.posizione + 1 }}</span>
       <span class="data">{{ '✎' if r.aperta else r.lettera_data }}</span>
       <span class="giusta">{{ '' if r.aperta else r.lettera_corretta }}</span>
-    </div>
+    </a>
     {% endfor %}
   </div>
   {# risposte giuste sotto quelle lette, con gli stessi gruppi da 5: allineate lettera per
@@ -100,7 +241,9 @@
   <div class="riga-risposte-lette">
     <label for="input-risposte-riepilogo">Risposte lette</label>
     <input name="risposte" id="input-risposte-riepilogo" value="{{ v.risposte }}" autocomplete="off" spellcheck="false">
-    <button type="submit" id="btn-ricalcola" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" formnovalidate class="secondary" {% if lunghezza_valida %}disabled{% endif %}>{{ icona("ricarica", 14) }} Ricalcola</button>
+    <button type="submit" id="btn-ricalcola" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi" formnovalidate
+            class="secondary solo-icona" {% if lunghezza_valida %}disabled{% endif %}
+            data-info="Ricalcola con le risposte corrette qui" aria-label="Ricalcola">{{ icona("ricarica", 16) }}</button>
     {% if corrette %}
     <label for="risposte-corrette-riepilogo">Risposte corrette</label>
     <input id="risposte-corrette-riepilogo" class="risposte-corrette" value="{{ gruppi_corrette|join(' ') }}" readonly spellcheck="false"
@@ -113,131 +256,72 @@
 </div>
 
 {% if lunghezza_valida %}
-{# --- 2. svolgimenti da giudicare a mano, con gli obbligatori sbagliati (in rosso: il
-   punteggio calcolato, da confermare o cambiare come nella rivalutazione in fondo) --- #}
-{% set sbagliati = v.righe | selectattr('obbligatorio') | rejectattr('revisione') | rejectattr('aperta') | selectattr('svolta') | rejectattr('corretta') | list %}
-{% set posizioni_sbagliati = sbagliati | map(attribute='posizione') | list %}
-{% set minimo_esercizio = [corso.risposta_sbagliata, corso.risposta_vuota] | min %}
-{% if manuali or sbagliati %}
-<div class="card{% if svolgimenti_superflui %} svolgimenti-superflui{% endif %}" id="card-svolgimenti">
-  <div class="titolo-sezione-correzione">
-    <h2>Svolgimenti da valutare ({{ manuali|length }}){% if sbagliati %} <span class="muted" style="font-size:0.85rem; font-weight:normal">e {{ sbagliati|length }} obbligatori{{ 'o' if sbagliati|length == 1 else '' }} sbagliat{{ 'o' if sbagliati|length == 1 else 'i' }}</span>{% endif %}</h2>
-    {{ info("In rosso gli obbligatori con la risposta sbagliata: hanno il punteggio calcolato (" ~ corso.risposta_sbagliata ~ "), da confermare o cambiare se lo svolgimento merita di più; il voto si ricalcola e la nota sul compito riporta il punteggio calcolato e quello assegnato. Ogni svolgimento parte dal punteggio massimo (in grigio: " ~ corso.risposta_corretta ~ " per gli obbligatori con la risposta giusta, " ~ corso.punteggio_max_aperta ~ " per le domande aperte), da abbassare fino a " ~ corso.risposta_sbagliata ~ " se lo svolgimento non va: entrando nella casella il valore è già selezionato, basta scrivere il nuovo; se lo svolgimento è giusto, \"corretto\" conferma il massimo senza riscriverlo. La nota (facoltativa) descrive gli errori. \"Dopo\" rimanda la valutazione alla pagina Svolgimenti: il compito si registra con un voto provvisorio, e finché non è valutata una domanda aperta conta 0.") }}
-    {% if svolgimenti_superflui %}
-    <input type="hidden" name="svolgimenti_superflui" value="1">
-    <span class="muted avviso-superflui">facoltativi: il compito è insufficiente comunque
-      <button type="button" class="link-simile" id="btn-valuta-comunque">valutali comunque</button></span>
-    {% endif %}
-    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/svolgimenti" class="link-laterale" target="_blank" rel="noopener">{{ icona("elenco", 13) }} confronta con gli altri compiti {{ icona("esterno", 12) }}</a>
-  </div>
+{# --- 2. gli esercizi, in tre sezioni: domande aperte, obbligatori, tutti gli altri ---
+   In ogni sezione in ordine di numero, col punteggio calcolato dalla griglia: gli
+   svolgimenti (e gli obbligatori sbagliati) vanno confermati o cambiati, gli altri sono
+   già confermati e la matita li cambia. #}
+{% set posizioni_manuali = manuali | map(attribute='posizione') | list %}
+{% set aperte = v.righe | selectattr('aperta') | rejectattr('revisione', 'equalto', 'annullato') | list %}
+{% set obbligatori = v.righe | rejectattr('aperta') | selectattr('obbligatorio') | rejectattr('revisione', 'equalto', 'annullato') | list %}
+{% set pos_sezioni = (aperte + obbligatori) | map(attribute='posizione') | list %}
+{% set altri = v.righe | rejectattr('posizione', 'in', pos_sezioni) | list %}
 
-  <div class="elenco-svolgimenti">
-  {% for r in (manuali + sbagliati) | sort(attribute='posizione') %}
-  {% if r.posizione in posizioni_sbagliati %}
-  {% set calcolato = corso.risposta_sbagliata %}
-  {% set valore = rivalutazioni.get(r.posizione, calcolato) %}
-  <div class="riga-svolgimento riga-sbagliata" data-default="{{ calcolato }}">
-    <div class="svolg-nome">
-      <strong>{{ r.posizione + 1 }}. {{ r.esercizio_nome }}</strong>
-      <span class="badge badge-err">obbligatorio sbagliato</span>
-    </div>
-    <div class="svolg-punteggio">
-      <input type="number" class="campo-punteggio campo-rivaluta{% if r.posizione not in rivalutazioni %} automatico{% endif %}" name="rivaluta_{{ r.posizione }}"
-             data-pos="{{ r.posizione }}" data-numero="{{ r.posizione + 1 }}" data-calcolato="{{ calcolato }}"
-             min="{{ minimo_esercizio }}" max="{{ corso.risposta_corretta }}" step="1" value="{{ valore }}"
-             aria-label="Punteggio di {{ r.esercizio_nome }}, calcolato {{ calcolato }}">
-      <span class="muted svolg-max">/ {{ corso.risposta_corretta }}</span>
-      <button type="button" class="secondary btn-massimo" data-info="Conferma il punteggio calcolato ({{ calcolato }}) e passa al successivo">{{ icona("spunta", 13) }} conferma</button>
-    </div>
-    <span class="muted svolg-lettere">risposta <strong>{{ r.lettera_data }}</strong>, giusta <strong>{{ r.lettera_corretta }}</strong></span>
-    <span></span>
+{% if aperte %}
+<div class="card sezione-esercizi{% if svolgimenti_superflui %} svolgimenti-superflui{% endif %}">
+  <div class="titolo-sezione-correzione">
+    <h2>Domande aperte ({{ aperte|length }})</h2>
+    {{ info("Ogni domanda parte dal punteggio massimo (" ~ corso.punteggio_max_aperta ~ ", in grigio finché non lo confermi): la spunta lo conferma e passa alla successiva, oppure scrivi il punteggio (da " ~ corso.risposta_sbagliata ~ "); entrando nella casella il valore è già selezionato. L'orologio rimanda la valutazione alla pagina Svolgimenti: il compito si registra con un voto provvisorio, e finché non è valutata una domanda aperta conta 0.") }}
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/svolgimenti" class="link-laterale pulsante-icona pulsante-neutro" target="_blank" rel="noopener"
+       data-info="Confronta punteggi e note con gli altri compiti, esercizio per esercizio (pagina Svolgimenti, in un'altra scheda)" aria-label="Confronta con gli altri compiti">{{ icona("esterno", 15) }}</a>
   </div>
-  {% else %}
-  {% set massimo = corso.punteggio_max_aperta if r.aperta else corso.risposta_corretta %}
-  {% set valore = punteggi_proposti.get(r.posizione, '') %}
-  {% set rimandato = r.posizione in rimandati %}
-  <div class="riga-svolgimento riga-manuale{% if rimandato %} rimandato{% endif %}" data-pos="{{ r.posizione }}" data-max="{{ massimo }}" data-default="{{ massimo }}"
-       data-aperta="{{ '1' if r.aperta else '' }}" data-esercizio="{{ r.esercizio_id if r.esercizio_id is not none else '' }}">
-    <div class="svolg-nome">
-      <strong>{{ r.posizione + 1 }}. {{ r.esercizio_nome }}</strong>
-      <span class="badge {{ 'badge-info' if r.aperta else 'badge-ok' }}">{{ 'aperta' if r.aperta else 'obbligatorio' }}</span>
-    </div>
-    <div class="svolg-punteggio">
-      <input type="number" class="campo-punteggio{% if r.posizione in automatici %} automatico{% endif %}" name="punteggio_{{ r.posizione }}" aria-label="Punteggio di {{ r.esercizio_nome }}"
-             min="{{ corso.risposta_sbagliata }}" max="{{ massimo }}" step="1" value="{{ valore }}" {% if rimandato %}disabled{% endif %}>
-      <span class="muted svolg-max">/ {{ massimo }}</span>
-      <button type="button" class="secondary btn-massimo" data-info="Svolgimento corretto: conferma il punteggio massimo ({{ massimo }}) e passa al successivo" {% if rimandato %}disabled{% endif %}>{{ icona("spunta", 13) }} corretto</button>
-    </div>
-    <input class="campo-nota" name="nota_{{ r.posizione }}" value="{{ note_proposte.get(r.posizione, '') }}"
-           {% if r.esercizio_id is not none and note_precedenti.get(r.esercizio_id) %}list="note-es-{{ r.esercizio_id }}"{% endif %}
-           placeholder="Nota (facoltativa)" aria-label="Nota su {{ r.esercizio_nome }}">
-    <label class="svolg-dopo" data-info="Valuta più tardi dalla pagina Svolgimenti: il compito resta in sospeso">
-      <input type="checkbox" class="check-rimanda" name="rimanda_{{ r.posizione }}" value="1" {% if rimandato %}checked{% endif %}> dopo
-    </label>
-    <div class="note-simili"></div>
+  <div class="elenco-esercizi">
+    {% for r in aperte %}{{ riga_esercizio(r, 'manuale' if r.posizione in posizioni_manuali else 'annullato') }}{% endfor %}
   </div>
-  {% endif %}
-  {% endfor %}
-  </div>
-  {% for es_id, note in note_precedenti.items() %}
-  <datalist id="note-es-{{ es_id }}">{% for n in note|map(attribute='nota')|unique %}<option value="{{ n }}">{% endfor %}</datalist>
-  {% endfor %}
 </div>
 {% endif %}
 
-{# --- 3. esito --- #}
+{% if obbligatori %}
+<div class="card sezione-esercizi{% if svolgimenti_superflui %} svolgimenti-superflui{% endif %}">
+  <div class="titolo-sezione-correzione">
+    <h2>Obbligatori ({{ obbligatori|length }})</h2>
+    {{ info("Con la risposta giusta (in verde) si giudica lo svolgimento: parte dal punteggio massimo (" ~ corso.risposta_corretta ~ "), la spunta lo conferma, oppure scrivi il punteggio. Con la risposta sbagliata (in rosso) parte dal punteggio calcolato (" ~ corso.risposta_sbagliata ~ "), da confermare o alzare se lo svolgimento merita di più: la nota sul compito riporta il punteggio calcolato e quello assegnato. Un obbligatorio non svolto rende il compito insufficiente.") }}
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/svolgimenti" class="link-laterale pulsante-icona pulsante-neutro" target="_blank" rel="noopener"
+       data-info="Confronta punteggi e note con gli altri compiti, esercizio per esercizio (pagina Svolgimenti, in un'altra scheda)" aria-label="Confronta con gli altri compiti">{{ icona("esterno", 15) }}</a>
+  </div>
+  <div class="elenco-esercizi">
+    {% for r in obbligatori %}
+    {% if r.posizione in posizioni_manuali %}{{ riga_esercizio(r, 'manuale') }}
+    {% elif r.svolta and not r.corretta and not r.revisione %}{{ riga_esercizio(r, 'sbagliato') }}
+    {% else %}{{ riga_esercizio(r, 'altro') }}{% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if altri %}
+<div class="card sezione-esercizi">
+  <div class="titolo-sezione-correzione">
+    <h2>Altri esercizi ({{ altri|length }})</h2>
+    {{ info("Punteggio calcolato dalla griglia, già confermato. La matita lo cambia (da " ~ ([corso.risposta_sbagliata, corso.risposta_vuota]|min) ~ " a " ~ corso.risposta_corretta ~ "): il voto si ricalcola e la nota sul compito riporta l'esercizio, il punteggio calcolato e quello assegnato. L'icona della nota ne aggiunge una sull'esercizio.") }}
+  </div>
+  <div class="elenco-esercizi">
+    {% for r in altri %}{{ riga_esercizio(r, 'annullato' if r.revisione == 'annullato' else 'altro') }}{% endfor %}
+  </div>
+</div>
+{% endif %}
+{% for es_id, note in note_precedenti.items() %}
+<datalist id="note-es-{{ es_id }}">{% for n in note|map(attribute='nota')|unique %}<option value="{{ n }}">{% endfor %}</datalist>
+{% endfor %}
+
+{# --- 3. esito: nota sul voto finale e orale --- #}
 {% set orale_possibile = not v.non_svolte_obbligatorie %}
 <div class="card" id="card-esito">
-  <div class="riga-voto-finale">
-    <div>
-      <label for="voto-finale">Voto finale</label>
-      <input type="number" name="voto_finale" id="voto-finale" class="seleziona-al-focus" value="{{ voto_proposto if voto_proposto is not none else v.voto_base }}">
-    </div>
-    <div class="voto-calcolato">
-      <span class="muted">calcolato: <strong id="voto-calcolato">{{ v.voto_base }}</strong></span>
-      <span class="badge badge-warn" id="badge-voto-a-mano" hidden>cambiato a mano</span>
-      <button type="button" class="link-simile" id="btn-voto-calcolato" hidden>{{ icona("ricarica", 12) }} usa il calcolato</button>
-    </div>
-  </div>
+  <h2>Esito</h2>
   <input type="hidden" name="voto_modificato" id="voto-modificato" value="{{ '1' if voto_a_mano else '' }}">
-
-  {# rivalutazione a mano: o il voto finale qui sopra (il totale), o il punteggio dei
-     singoli esercizi a risposta chiusa (gli svolgimenti si cambiano già nel loro riquadro):
-     il voto si ricalcola e la nota riporta esercizio, punteggio calcolato e assegnato #}
-  {% set posizioni_manuali = manuali | map(attribute='posizione') | list %}
-  {% set rivalutabili = v.righe | rejectattr('aperta') | rejectattr('revisione', 'equalto', 'annullato') | rejectattr('posizione', 'in', posizioni_manuali + posizioni_sbagliati) | list %}
-  {% set rivalutati_in_fondo = rivalutabili | selectattr('posizione', 'in', rivalutazioni) | list %}
-  {% if rivalutabili %}
-  <details class="rivaluta-esercizi" id="rivaluta-esercizi" {% if rivalutati_in_fondo %}open{% endif %}>
-    <summary class="muted">Rivaluta esercizio per esercizio</summary>
-    <p class="muted spiegazione sr-only" style="margin:0.4rem 0 0.5rem; font-size:0.85rem">
-      Cambia il punteggio di un esercizio (da {{ minimo_esercizio }} a {{ corso.risposta_corretta }}): il voto finale si
-      aggiorna e la nota sul compito riporta l'esercizio, il punteggio calcolato e quello assegnato. Per rivalutare
-      il totale, cambia invece direttamente il voto finale.
-    </p>
-    <div class="griglia-rivaluta">
-      {% for r in rivalutabili %}
-      {% set calcolato = corso.risposta_vuota if not r.svolta else (corso.risposta_corretta if r.corretta else corso.risposta_sbagliata) %}
-      {% set valore = rivalutazioni.get(r.posizione, calcolato) %}
-      <label class="voce-rivaluta" title="{{ r.posizione + 1 }}. {{ r.esercizio_nome }}">
-        <span class="voce-rivaluta-nome"><strong>{{ r.posizione + 1 }}.</strong> {{ r.esercizio_nome }}</span>
-        <span class="muted voce-rivaluta-lettere">{{ r.lettera_data }}/{{ r.lettera_corretta }}</span>
-        <input type="number" class="campo-punteggio campo-rivaluta{% if valore == calcolato %} automatico{% endif %}" name="rivaluta_{{ r.posizione }}"
-               data-pos="{{ r.posizione }}" data-numero="{{ r.posizione + 1 }}" data-calcolato="{{ calcolato }}"
-               min="{{ minimo_esercizio }}" max="{{ corso.risposta_corretta }}" step="1" value="{{ valore }}"
-               aria-label="Punteggio dell'esercizio {{ r.posizione + 1 }}, calcolato {{ calcolato }}">
-      </label>
-      {% endfor %}
-    </div>
-  </details>
-  {% endif %}
-
-  <details class="dettaglio-nota" id="dettaglio-nota" {% if nota_correzione or voto_a_mano %}open{% endif %}>
-    <summary class="muted">Nota sul compito <span class="muted">(solo per il docente)</span></summary>
-    <textarea name="nota_correzione" id="nota-correzione" rows="2" class="testo-normale"
-              placeholder="Es. perché hai cambiato il voto, o un'osservazione da ricordare">{{ nota_correzione }}</textarea>
-    <div class="stato-campo stato-warn" id="avviso-nota" hidden>Hai cambiato il voto a mano: scrivi qui il perché.</div>
-  </details>
+  <label for="nota-correzione">Nota sul voto finale <span class="muted">(solo per il docente)</span></label>
+  <textarea name="nota_correzione" id="nota-correzione" rows="2" class="testo-normale"
+            placeholder="Es. perché hai cambiato il voto, o un'osservazione da ricordare">{{ nota_correzione }}</textarea>
+  <div class="stato-campo stato-warn" id="avviso-nota" hidden>Hai cambiato il voto a mano: scrivi qui il perché.</div>
 
   {% if convocazione and convocazione.precedente %}
   <div class="stato-campo stato-warn" id="avviso-convocazione">
@@ -250,25 +334,39 @@
       <input type="checkbox" id="checkbox-richiedi-orale" {% if richiedi_orale_checked and orale_possibile %}checked{% endif %} {% if not orale_possibile %}disabled{% endif %}>
       {% if convocazione %}{{ "Conferma la convocazione all'orale" if convocazione.precedente else "Convoca all'orale" }}{% else %}Richiedi l'orale{% endif %}
     </label>
+    {% if convocazione %}{{ info("Ultima prova: la convocazione confermata qui comparirà nei risultati complessivi; senza spunta lo studente non è convocato." if convocazione.ultima else "La convocazione comparirà nei risultati complessivi solo se confermata nell'ultima prova: nella prossima ti verrà riproposta.") }}{% endif %}
     <span class="muted" id="avviso-orale">{% if not orale_possibile %}non disponibile: compito insufficiente per un obbligatorio non svolto{% endif %}</span>
   </div>
-  {% if convocazione %}
-  <p class="muted spiegazione sr-only" style="margin:0.2rem 0 0">{% if convocazione.ultima %}Ultima prova: la convocazione confermata qui comparirà nei risultati complessivi; senza spunta lo studente non è convocato.{% else %}La convocazione comparirà nei risultati complessivi solo se confermata nell'ultima prova: nella prossima ti verrà riproposta.{% endif %}</p>
-  {% endif %}
   <div id="box-motivazione-orale" hidden>
-    <label>Motivazione {{ "della convocazione" if convocazione else "dell'orale" }} (solo per il docente)</label>
-    <textarea name="orale_motivazione" rows="2" class="testo-normale">{{ orale_motivazione }}</textarea>
+    <label for="orale-motivazione">Nota per l'orale <span class="muted">(motivazione, solo per il docente)</span></label>
+    <textarea name="orale_motivazione" id="orale-motivazione" rows="2" class="testo-normale">{{ orale_motivazione }}</textarea>
   </div>
   <input type="hidden" name="azione" id="azione-hidden" value="salva">
   <input type="hidden" name="conferma_orale_obbligatorio" id="conferma-obbligatorio-hidden" value="">
 </div>
 
+{# voto finale e azioni: sempre in vista in fondo allo schermo #}
 <div class="barra-azioni-correzione">
-  <button type="submit" id="btn-conferma-correzione">{{ icona("spunta", 17) }} <span class="etichetta-conferma">Conferma</span></button>
-  <button type="submit" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/bozza" formnovalidate class="secondary"
-          data-info="Tiene da parte matricola, codice, risposte e quanto già valutato, senza registrare nessun esito: la riprendi da &quot;Correzioni da completare&quot;">{{ icona("nota", 14) }} Salva come bozza</button>
-  <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione" class="muted link-con-icona">{{ icona("indietro", 14) }} Annulla</a>
-  <span class="muted suggerimento-tastiera"><kbd>Invio</kbd> passa al campo successivo</span>
+  <div class="barra-voto" aria-live="polite">
+    <label for="voto-finale">Voto</label>
+    <input type="number" name="voto_finale" id="voto-finale" class="seleziona-al-focus" value="{{ voto_proposto if voto_proposto is not none else v.voto_base }}"
+           data-info="Voto finale: si aggiorna con i punteggi degli esercizi; scrivilo per cambiarlo a mano">
+    <div class="barra-voto-stato">
+      <span class="muted">calcolato <strong id="voto-calcolato">{{ v.voto_base }}</strong></span>
+      <button type="button" class="pulsante-icona pulsante-neutro" id="btn-voto-calcolato" hidden
+              data-info="Torna al voto calcolato, annullando le modifiche a mano" aria-label="Usa il voto calcolato">{{ icona("ricarica", 14) }}</button>
+      <span id="stato-voto"></span>
+    </div>
+  </div>
+  <span class="muted suggerimento-tastiera"><kbd>Invio</kbd> passa al punteggio successivo</span>
+  <div class="barra-pulsanti-correzione">
+    <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione" class="pulsante-icona pulsante-neutro pulsante-grande"
+       data-info="Annulla: torna alla correzione senza salvare" aria-label="Annulla">{{ icona("chiudi", 20) }}</a>
+    <button type="submit" formaction="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/correggi/bozza" formnovalidate class="pulsante-icona pulsante-neutro pulsante-grande"
+            data-info="Salva come bozza: tiene da parte matricola, codice, risposte e quanto già valutato, senza registrare nessun esito (la riprendi da &quot;Correzioni da completare&quot;)"
+            aria-label="Salva come bozza">{{ icona("salva", 20) }}</button>
+    <button type="submit" id="btn-conferma-correzione" class="solo-icona" data-info="Conferma" aria-label="Conferma">{{ icona("spunta", 22) }}</button>
+  </div>
 </div>
 {% endif %}
 </form>
@@ -285,14 +383,37 @@
   function risposteCambiate() { return inputRisposte.value.replace(/\s+/g, "") !== risposteOriginali; }
   inputRisposte.addEventListener("input", function () { btnRicalcola.disabled = lunghezzaValida && !risposteCambiate(); });
 
+  // testo dell'esercizio (risposta data e giusta) sotto la riga, al clic sul nome; un clic
+  // su una casella della griglia porta all'esercizio e ne apre il testo
+  function apriTesto(riga, apri) {
+    var box = riga.querySelector(".testo-esercizio");
+    var btn = riga.querySelector(".btn-testo-esercizio");
+    box.hidden = apri === undefined ? !box.hidden : !apri;
+    btn.setAttribute("aria-expanded", box.hidden ? "false" : "true");
+    if (!box.hidden && !box.dataset.reso) { box.dataset.reso = "1"; renderizzaLatex(box); }
+  }
+  document.querySelectorAll(".btn-testo-esercizio").forEach(function (btn) {
+    btn.addEventListener("click", function () { apriTesto(btn.closest(".riga-esercizio")); });
+  });
+  document.querySelectorAll(".griglia-risposte .cella-risposta").forEach(function (cella) {
+    cella.addEventListener("click", function (ev) {
+      var riga = document.querySelector(cella.getAttribute("href"));
+      if (!riga) return;
+      ev.preventDefault();
+      apriTesto(riga, true);
+      riga.scrollIntoView({ block: "center", behavior: "smooth" });
+      riga.classList.remove("evidenziata");
+      void riga.offsetWidth;
+      riga.classList.add("evidenziata");
+    });
+  });
+
   var conferma = document.getElementById("btn-conferma-correzione");
   if (!conferma) { inputRisposte.focus(); return; }
 
   var votoFinale = document.getElementById("voto-finale");
-  var votoMostrato = document.getElementById("voto-mostrato");
   var statoVoto = document.getElementById("stato-voto");
   var votoCalcolatoEl = document.getElementById("voto-calcolato");
-  var badgeAMano = document.getElementById("badge-voto-a-mano");
   var btnUsaCalcolato = document.getElementById("btn-voto-calcolato");
   var votoModificato = document.getElementById("voto-modificato");
   var notaCorrezione = document.getElementById("nota-correzione");
@@ -311,7 +432,6 @@
   var modificaCorrente = {{ 'true' if modifica else 'false' }};
   // insufficiente qualunque punteggio abbiano gli svolgimenti: vuoti non sono "da valutare"
   var superflui = {{ 'true' if svolgimenti_superflui else 'false' }};
-  var cardSvolgimenti = document.getElementById("card-svolgimenti");
 
   var righe = Array.prototype.slice.call(document.querySelectorAll(".riga-manuale"));
   function campo(riga) { return riga.querySelector(".campo-punteggio"); }
@@ -333,11 +453,21 @@
     return fuori;
   }
   function avvisaFuoriIntervallo(input) {
+    mostraCampo(input);
     window.alert("Punteggio non valido: \"" + input.value + "\". Scrivi un numero intero da " + input.min + " a " + input.max + ".");
     input.focus();
   }
+  // casella di un esercizio già confermato, nascosta dietro la matita
+  function mostraCampo(input) {
+    if (!input.hidden) return;
+    var riga = input.closest(".riga-esercizio");
+    input.hidden = false;
+    riga.querySelector(".es-valore").hidden = true;
+    var matita = riga.querySelector(".btn-modifica-punteggio");
+    if (matita) matita.hidden = true;
+  }
 
-  // --- rivalutazione dei singoli esercizi a risposta chiusa
+  // --- rivalutazione dei singoli esercizi a risposta chiusa (obbligatori sbagliati e altri)
   var campiRivaluta = Array.prototype.slice.call(document.querySelectorAll(".campo-rivaluta"));
   function rivalutati() {
     return campiRivaluta.filter(function (input) {
@@ -392,24 +522,24 @@
     if (!totaleAMano) votoFinale.value = perEsercizi ? c.rivalutato : c.voto;
     votoFinale.disabled = c.rimandati > 0;
     var voto = parseInt(votoFinale.value, 10);
-    votoMostrato.textContent = isNaN(voto) ? "?" : voto;
     var insuff = !isNaN(voto) && voto < votomin;
-    votoMostrato.className = "voto-testata-valore" + (insuff ? " insufficiente" : "") + (c.mancanti ? " provvisorio" : "");
+    votoFinale.classList.toggle("insufficiente", insuff);
+    votoFinale.classList.toggle("provvisorio", c.mancanti > 0);
     var motivoAMano = totaleAMano ? "cambiato a mano" : "esercizi rivalutati a mano";
     statoVoto.textContent = c.mancanti
       ? "provvisorio: " + c.mancanti + " svolgiment" + (c.mancanti === 1 ? "o" : "i") + " da valutare"
       : (insufficientePerObbligatorio ? "insufficiente: obbligatorio non svolto"
         : (superflui && insuff && !aMano ? "insufficiente comunque" : (insuff ? "insufficiente" : (aMano ? motivoAMano : ""))));
-    badgeAMano.textContent = motivoAMano;
-    badgeAMano.hidden = btnUsaCalcolato.hidden = !aMano;
-    if (aMano) document.getElementById("dettaglio-nota").open = true;
+    statoVoto.className = "stato-voto" + (c.mancanti ? " provvisorio" : (insuff ? " insufficiente" : (aMano ? " a-mano" : "")));
+    btnUsaCalcolato.hidden = !aMano;
     avvisoNota.hidden = !aMano || notaCorrezione.value.trim() !== "";
     aggiornaOrale(voto, c);
     var confermaInsufficienza = superflui && !c.rimandati && insuff;
     conferma.classList.toggle("danger", confermaInsufficienza);
-    conferma.querySelector(".etichetta-conferma").textContent =
-      c.rimandati ? "Conferma, svolgimenti dopo"
-        : (confermaInsufficienza ? "Conferma l'insufficienza" : (modificaCorrente ? "Salva le modifiche" : "Conferma"));
+    var etichetta = c.rimandati ? "Conferma, con gli svolgimenti da valutare dopo"
+      : (confermaInsufficienza ? "Conferma l'insufficienza" : (modificaCorrente ? "Salva le modifiche" : "Conferma"));
+    conferma.dataset.info = etichetta;
+    conferma.setAttribute("aria-label", etichetta);
   }
 
   votoFinale.addEventListener("input", function () {
@@ -425,23 +555,40 @@
       input.value = input.dataset.calcolato;
       input.classList.add("automatico");
       segnalaIntervallo(input);
+      aggiornaValore(input);
     });
-    righeSbagliate.forEach(function (riga) { riga.segnaDefault(); });
+    righeDaConfermare.forEach(function (riga) { riga.segnaDefault(); });
     aggiornaNotaRivalutazioni();
     aggiorna();
     votoFinale.focus();
   });
+  // valore mostrato accanto alla matita (esercizi già confermati)
+  function aggiornaValore(input) {
+    var riga = input.closest(".riga-esercizio");
+    var valore = riga.querySelector(".es-valore");
+    if (!valore) return;
+    valore.textContent = input.value;
+    riga.classList.toggle("rivalutata", parseInt(input.value, 10) !== parseInt(input.dataset.calcolato, 10));
+  }
   // cambiare un esercizio torna alla rivalutazione per esercizi: il voto finale è di
-  // nuovo quello calcolato con i punteggi assegnati. Nel riquadro degli svolgimenti
-  // (obbligatori sbagliati) scrivere il punteggio lo conferma, come per gli svolgimenti
+  // nuovo quello calcolato con i punteggi assegnati. Per gli obbligatori sbagliati
+  // scrivere il punteggio lo conferma, come per gli svolgimenti
   campiRivaluta.forEach(function (input) {
     input.addEventListener("input", function () {
-      if (input.closest(".riga-sbagliata")) input.classList.remove("automatico");
+      if (input.classList.contains("da-confermare")) input.classList.remove("automatico");
       else input.classList.toggle("automatico", parseInt(input.value, 10) === parseInt(input.dataset.calcolato, 10));
       segnalaIntervallo(input);
+      aggiornaValore(input);
       totaleAMano = false;
       aggiornaNotaRivalutazioni();
       aggiorna();
+    });
+  });
+  document.querySelectorAll(".btn-modifica-punteggio").forEach(function (matita) {
+    matita.addEventListener("click", function () {
+      var input = matita.closest(".riga-esercizio").querySelector(".campo-punteggio");
+      mostraCampo(input);
+      input.focus();
     });
   });
   notaCorrezione.addEventListener("input", aggiorna);
@@ -475,67 +622,81 @@
     sincronizzaOrale();
   });
 
-  // --- pulsante "corretto" / "conferma": conferma il punteggio proposto (il massimo per
-  // gli svolgimenti, il calcolato per gli obbligatori sbagliati) senza riscriverlo, e passa
-  // al successivo; resta premuto finché il punteggio confermato è quello
-  function campiRiquadro() {
-    return Array.prototype.slice.call(document.querySelectorAll(".elenco-svolgimenti .campo-punteggio"))
+  // --- spunta: conferma il punteggio proposto (il massimo per gli svolgimenti, il
+  // calcolato per gli obbligatori sbagliati) senza riscriverlo e passa al successivo;
+  // resta verde finché il punteggio confermato è quello, e si può sempre cambiare
+  function campiDaConfermare() {
+    return Array.prototype.slice.call(document.querySelectorAll(".campo-punteggio.da-confermare"))
       .filter(function (input) { return !input.disabled; });
   }
   function vaiAlSuccessivo(input) {
-    var campi = campiRiquadro();
+    var campi = campiDaConfermare();
     var i = campi.indexOf(input);
     var prossimo = i !== -1 && i + 1 < campi.length ? campi[i + 1] : conferma;
     prossimo.focus();
     if (prossimo.select) prossimo.select();
   }
-  function preparaConferma(riga, dopoConferma) {
+  var righeDaConfermare = Array.prototype.slice.call(document.querySelectorAll(".riga-manuale, .riga-sbagliata"));
+  righeDaConfermare.forEach(function (riga) {
     var input = campo(riga);
-    var btn = riga.querySelector(".btn-massimo");
+    var btn = riga.querySelector(".btn-conferma-punteggio");
     riga.segnaDefault = function () {
-      btn.classList.toggle("premuto", !input.classList.contains("automatico") && input.value.trim() === riga.dataset.default);
+      var confermato = !input.classList.contains("automatico") && input.value.trim() !== "";
+      btn.classList.toggle("premuto", confermato && input.value.trim() === riga.dataset.default);
+      riga.classList.toggle("confermata", confermato || (riga.classList.contains("riga-manuale") && rimandata(riga)));
     };
     input.addEventListener("input", riga.segnaDefault);
     btn.addEventListener("click", function () {
       input.value = riga.dataset.default;
       input.classList.remove("automatico");
-      riga.segnaDefault();
       segnalaIntervallo(input);
       valutaComunque();
-      dopoConferma();
+      if (input.classList.contains("campo-rivaluta")) { totaleAMano = false; aggiornaNotaRivalutazioni(); }
+      riga.segnaDefault();
+      suggerimento(riga);
+      aggiorna();
       vaiAlSuccessivo(input);
     });
     riga.segnaDefault();
-  }
-  var righeSbagliate = Array.prototype.slice.call(document.querySelectorAll(".riga-sbagliata"));
-  righeSbagliate.forEach(function (riga) {
-    preparaConferma(riga, function () { totaleAMano = false; aggiornaNotaRivalutazioni(); aggiorna(); });
   });
 
-  // --- svolgimenti: punteggio, nota con suggerimenti, "dopo"
+  // --- note: suggerimenti dalle note scritte sullo stesso esercizio negli altri compiti
   function suggerimento(riga) {
-    // note simili scritte per lo stesso esercizio negli altri compiti, con studente e punteggio
-    mostraNoteSimili(riga.querySelector(".note-simili"), riga.querySelector(".campo-nota").value,
-      notePrecedenti[riga.dataset.esercizio] || [], rimandata(riga) ? "" : campo(riga).value);
+    var nota = riga.querySelector(".campo-nota");
+    var input = campo(riga);
+    var punteggio = !input ? "" : (riga.classList.contains("riga-manuale") && rimandata(riga) ? "" : input.value);
+    mostraNoteSimili(riga.querySelector(".note-simili"), nota.value, notePrecedenti[riga.dataset.esercizio] || [], punteggio);
   }
-  // svolgimenti facoltativi in grigio: tornano normali appena se ne valuta uno
-  function valutaComunque() { if (cardSvolgimenti) cardSvolgimenti.classList.remove("svolgimenti-superflui"); }
-  var btnValutaComunque = document.getElementById("btn-valuta-comunque");
-  if (btnValutaComunque) btnValutaComunque.addEventListener("click", function () {
-    valutaComunque();
-    var primo = campiRiquadro()[0];
-    if (primo) { primo.focus(); primo.select(); }
+  document.querySelectorAll(".riga-esercizio").forEach(function (riga) {
+    var nota = riga.querySelector(".campo-nota");
+    nota.addEventListener("input", function () { suggerimento(riga); });
+    var apriNota = riga.querySelector(".btn-apri-nota");
+    if (apriNota) apriNota.addEventListener("click", function () {
+      riga.querySelector(".es-nota").classList.remove("chiusa");
+      nota.focus();
+    });
+    if (nota.value) suggerimento(riga);
+  });
+
+  // --- svolgimenti facoltativi (compito insufficiente comunque): in grigio, tornano
+  // normali appena se ne valuta uno
+  function valutaComunque() {
+    document.querySelectorAll(".svolgimenti-superflui").forEach(function (s) { s.classList.remove("svolgimenti-superflui"); });
+  }
+  document.querySelectorAll(".btn-valuta-comunque").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      valutaComunque();
+      var primo = campiDaConfermare()[0];
+      if (primo) { primo.focus(); primo.select(); }
+    });
   });
   righe.forEach(function (riga) {
     var input = campo(riga);
-    var nota = riga.querySelector(".campo-nota");
-    var btnMassimo = riga.querySelector(".btn-massimo");
+    var btnConferma = riga.querySelector(".btn-conferma-punteggio");
     input.addEventListener("input", function () { input.classList.remove("automatico"); segnalaIntervallo(input); valutaComunque(); suggerimento(riga); aggiorna(); });
-    preparaConferma(riga, function () { suggerimento(riga); aggiorna(); });
-    nota.addEventListener("input", function () { suggerimento(riga); });
     riga.querySelector(".check-rimanda").addEventListener("change", function (ev) {
       riga.classList.toggle("rimandato", ev.target.checked);
-      input.disabled = btnMassimo.disabled = ev.target.checked;
+      input.disabled = btnConferma.disabled = ev.target.checked;
       // valutato subito: parte dal massimo, come gli altri
       if (!ev.target.checked && input.value === "" && !superflui) {
         input.value = riga.dataset.max;
@@ -547,29 +708,19 @@
       aggiorna();
       if (!ev.target.checked) input.focus();
     });
-    suggerimento(riga);
   });
 
   // --- tastiera: Invio non invia mai il modulo per sbaglio da un campo; passa da un
-  // punteggio al successivo e dall'ultimo a Conferma, dove Invio registra
+  // punteggio da confermare al successivo e dall'ultimo a Conferma, dove Invio registra
   form.addEventListener("keydown", function (ev) {
     if (ev.key !== "Enter" || ev.target.tagName !== "INPUT") return;
     ev.preventDefault();
     if (ev.target.type === "checkbox") return;
     if (ev.target === inputRisposte) { if (!btnRicalcola.disabled) btnRicalcola.click(); return; }
     if (ev.target.classList.contains("campo-punteggio") && segnalaIntervallo(ev.target)) { avvisaFuoriIntervallo(ev.target); return; }
-    // nel riquadro degli svolgimenti: al punteggio successivo (anche dalla nota), dall'ultimo a Conferma
-    var rigaRiquadro = ev.target.closest(".riga-svolgimento");
-    if (rigaRiquadro) { vaiAlSuccessivo(campo(rigaRiquadro)); return; }
-    if (ev.target.classList.contains("campo-rivaluta")) {
-      // da un esercizio rivalutato al successivo, dall'ultimo al voto finale
-      var inFondo = campiRivaluta.filter(function (input) { return input.closest(".rivaluta-esercizi"); });
-      var j = inFondo.indexOf(ev.target);
-      var dopo = j + 1 < inFondo.length ? inFondo[j + 1] : votoFinale;
-      dopo.focus();
-      if (dopo.select) dopo.select();
-      return;
-    }
+    var riga = ev.target.closest(".riga-esercizio");
+    var input = riga && campo(riga);
+    if (input && input.classList.contains("da-confermare")) { vaiAlSuccessivo(input); return; }
     conferma.focus();
   });
 
@@ -579,30 +730,26 @@
     // bozza) restano da confermare, quelli confermati restano confermati
     document.getElementById("automatici-hidden").value = Array.prototype.slice.call(
       document.querySelectorAll(".campo-punteggio.automatico")
-    ).map(function (input) {
-      var riga = input.closest(".riga-manuale");
-      return riga ? riga.dataset.pos : input.dataset.pos;
-    }).filter(Boolean).join(",");
+    ).map(function (input) { return input.closest(".riga-esercizio").dataset.pos; }).join(",");
     var bottone = ev.submitter;
     if (bottone && bottone !== conferma) return;  // bozza o ricalcola: nessun controllo
     if (risposteCambiate()) {
       ev.preventDefault();
-      window.alert("Hai cambiato le risposte lette: premi \"Ricalcola\" prima di confermare.");
+      window.alert("Hai cambiato le risposte lette: ricalcola prima di confermare.");
       inputRisposte.focus();
       return;
     }
     var fuori = righe.map(campo).concat(campiRivaluta).filter(segnalaIntervallo)[0];
     if (fuori) {
       ev.preventDefault();
-      if (fuori.closest("details")) fuori.closest("details").open = true;
       avvisaFuoriIntervallo(fuori);
       return;
     }
     var vuoto = superflui ? null : righe.filter(function (r) { return !rimandata(r) && campo(r).value.trim() === ""; })[0];
     if (vuoto) {
       ev.preventDefault();
-      window.alert("Manca il punteggio di \"" + vuoto.querySelector(".svolg-nome strong").textContent.trim() +
-        "\": assegnalo, oppure spunta \"dopo\" per valutarlo più tardi.");
+      window.alert("Manca il punteggio di \"" + vuoto.querySelector(".btn-testo-esercizio").textContent.trim() +
+        "\": assegnalo, oppure rimandalo a dopo con l'orologio.");
       campo(vuoto).focus();
       return;
     }
@@ -611,6 +758,8 @@
     setTimeout(function () { conferma.disabled = true; }, 0);
   });
 
+  // punteggi già fuori intervallo (salvati prima del controllo): in rosso da subito
+  righe.map(campo).concat(campiRivaluta).forEach(function (input) { if (segnalaIntervallo(input)) mostraCampo(input); });
   aggiorna();
   // pronto per la tastiera: cursore sulla prima domanda aperta ancora da valutare (al
   // massimo in automatico, già selezionato: basta scrivere il punteggio), altrimenti su Conferma

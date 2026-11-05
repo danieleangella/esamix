@@ -72,7 +72,7 @@
         {% if not st %}<span class="muted">mai sostenuto</span>
         {% elif st.stato == 'verbalizzato' %}<span class="badge badge-ok" data-info="Verbalizzato">{{ st.voto }}</span>
         {% elif st.stato == 'da_verbalizzare' %}<span class="badge badge-warn" data-info="Da verbalizzare">{{ st.voto }}</span>
-        {% elif st.stato == 'insufficiente' %}<span class="badge badge-err" data-info="Insufficiente">{{ st.voto }}</span>
+        {% elif st.stato == 'insufficiente' %}<span class="badge badge-err" data-info="Insufficiente">{{ st.voto|int if st.voto is number and st.voto == st.voto|int else st.voto }}</span>
         {% endif %}
       </td>
       <td class="cella-azioni"><button type="button" class="pulsante-icona btn-modifica-studente" data-matricola="{{ s.matricola }}" data-info="Modifica o elimina lo studente" aria-label="Modifica {{ s.cognome }} {{ s.nome }}">{{ icona("matita") }}</button></td>
@@ -89,11 +89,11 @@
             <option value="L104"{% if s.dsa_tipo == 'L104' %} selected{% endif %}>L104 (disabilità)</option>
           </select></div>
           <div><label>Nota DSA/L104 (facoltativa)</label><input name="dsa_note" value="{{ s.dsa_note }}" placeholder="es. tempo aggiuntivo 30%"></div>
-          <button type="submit">Salva</button>
+          <button type="submit" data-info="Salva" aria-label="Salva" class="solo-icona">{{ icona("salva", 16) }}</button>
         </form>
         <form method="post" action="/corsi/{{ corso.tag }}/studenti/{{ s.matricola }}/elimina" class="inline"
               onsubmit="return confirm({{ ('Eliminare ' ~ s.cognome ~ ' ' ~ s.nome ~ ' (' ~ s.matricola ~ ')? Possibile solo se non ha risultati registrati.')|js }});" style="margin-top:0.5rem">
-          <button type="submit" class="danger pulsante-piccolo">{{ icona("cestino", 13) }} Elimina studente</button>
+          <button type="submit" class="pulsante-icona" data-info="Elimina lo studente" aria-label="Elimina lo studente">{{ icona("cestino", 16) }}</button>
         </form>
       </td>
     </tr>
@@ -117,7 +117,7 @@
           </select></div>
       <div><label>Nota DSA/L104 (facoltativa)</label><input name="dsa_note" placeholder="es. tempo aggiuntivo 30%"></div>
     </div>
-    <button type="submit" style="margin-top:0.5rem">Salva</button>
+    <button type="submit" style="margin-top:0.5rem" data-info="Salva" aria-label="Salva" class="solo-icona">{{ icona("salva", 16) }}</button>
   </form>
 </details>
 
@@ -125,7 +125,7 @@
   <summary>Importa da CSV {{ info("Una riga per studente. Le colonne possono essere in qualsiasi ordine e averne anche di superflue: nel passo successivo si sceglie quale colonna usare per matricola, nome e cognome, con un'anteprima e la conferma prima di scrivere davvero i dati.") }}</summary>
   <form method="post" action="/corsi/{{ corso.tag }}/studenti/importa-csv" enctype="multipart/form-data">
     <input type="file" name="file" accept=".csv" required>
-    <button type="submit">Importa</button>
+    <button type="submit" data-info="Importa" aria-label="Importa" class="solo-icona">{{ icona("carica", 16) }}</button>
   </form>
 </details>
 

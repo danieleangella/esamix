@@ -126,7 +126,7 @@
     · <a href="{{ qui }}.json">scarica il file</a></p>
   <form class="inline" method="post" action="{{ qui }}/elimina" onsubmit="return confirm('Eliminare questa verifica salvata? Gli esiti degli esercizi restano.')">
     <input type="hidden" name="torna" value="{{ url }}">
-    <button type="submit" class="secondary" style="margin:0.5rem 0 0">{{ icona("cestino", 14) }} Elimina questa verifica salvata</button>
+    <button type="submit" class="pulsante-icona" style="margin:0.5rem 0 0" data-info="Elimina questa verifica salvata" aria-label="Elimina questa verifica salvata">{{ icona("cestino", 16) }}</button>
   </form>
   {% else %}
   <p class="muted" style="margin-bottom:0">Verifica fatta con {{ conf_usata.nome }} ({{ conf_usata.modello }}); esiti salvati.

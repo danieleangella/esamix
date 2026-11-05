@@ -64,11 +64,14 @@
     passando con il mouse sul titolo della sezione, sull'etichetta del campo o sulla testata
     della colonna a cui si riferiscono. Allo stesso modo, i pulsanti a icona (matita per
     modificare, cestino per eliminare o togliere, e così via) mostrano al passaggio del mouse
-    cosa fanno; le azioni secondarie sono semplici descrizioni con un'icona, il pulsante pieno
-    blu è l'azione principale della pagina. Sopra ogni tabella lunga c'è un campo
-    <strong>Filtra</strong> che tiene solo le righe con le parole scritte (in qualunque
-    colonna) e, per le colonne con pochi valori diversi (stato, esito, aula...), un menu per
-    sceglierne uno; accanto, quante righe restano. Le azioni più frequenti — aggiungere o togliere iscritti, esercizi e
+    cosa fanno: salvare, annullare, aggiungere, caricare, stampare e simili sono icone semplici,
+    il pulsante pieno blu è l'azione principale della pagina. Sotto la testata di ogni tabella
+    lunga c'è una riga di <strong>filtri</strong>, uno per colonna: un campo che tiene solo le
+    righe con le parole scritte in quella colonna o, per le colonne con pochi valori diversi
+    (stato, esito, aula...), un menu per sceglierne uno; sopra la tabella, quante righe restano.
+    L'icona in alto a destra, accanto al menu, sceglie il <strong>tema</strong>: automatico
+    (chiaro o scuro come il sistema), chiaro o scuro; la scelta si salva nelle Impostazioni
+    dell'app (sezione Generali), dove si può anche cambiare. Le azioni più frequenti — aggiungere o togliere iscritti, esercizi e
     aule, assegnare le aule, rendere obbligatorio un esercizio, eliminare un esercizio dalla
     banca — si salvano senza ricaricare la pagina.
   </p>
@@ -305,9 +308,9 @@
   </p>
   <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem">
     <strong>Prompt da dare all'IA</strong>
-    <button type="button" class="secondary" id="btn-copia-prompt-import" style="margin-top:0">{{ icona("copia", 14) }} Copia prompt</button>
+    <button type="button" class="solo-icona secondary" id="btn-copia-prompt-import" style="margin-top:0" data-info="Copia il prompt" aria-label="Copia il prompt">{{ icona("copia", 16) }}</button>
   </div>
-  <pre id="prompt-import" style="white-space:pre-wrap; word-break:break-word; overflow-x:auto; font-size:0.85rem; background:#f1f2f4; padding:0.75rem; border-radius:6px">{% raw %}Converti il compito d'esame che trovi in fondo a questo messaggio in un file di testo per l'importazione in EsaMiX. Rispondi SOLO con il contenuto del file, dentro un unico blocco di codice, senza commenti prima o dopo.
+  <pre id="prompt-import" style="white-space:pre-wrap; word-break:break-word; overflow-x:auto; font-size:0.85rem; background:var(--code-bg); padding:0.75rem; border-radius:6px">{% raw %}Converti il compito d'esame che trovi in fondo a questo messaggio in un file di testo per l'importazione in EsaMiX. Rispondi SOLO con il contenuto del file, dentro un unico blocco di codice, senza commenti prima o dopo.
 
 {% endraw %}{{ formato_esercizi }}{% raw %}
 
@@ -329,8 +332,10 @@ COMPITO DA CONVERTIRE
     btn.addEventListener("click", function () {
       var testo = document.getElementById("prompt-import").textContent;
       function fatto() {
-        btn.textContent = "Copiato!";
-        setTimeout(function () { btn.textContent = "Copia prompt"; }, 1500);
+        // pulsante a icona: la conferma passa dalla descrizione e dal colore
+        btn.dataset.info = "Copiato!";
+        btn.classList.add("copiato");
+        setTimeout(function () { btn.dataset.info = "Copia il prompt"; btn.classList.remove("copiato"); }, 1500);
       }
       if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(testo).then(fatto);
@@ -510,24 +515,39 @@ COMPITO DA CONVERTIRE
     riepilogo delle statistiche). Un elenco a scomparsa "Presenti da
     correggere" elenca chi risulta presente e non ancora corretto, con un pulsante che
     precompila la matricola e sposta il focus sul codice, per scorrere gli studenti più
-    rapidamente. Si arriva sempre a un riepilogo prima di salvare: in alto studente, codice e
-    il voto aggiornato in tempo reale; poi le risposte come caselle colorate (in alto la
-    lettera letta, sotto quella giusta: verde giusta, rosso sbagliata, grigio non data, blu
-    domanda aperta; bordo spesso per gli obbligatori), con la stringa letta da correggere e
-    ricalcolare. In fondo il voto finale, che si può cambiare a mano (il riepilogo lo
-    segnala, mostra il voto calcolato e invita a scriverne il motivo nella <strong>nota sul
-    compito</strong>, visibile solo al docente), ed eventualmente <strong>richiedere
-    l'orale</strong> invece di salvare un voto scritto definitivo (solo se il compito è
-    sufficiente). Se non si vuole ancora decidere, "Salva come
-    bozza" tiene da parte matricola, codice e risposte, con quanto già fatto (punteggi
-    confermati con «corretto», note, svolgimenti rimandati, rivalutazioni, nota sul compito,
-    voto scelto a mano e orale), senza registrare nessun esito: riprendendola si ritrova
-    tutto com'era. La
+    rapidamente. Una matricola o un codice scritti per intero vengono presi da soli (senza
+    sceglierli dall'elenco dei suggerimenti) e il cursore passa al campo successivo; il codice
+    si giudica inesistente solo da 4 caratteri in su (o uscendo dal campo).
+    Si arriva sempre a un riepilogo prima di salvare: in alto studente e codice, poi le
+    risposte come caselle colorate (in alto la lettera letta, sotto quella giusta: verde
+    giusta, rosso sbagliata, grigio non data, blu domanda aperta; bordo spesso per gli
+    obbligatori; un clic su una casella porta all'esercizio), con la stringa letta da
+    correggere e ricalcolare (icona accanto). Seguono gli esercizi in tre sezioni,
+    ciascuna in ordine di numero: <strong>domande aperte</strong>, <strong>obbligatori</strong>
+    e <strong>altri esercizi</strong>, su fondo verde (giusto), rosso (sbagliato) o grigio (non
+    dato). Ogni esercizio parte dal punteggio calcolato dalla griglia; cliccando sul nome se ne
+    vede il testo, con la risposta data e quella giusta. In fondo allo schermo, sempre in vista
+    anche scorrendo, il <strong>voto</strong> aggiornato in tempo reale (si può cambiare a mano:
+    lo si segnala e si invita a scriverne il motivo nella <strong>nota sul voto finale</strong>,
+    visibile solo al docente) con le icone per annullare, salvare come bozza e confermare. Nel
+    riquadro "Esito" si può <strong>richiedere l'orale</strong> invece di salvare un voto scritto
+    definitivo (solo se il compito è sufficiente), con una nota per l'orale. La
+    <strong>bozza</strong> tiene da parte matricola, codice e risposte, con quanto già fatto
+    (punteggi confermati, note, svolgimenti rimandati, rivalutazioni, nota, voto scelto a mano e
+    orale), senza registrare nessun esito: riprendendola si ritrova tutto com'era. La
     correzione compare nell'elenco "Correzioni da completare" della scheda (insieme ai
-    compiti con svolgimenti ancora da valutare), pronta da riprendere ("Riprendi") o da
-    scartare in qualsiasi momento.
+    compiti con svolgimenti ancora da valutare), pronta da riprendere o da scartare in
+    qualsiasi momento.
   </p>
-  <p class="muted">
+  <p>
+    Se le risposte sono molto simili a quelle di un altro compito già corretto, un avviso lo
+    segnala; aprendo "Dettagli e confronto" si vedono le due griglie lettera per lettera (le
+    lettere uguali evidenziate, gli stessi errori in rosso), quante risposte uguali sono
+    sbagliate, quante volte hanno scelto la stessa risposta allo stesso esercizio (confronto
+    indipendente dall'ordine di esercizi e risposte) e quanto erano vicini i due compiti
+    nella stampa: consecutivi, o a non più di tre posti nello stesso blocco, possono essere
+    stati dati a persone sedute nella stessa fila (le file sono di quattro posti al più).
+  </p>
     Per i compiti importati da una migrazione dati legacy, a volte non è noto quale
     esercizio corrisponda a ciascuna posizione del compito: il riepilogo lo segnala e
     mostra comunque il confronto risposta data/corretta posizione per posizione, senza
@@ -536,29 +556,31 @@ COMPITO DA CONVERTIRE
   <p>
     Se un esercizio obbligatorio non è stato svolto, il compito risulta automaticamente
     insufficiente. Se è stato svolto e la risposta a scelta multipla è corretta, lo
-    svolgimento riceve in automatico il punteggio massimo (in grigio), da abbassare fino al
-    valore di una risposta sbagliata se lo svolgimento scritto non va; se è giusto, il
-    pulsante <strong>«corretto»</strong> accanto lo conferma (diventa verde) senza doverlo
-    riscrivere e passa allo svolgimento successivo. Gli obbligatori svolti con la risposta
-    <em>sbagliata</em> compaiono nello stesso riquadro, in rosso, con il punteggio calcolato:
-    «conferma» lo tiene, oppure lo si alza se lo svolgimento merita di più (il voto si
-    ricalcola e la nota sul compito riporta punteggio calcolato e assegnato, come nella
-    rivalutazione esercizio per esercizio). I punteggi rivalutati si salvano con la correzione
-    e si ritrovano modificandola. Le domande aperte
-    richiedono sempre un punteggio assegnato a mano, fino a un massimo impostabile nelle
-    Impostazioni del corso ("Punteggio massimo domanda aperta", può superare i punti di
-    una risposta corretta).
+    svolgimento riceve in automatico il punteggio massimo (in grigio, con il bordo
+    tratteggiato finché non è confermato), da abbassare fino al valore di una risposta
+    sbagliata se lo svolgimento scritto non va; se è giusto, la <strong>spunta</strong> accanto
+    lo conferma (diventa verde) senza doverlo riscrivere e passa allo svolgimento successivo;
+    una volta confermato lo si può comunque cambiare. Gli obbligatori svolti con la risposta
+    <em>sbagliata</em> (in rosso) partono dal punteggio calcolato: la spunta lo conferma, oppure
+    lo si alza se lo svolgimento merita di più. Le domande aperte richiedono sempre un punteggio
+    assegnato a mano, fino a un massimo impostabile nelle Impostazioni del corso ("Punteggio
+    massimo domanda aperta", può superare i punti di una risposta corretta). Gli altri esercizi
+    sono già confermati col punteggio calcolato: la <strong>matita</strong> lo cambia. Ogni
+    cambiamento ricalcola il voto, e la nota sul voto finale riporta gli esercizi rivalutati con
+    il punteggio calcolato e quello assegnato; i punteggi rivalutati si salvano con la
+    correzione e si ritrovano modificandola.
   </p>
   <p>
-    Ogni svolgimento ha il campo del punteggio e una
-    <strong>nota</strong> facoltativa per gli errori fatti. Mentre la si scrive, sotto
-    compaiono in piccolo le note simili già date allo stesso esercizio in altri compiti, con i
-    punteggi; passando sopra col mouse si vede l'elenco con studente, punteggio e nota, per
-    dare lo stesso giudizio agli stessi errori (un punteggio diverso da quelli dati con note
-    simili è evidenziato).
+    Su <strong>ogni esercizio</strong> si può scrivere una nota (per gli altri esercizi la apre
+    l'icona della nota): si sceglie tra quelle già scritte sullo stesso esercizio negli altri
+    compiti, o la si scrive a mano. Mentre la si scrive, sotto compaiono in piccolo le note
+    simili, con i punteggi; passando sopra col mouse si vede l'elenco con studente, punteggio e
+    nota (un punteggio diverso da quelli dati con note simili è evidenziato). L'icona
+    dell'elenco accanto apre in un'altra scheda tutte le note di quell'esercizio negli altri
+    compiti, con studente, compito, risposta, punteggio calcolato e assegnato e voto.
   </p>
   <p>
-    Uno svolgimento si può rimandare con la spunta <strong>"dopo"</strong>: il compito si
+    Uno svolgimento si può rimandare con l'<strong>orologio</strong>: il compito si
     registra con un voto provvisorio, in cui una domanda aperta senza punteggio conta 0 (e
     un obbligatorio il massimo), compare tra le "Correzioni da completare" e intanto non è
     verbalizzabile. Con la casella "Rimanda la valutazione degli svolgimenti a dopo", sotto
@@ -575,7 +597,7 @@ COMPITO DA CONVERTIRE
     punteggio non lo sovrascrive: un avviso mostra quanto sarebbe ora il voto calcolato.
   </p>
   <p>
-    Nel riepilogo, "Ricalcola" (dopo aver corretto la stringa delle risposte lette) conserva
+    Nel riepilogo, il ricalcolo (dopo aver corretto la stringa delle risposte lette) conserva
     punteggi e note già scritti. Per uno studente che deve fare l'orale in ogni appello la
     casella "Richiedi l'orale" parte spuntata, e toglierla chiede conferma; con uno scritto
     insufficiente l'orale non si può richiedere e il voto si salva normalmente. Un compito
@@ -598,8 +620,11 @@ COMPITO DA CONVERTIRE
     corso, con il compito corrente evidenziato tra gli altri appelli già sostenuti.
   </p>
   <p>
-    L'elenco "Risultati inseriti" si può cercare per cognome (ordinato così per default)
-    e ordinare anche per voto, cliccando sulle intestazioni delle colonne.
+    L'elenco "Risultati inseriti" parte dal più recente; la colonna "N." è l'ordine di
+    inserimento (1 = il primo), e cliccando sulle intestazioni si ordina per inserimento,
+    cognome o voto, in un verso o nell'altro (l'icona accanto mostra quale): per esempio per
+    ritrovare gli ultimi risultati inseriti. I voti sufficienti sono in verde, gli
+    insufficienti in rosso, rispetto al voto minimo della prova.
   </p>
   <p>
     Finito di correggere i compiti consegnati, nella stessa sezione
@@ -880,7 +905,10 @@ COMPITO DA CONVERTIRE
   <p>
     I compiti sono scritti in un carattere senza grazie chiaro (Helvetica), senza corsivi, con
     un'intestazione su fondo grigio chiaro (corso, prova, codice del compito, campi per i dati,
-    griglia delle risposte e voto) e una riga verticale tra le due colonne di esercizi.
+    griglia delle risposte e voto) e una riga verticale tra le due colonne di esercizi. Nella
+    griglia delle risposte, dopo ogni quinta casella il filetto è appena più spesso: gli stessi
+    gruppi da cinque della casella delle risposte in correzione, per ritrovare il punto mentre
+    si trascrivono.
     <strong>Ogni compito occupa sempre due pagine</strong>, cioè un foglio fronte-retro: se il testo
     sta in una pagina la seconda resta bianca; se non sta in due, la generazione lo segnala.
   </p>

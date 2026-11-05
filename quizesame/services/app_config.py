@@ -11,6 +11,7 @@ from quizesame import config
 SETTINGS_PATH = config.DATA_ROOT / "app_settings.json"
 
 FORNITORI_IA = ("anthropic", "openrouter", "ollama")
+TEMI = ("auto", "light", "dark")
 
 
 @dataclass
@@ -21,6 +22,8 @@ class AppSettings:
     # dove riceve il docente (es. "studio 12, 2° piano"): si sceglie come aula dell'orale
     studio_docente: str = ""
     mostra_riepilogo_home: bool = True
+    # tema delle pagine: "auto" (chiaro o scuro come il sistema), "light" o "dark"
+    tema: str = "auto"
     # Configurazioni per l'IA (vedi services/ia.py): se ne possono salvare più d'una (es.
     # una chiave personale e una del dipartimento, o un server Ollama) e scegliere di volta
     # in volta quale usare. Ognuna è {"id", "nome", "fornitore" (anthropic | openrouter |
@@ -70,6 +73,7 @@ def get_settings() -> AppSettings:
         email_docente=data.get("email_docente", ""),
         studio_docente=data.get("studio_docente", ""),
         mostra_riepilogo_home=bool(data.get("mostra_riepilogo_home", True)),
+        tema=data.get("tema") if data.get("tema") in TEMI else "auto",
         ia_profili=profili,
         ia_profilo_predefinito=predefinito,
     )

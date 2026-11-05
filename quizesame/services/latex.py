@@ -167,7 +167,13 @@ def _griglia_risposte(posizioni: list[dict]) -> str:
     righe = []
     for inizio in range(0, len(posizioni), _CASELLE_PER_RIGA):
         gruppo = posizioni[inizio:inizio + _CASELLE_PER_RIGA]
-        colonne = "|" + "|".join(">{\\centering\\arraybackslash}p{0.62cm}" for _ in gruppo) + "|"
+        # dopo ogni quinta casella un filetto appena più spesso: gli stessi gruppi da cinque
+        # della casella delle risposte in correzione, per ritrovare il punto a colpo d'occhio
+        colonne = "|"
+        for k in range(len(gruppo)):
+            ultima = k == len(gruppo) - 1
+            separatore = "|" if ultima or (inizio + k + 1) % 5 else "!{\\vrule width 0.8pt}"
+            colonne += ">{\\centering\\arraybackslash}p{0.62cm}" + separatore
         numeri = " & ".join(f"{{\\footnotesize {inizio + k + 1}}}" for k in range(len(gruppo)))
         caselle = " & ".join("{\\Large --}" if p["aperta"] else "" for p in gruppo)
         # un unico fondo bianco dietro la tabella (sul grigio dell'intestazione): un fondo per

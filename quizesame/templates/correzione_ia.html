@@ -97,7 +97,7 @@
     <input type="hidden" name="torna" value="{{ torna }}">
     <button type="submit">Accetta e salva la correzione</button>
   </form>
-  <a class="button secondary" href="{{ torna }}">{{ icona("annulla", 14) }} Annulla</a>
+  <a class="button secondary solo-icona" href="{{ torna }}" data-info="Annulla" aria-label="Annulla">{{ icona("annulla", 16) }}</a>
   <a href="/corsi/{{ corso.tag }}/esercizi/{{ esercizio.id }}/ia/correggi?torna={{ torna|urlencode }}" style="margin-left:0.75rem">chiedi un'altra proposta</a>
 </div>
 <details class="card" {% if modificata %}open{% endif %}>

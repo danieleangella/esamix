@@ -29,12 +29,12 @@
     Gli studenti sono indicati con pseudonimi casuali, diversi a ogni analisi.
   </p>
   <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center">
-    <button type="button" class="secondary" id="btn-copia-analisi" style="margin:0">{{ icona("copia", 14) }} Copia il testo</button>
+    <button type="button" class="solo-icona secondary" id="btn-copia-analisi" style="margin:0" data-info="Copia il testo" aria-label="Copia il testo">{{ icona("copia", 16) }}</button>
     <a class="button secondary" href="{{ qui }}" style="margin:0">{{ icona("piu", 14) }} Nuova analisi</a>
     {% if analisi.id %}
     <form class="inline" method="post" action="{{ url }}/elimina{% if query %}?{{ query }}{% endif %}" onsubmit="return confirm('Eliminare questa analisi salvata?')">
       <input type="hidden" name="salvata" value="{{ analisi.id }}">
-      <button type="submit" class="secondary" style="margin:0">{{ icona("cestino", 14) }} Elimina</button>
+      <button type="submit" class="pulsante-icona" style="margin:0" data-info="Elimina questa analisi" aria-label="Elimina questa analisi">{{ icona("cestino", 16) }}</button>
     </form>
     {% endif %}
     <span class="muted" id="stato-copia-analisi" role="status"></span>
@@ -105,7 +105,7 @@
   <p class="muted spiegazione sr-only" style="margin-top:0.5rem">Dopo aver usato il prompt in un chatbot, puoi incollare qui la sua risposta per conservarla insieme alle altre analisi.</p>
   <form method="post" action="{{ qui }}">
     <textarea name="risposta" rows="6" required placeholder="Incolla qui il rapporto del chatbot"></textarea>
-    <button type="submit">Salva la risposta</button>
+    <button type="submit" data-info="Salva la risposta" aria-label="Salva la risposta" class="solo-icona">{{ icona("salva", 16) }}</button>
   </form>
 </details>
 

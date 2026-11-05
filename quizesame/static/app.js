@@ -527,76 +527,89 @@ function attivaSpiegazioni(radice) {
 })();
 
 // --- Filtri nelle tabelle ---------------------------------------------------------------
-// Sopra ogni tabella con un po' di righe: un campo per cercare in tutte le colonne e, per
-// le colonne con pochi valori diversi (stato, esito, aula...), un menu per sceglierne uno.
-// Non per le tabelle con filtri propri o che non sono elenchi (data-senza-filtri).
+// In ogni tabella con un po' di righe, una riga di filtri sotto la testata, uno per
+// colonna: un menu per le colonne con pochi valori diversi (stato, esito, aula...), un
+// campo di testo per le altre. Non per le tabelle con filtri propri o che non sono elenchi
+// (data-senza-filtri), né per le colonne senza titolo o senza testo (azioni, caselle).
 var _RIGHE_MINIME_FILTRO = 8;
 function attivaFiltriTabelle(radice) {
   (radice || document).querySelectorAll("table:not([data-senza-filtri]):not([data-filtri-attivi])").forEach(function (tabella) {
     if (tabella.closest("[data-senza-filtri]") || tabella.tBodies.length !== 1) return;
+    var testata = tabella.tHead ? tabella.tHead.rows[0] : tabella.rows[0];
+    if (!testata || !testata.querySelector("th") || testata.querySelector("td")) return;
     var righe = Array.prototype.slice.call(tabella.tBodies[0].rows).filter(function (tr) {
-      return tr.cells.length > 1 && !tr.querySelector("th") && !tr.hidden && tr.style.display !== "none";
+      return tr !== testata && tr.cells.length > 1 && !tr.querySelector("th") && !tr.hidden && tr.style.display !== "none";
     });
     if (righe.length < _RIGHE_MINIME_FILTRO) return;
-    tabella.dataset.filtriAttivi = "1";
-    var testata = tabella.tHead ? tabella.tHead.rows[0] : tabella.querySelector("tr");
-    var nomi = testata ? Array.prototype.map.call(testata.cells, function (c) { return c.textContent.trim(); }) : [];
     var nColonne = Math.max.apply(null, righe.map(function (tr) { return tr.cells.length; }));
+    // testate su più colonne (colspan): non si saprebbe a quale colonna va il filtro
+    if (testata.cells.length !== nColonne || Array.prototype.some.call(testata.cells, function (c) { return c.colSpan > 1; })) return;
+    tabella.dataset.filtriAttivi = "1";
+    var nomi = Array.prototype.map.call(testata.cells, function (c) { return c.textContent.replace(/\s+/g, " ").trim(); });
     function valore(tr, i) { var c = tr.cells[i]; return c ? c.textContent.replace(/\s+/g, " ").trim() : ""; }
 
-    var barra = document.createElement("div");
-    barra.className = "filtri-tabella non-stampare";
-    var cerca = document.createElement("input");
-    cerca.type = "search";
-    cerca.placeholder = "Filtra…";
-    cerca.setAttribute("aria-label", "Filtra le righe della tabella");
-    cerca.setAttribute("autocomplete", "off");
-    barra.appendChild(cerca);
-    var menu = [];
+    var rigaFiltri = document.createElement("tr");
+    rigaFiltri.className = "riga-filtri-colonne non-stampare";
+    var filtri = [];
     for (var i = 0; i < nColonne; i++) {
-      if (!nomi[i]) continue;
+      var cella = document.createElement("th");
+      rigaFiltri.appendChild(cella);
       var valori = {};
       righe.forEach(function (tr) { var v = valore(tr, i); if (v) valori[v] = (valori[v] || 0) + 1; });
       var chiavi = Object.keys(valori).sort(function (a, b) { return a.localeCompare(b, "it", { numeric: true }); });
-      if (chiavi.length < 2 || chiavi.length > 8 || chiavi.length > righe.length / 2
-          || chiavi.some(function (v) { return v.length > 30; })) continue;
-      var sel = document.createElement("select");
-      sel.dataset.colonna = i;
-      sel.setAttribute("aria-label", "Filtra per " + nomi[i]);
-      var tutte = document.createElement("option");
-      tutte.value = ""; tutte.textContent = nomi[i] + ": tutti";
-      sel.appendChild(tutte);
-      chiavi.forEach(function (v) {
-        var o = document.createElement("option");
-        o.value = v; o.textContent = v + " (" + valori[v] + ")";
-        sel.appendChild(o);
-      });
-      barra.appendChild(sel);
-      menu.push(sel);
+      if (!nomi[i] || !chiavi.length) continue;
+      var campo;
+      if (chiavi.length >= 2 && chiavi.length <= 8 && chiavi.length <= righe.length / 2
+          && !chiavi.some(function (v) { return v.length > 30; })) {
+        campo = document.createElement("select");
+        var tutte = document.createElement("option");
+        tutte.value = ""; tutte.textContent = "tutti";
+        campo.appendChild(tutte);
+        chiavi.forEach(function (v) {
+          var o = document.createElement("option");
+          o.value = v; o.textContent = v + " (" + valori[v] + ")";
+          campo.appendChild(o);
+        });
+      } else {
+        campo = document.createElement("input");
+        campo.type = "search";
+        campo.placeholder = "filtra";
+        campo.setAttribute("autocomplete", "off");
+      }
+      campo.dataset.colonna = i;
+      campo.setAttribute("aria-label", "Filtra per " + nomi[i]);
+      cella.appendChild(campo);
+      filtri.push(campo);
     }
-    var conteggio = document.createElement("span");
-    conteggio.className = "muted conteggio-filtro";
-    barra.appendChild(conteggio);
-    tabella.parentNode.insertBefore(barra, tabella);
+    if (!filtri.length) return;
+    testata.parentNode.insertBefore(rigaFiltri, testata.nextSibling);
+    var conteggio = document.createElement("div");
+    conteggio.className = "muted conteggio-filtro non-stampare";
+    conteggio.hidden = true;
+    tabella.parentNode.insertBefore(conteggio, tabella);
 
     function applica() {
-      var parole = cerca.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
       var visibili = 0;
       righe.forEach(function (tr) {
-        var t = tr.textContent.toLowerCase();
-        var ok = parole.every(function (p) { return t.indexOf(p) !== -1; })
-          && menu.every(function (s) { return !s.value || valore(tr, +s.dataset.colonna) === s.value; });
+        var ok = filtri.every(function (f) {
+          var cercato = f.value.trim().toLowerCase();
+          if (!cercato) return true;
+          var v = valore(tr, +f.dataset.colonna);
+          return f.tagName === "SELECT" ? v === f.value
+            : cercato.split(/\s+/).every(function (p) { return v.toLowerCase().indexOf(p) !== -1; });
+        });
         tr.classList.toggle("riga-filtrata", !ok);
         // la riga di dettaglio aperta sotto (carriera, modifica) segue la sua riga
         var dopo = tr.nextElementSibling;
-        if (dopo && righe.indexOf(dopo) === -1) dopo.classList.toggle("riga-filtrata", !ok);
+        if (dopo && dopo !== rigaFiltri && righe.indexOf(dopo) === -1) dopo.classList.toggle("riga-filtrata", !ok);
         visibili += ok ? 1 : 0;
       });
-      var attivo = parole.length || menu.some(function (s) { return s.value; });
-      conteggio.textContent = attivo ? visibili + " su " + righe.length : "";
+      var attivi = filtri.filter(function (f) { return f.value.trim(); });
+      filtri.forEach(function (f) { f.classList.toggle("filtro-attivo", !!f.value.trim()); });
+      conteggio.hidden = !attivi.length;
+      conteggio.textContent = visibili + " righe su " + righe.length;
     }
-    cerca.addEventListener("input", applica);
-    menu.forEach(function (s) { s.addEventListener("change", applica); });
+    filtri.forEach(function (f) { f.addEventListener(f.tagName === "SELECT" ? "change" : "input", applica); });
   });
 }
 document.addEventListener("DOMContentLoaded", function () {

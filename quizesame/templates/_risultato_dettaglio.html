@@ -75,7 +75,7 @@
 
   {% if not chiuso and risultato.esito in ('voto', 'rifiutato') and not risultato.verbalizzato %}
   <p style="margin:1rem 0 0">
-    <a href="/corsi/{{ tag }}/appelli/{{ risultato.appello_id }}/risultati/{{ risultato.matricola }}/modifica" class="icona-azione">{{ icona("matita", 13) }} Modifica</a>
+    <a href="/corsi/{{ tag }}/appelli/{{ risultato.appello_id }}/risultati/{{ risultato.matricola }}/modifica" class="pulsante-icona pulsante-neutro" data-info="Modifica la correzione" aria-label="Modifica la correzione">{{ icona("matita", 16) }}</a>
   </p>
   {% endif %}
   </div>
@@ -86,7 +86,7 @@
   <table>
     <tr><th>Appello</th><th>Esito</th><th>Orale</th></tr>
     {% for s in storico %}
-    <tr {% if s.corrente %}style="background:var(--accent-bg, #eef2ff)"{% endif %}>
+    <tr {% if s.corrente %}style="background:var(--accent-soft)"{% endif %}>
       <td>
         {% if s.corrente %}{{ s.appello_nome }} <span class="badge badge-info">questo compito</span>
         {% else %}<a href="/corsi/{{ tag }}/appelli/{{ s.appello_id }}/risultati/{{ risultato.matricola }}">{{ s.appello_nome }}</a>{% endif %}
@@ -140,6 +140,6 @@
   <p class="muted">Registrato nel corso, ma senza risultati.</p>
   {% endif %}
   {% endfor %}
-  <p style="margin:1rem 0 0"><a href="/corsi/{{ tag }}/studenti/{{ risultato.matricola }}" class="button secondary">{{ icona("utente-spunta", 14) }} Pagina dello studente</a></p>
+  <p style="margin:1rem 0 0"><a href="/corsi/{{ tag }}/studenti/{{ risultato.matricola }}" class="button secondary" target="_blank" rel="noopener">{{ icona("utente-spunta", 14) }} Pagina dello studente {{ icona("esterno", 12) }}</a></p>
   </div>
 </div>

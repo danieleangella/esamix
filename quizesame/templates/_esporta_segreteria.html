@@ -11,14 +11,14 @@
   {% if raggruppamento %}
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/segreteria-csv/elimina" style="margin-top:0.5rem"
         onsubmit="return confirm('Rimuovere il file caricato?');">
-    <button type="submit" class="secondary">{{ icona("cestino", 14) }} Rimuovi file caricato</button>
+    <button type="submit" class="pulsante-icona" data-info="Rimuovi il file caricato" aria-label="Rimuovi il file caricato">{{ icona("cestino", 16) }}</button>
   </form>
   {% endif %}
   {% elif raggruppamento %}
   <p class="muted spiegazione sr-only" style="margin-top:0.75rem">Carica il file "Lista Studenti Esame" scaricato dalla segreteria.</p>
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/segreteria-csv" enctype="multipart/form-data">
     <input type="file" name="file" accept=".csv,.xls,.xlsx" required>
-    <button type="submit">Carica</button>
+    <button type="submit" data-info="Carica il file" aria-label="Carica il file" class="solo-icona">{{ icona("carica", 16) }}</button>
   </form>
   {% else %}
   <p class="muted" style="margin-top:0.75rem">

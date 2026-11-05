@@ -228,6 +228,8 @@ class RigaRisposta:
     svolta: bool  # ha dato una risposta (diversa da 'X') in quella posizione
     corretta: bool  # la lettera scelta coincide con quella corretta
     revisione: Optional[str] = None  # "annullato" o "facoltativo" (revisione del testo dopo la prova)
+    testo: str = ""  # testo della variante stampata su questo compito
+    risposte: list = field(default_factory=list)  # risposte nell'ordine stampato (A, B, ...)
 
 
 @dataclass
@@ -302,7 +304,8 @@ def _righe_risposta(tag: str, compito_id: int, soluzioni: str, risposte: str) ->
             obbligatorio=bool(pos["obbligatorio"]), aperta=aperta,
             lettera_data=lettera_data, lettera_corretta=lettera_corretta,
             svolta=svolta, corretta=svolta and lettera_data == lettera_corretta,
-            revisione=pos.get("revisione"),
+            revisione=pos.get("revisione"), testo=pos.get("testo") or "",
+            risposte=json.loads(pos["risposte_mischiate"]) if pos.get("risposte_mischiate") else [],
         ))
     return righe, True
 
@@ -343,25 +346,120 @@ def _similarita(a: str, b: str) -> Optional[tuple[float, int]]:
     return uguali / confrontabili, confrontabili
 
 
-def _risposte_simili(conn, appello_id: int, matricola: str, risposte: str) -> list[dict]:
+# le file in aula sono di quattro posti al più: due compiti a non più di tre posti di
+# distanza nell'ordine di stampa possono essere finiti nella stessa fila
+DISTANZA_STESSA_FILA = 3
+
+
+def _posto_nella_stampa(conn, compito_id: int) -> Optional[dict]:
+    """Blocco del compito e suo numero d'ordine nella stampa di quel blocco (i compiti di
+    un blocco si stampano, e di solito si distribuiscono, in quest'ordine)."""
+    c = conn.execute(
+        "SELECT c.blocco_id, b.numero FROM compiti c LEFT JOIN blocchi b ON b.id = c.blocco_id WHERE c.id=?",
+        (compito_id,),
+    ).fetchone()
+    if c is None or c["blocco_id"] is None:
+        return None
+    ids = [r["id"] for r in conn.execute("SELECT id FROM compiti WHERE blocco_id=? ORDER BY id", (c["blocco_id"],))]
+    return {"blocco": c["numero"], "ordine": ids.index(compito_id) + 1, "totale": len(ids)}
+
+
+def _vicinanza(mio: Optional[dict], suo: Optional[dict]) -> Optional[dict]:
+    """Quanto erano vicini nella stampa due compiti: consecutivi o a pochi posti nello
+    stesso blocco possono essere stati dati a persone sedute vicine."""
+    if not mio or not suo:
+        return None
+    if mio["blocco"] != suo["blocco"]:
+        return {"vicini": False, "testo": f"blocchi diversi (n. {mio['ordine']} del blocco {mio['blocco']}, "
+                                          f"n. {suo['ordine']} del blocco {suo['blocco']})"}
+    distanza = abs(mio["ordine"] - suo["ordine"])
+    posti = f"n. {mio['ordine']} e {suo['ordine']} del blocco {mio['blocco']}"
+    if distanza == 1:
+        return {"vicini": True, "distanza": 1,
+                "testo": f"consecutivi nella stampa ({posti}): potrebbero essere stati dati a persone vicine"}
+    if distanza <= DISTANZA_STESSA_FILA:
+        return {"vicini": True, "distanza": distanza,
+                "testo": f"a {distanza} posti nella stampa ({posti}): possibile la stessa fila (file da 4)"}
+    return {"vicini": False, "distanza": distanza, "testo": f"lontani nella stampa ({posti})"}
+
+
+def _scelte_per_esercizio(conn, compito_id: int, risposte: str) -> dict[int, tuple[str, bool]]:
+    """{esercizio_id: (testo della risposta scelta, se è giusta)} per le domande a risposta
+    chiusa date: confrontabile tra compiti diversi, dove lo stesso esercizio sta in
+    un'altra posizione e le sue risposte in un altro ordine."""
+    soluzioni = conn.execute("SELECT soluzioni FROM compiti WHERE id=?", (compito_id,)).fetchone()
+    soluzioni = (soluzioni["soluzioni"] if soluzioni else "").upper()
+    scelte = {}
+    for p in conn.execute(
+        "SELECT posizione, esercizio_id, aperta, risposte_mischiate FROM compito_esercizi WHERE compito_id=?",
+        (compito_id,),
+    ):
+        i = p["posizione"]
+        lettera = risposte[i].upper() if i < len(risposte) else "X"
+        if p["aperta"] or not p["risposte_mischiate"] or not ("A" <= lettera <= "Z") or lettera == "X":
+            continue
+        opzioni = json.loads(p["risposte_mischiate"])
+        k = ord(lettera) - ord("A")
+        if k < len(opzioni):
+            scelte[p["esercizio_id"]] = (opzioni[k], i < len(soluzioni) and lettera == soluzioni[i])
+    return scelte
+
+
+def _risposte_simili(conn, appello_id: int, matricola: str, risposte: str,
+                     compito_id: Optional[int] = None, soluzioni: str = "") -> list[dict]:
+    """Altri compiti dell'appello con le risposte molto simili, con quanto serve per
+    decidere: le due griglie a confronto (stesse lettere, stessi errori), le stesse
+    risposte date agli stessi esercizi (in posizioni e ordini diversi) e quanto erano
+    vicini i due compiti nella stampa."""
     altri = conn.execute(
-        "SELECT r.matricola, r.risposte, s.nome, s.cognome FROM risultati r "
-        "JOIN studenti s ON s.matricola = r.matricola "
+        "SELECT r.matricola, r.risposte, r.voto, r.voto_scritto, r.compito_id, c.codice, c.soluzioni, "
+        "s.nome, s.cognome FROM risultati r "
+        "JOIN studenti s ON s.matricola = r.matricola LEFT JOIN compiti c ON c.id = r.compito_id "
         "WHERE r.appello_id=? AND r.matricola!=? AND r.risposte IS NOT NULL",
         (appello_id, matricola),
     ).fetchall()
     simili = []
+    mio_posto = mie_scelte = None
     for altro in altri:
         esito = _similarita(risposte, altro["risposte"])
         if esito is None:
             continue
         percentuale, confrontabili = esito
-        if percentuale >= SOGLIA_SIMILARITA:
-            simili.append({
-                "matricola": altro["matricola"], "nome": altro["nome"], "cognome": altro["cognome"],
-                "percentuale": round(percentuale * 100), "identica": percentuale == 1.0,
-                "posizioni_confrontabili": confrontabili,
-            })
+        if percentuale < SOGLIA_SIMILARITA:
+            continue
+        sue, sue_sol = altro["risposte"].upper(), (altro["soluzioni"] or "").upper()
+        confronto, errori_comuni, giuste_comuni = [], 0, 0
+        for i, mia in enumerate(risposte.upper()):
+            sua = sue[i] if i < len(sue) else ""
+            uguale = mia == sua and mia not in ("X", "-")
+            sbagliata_mia = i < len(soluzioni) and mia != soluzioni[i].upper()
+            sbagliata_sua = i < len(sue_sol) and sua != sue_sol[i]
+            errore = uguale and sbagliata_mia and sbagliata_sua
+            errori_comuni += errore
+            giuste_comuni += uguale and not sbagliata_mia and not sbagliata_sua
+            confronto.append({"mia": mia, "sua": sua, "uguale": uguale, "errore": errore})
+        voce = {
+            "matricola": altro["matricola"], "nome": altro["nome"], "cognome": altro["cognome"],
+            "percentuale": round(percentuale * 100), "identica": percentuale == 1.0,
+            "posizioni_confrontabili": confrontabili, "codice": altro["codice"],
+            "voto": altro["voto_scritto"] if altro["voto_scritto"] is not None else altro["voto"],
+            "confronto": confronto, "errori_comuni": errori_comuni, "giuste_comuni": giuste_comuni,
+            "uguali": sum(c["uguale"] for c in confronto), "vicinanza": None, "stesse_scelte": None,
+        }
+        if compito_id is not None and altro["compito_id"] is not None:
+            if mio_posto is None:
+                mio_posto = _posto_nella_stampa(conn, compito_id) or {}
+                mie_scelte = _scelte_per_esercizio(conn, compito_id, risposte)
+            voce["vicinanza"] = _vicinanza(mio_posto, _posto_nella_stampa(conn, altro["compito_id"]))
+            sue_scelte = _scelte_per_esercizio(conn, altro["compito_id"], altro["risposte"])
+            comuni = [e for e in mie_scelte if e in sue_scelte]
+            if comuni:
+                uguali = [e for e in comuni if mie_scelte[e][0] == sue_scelte[e][0]]
+                voce["stesse_scelte"] = {
+                    "esercizi": len(comuni), "uguali": len(uguali),
+                    "sbagliate": sum(not mie_scelte[e][1] for e in uguali),
+                }
+        simili.append(voce)
     simili.sort(key=lambda s: s["percentuale"], reverse=True)
     return simili
 
@@ -422,7 +520,8 @@ def valuta_preliminare(tag: str, appello_id: int, matricola: str, codice: str, r
             orale_obbligatorio=_orale_obbligatorio(conn, studente["matricola"]),
             lunghezza_attesa=len(soluzioni),
             codice_duplicato=_codice_duplicato(conn, appello_id, studente["matricola"], compito["id"]),
-            risposte_simili=_risposte_simili(conn, appello_id, studente["matricola"], risposte),
+            risposte_simili=_risposte_simili(conn, appello_id, studente["matricola"], risposte,
+                                             compito["id"], soluzioni.upper()),
             dettaglio_esercizi_disponibile=dettaglio_disponibile,
             voto_fisso=voto_fisso,
         )
@@ -643,7 +742,14 @@ def conferma_risultato(
         punteggi = {i: v for i, v in (punteggi_obbligatori or {}).items() if i in manuali}
         for i, v in punteggi.items():
             _controlla_punteggio(corso, manuali[i], v)
-        note = {i: n.strip() for i, n in (note_svolgimenti or {}).items() if i in manuali and n and n.strip()}
+        # una nota si può scrivere su qualunque esercizio, non solo sugli svolgimenti
+        note = {i: n.strip() for i, n in (note_svolgimenti or {}).items()
+                if 0 <= i < len(soluzioni) and n and n.strip()}
+        minimo_chiusa = min(corso.risposta_sbagliata, corso.risposta_vuota)
+        for i, v in (rivalutazioni or {}).items():
+            if not minimo_chiusa <= v <= corso.risposta_corretta:
+                raise ValueError(f"Punteggio {v} dell'esercizio {i + 1} fuori dall'intervallo consentito "
+                                 f"({minimo_chiusa}…{corso.risposta_corretta})")
         calcolo = calcola_voto(corso, votomin, soluzioni, risposte, posizioni, punteggi)
         sospesa = bool(calcolo.mancanti)
         insufficiente = calcolo.insufficiente
@@ -923,18 +1029,68 @@ def svolgimenti_appello(tag: str, appello_id: int, escludi_matricola: Optional[s
     }
 
 
-def note_precedenti(tag: str, appello_id: int, matricola: str) -> dict:
-    """Per la pagina di correzione di un compito: per ogni esercizio, le note già scritte
-    sugli altri compiti dell'appello, con studente e punteggio dato, da mostrare come
-    suggerimento mentre si scrive una nota simile (per restare coerenti)."""
-    return {
-        e["esercizio_id"]: [
-            {"nota": v["nota"], "punteggio": v["punteggio"], "studente": f"{v['cognome']} {v['nome']}"}
-            for v in e["voci"] if v["nota"]
-        ]
-        for e in svolgimenti_appello(tag, appello_id, escludi_matricola=matricola)["esercizi"]
-        if e["esercizio_id"] is not None and any(v["nota"] for v in e["voci"])
-    }
+def note_esercizi(tag: str, appello_id: int, escludi_matricola: Optional[str] = None,
+                  esercizio_id: Optional[int] = None) -> dict[int, list[dict]]:
+    """Le note scritte sugli esercizi dei compiti registrati nell'appello (su qualunque
+    esercizio, non solo sugli svolgimenti), per esercizio: {esercizio_id: [voce]}, con
+    studente, compito, posizione, risposta data e giusta, punteggio calcolato e assegnato
+    e voto del compito. Servono come suggerimento mentre si scrive una nota simile (per
+    dare lo stesso giudizio agli stessi errori) e per l'elenco delle note di un esercizio."""
+    corso = corsi_service.get_corso(tag)
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        risultati = conn.execute(
+            "SELECT r.matricola, r.risposte, r.voto, r.voto_scritto, r.punteggi_obbligatori, r.rivalutazioni, "
+            "r.note_svolgimenti, r.valutazione_sospesa, r.compito_id, c.codice, c.soluzioni, s.nome, s.cognome "
+            "FROM risultati r JOIN compiti c ON c.id = r.compito_id JOIN studenti s ON s.matricola = r.matricola "
+            "WHERE r.appello_id=? AND r.note_svolgimenti IS NOT NULL "
+            "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
+            (appello_id,),
+        ).fetchall()
+        posizioni: dict[int, dict[int, dict]] = {}
+        for p in conn.execute(
+            "SELECT ce.compito_id, ce.posizione, ce.esercizio_id, ce.aperta, ce.obbligatorio, rv.revisione "
+            "FROM compito_esercizi ce JOIN compiti c ON c.id = ce.compito_id "
+            "LEFT JOIN appello_revisione_esercizi rv ON rv.appello_id = c.appello_id AND rv.esercizio_id = ce.esercizio_id "
+            "WHERE c.appello_id=?",
+            (appello_id,),
+        ):
+            posizioni.setdefault(p["compito_id"], {})[p["posizione"]] = dict(p)
+    finally:
+        conn.close()
+    esito: dict[int, list[dict]] = {}
+    for r in risultati:
+        if escludi_matricola is not None and r["matricola"] == escludi_matricola:
+            continue
+        note = _json_posizioni(r["note_svolgimenti"])
+        punteggi = _json_posizioni(r["punteggi_obbligatori"])
+        rivalutazioni = _json_posizioni(r["rivalutazioni"])
+        soluzioni, risposte = (r["soluzioni"] or "").upper(), (r["risposte"] or "").upper()
+        for i, nota in note.items():
+            p = posizioni.get(r["compito_id"], {}).get(i)
+            if not nota or p is None or (esercizio_id is not None and p["esercizio_id"] != esercizio_id):
+                continue
+            lettera = risposte[i] if i < len(risposte) else "X"
+            giusta = soluzioni[i] if i < len(soluzioni) else "?"
+            if p["aperta"]:
+                calcolato = None
+            else:
+                calcolato = corso.risposta_vuota if lettera == "X" else (
+                    corso.risposta_corretta if lettera == giusta else corso.risposta_sbagliata)
+            if p["revisione"] == "annullato":
+                assegnato = punteggio_massimo(corso, bool(p["aperta"]))
+            else:
+                assegnato = punteggi.get(i, rivalutazioni.get(i, calcolato))
+            esito.setdefault(p["esercizio_id"], []).append({
+                "nota": nota, "punteggio": assegnato, "calcolato": calcolato,
+                "studente": f"{r['cognome']} {r['nome']}", "matricola": r["matricola"],
+                "codice": r["codice"], "posizione": i, "aperta": bool(p["aperta"]),
+                "obbligatorio": bool(p["obbligatorio"]), "lettera_data": "" if p["aperta"] else lettera,
+                "lettera_corretta": "" if p["aperta"] else giusta,
+                "voto": r["voto_scritto"] if r["voto_scritto"] is not None else r["voto"],
+                "sospesa": bool(r["valutazione_sospesa"]),
+            })
+    return esito
 
 
 ESITI_ORALE = ("assente", "insufficiente", "voto")

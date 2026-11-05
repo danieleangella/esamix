@@ -16,8 +16,8 @@
           <td>{{ r.matricola }}</td>
           <td>{{ r.voto }}</td>
           <td style="white-space:nowrap">
-            <button type="submit" form="form-verbalizza-{{ r.matricola }}" style="margin-top:0">Verbalizza</button>
-            <button type="submit" form="form-rifiuta-{{ r.matricola }}" class="secondary" style="margin-top:0">{{ icona("annulla", 14) }} Rifiuta</button>
+            <button type="submit" form="form-verbalizza-{{ r.matricola }}" style="margin-top:0" data-info="Verbalizza" aria-label="Verbalizza" class="solo-icona">{{ icona("verbale", 16) }}</button>
+            <button type="submit" form="form-rifiuta-{{ r.matricola }}" class="solo-icona secondary" style="margin-top:0" data-info="Rifiutato dallo studente" aria-label="Rifiutato dallo studente">{{ icona("annulla", 16) }}</button>
           </td>
         </tr>
         {% endfor %}

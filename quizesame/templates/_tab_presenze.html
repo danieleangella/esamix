@@ -56,11 +56,11 @@
       </select>
       <form method="post" action="{{ url_appello }}/presenze/segna-restanti" class="inline form-restanti" style="margin-left:auto">
         <input type="hidden" name="esito" value="presente">
-        <button type="submit" class="secondary pulsante-piccolo">{{ icona("spunta", 13) }} Presenti i restanti (<span class="n-restanti">0</span>)</button>
+        <button type="submit" class="secondary pulsante-piccolo">{{ icona("spunta", 13) }} <span>Presenti i restanti (<span class="n-restanti">0</span>)</span></button>
       </form>
       <form method="post" action="{{ url_appello }}/presenze/segna-restanti" class="inline form-restanti">
         <input type="hidden" name="esito" value="assente">
-        <button type="submit" class="secondary pulsante-piccolo">{{ icona("chiudi", 13) }} Assenti i restanti (<span class="n-restanti">0</span>)</button>
+        <button type="submit" class="secondary pulsante-piccolo">{{ icona("chiudi", 13) }} <span>Assenti i restanti (<span class="n-restanti">0</span>)</span></button>
       </form>
       {{ info("Segna in un colpo solo tutti quelli ancora da segnare tra quelli mostrati: con un filtro attivo (es. un'aula) solo quelli; chi è già presente o ha già un esito non cambia.") }}
     </div>
@@ -134,7 +134,7 @@
             <input type="hidden" name="cognome" value="{{ s.cognome }}">
             <input type="hidden" name="nome" value="{{ s.nome }}">
             <input type="hidden" name="next" value="{{ url_appello }}#presenze{{ pane_suffix }}">
-            <button type="submit" class="secondary" style="padding:0.1rem 0.5rem; font-size:0.85rem" title="Non è ancora uno studente registrato in questo corso">{{ icona("utente-piu", 14) }} Registra come studente</button>
+            <button type="submit" class="solo-icona secondary" style="padding:0.1rem 0.5rem; font-size:0.85rem" title="Non è ancora uno studente registrato in questo corso" data-info="Registra come studente del corso" aria-label="Registra come studente del corso">{{ icona("utente-piu", 16) }}</button>
           </form>
           {% endif %}
         </td>

@@ -22,7 +22,7 @@
     <option value="aggiornamento" {% if filtro_tipo == 'aggiornamento' %}selected{% endif %}>Aggiornamenti dell'app</option>
   </select>
   <input name="q" value="{{ q }}" placeholder="Cerca (es. blocco, verifica)" aria-label="Cerca">
-  <button type="submit" class="secondary" style="margin:0">{{ icona("filtro", 14) }} Filtra</button>
+  <button type="submit" class="solo-icona secondary" style="margin:0" data-info="Filtra" aria-label="Filtra">{{ icona("filtro", 16) }}</button>
   {% if filtro_corso or filtro_tipo or q %}<a href="/registro">Mostra tutto</a>{% endif %}
   <span class="muted" style="margin-left:auto">{{ totale }} voci{% if totale > voci|length %} (ultime {{ voci|length }}){% endif %}</span>
 </form>

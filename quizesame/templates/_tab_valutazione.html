@@ -87,8 +87,8 @@
           <div class="campo-risposte-stato stato-campo"></div>
         </div>
       </div>
-      <button type="submit">{{ icona("avanti", 14) }} Vai al riepilogo</button>
-      <button type="reset" class="secondary">{{ icona("chiudi", 14) }} Svuota</button>
+      <button type="submit" class="solo-icona" data-info="Vai al riepilogo" aria-label="Vai al riepilogo">{{ icona("avanti", 18) }}</button>
+      <button type="reset" class="secondary solo-icona" data-info="Svuota i campi" aria-label="Svuota">{{ icona("chiudi", 18) }}</button>
     </form>
     {% if con_svolgimenti %}
     <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/rimanda-svolgimenti" class="riga-opzione" style="margin-top:0.75rem">
@@ -142,6 +142,8 @@
           if (match.stato === "già valutato") imposta(nomeRisolto, "⚠ " + match.cognome + " " + match.nome + ": già valutato in questa prova", "err");
           else if (match.stato === "assente" || match.stato === "ritirato" || match.stato === "annullato") imposta(nomeRisolto, "⚠ " + match.cognome + " " + match.nome + ": segnato " + match.stato, "warn");
           else imposta(nomeRisolto, "✓ " + match.cognome + " " + match.nome + (match.stato ? " (" + match.stato + ")" : ""), "ok");
+          // matricola esatta (o scelta dall'elenco): presa senza doverla scegliere, si passa al codice
+          if (dati.length === 1) accetta(inputMatricola, root.querySelector(".campo-suggerimenti-studenti"), inputCodice);
         },
         function (s) { return s.stato; }
       );
@@ -152,12 +154,27 @@
         function (p) { return "/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/api/compiti/cerca?prefix=" + encodeURIComponent(p); },
         function (c) { return c; },
         function (c) { return c; },
-        function (dati, valore) { if (dati.length === 1 && dati[0] === valore) verificaCodice(); }
+        function (dati, valore) {
+          if (dati.length !== 1 || dati[0] !== valore) return;
+          // codice esatto: preso senza doverlo scegliere, si passa alle risposte
+          verificaCodice();
+          accetta(inputCodice, root.querySelector(".campo-suggerimenti-codici"), inputRisposte);
+        }
       );
+      // dato esatto riconosciuto: chiude l'elenco dei suggerimenti e passa al campo dopo
+      // (solo se si sta ancora scrivendo lì: non sposta il cursore da un altro campo)
+      function accetta(campo, elenco, prossimo) {
+        setTimeout(function () {
+          elenco.style.display = "none";
+          if (document.activeElement === campo) prossimo.focus();
+        }, 0);
+      }
       var timerCodice = null, ultimaVerifica = 0;
-      function verificaCodice() {
+      // mentre si scrive, sotto i 4 caratteri il codice non si giudica ancora (inesistente
+      // lo sarebbe quasi sempre); uscendo dal campo sì, anche se corto
+      function verificaCodice(ancheCorto) {
         var codice = inputCodice.value.trim();
-        if (!codice) { imposta(statoCodice, "", ""); return; }
+        if (!codice || (codice.length < 4 && ancheCorto !== true)) { ultimaVerifica++; imposta(statoCodice, "", ""); return; }
         var id = ++ultimaVerifica;
         fetch("/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/api/compiti/verifica?codice=" + encodeURIComponent(codice))
           .then(function (r) { return r.json(); })
@@ -176,7 +193,7 @@
           });
       }
       inputCodice.addEventListener("input", function () { clearTimeout(timerCodice); timerCodice = setTimeout(verificaCodice, 300); });
-      inputCodice.addEventListener("change", verificaCodice);
+      inputCodice.addEventListener("change", function () { verificaCodice(true); });
 
       // Invio nei primi due campi passa al successivo invece di inviare il modulo
       [[inputMatricola, inputCodice], [inputCodice, inputRisposte]].forEach(function (coppia) {
@@ -246,7 +263,7 @@
             <input type="hidden" name="matricola" value="{{ b.matricola }}">
             <input type="hidden" name="codice" value="{{ b.codice }}">
             <input type="hidden" name="risposte" value="{{ b.risposte }}">
-            <button type="submit" class="secondary pulsante-piccolo" style="margin:0">{{ icona("correzione", 13) }} Riprendi</button>
+            <button type="submit" class="pulsante-icona pulsante-neutro" data-info="Riprendi la correzione" aria-label="Riprendi la correzione di {{ b.cognome }} {{ b.nome }}">{{ icona("correzione") }}</button>
           </form>
           <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/correggi/bozza/{{ b.matricola }}/elimina"
                 onsubmit="return confirm({{ ('Eliminare la bozza di ' ~ b.cognome ~ ' ' ~ b.nome ~ '?')|js }});">
@@ -261,7 +278,7 @@
         <td>{{ r.matricola }}</td>
         <td class="muted">svolgimenti da valutare · voto provvisorio {{ r.voto }}</td>
         <td style="text-align:right; white-space:nowrap">
-          <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/modifica" class="button secondary pulsante-piccolo" style="margin:0">{{ icona("matita", 13) }} Completa</a>
+          <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/modifica" class="pulsante-icona pulsante-neutro" data-info="Completa la valutazione" aria-label="Completa la valutazione di {{ r.cognome }} {{ r.nome }}">{{ icona("matita") }}</a>
         </td>
       </tr>
       {% endfor %}
@@ -276,23 +293,30 @@
 
   <details class="card" open>
     <summary><strong>Risultati inseriti ({{ md.risultati|length }})</strong>{% if n_assenti or n_ritirati %} <span class="muted">— {{ n_corretti }} corrett{{ 'o' if n_corretti == 1 else 'i' }}{% if n_assenti %}, {{ n_assenti }} assent{{ 'e' if n_assenti == 1 else 'i' }}{% endif %}{% if n_ritirati %}, {{ n_ritirati }} ritirat{{ 'o' if n_ritirati == 1 else 'i' }}{% endif %}</span>{% endif %}
-      <span class="muted" style="font-size:0.85rem">· dal più recente</span></summary>
+      </summary>
     <table class="tabella-risultati" style="margin-top:0.5rem">
       <tr>
-        <th class="th-ordina-risultati" data-campo="cognome" style="cursor:pointer" title="Ordina per cognome">Studente <span class="muted">⇅</span></th>
+        <th class="th-ordina-risultati ordinata" data-campo="inserimento" data-direzione="desc" data-info="Ordine di inserimento: un clic passa dal più recente al primo inserito e viceversa">N. {{ icona("ordina-giu", 13, "icona-ordine") }}</th>
+        <th class="th-ordina-risultati" data-campo="cognome" data-info="Ordina per cognome">Studente {{ icona("ordina", 13, "icona-ordine") }}</th>
         <th>Matricola</th>
-        <th class="th-ordina-risultati" data-campo="voto" style="cursor:pointer" title="Ordina per voto">Esito <span class="muted">⇅</span></th>
+        <th class="th-ordina-risultati" data-campo="voto" data-info="Ordina per voto">Esito {{ icona("ordina", 13, "icona-ordine") }}</th>
         <th style="text-align:right"></th>
       </tr>
-      {# dall'ultimo inserito: il compito appena corretto è in cima, da ricontrollare #}
+      {# dall'ultimo inserito: il compito appena corretto è in cima, da ricontrollare; il
+         numero è l'ordine di inserimento (1 = il primo) #}
+      {% set ordine_inserimento = {} %}
+      {% for r in md.risultati | sort(attribute='id') %}{% set _ = ordine_inserimento.update({r.id: loop.index}) %}{% endfor %}
       {% for r in md.risultati | sort(attribute='id', reverse=True) %}
-      <tr class="riga-risultato" data-cognome="{{ r.cognome|lower }}" data-voto="{{ r.voto if r.voto is not none else -9999 }}">
+      {% set scritto = r.voto_scritto if r.voto_scritto is not none else r.voto %}
+      {% set classe_voto = '' if scritto is none or r.esito not in ('voto', 'rifiutato') else ('voto-sufficiente' if scritto >= md.votomin_effettivo else 'voto-insufficiente') %}
+      <tr class="riga-risultato" data-inserimento="{{ ordine_inserimento[r.id] }}" data-cognome="{{ r.cognome|lower }}" data-voto="{{ r.voto if r.voto is not none else -9999 }}">
+        <td class="numero-inserimento">{{ ordine_inserimento[r.id] }}</td>
         <td>
           <button type="button" class="link-simile btn-dettaglio-risultato" data-matricola="{{ r.matricola }}">{{ r.cognome }} {{ r.nome }}</button>
         </td>
         <td>{{ r.matricola }}</td>
         <td>
-          {% if r.esito == 'rifiutato' %}<span class="badge badge-warn">rifiutato</span> <span class="muted">({{ r.voto }})</span>
+          {% if r.esito == 'rifiutato' %}<span class="badge badge-warn">rifiutato</span> <span class="{{ classe_voto }}">({{ r.voto }})</span>
           {% elif r.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if r.annullamento_nota %} <span class="muted">— {{ r.annullamento_nota }}</span>{% endif %}
           {% if not md.appello.chiuso and not r.verbalizzato %}
           {# nella stessa cella, così segue la riga quando la tabella si riordina #}
@@ -301,15 +325,15 @@
               <input type="hidden" name="matricola" value="{{ r.matricola }}">
               <input type="hidden" name="torna" value="valutazione">
               <input name="nota" value="{{ r.annullamento_nota or '' }}" placeholder="Motivo dell'annullamento" aria-label="Motivo dell'annullamento" style="flex:1; min-width:12rem">
-              <button type="submit" style="margin:0">{{ icona("spunta") }} Salva</button>
-              <button type="button" class="secondary" data-chiudi-modifica style="margin:0">{{ icona("annulla", 14) }} Annulla</button>
+              <button type="submit" class="solo-icona" style="margin:0" data-info="Salva" aria-label="Salva">{{ icona("salva") }}</button>
+              <button type="button" class="secondary solo-icona" data-chiudi-modifica style="margin:0" data-info="Annulla" aria-label="Annulla">{{ icona("annulla") }}</button>
             </form>
           </div>
           {% endif %}
           {% elif r.esito != 'voto' %}{{ r.esito }}
           {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
-          {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
-          {% else %}{{ r.voto }}{% if r.richiede_orale and r.orale_svolto %} <span class="badge badge-ok">orale svolto</span>{% endif %}{% endif %}
+          {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="{{ classe_voto }}">({{ scritto }})</span>
+          {% else %}<span class="{{ classe_voto }}">{{ r.voto }}</span>{% if r.richiede_orale and r.orale_svolto %} <span class="badge badge-ok">orale svolto</span>{% endif %}{% endif %}
           {% if r.convocazione_orale and r.esito == 'voto' %} <span class="badge badge-warn" data-info="Conta solo se confermata nell'ultima prova del raggruppamento">convocato all'orale</span>{% endif %}
           {% if r.nota_correzione %}<span class="nota-risultato" tabindex="0" data-info="{{ r.nota_correzione }}" aria-label="Nota: {{ r.nota_correzione }}">{{ icona("nota", 12) }} nota</span>{% endif %}
           {% if r.verbalizzato %}
@@ -325,7 +349,7 @@
           <span class="muted" data-info="Appello chiuso: riaprilo dalla scheda Chiusura per modificare">{{ icona("lucchetto", 14) }}</span>
           {% elif not r.verbalizzato %}
           {% if r.valutazione_sospesa %}
-          <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/modifica" class="button warning pulsante-piccolo" style="margin:0">{{ icona("matita", 13) }} Completa valutazione</a>
+          <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/modifica" class="pulsante-icona pulsante-neutro" style="color:var(--warn-strong-text)" data-info="Completa la valutazione (svolgimenti in sospeso)" aria-label="Completa la valutazione di {{ r.cognome }} {{ r.nome }}">{{ icona("matita") }}</a>
           {% elif r.esito in ('voto', 'rifiutato') %}
           <a href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/risultati/{{ r.matricola }}/modifica" class="pulsante-icona" style="display:inline-flex"
              data-info="Modifica la correzione" aria-label="Modifica il risultato di {{ r.cognome }} {{ r.nome }}">{{ icona("matita") }}</a>
@@ -343,7 +367,7 @@
         </td>
       </tr>
       <tr class="riga-dettaglio-risultato" data-matricola="{{ r.matricola }}" style="display:none">
-        <td colspan="4"></td>
+        <td colspan="5"></td>
       </tr>
       {% endfor %}
     </table>
@@ -362,7 +386,7 @@
         <td>{{ nome_studente(corso.tag, s.matricola, s.cognome) }}</td>
         <td>{{ s.nome }}</td>
         <td style="text-align:right">
-          <button type="button" class="secondary btn-correggi-presente" data-matricola="{{ s.matricola }}" data-nome="{{ s.cognome }} {{ s.nome }}" style="margin-top:0">{{ icona("correzione", 13) }} Correggi</button>
+          <button type="button" class="pulsante-icona pulsante-neutro btn-correggi-presente" data-matricola="{{ s.matricola }}" data-nome="{{ s.cognome }} {{ s.nome }}" data-info="Correggi il compito" aria-label="Correggi il compito di {{ s.cognome }} {{ s.nome }}">{{ icona("correzione") }}</button>
         </td>
       </tr>
       {% endfor %}
@@ -397,19 +421,29 @@
 
     var tabellaRisultati = root.querySelector(".tabella-risultati");
     if (tabellaRisultati) {
-      // (la ricerca è quella generale sopra le tabelle, attivaFiltriTabelle in app.js)
+      // (i filtri per colonna sono quelli generali delle tabelle, attivaFiltriTabelle in app.js)
       var righeRisultati = Array.prototype.slice.call(tabellaRisultati.querySelectorAll(".riga-risultato"));
 
-      var direzioneCorrente = {};
-      tabellaRisultati.querySelectorAll(".th-ordina-risultati").forEach(function (th) {
+      // un clic su una testata ordina per quella colonna, un altro inverte l'ordine; l'icona
+      // mostra la colonna e la direzione (all'apertura: dal più recente inserito)
+      var testate = tabellaRisultati.querySelectorAll(".th-ordina-risultati");
+      var ICONE = { asc: {{ icona("ordina-su", 13, "icona-ordine")|tojson }}, desc: {{ icona("ordina-giu", 13, "icona-ordine")|tojson }}, nessuna: {{ icona("ordina", 13, "icona-ordine")|tojson }} };
+      testate.forEach(function (th) {
         th.addEventListener("click", function () {
           var campo = th.dataset.campo;
-          var decrescente = direzioneCorrente[campo] !== "desc";
-          direzioneCorrente = {};
-          direzioneCorrente[campo] = decrescente ? "desc" : "asc";
+          // prima volta su una colonna: numeri dal più alto, nomi dalla A
+          var decrescente = th.dataset.direzione ? th.dataset.direzione === "asc" : campo !== "cognome";
+          testate.forEach(function (t) {
+            delete t.dataset.direzione;
+            t.classList.remove("ordinata");
+            t.querySelector(".icona-ordine").outerHTML = ICONE.nessuna;
+          });
+          th.dataset.direzione = decrescente ? "desc" : "asc";
+          th.classList.add("ordinata");
+          th.querySelector(".icona-ordine").outerHTML = ICONE[th.dataset.direzione];
           righeRisultati.sort(function (a, b) {
-            var va = campo === "voto" ? parseFloat(a.dataset.voto) : a.dataset.cognome;
-            var vb = campo === "voto" ? parseFloat(b.dataset.voto) : b.dataset.cognome;
+            var va = campo === "cognome" ? a.dataset.cognome : parseFloat(a.dataset[campo]);
+            var vb = campo === "cognome" ? b.dataset.cognome : parseFloat(b.dataset[campo]);
             if (va < vb) return decrescente ? 1 : -1;
             if (va > vb) return decrescente ? -1 : 1;
             return 0;
@@ -441,7 +475,7 @@
        data-info="{{ 'Voti di questa prova nel formato del file di Moodle caricato (' ~ md.moodle_file.nome_file ~ '), con una colonna in più per il voto: da importare nel registro valutatore di Moodle' if md.moodle_file else 'Voti di questa prova in un CSV per Moodle (Nome, Cognome, Codice identificativo, Indirizzo email, Voto): da importare nel registro valutatore. Se carichi le prenotazioni da Moodle, si usa la struttura di quel file' }}">{{ icona("scarica", 14) }} Voti per Moodle</a>
     {% if not md.appello.chiuso %}
     <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/riapri-correzione-scritto" style="margin-left:auto">
-      <button type="submit" class="secondary pulsante-piccolo">{{ icona("lucchetto-aperto", 13) }} Riapri la correzione</button>
+      <button type="submit" class="pulsante-icona pulsante-neutro" data-info="Riapri la correzione" aria-label="Riapri la correzione">{{ icona("lucchetto-aperto") }}</button>
     </form>
     {% endif %}
     {% elif not md.appello.chiuso %}

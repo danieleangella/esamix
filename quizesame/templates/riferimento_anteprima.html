@@ -24,7 +24,7 @@
   <span class="formati">
     <label style="display:inline-flex; align-items:center; gap:0.35rem; margin:0; color:var(--text)">
       <input type="checkbox" id="mostra-soluzioni" style="width:auto; margin:0" {% if soluzioni %}checked{% endif %}> Mostra le soluzioni</label>
-    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">{{ icona("stampa", 14) }} Stampa</button>
+    <button type="button" class="solo-icona secondary pulsante-piccolo" onclick="window.print()" data-info="Stampa" aria-label="Stampa">{{ icona("stampa", 16) }}</button>
   </span>
 </div>
 

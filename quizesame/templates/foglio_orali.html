@@ -17,7 +17,7 @@
   <p class="muted" style="margin:0">{{ studenti|length }} studenti. Spunta la presenza e scrivi il voto a penna sul foglio stampato.</p>
   <span class="formati">
     {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/orali", pdf=True, tex=True, md=True, csv=True) }}
-    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">{{ icona("stampa", 14) }} Stampa</button>
+    <button type="button" class="solo-icona secondary pulsante-piccolo" onclick="window.print()" data-info="Stampa" aria-label="Stampa">{{ icona("stampa", 16) }}</button>
   </span>
 </div>
 {% if frase_orale %}<p><strong>{{ frase_orale }}</strong></p>{% endif %}

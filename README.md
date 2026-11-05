@@ -155,13 +155,19 @@ dice cosa fare adesso. In tutti gli elenchi di studenti, cliccando il nome si ap
 - **Presenze**: registro del giorno della prova; in alternativa, finite le correzioni,
   "Segna assenti tutti i non corretti".
 - **Correzione**: inserimento delle risposte di ogni compito (solo le lettere delle domande
-  chiuse: il "-" delle domande aperte lo aggiunge il campo da solo), con il voto in tempo
-  reale e una barra con la percentuale di compiti corretti (e di ammessi all'orale tra i
-  sufficienti). Gli obbligatori svolti con la risposta giusta partono dal punteggio massimo,
-  da confermare col pulsante «corretto» o da abbassare se lo svolgimento non va; quelli con la
-  risposta sbagliata compaiono in rosso col punteggio calcolato, da confermare o alzare; le
-  domande aperte ricevono un punteggio a mano (finché manca contano 0). Per ogni svolgimento una nota degli errori, con le note simili già date ad
-  altri studenti come suggerimento, e una nota sul compito. Gli svolgimenti si possono
+  chiuse: il "-" delle domande aperte lo aggiunge il campo da solo; matricola e codice esatti
+  si prendono da soli), con una barra con la percentuale di compiti corretti (e di ammessi
+  all'orale tra i sufficienti). Il riepilogo mostra le griglie e poi gli esercizi in tre
+  sezioni (domande aperte, obbligatori, altri), ognuno col punteggio calcolato e, cliccando
+  sul nome, il testo con la risposta data e quella giusta; voto e azioni restano sempre in
+  vista. Gli obbligatori svolti con la risposta giusta partono dal punteggio massimo, da
+  confermare con la spunta o da abbassare se lo svolgimento non va; quelli con la risposta
+  sbagliata compaiono in rosso col punteggio calcolato, da confermare o alzare; le domande
+  aperte ricevono un punteggio a mano (finché manca contano 0); gli altri esercizi sono già
+  confermati e si rivalutano con la matita. Su ogni esercizio una nota, con le note già date
+  allo stesso esercizio come suggerimento e una pagina che le raccoglie tutte; una nota sul
+  voto finale e una per l'orale. Le risposte molto simili a quelle di un altro compito sono
+  segnalate, con il confronto delle due griglie e la vicinanza dei compiti nella stampa. Gli svolgimenti si possono
   rimandare e valutare poi esercizio per esercizio nella pagina **Svolgimenti e note**, che
   confronta punteggi e note per vedere se le correzioni sono coerenti. Bozze e compiti con
   svolgimenti da valutare stanno nell'elenco **Correzioni da completare** (una bozza conserva
@@ -179,8 +185,10 @@ dice cosa fare adesso. In tutti gli elenchi di studenti, cliccando il nome si ap
 Le azioni più frequenti (iscritti, esercizi, aule) si salvano senza ricaricare la pagina. Le
 azioni secondarie sono descrizioni con un'icona; le spiegazioni meno usate compaiono passando
 col mouse sul titolo della sezione, sull'etichetta del campo o sulla testata della colonna, e
-i pulsanti a icona mostrano così cosa fanno. Sopra le tabelle lunghe c'è un campo per
-filtrare le righe (e un menu per le colonne con pochi valori, come stato o esito). La voce **Guida** del menu descrive tutto nel dettaglio.
+i pulsanti a icona (salva, annulla, aggiungi, stampa...) mostrano così cosa fanno. Sotto la
+testata delle tabelle lunghe c'è un filtro per ogni colonna (un menu per le colonne con pochi
+valori, come stato o esito). L'icona in alto a destra sceglie il tema: automatico, chiaro o
+scuro (si salva nelle Impostazioni dell'app, dove si può anche cambiare). La voce **Guida** del menu descrive tutto nel dettaglio.
 
 Per le **prove parziali**, chiusa la correzione dell'ultima prova si generano i **risultati
 complessivi**: solo chi ha superato tutte le prove, con il voto di ciascuna e il voto finale,

@@ -17,7 +17,7 @@
   <p class="muted" style="margin:0">Pronto da pubblicare.</p>
   <span class="formati">
     {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/risultati", pdf=True, tex=True, md=True) }}
-    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">{{ icona("stampa", 14) }} Stampa</button>
+    <button type="button" class="solo-icona secondary pulsante-piccolo" onclick="window.print()" data-info="Stampa" aria-label="Stampa">{{ icona("stampa", 16) }}</button>
   </span>
 </div>
 {% if frase_orale %}<div class="card" style="padding:0.6rem 1rem"><strong>{{ frase_orale }}</strong></div>{% endif %}

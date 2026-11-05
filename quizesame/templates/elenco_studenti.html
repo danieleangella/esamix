@@ -17,7 +17,7 @@
   <p class="muted" style="margin:0">{{ elenco|length }} studenti. Spunta "presente" a penna sul foglio stampato.</p>
   <span class="formati">
     {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/" ~ tipo, pdf=True, tex=True, csv=not tipo.startswith("ammessi-aula")) }}
-    <button type="button" class="secondary pulsante-piccolo" onclick="window.print()">{{ icona("stampa", 14) }} Stampa</button>
+    <button type="button" class="solo-icona secondary pulsante-piccolo" onclick="window.print()" data-info="Stampa" aria-label="Stampa">{{ icona("stampa", 16) }}</button>
   </span>
 </div>
 {% macro tabella(righe, etichetta, con_aula=False) %}

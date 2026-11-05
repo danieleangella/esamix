@@ -106,7 +106,7 @@
       {% if not md.appello.chiuso %}
       <form class="inline" method="post" action="{{ url }}/aule/riapri" data-pagina-intera
             onsubmit="return confirm('Riaprire l\'assegnazione delle aule? Gli studenti restano dove sono finché non riassegni; se riassegni, la distribuzione già comunicata non varrà più.')">
-        <button type="submit" class="secondary pulsante-piccolo">{{ icona("matita", 12) }} Riapri</button>
+        <button type="submit" class="solo-icona secondary pulsante-piccolo" data-info="Riapri" aria-label="Riapri">{{ icona("lucchetto-aperto", 16) }}</button>
       </form>
       {% endif %}
     </div>
@@ -249,7 +249,7 @@
       {% for a in md.aule %}<option value="{{ a.id }}">{{ a.nome }}{% if a.dsa %} (DSA){% endif %}</option>{% endfor %}
     </select>
     {% endif %}
-    <button type="submit" class="secondary" style="margin:0">{{ icona("piu") }} Aggiungi</button>
+    <button type="submit" class="solo-icona secondary" style="margin:0" data-info="Aggiungi" aria-label="Aggiungi">{{ icona("piu", 16) }}</button>
   </form>
   {% endif %}
 

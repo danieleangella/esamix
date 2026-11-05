@@ -67,17 +67,17 @@
           </div>
           {% endfor %}
         </div>
-        <button type="button" class="secondary btn-aggiungi-sbagliata">{{ icona("piu", 14) }} Aggiungi risposta sbagliata</button>
+        <button type="button" class="solo-icona secondary btn-aggiungi-sbagliata" data-info="Aggiungi una risposta sbagliata" aria-label="Aggiungi una risposta sbagliata">{{ icona("piu", 16) }}</button>
       </div>
-      <button type="button" class="secondary pulsante-piccolo btn-rimuovi-variante">{{ icona("cestino", 13) }} Rimuovi questa variante</button>
+      <button type="button" class="pulsante-icona btn-rimuovi-variante" data-info="Rimuovi questa variante" aria-label="Rimuovi questa variante">{{ icona("cestino", 16) }}</button>
     </div>
     {% endfor %}
   </div>
   </div>
   <div class="barra-strumenti" style="margin-top:0.75rem">
-    <button type="submit" style="margin:0">Salva esercizio</button>
+    <button type="submit" style="margin:0" data-info="Salva l'esercizio" aria-label="Salva l'esercizio" class="solo-icona">{{ icona("salva", 16) }}</button>
     {% if esercizio is defined %}
-    <button type="button" class="secondary btn-annulla-modifica" style="margin:0">{{ icona("annulla", 14) }} Annulla</button>
+    <button type="button" class="solo-icona secondary btn-annulla-modifica" style="margin:0" data-info="Annulla" aria-label="Annulla">{{ icona("annulla", 16) }}</button>
     {% endif %}
   </div>
 
@@ -91,9 +91,9 @@
         <input class="campo-corretta">
         <label>Risposte sbagliate</label>
         <div class="sbagliate-container"></div>
-        <button type="button" class="secondary btn-aggiungi-sbagliata">{{ icona("piu", 14) }} Aggiungi risposta sbagliata</button>
+        <button type="button" class="solo-icona secondary btn-aggiungi-sbagliata" data-info="Aggiungi una risposta sbagliata" aria-label="Aggiungi una risposta sbagliata">{{ icona("piu", 16) }}</button>
       </div>
-      <button type="button" class="secondary pulsante-piccolo btn-rimuovi-variante">{{ icona("cestino", 13) }} Rimuovi questa variante</button>
+      <button type="button" class="pulsante-icona btn-rimuovi-variante" data-info="Rimuovi questa variante" aria-label="Rimuovi questa variante">{{ icona("cestino", 16) }}</button>
     </div>
   </template>
 

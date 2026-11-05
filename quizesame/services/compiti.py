@@ -659,13 +659,15 @@ def get_soluzione(tag: str, appello_id: int, codice: str) -> str | None:
 def list_posizioni_compito(tag: str, compito_id: int) -> list[dict]:
     """Per ogni posizione della griglia di risposte di un compito, l'esercizio (e se era
     obbligatorio) che vi corrisponde in quello specifico compito, con l'eventuale
-    revisione decisa dopo la prova ("annullato" o "facoltativo", altrimenti None)."""
+    revisione decisa dopo la prova ("annullato" o "facoltativo", altrimenti None) e il
+    testo della variante stampata."""
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         rows = conn.execute(
             "SELECT ce.posizione, ce.obbligatorio, ce.aperta, ce.risposte_mischiate, e.id AS esercizio_id, "
-            "e.nome AS esercizio_nome, rv.revisione FROM compito_esercizi ce "
+            "e.nome AS esercizio_nome, rv.revisione, ev.testo FROM compito_esercizi ce "
             "JOIN esercizi e ON e.id = ce.esercizio_id JOIN compiti c ON c.id = ce.compito_id "
+            "LEFT JOIN esercizio_varianti ev ON ev.id = ce.variante_id "
             "LEFT JOIN appello_revisione_esercizi rv ON rv.appello_id = c.appello_id AND rv.esercizio_id = ce.esercizio_id "
             "WHERE ce.compito_id=? ORDER BY ce.posizione",
             (compito_id,),

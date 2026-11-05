@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_studente.html" import nome_studente %}
+{% from "_icone.html" import icona %}
+{% set nome = (esercizio.nome if esercizio and esercizio.nome else 'Esercizio') %}
+{% block title %}Note · {{ nome }} · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Note su {{ nome }}</span>
+{% endblock %}
+{% block content %}
+<div class="intestazione-pagina">
+  <div class="intestazione-livello">Correzione · <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }}</a></div>
+  <h1>Note su {{ nome }}</h1>
+  <p class="muted spiegazione sr-only">Le note scritte su questo esercizio negli altri compiti della prova, con il punteggio
+    calcolato dalla griglia e quello assegnato: per dare lo stesso giudizio agli stessi errori. Le note uguali sono vicine.</p>
+</div>
+
+<div class="card">
+  {% if voci %}
+  {% set gruppi = voci | groupby('nota') %}
+  <p class="muted" style="margin:0 0 0.5rem">{{ voci|length }} not{{ 'a' if voci|length == 1 else 'e' }} in {{ voci | map(attribute='matricola') | unique | list | length }} compiti
+    · {{ gruppi|length }} divers{{ 'a' if gruppi|length == 1 else 'e' }}</p>
+  <table class="tabella-elenco">
+    <thead>
+      <tr><th>Nota</th><th>Assegnato</th><th>Calcolato</th><th>Risposta</th><th>Studente</th><th>Compito</th><th>Voto del compito</th></tr>
+    </thead>
+    <tbody>
+      {% for v in voci %}
+      <tr>
+        <td>{{ v.nota }}</td>
+        <td><strong>{{ v.punteggio if v.punteggio is not none else '–' }}</strong>{% if v.calcolato is not none and v.punteggio != v.calcolato %} <span class="badge badge-warn">rivalutato</span>{% endif %}</td>
+        <td class="muted">{{ v.calcolato if v.calcolato is not none else '–' }}</td>
+        <td>{% if v.aperta %}<span class="badge badge-info">aperta</span>{% else %}<span style="font-family:monospace">{{ v.lettera_data }}</span> <span class="muted">(giusta {{ v.lettera_corretta }})</span>{% endif %}</td>
+        <td>{{ nome_studente(corso.tag, v.matricola, v.studente) }} <span class="muted">{{ v.matricola }}</span></td>
+        <td><span style="font-family:monospace">{{ v.codice }}</span> <span class="muted">es. {{ v.posizione + 1 }}</span></td>
+        <td>{{ v.voto if v.voto is not none else '–' }}{% if v.sospesa %} <span class="badge badge-warn">provvisorio</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted" style="margin:0">Ancora nessuna nota su questo esercizio negli altri compiti della prova.</p>
+  {% endif %}
+</div>
+{% endblock %}

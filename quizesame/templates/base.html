@@ -1,6 +1,8 @@
 {% from "_icone.html" import icona %}
+{% set impostazioni_app = get_app_settings() %}
 <!DOCTYPE html>
-<html lang="it">
+{# tema dalle impostazioni dell'app: senza data-theme (automatico) segue il sistema #}
+<html lang="it"{% if impostazioni_app.tema in ('light', 'dark') %} data-theme="{{ impostazioni_app.tema }}"{% endif %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -224,7 +226,7 @@
 </head>
 <body>
   <a href="#contenuto" class="salta-al-contenuto">Salta al contenuto</a>
-  {% set docente_globale = get_app_settings().docente %}
+  {% set docente_globale = impostazioni_app.docente %}
   {# barra dell'app e briciole restano entrambe in vista mentre si scorre la pagina #}
   <div class="testata-fissa">
   <header class="topbar" id="topbar">
@@ -232,6 +234,38 @@
       <a class="brand" href="/"><img src="/static/favicon.svg" alt="" width="22" height="22"> EsaMiX</a>
       {% if docente_globale %}<span class="brand-docente">({{ docente_globale }})</span>{% endif %}
     </span>
+    {# tema: automatico (come il sistema) → chiaro → scuro; si salva nelle impostazioni dell'app #}
+    <button type="button" class="pulsante-tema" id="pulsante-tema" aria-label="Tema">
+      <span data-tema="auto">{{ icona("tema-auto", 17) }}</span><span data-tema="light">{{ icona("sole", 17) }}</span><span data-tema="dark">{{ icona("luna", 17) }}</span>
+    </button>
+    <script>
+    (function () {
+      var btn = document.getElementById("pulsante-tema");
+      var NOMI = { auto: "Tema automatico (come il sistema): un clic passa al chiaro", light: "Tema chiaro: un clic passa allo scuro", dark: "Tema scuro: un clic torna automatico" };
+      function attuale() { return document.documentElement.dataset.theme || "auto"; }
+      function mostra() {
+        var t = attuale();
+        btn.querySelectorAll("[data-tema]").forEach(function (s) { s.hidden = s.dataset.tema !== t; });
+        btn.dataset.info = NOMI[t];
+        btn.setAttribute("aria-label", NOMI[t]);
+      }
+      btn.addEventListener("click", function () {
+        var prossimo = { auto: "light", light: "dark", dark: "auto" }[attuale()];
+        if (prossimo === "auto") delete document.documentElement.dataset.theme;
+        else document.documentElement.dataset.theme = prossimo;
+        mostra();
+        var dati = new FormData();
+        dati.append("tema", prossimo);
+        fetch("/impostazioni/tema", { method: "POST", body: dati }).then(function (r) {
+          if (!r.ok) throw new Error("errore " + r.status);
+          // la tendina nella pagina Impostazioni, se aperta, resta allineata
+          var tendina = document.getElementById("tema-app");
+          if (tendina) tendina.value = prossimo;
+        }).catch(function (err) { alert("Non sono riuscito a salvare il tema: " + err.message); });
+      });
+      mostra();
+    })();
+    </script>
     {# su schermi stretti il menu si apre da questo pulsante (vedi style.css) #}
     <button type="button" class="menu-toggle" aria-expanded="false" aria-controls="menu-principale"
             onclick="var h=document.getElementById('topbar'); var a=h.classList.toggle('menu-aperto'); this.setAttribute('aria-expanded', a);">
@@ -277,7 +311,7 @@
       <div class="card" id="flash-dettaglio" style="margin-top:-0.5rem; margin-bottom:1.25rem">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem">
           <strong>Dettaglio errore</strong>
-          <button type="button" class="secondary" id="btn-copia-dettaglio">{{ icona("copia", 14) }} Copia</button>
+          <button type="button" class="secondary solo-icona" id="btn-copia-dettaglio" data-info="Copia il dettaglio" aria-label="Copia il dettaglio">{{ icona("copia", 16) }}</button>
         </div>
         <pre style="white-space:pre-wrap; word-break:break-word; overflow-x:auto; margin-top:0.5rem; margin-bottom:0; font-size:0.85rem">{{ dettaglio }}</pre>
       </div>
@@ -296,8 +330,9 @@
           btnCopia.addEventListener("click", function () {
             var testo = document.querySelector("#flash-dettaglio pre").textContent;
             navigator.clipboard.writeText(testo).then(function () {
-              btnCopia.textContent = "Copiato!";
-              setTimeout(function () { btnCopia.textContent = "Copia"; }, 1500);
+              btnCopia.dataset.info = "Copiato!";
+              btnCopia.classList.add("copiato");
+              setTimeout(function () { btnCopia.dataset.info = "Copia il dettaglio"; btnCopia.classList.remove("copiato"); }, 1500);
             });
           });
         }
@@ -313,7 +348,7 @@
       <p class="muted" id="sfoglia-path" style="word-break:break-all"></p>
       <div class="sfoglia-lista" id="sfoglia-lista"></div>
       <div style="margin-top:1rem; display:flex; justify-content:flex-end; gap:0.5rem">
-        <button type="button" class="secondary" id="sfoglia-annulla">{{ icona("annulla", 14) }} Annulla</button>
+        <button type="button" class="solo-icona secondary" id="sfoglia-annulla" data-info="Annulla" aria-label="Annulla">{{ icona("annulla", 16) }}</button>
         <button type="button" id="sfoglia-seleziona">Seleziona questa cartella</button>
       </div>
     </div>

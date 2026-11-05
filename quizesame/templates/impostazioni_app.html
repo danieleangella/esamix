@@ -18,14 +18,20 @@
     <input type="email" name="email_docente" value="{{ app_settings.email_docente }}" placeholder="es. nome.cognome@unifi.it">
     <label>Studio del docente {{ info("Dove si svolgono gli orali in studio: nelle impostazioni di ogni appello si sceglie con un clic come aula dell'orale.") }}</label>
     <input name="studio_docente" value="{{ app_settings.studio_docente }}" placeholder="es. studio 12, 2° piano, viale Morgagni 67/a">
+    <label for="tema-app">Tema {{ info("Chiaro o scuro per tutte le pagine; automatico segue l'impostazione del sistema. Si cambia anche dall'icona in alto a destra, accanto al menu.") }}</label>
+    <select name="tema" id="tema-app">
+      {% for valore, nome in [('auto', 'Automatico (come il sistema)'), ('light', 'Chiaro'), ('dark', 'Scuro')] %}
+      <option value="{{ valore }}" {% if app_settings.tema == valore %}selected{% endif %}>{{ nome }}</option>
+      {% endfor %}
+    </select>
     <label class="riga-opzione">
       <input type="checkbox" name="mostra_riepilogo_home" {% if app_settings.mostra_riepilogo_home %}checked{% endif %}>
       Riepilogo generale in homepage
       {{ info("Il riquadro con il numero di esami svolti e di sufficienze in tutti i corsi.") }}
     </label>
     <div class="barra-pulsanti">
-      <button type="submit">Salva</button>
-      <button type="button" class="secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate">{{ icona("annulla", 14) }} Annulla</button>
+      <button type="submit" data-info="Salva" aria-label="Salva" class="solo-icona">{{ icona("salva", 16) }}</button>
+      <button type="button" class="solo-icona secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate" aria-label="Annulla le modifiche">{{ icona("annulla", 16) }}</button>
     </div>
   </form>
 </section>
@@ -52,7 +58,7 @@
     <label>Ripristina un backup {{ info("Carica uno zip scaricato da qui (di un singolo corso o di tutti insieme): nella pagina successiva scegli quali corsi ripristinare, con un avviso per quelli che esistono già e verrebbero sovrascritti.") }}</label>
     <div class="barra-aggiungi" style="margin:0">
       <input type="file" name="file" accept=".zip" required style="flex:1; min-width:12rem">
-      <button type="submit" class="secondary" style="margin:0">{{ icona("carica", 14) }} Carica</button>
+      <button type="submit" class="solo-icona secondary" style="margin:0" data-info="Carica" aria-label="Carica">{{ icona("carica", 16) }}</button>
     </div>
   </form>
 </section>
@@ -138,8 +144,8 @@
           {% endif %}
         </div>
         <div class="barra-pulsanti">
-          <button type="submit">{{ icona("spunta", 14) }} Salva</button>
-          <button type="button" class="secondary" data-chiudi-modifica>{{ icona("annulla", 14) }} Annulla</button>
+          <button type="submit" data-info="Salva" aria-label="Salva" class="solo-icona">{{ icona("salva", 16) }}</button>
+          <button type="button" class="solo-icona secondary" data-chiudi-modifica data-info="Annulla le modifiche" aria-label="Annulla le modifiche">{{ icona("annulla", 16) }}</button>
         </div>
       </form>
     </li>
@@ -202,8 +208,8 @@
         Usala come predefinita
       </label><br>
       <div class="barra-pulsanti">
-        <button type="submit">Salva configurazione</button>
-        <button type="button" class="secondary btn-annulla" disabled data-info="Svuota il modulo">{{ icona("annulla", 14) }} Annulla</button>
+        <button type="submit" data-info="Salva la configurazione" aria-label="Salva la configurazione" class="solo-icona">{{ icona("salva", 16) }}</button>
+        <button type="button" class="solo-icona secondary btn-annulla" disabled data-info="Svuota il modulo" aria-label="Annulla le modifiche">{{ icona("annulla", 16) }}</button>
       </div>
     </form>
   </details>
