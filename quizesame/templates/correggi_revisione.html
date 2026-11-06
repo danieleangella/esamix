@@ -365,7 +365,7 @@
       <div class="barra-voto-stato">
         <span class="muted" id="box-calcolato" {% if not voto_a_mano %}hidden{% endif %}>calcolato <strong id="voto-calcolato">{{ v.voto_base }}</strong></span>
         <button type="button" class="pulsante-icona pulsante-neutro" id="btn-voto-calcolato" hidden
-                data-info="Torna al voto calcolato, annullando le modifiche a mano" aria-label="Usa il voto calcolato">{{ icona("ricarica", 14) }}</button>
+                data-info="Torna al voto calcolato: tutti i punteggi a quelli previsti, annullando le modifiche a mano" aria-label="Usa il voto calcolato">{{ icona("ricarica", 14) }}</button>
         <span id="stato-voto"></span>
       </div>
     </div>
@@ -544,9 +544,22 @@
     });
     // con gli esercizi rivalutati a mano: stesso calcolo, con i punteggi assegnati
     var rivalutato = somma + scartoRivalutazioni();
+    // voto calcolato, quello da mostrare: tutti i punteggi a quelli previsti (gli
+    // svolgimenti al massimo, gli altri esercizi al calcolato dalla griglia)
+    var previsto_ = votoFisso;
+    righe.forEach(function (riga) {
+      if (tipo(riga) === "manuale") previsto_ += !attiva(riga) ? provvisorio(riga) : previsto(riga);
+    });
     if (insufficientePerObbligatorio && somma >= votomin) somma = votomin - 1;
     if (insufficientePerObbligatorio && rivalutato >= votomin) rivalutato = votomin - 1;
-    return { voto: somma, rivalutato: rivalutato, daConfermare: daConfermare().length };
+    if (insufficientePerObbligatorio && previsto_ >= votomin) previsto_ = votomin - 1;
+    return { voto: somma, rivalutato: rivalutato, previsto: previsto_, daConfermare: daConfermare().length };
+  }
+  // svolgimenti confermati con un punteggio diverso da quello previsto
+  function svolgimentiCambiati() {
+    return righe.filter(function (r) {
+      return tipo(r) === "manuale" && attiva(r) && confermata(r) && parseInt(campo(r).value, 10) !== previsto(r);
+    });
   }
   // voto finale scritto direttamente (rivalutazione del totale): vale anche sopra le
   // rivalutazioni dei singoli esercizi, finché non si torna al calcolato
@@ -556,9 +569,12 @@
   })();
   function aggiorna() {
     var c = calcola();
-    votoCalcolatoEl.textContent = c.voto;
+    votoCalcolatoEl.textContent = c.previsto;
     var perEsercizi = rivalutati().length > 0;
     var aMano = totaleAMano || perEsercizi;
+    // qualche punteggio diverso da quello previsto (anche di uno svolgimento): si mostrano
+    // il voto calcolato e il ↺ per tornarci
+    var cambiato = aMano || svolgimentiCambiati().length > 0;
     votoModificato.value = aMano ? "1" : "";
     if (!totaleAMano) votoFinale.value = perEsercizi ? c.rivalutato : c.voto;
     var voto = parseInt(votoFinale.value, 10);
@@ -566,15 +582,15 @@
     // rosso se insufficiente (si conferma subito); giallo se restano svolgimenti da confermare
     votoFinale.classList.toggle("insufficiente", insuff && !c.daConfermare);
     votoFinale.classList.toggle("provvisorio", c.daConfermare > 0);
-    var motivoAMano = totaleAMano ? "cambiato a mano" : "esercizi rivalutati a mano";
+    var motivoAMano = totaleAMano ? "cambiato a mano" : "punteggi cambiati a mano";
     // il voto rosso basta a dire che è insufficiente; giallo (mai rosso) finché resta da confermare
     statoVoto.textContent = c.daConfermare
       ? c.daConfermare + " da confermare"
-      : (aMano ? motivoAMano : "");
-    statoVoto.className = "stato-voto" + (c.daConfermare ? " provvisorio" : (aMano ? " a-mano" : ""));
-    btnUsaCalcolato.hidden = !aMano;
+      : (cambiato ? motivoAMano : "");
+    statoVoto.className = "stato-voto" + (c.daConfermare ? " provvisorio" : (cambiato ? " a-mano" : ""));
+    btnUsaCalcolato.hidden = !cambiato;
     // il voto calcolato si mostra solo quando quello finale è stato cambiato
-    document.getElementById("box-calcolato").hidden = !aMano;
+    document.getElementById("box-calcolato").hidden = !cambiato;
     avvisoNota.hidden = !totaleAMano || notaCorrezione.value.trim() !== "";
     if (totaleAMano) mostraNotaVoto(false);
     btnNotaVoto.classList.toggle("attivo", notaCorrezione.value.trim() !== "");
@@ -637,6 +653,13 @@
       if (input.disabled || parseInt(input.value, 10) === parseInt(input.dataset.calcolato, 10)) return;
       input.value = input.dataset.calcolato;
       var riga = input.closest(".riga-esercizio");
+      riga.querySelector(".es-valore").textContent = input.value;
+      riga.classList.remove("rivalutata");
+      segnalaIntervallo(input);
+    });
+    svolgimentiCambiati().forEach(function (riga) {
+      var input = campo(riga);
+      input.value = riga.dataset.previsto;
       riga.querySelector(".es-valore").textContent = input.value;
       riga.classList.remove("rivalutata");
       segnalaIntervallo(input);
