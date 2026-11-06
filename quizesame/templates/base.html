@@ -243,6 +243,16 @@
       <a class="brand" href="/"><img src="/static/favicon.svg" alt="" width="22" height="22"> EsaMiX</a>
       {% if docente_globale %}<span class="brand-docente">({{ docente_globale }})</span>{% endif %}
     </span>
+    {# chiave di sblocco: il lucchetto dice se la sessione è sbloccata (un clic la blocca) #}
+    {% set chiave = stato_chiave(request) %}
+    {% if chiave == "sbloccata" %}
+    <form method="post" action="/blocca" class="inline modulo-lucchetto">
+      <button type="submit" class="pulsante-tema" data-info="Sbloccato con la chiave: un clic blocca di nuovo" aria-label="Blocca">{{ icona("lucchetto-aperto", 17) }}</button>
+    </form>
+    {% elif chiave == "bloccata" %}
+    <a class="pulsante-tema lucchetto-chiuso" href="/sblocca?torna={{ (request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) | urlencode }}"
+       data-info="Bloccato: le operazioni protette chiedono la chiave. Un clic per sbloccare" aria-label="Sblocca">{{ icona("lucchetto", 17) }}</a>
+    {% endif %}
     {# tema: automatico (come il sistema) → chiaro → scuro; si salva nelle impostazioni dell'app #}
     <button type="button" class="pulsante-tema" id="pulsante-tema" aria-label="Tema">
       <span data-tema="auto">{{ icona("tema-auto", 17) }}</span><span data-tema="light">{{ icona("sole", 17) }}</span><span data-tema="dark">{{ icona("luna", 17) }}</span>

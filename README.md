@@ -190,6 +190,8 @@ dice cosa fare adesso. In tutti gli elenchi di studenti, cliccando il nome si ap
   risposta giusta e data segnate; a corso concluso, il PDF con **tutti gli esercizi dell'anno**.
 - Avvisi di **compiti simili** salvati con la correzione, nei risultati e nella pagina Note.
 - **Backup di un appello** (file JSON con tutti i suoi dati) da scaricare e, dopo conferma, reinserire.
+- **Chiave di sblocco** facoltativa (Impostazioni): protegge le operazioni pericolose e, a scelta,
+  l'inserimento degli esiti; vale per la sessione fino a un periodo di inattività.
 - **Tema scuro** più contrastato; in correzione Tab prende l'unico suggerimento.
 - **Statistiche** dell'appello calcolate sui compiti corretti, con quanti sono sui consegnati.
 - **Verbalizzazione** (con l'esportazione dei voti nel file della segreteria) e

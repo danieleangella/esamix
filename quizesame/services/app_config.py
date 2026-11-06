@@ -32,6 +32,13 @@ class AppSettings:
     # Le chiavi restano solo in questo file sul computer e non vengono mai rimostrate.
     ia_profili: list = field(default_factory=list)
     ia_profilo_predefinito: str = ""
+    # chiave di sblocco (vedi services/chiave.py): solo l'impronta e il sale, mai la chiave;
+    # se protegge anche l'inserimento e la modifica degli esiti; dopo quanti minuti di
+    # inattività va reinserita
+    chiave_impronta: str = ""
+    chiave_sale: str = ""
+    chiave_correzione: bool = True
+    chiave_minuti: int = 30
 
 
 def nuovo_id_profilo() -> str:
@@ -76,6 +83,10 @@ def get_settings() -> AppSettings:
         tema=data.get("tema") if data.get("tema") in TEMI else "auto",
         ia_profili=profili,
         ia_profilo_predefinito=predefinito,
+        chiave_impronta=data.get("chiave_impronta", "") or "",
+        chiave_sale=data.get("chiave_sale", "") or "",
+        chiave_correzione=bool(data.get("chiave_correzione", True)),
+        chiave_minuti=int(data.get("chiave_minuti") or 30),
     )
 
 

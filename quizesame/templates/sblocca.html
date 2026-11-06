@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_icone.html" import icona %}
+{% block title %}Sblocca{% endblock %}
+{% block breadcrumb %}<a href="/">Corsi</a> <span class="sep">›</span> <span class="current">Sblocca</span>{% endblock %}
+{% block content %}
+<div class="card riquadro-sblocca">
+  <h1>{{ icona("lucchetto", 22) }} Serve la chiave</h1>
+  <p class="muted" style="margin-top:0">Questa operazione è protetta dalla chiave di sblocco: inserita, vale per tutta la sessione.</p>
+  {% if errore %}<div class="flash flash-error">{{ errore }}</div>{% endif %}
+  {% if avviso %}<div class="flash flash-warning">{{ avviso }}</div>{% endif %}
+  <form method="post" action="/sblocca" autocomplete="off">
+    <input type="hidden" name="__azione" value="{{ azione }}">
+    <input type="hidden" name="__metodo" value="{{ metodo }}">
+    <input type="hidden" name="__campi" value="{{ campi | tojson | forceescape }}">
+    <label for="campo-chiave">Chiave</label>
+    <input type="password" id="campo-chiave" name="__chiave" autofocus required style="max-width:18rem">
+    <div class="barra-pulsanti">
+      <button type="submit" class="solo-icona" data-info="Sblocca e continua" aria-label="Sblocca e continua">{{ icona("lucchetto-aperto", 18) }}</button>
+      <a href="javascript:history.back()" class="icona-azione">{{ icona("indietro", 14) }} indietro</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

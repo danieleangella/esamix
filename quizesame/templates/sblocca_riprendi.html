@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><title>Sbloccato</title></head>
+<body>
+{# sbloccata la sessione: si reinvia il modulo interrotto, con i dati com'erano #}
+<form method="post" action="{{ azione }}" id="riprendi">
+  {% for k, v in campi %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <noscript><button type="submit">Continua</button></noscript>
+</form>
+<script>document.getElementById("riprendi").submit();</script>
+</body></html>

@@ -20,6 +20,7 @@ from fastapi.templating import Jinja2Templates
 from quizesame import config
 from quizesame.services import corsi as corsi_service
 from quizesame.services import backup_appello as backup_appello_service
+from quizesame.services import chiave as chiave_service
 from quizesame.services import studenti as studenti_service
 from quizesame.services import esercizi as esercizi_service
 from quizesame.services import compiti as compiti_service
@@ -134,6 +135,17 @@ def _corso_chiuso(tag: str) -> bool:
 
 
 templates.env.globals["corso_chiuso"] = _corso_chiuso
+
+
+def _stato_chiave(request) -> str:
+    """"" senza chiave impostata, altrimenti "sbloccata" o "bloccata" (per il lucchetto in alto)."""
+    if not chiave_service.attiva():
+        return ""
+    token = request.cookies.get(chiave_service.COOKIE, "") if request is not None else ""
+    return "sbloccata" if token in chiave_service._sessioni else "bloccata"
+
+
+templates.env.globals["stato_chiave"] = _stato_chiave
 templates.env.globals["static_version"] = _static_version
 templates.env.globals["get_app_settings"] = app_config_service.get_settings
 templates.env.globals["riassunto_aule"] = aule_service.riassunto_assegnazione
@@ -203,6 +215,107 @@ async def registra_azioni(request: Request, call_next):
         esercizio_id=int(m.group(3)) if m and m.group(3) else None,
         gravita=gravita, percorso=percorso, metodo=request.method,
     )
+    return risposta
+
+
+@app.middleware("http")
+async def controlla_chiave(request: Request, call_next):
+    """Chiave di sblocco (vedi services/chiave.py): le azioni protette, a sessione
+    bloccata, passano dalla pagina che chiede la chiave; i dati di un modulo inviato non
+    si perdono (si reinviano dopo lo sblocco). Ogni richiesta di una sessione sbloccata
+    ne rinnova l'attività."""
+    token = request.cookies.get(chiave_service.COOKIE, "")
+    if chiave_service.attiva() and chiave_service.sbloccata(token):
+        return await call_next(request)
+    percorso = request.url.path
+    if not chiave_service.protetta(request.method, percorso):
+        return await call_next(request)
+    azione = percorso + (f"?{request.url.query}" if request.url.query else "")
+    if "application/json" in request.headers.get("accept", "") or percorso.endswith("/svolgimenti/valuta"):
+        return JSONResponse({"errore": "Serve la chiave: sbloccala dal lucchetto in alto"}, status_code=403)
+    if request.method == "GET":
+        return templates.TemplateResponse(request, "sblocca.html", {"azione": azione, "metodo": "GET", "campi": []})
+    tipo = request.headers.get("content-type", "")
+    if tipo.startswith("application/x-www-form-urlencoded"):
+        modulo = await request.form()
+        campi = [(k, v) for k, v in modulo.multi_items() if isinstance(v, str)]
+        return templates.TemplateResponse(request, "sblocca.html", {"azione": azione, "metodo": "POST", "campi": campi})
+    # file caricati: non si possono conservare, si torna alla pagina di prima
+    torna = request.headers.get("referer", "/")
+    return templates.TemplateResponse(request, "sblocca.html", {"azione": torna, "metodo": "GET", "campi": [],
+                                                              "avviso": "Dopo lo sblocco ricarica il file."})
+
+
+@app.get("/sblocca", response_class=HTMLResponse)
+def pagina_sblocca(request: Request, torna: str = "/"):
+    """Sblocco dal lucchetto in alto: inserita la chiave, si torna alla pagina di prima."""
+    if not torna.startswith("/") or torna.startswith("//"):
+        torna = "/"
+    return templates.TemplateResponse(request, "sblocca.html", {"azione": torna, "metodo": "GET", "campi": []})
+
+
+@app.post("/sblocca", response_class=HTMLResponse)
+async def sblocca(request: Request):
+    """Verifica la chiave e sblocca la sessione; poi riprende l'azione interrotta."""
+    modulo = await request.form()
+    azione = modulo.get("__azione") or "/"
+    if not azione.startswith("/") or azione.startswith("//"):
+        azione = "/"
+    metodo = modulo.get("__metodo") or "GET"
+    campi = json.loads(modulo.get("__campi") or "[]")
+    if not chiave_service.verifica(modulo.get("__chiave") or ""):
+        import asyncio
+        await asyncio.sleep(1)  # niente tentativi a raffica
+        return templates.TemplateResponse(request, "sblocca.html", {
+            "azione": azione, "metodo": metodo, "campi": campi, "errore": "Chiave sbagliata"}, status_code=403)
+    token = chiave_service.nuova_sessione()
+    if metodo == "POST":
+        risposta = templates.TemplateResponse(request, "sblocca_riprendi.html", {"azione": azione, "campi": campi})
+    else:
+        risposta = RedirectResponse(azione, status_code=303)
+    risposta.set_cookie(chiave_service.COOKIE, token, httponly=True, samesite="lax")
+    return risposta
+
+
+@app.post("/blocca")
+def blocca(request: Request):
+    chiave_service.chiudi_sessione(request.cookies.get(chiave_service.COOKIE, ""))
+    risposta = RedirectResponse(request.headers.get("referer", "/"), status_code=303)
+    risposta.delete_cookie(chiave_service.COOKIE)
+    return risposta
+
+
+@app.post("/impostazioni/chiave")
+async def imposta_chiave(request: Request):
+    """Imposta, cambia o toglie la chiave di sblocco; per cambiarla o toglierla serve
+    quella attuale."""
+    modulo = await request.form()
+    attuale = modulo.get("attuale") or ""
+    nuova = (modulo.get("nuova") or "").strip()
+    ripeti = (modulo.get("ripeti") or "").strip()
+    protegge = bool(modulo.get("correzione"))
+    try:
+        minuti = int(modulo.get("minuti") or chiave_service.MINUTI_PREDEFINITI)
+    except ValueError:
+        minuti = chiave_service.MINUTI_PREDEFINITI
+    azione = modulo.get("azione") or "opzioni"
+    if chiave_service.attiva() and azione in ("cambia", "togli") and not chiave_service.verifica(attuale):
+        return flash_redirect("/impostazioni", "Chiave attuale sbagliata: niente è cambiato", "error", anchor="chiave")
+    if azione == "togli":
+        chiave_service.imposta("", protegge, minuti)
+        return flash_redirect("/impostazioni", "Chiave di sblocco tolta", anchor="chiave")
+    if azione == "opzioni":
+        chiave_service.imposta_opzioni(protegge, minuti)
+        return flash_redirect("/impostazioni", "Impostazioni della chiave salvate", anchor="chiave")
+    if nuova != ripeti:
+        return flash_redirect("/impostazioni", "Le due chiavi scritte non coincidono", "error", anchor="chiave")
+    try:
+        chiave_service.imposta(nuova, protegge, minuti)
+    except ValueError as e:
+        return flash_redirect("/impostazioni", str(e), "error", anchor="chiave")
+    # chi la imposta è già sbloccato
+    risposta = flash_redirect("/impostazioni", "Chiave di sblocco impostata", anchor="chiave")
+    risposta.set_cookie(chiave_service.COOKIE, chiave_service.nuova_sessione(), httponly=True, samesite="lax")
     return risposta
 
 

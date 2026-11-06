@@ -36,6 +36,43 @@
   </form>
 </section>
 
+<section class="card riquadro-impostazioni" id="chiave">
+  {% set imp = app_settings %}
+  <h2>{{ icona("lucchetto", 17) }} Chiave di sblocco {{ info("Facoltativa. Se impostata, le operazioni pericolose (ripristini, eliminazioni, migrazione, verbalizzazioni) e, se scegli, anche l'inserimento e la modifica degli esiti chiedono la chiave; le pagine restano tutte visibili. Inserita, vale per la sessione finché non resta inattiva per i minuti indicati. Si conserva solo un'impronta, mai la chiave in chiaro: se la dimentichi, toglila dal file app_settings.json.") }}</h2>
+  <form method="post" action="/impostazioni/chiave" autocomplete="off">
+    {% if imp.chiave_impronta %}
+    <p style="margin:0 0 0.5rem"><span class="badge badge-ok">attiva</span></p>
+    <label class="riga-opzione"><input type="checkbox" name="correzione" value="1" {% if imp.chiave_correzione %}checked{% endif %}> anche per inserire o modificare gli esiti</label>
+    <label class="riga-opzione">bloccata dopo <input type="number" name="minuti" value="{{ imp.chiave_minuti }}" min="1" style="width:5rem"> minuti di inattività</label>
+    <div class="barra-pulsanti">
+      <button type="submit" name="azione" value="opzioni" class="solo-icona" data-info="Salva le opzioni" aria-label="Salva le opzioni">{{ icona("salva", 16) }}</button>
+    </div>
+    <details class="dettaglio-fisarmonica" style="margin-top:0.6rem">
+      <summary>Cambia o togli la chiave</summary>
+      <div class="form-grid" style="margin-top:0.5rem">
+        <div><label>Chiave attuale</label><input type="password" name="attuale"></div>
+        <div><label>Nuova chiave</label><input type="password" name="nuova"></div>
+        <div><label>Ripeti la nuova</label><input type="password" name="ripeti"></div>
+      </div>
+      <div class="barra-pulsanti">
+        <button type="submit" name="azione" value="cambia" class="solo-icona" data-info="Cambia la chiave" aria-label="Cambia la chiave">{{ icona("salva", 16) }}</button>
+        <button type="submit" name="azione" value="togli" class="solo-icona danger" data-info="Togli la chiave (serve quella attuale)" aria-label="Togli la chiave">{{ icona("lucchetto-aperto", 16) }}</button>
+      </div>
+    </details>
+    {% else %}
+    <div class="form-grid">
+      <div><label>Nuova chiave</label><input type="password" name="nuova" minlength="4"></div>
+      <div><label>Ripeti</label><input type="password" name="ripeti" minlength="4"></div>
+    </div>
+    <label class="riga-opzione"><input type="checkbox" name="correzione" value="1" checked> anche per inserire o modificare gli esiti</label>
+    <label class="riga-opzione">bloccata dopo <input type="number" name="minuti" value="30" min="1" style="width:5rem"> minuti di inattività</label>
+    <div class="barra-pulsanti">
+      <button type="submit" name="azione" value="cambia" class="solo-icona" data-info="Imposta la chiave" aria-label="Imposta la chiave">{{ icona("lucchetto", 16) }}</button>
+    </div>
+    {% endif %}
+  </form>
+</section>
+
 <section class="card riquadro-impostazioni">
   <h2>Manutenzione</h2>
   <div class="elenco-operazioni">
