@@ -189,6 +189,7 @@ dice cosa fare adesso. In tutti gli elenchi di studenti, cliccando il nome si ap
 - **Copia del compito** di uno studente (PDF da scaricare, non salvato) con dati, risposte e
   risposta giusta e data segnate; a corso concluso, il PDF con **tutti gli esercizi dell'anno**.
 - Avvisi di **compiti simili** salvati con la correzione, nei risultati e nella pagina Note.
+- **Backup di un appello** (file JSON con tutti i suoi dati) da scaricare e, dopo conferma, reinserire.
 - **Tema scuro** più contrastato; in correzione Tab prende l'unico suggerimento.
 - **Statistiche** dell'appello calcolate sui compiti corretti, con quanti sono sui consegnati.
 - **Verbalizzazione** (con l'esportazione dei voti nel file della segreteria) e

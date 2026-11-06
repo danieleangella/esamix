@@ -157,6 +157,18 @@
     </p>
   </section>
 
+  <section class="card riquadro-impostazioni">
+    <h2>Backup {{ info("Tutti i dati di questo appello (esercizi assegnati, compiti stampati, iscritti, presenze, aule, risultati, note, bozze) in un file da conservare. Reinserirlo sostituisce i dati attuali, dopo una conferma; i PDF si rigenerano.") }}</h2>
+    <div class="barra-pulsanti" style="margin-top:0">
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/backup.json" class="button solo-icona" data-info="Scarica il backup dell'appello" aria-label="Scarica il backup dell'appello">{{ icona("scarica", 16) }}</a>
+      <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/ripristina" enctype="multipart/form-data" class="inline form-ripristina-appello">
+        <label class="button secondary solo-icona" data-info="Reinserisci un backup (chiede conferma)" aria-label="Reinserisci un backup" style="margin:0">
+          {{ icona("carica", 16) }}<input type="file" name="file" accept=".json,application/json" hidden onchange="this.form.submit()">
+        </label>
+      </form>
+    </div>
+  </section>
+
   {% if raggruppamento %}
   <section class="card riquadro-impostazioni">
     <h2>Ammissione e media {{ info("La media combina i voti di: " ~ (raggruppamento.membri | map(attribute='nome') | join(', ')) ~ ". Conta solo chi ha superato la soglia di ciascuna prova; la media è sufficiente se supera il voto minimo del corso (" ~ corso.votomin ~ "). Alle prove successive alla prima è ammesso chi ha superato la precedente; singoli studenti si ammettono a mano (in deroga) dalla scheda Compiti d'esame della prova.") }}</h2>
@@ -321,7 +333,7 @@
           {% elif r.esito != 'voto' %}{{ r.esito }}
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
           {% else %}{{ r.voto }}{% if r.richiede_orale and r.orale_svolto %} <span class="badge badge-ok">orale svolto</span>{% endif %}{% endif %}
-          {% if r.convocazione_orale and r.esito == 'voto' %} <span class="badge badge-warn" data-info="Conta solo se confermata nell'ultima prova del raggruppamento">convocato all'orale</span>{% endif %}
+          {% if r.convocazione_orale and r.esito == 'voto' %} <span class="badge badge-warn" data-info="Convocato all'orale: conta solo se confermato nell'ultima prova del raggruppamento">orale</span>{% endif %}
           {% if r.verbalizzato %}
           {% if r.esito == 'voto' and r.voto is not none %}
           <span class="badge {{ 'badge-ok' if r.voto >= votomin_effettivo else 'badge-err' }}">{{ 'superato' if r.voto >= votomin_effettivo else 'insufficiente' }} verbalizzato {{ r.data_verbalizzazione or "" }}</span>

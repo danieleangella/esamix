@@ -36,7 +36,7 @@
   {% for p in r.prove if p.nota_correzione or p.convocazione_orale %}
   <tr class="riga-nota-carriera"><td colspan="3">{{ icona("nota", 12) }} <span class="muted">{{ p.nome }}:</span>
     {% if p.nota_correzione %}<span style="white-space:pre-line">{{ p.nota_correzione }}</span>{% endif %}
-    {% if p.convocazione_orale %}<span class="badge badge-warn">convocato all'orale</span>{% if p.orale_motivazione %} {{ p.orale_motivazione }}{% endif %}{% endif %}</td></tr>
+    {% if p.convocazione_orale %}<span class="badge badge-warn" data-info="Convocato all'orale">orale</span>{% if p.orale_motivazione %} {{ p.orale_motivazione }}{% endif %}{% endif %}</td></tr>
   {% endfor %}
   {% endif %}
   {% if r.nota_correzione or (r.richiede_orale and r.orale_motivazione) %}

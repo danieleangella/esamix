@@ -12,7 +12,7 @@
   --su-accento: #ffffff;
   --ok-bg: #e8f7ee; --ok-text: #166534; --ok-border: #a7dcb9; --ok-strong: #34a853;
   --err-bg: #fdecec; --err-text: #991b1b; --err-border: #f3b7b7; --err-strong: #d93025;
-  --warn-bg: #fff7e6; --warn-text: #92400e; --warn-border: #f5d9a8; --warn-strong: #d97706; --warn-strong-text: #b45309;
+  --warn-bg: #fff2e0; --warn-text: #c25400; --warn-border: #fbc98c; --warn-strong: #f08000; --warn-strong-text: #d15c00;
   --info-bg: #dbeafe; --info-text: #1d4ed8; --info-border: #93c5fd;
   --aperta-bg: #eef4ff;
   --neutro-strong: #9aa0a6;
@@ -35,8 +35,8 @@
     --border: #343c4a; --border-strong: #4d5769;
     --accent: #6f9dff; --accent-soft: #223152; --accent-border: #4362a3; --su-accento: #0a0f1c;
     --ok-bg: #143823; --ok-text: #7af0ac; --ok-border: #2f7a4f; --ok-strong: #44c977;
-    --err-bg: #451d20; --err-text: #ffa8a8; --err-border: #8a3a3f; --err-strong: #ff6b5e;
-    --warn-bg: #43310f; --warn-text: #ffd27a; --warn-border: #8a6620; --warn-strong: #f0a531; --warn-strong-text: #ffbf5c;
+    --err-bg: #451d20; --err-text: #ff7a70; --err-border: #8a3a3f; --err-strong: #ff6b5e;
+    --warn-bg: #452a0c; --warn-text: #ffa53d; --warn-border: #a2611b; --warn-strong: #ff8c1a; --warn-strong-text: #ffa53d;
     --info-bg: #1c3158; --info-text: #a9c6ff; --info-border: #4566a8;
     --aperta-bg: #1c2a4f;
     --neutro-strong: #8a93a3;
@@ -57,8 +57,8 @@
   --border: #343c4a; --border-strong: #4d5769;
   --accent: #6f9dff; --accent-soft: #223152; --accent-border: #4362a3; --su-accento: #0a0f1c;
   --ok-bg: #143823; --ok-text: #7af0ac; --ok-border: #2f7a4f; --ok-strong: #44c977;
-  --err-bg: #451d20; --err-text: #ffa8a8; --err-border: #8a3a3f; --err-strong: #ff6b5e;
-  --warn-bg: #43310f; --warn-text: #ffd27a; --warn-border: #8a6620; --warn-strong: #f0a531; --warn-strong-text: #ffbf5c;
+  --err-bg: #451d20; --err-text: #ff7a70; --err-border: #8a3a3f; --err-strong: #ff6b5e;
+  --warn-bg: #452a0c; --warn-text: #ffa53d; --warn-border: #a2611b; --warn-strong: #ff8c1a; --warn-strong-text: #ffa53d;
   --info-bg: #1c3158; --info-text: #a9c6ff; --info-border: #4566a8;
   --aperta-bg: #1c2a4f;
   --neutro-strong: #8a93a3;
@@ -1104,7 +1104,7 @@ button.pulsante-tema:hover { color: var(--text); background: var(--bg); filter: 
   --su-accento: #ffffff;
   --ok-bg: #e8f7ee; --ok-text: #166534; --ok-border: #a7dcb9; --ok-strong: #34a853;
   --err-bg: #fdecec; --err-text: #991b1b; --err-border: #f3b7b7; --err-strong: #d93025;
-  --warn-bg: #fff7e6; --warn-text: #92400e; --warn-border: #f5d9a8; --warn-strong: #d97706; --warn-strong-text: #b45309;
+  --warn-bg: #fff2e0; --warn-text: #c25400; --warn-border: #fbc98c; --warn-strong: #f08000; --warn-strong-text: #d15c00;
   --info-bg: #dbeafe; --info-text: #1d4ed8; --info-border: #93c5fd;
   --aperta-bg: #eef4ff;
   --neutro-strong: #9aa0a6;

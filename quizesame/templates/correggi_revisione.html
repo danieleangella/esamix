@@ -151,7 +151,7 @@
       · {% if p.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% elif p.esito != 'voto' and p.esito != 'rifiutato' %}{{ p.esito }}{% else %}voto {{ p.voto if p.voto is not none else '–' }}{% endif %}
       {% if p.codice %}· compito <a href="/corsi/{{ corso.tag }}/appelli/{{ p.appello_id }}/risultati/{{ v.matricola }}" target="_blank" rel="noopener"
          class="codice-compito" data-info="Scheda completa del compito (in un'altra pagina)">{{ p.codice }}</a>{% endif %}
-      {% if p.convocato %}<span class="badge badge-warn">convocato all'orale</span>{% endif %}</div>
+      {% if p.convocato %}<span class="badge badge-warn" data-info="Convocato all'orale">orale</span>{% endif %}</div>
     <ul>
       {% if p.nota %}<li><span class="muted">Nota sul voto:</span> <span style="white-space:pre-line">{{ p.nota }}</span></li>{% endif %}
       {% if p.orale %}<li><span class="muted">Nota per l'orale:</span> {{ p.orale }}</li>{% endif %}
@@ -348,7 +348,6 @@
     <strong class="barra-nome">{{ v.cognome }} {{ v.nome }}</strong>
     <span><span class="muted">matricola</span> <strong>{{ v.matricola }}</strong></span>
     <span><span class="muted">compito</span> <strong class="codice-compito">{{ v.codice }}</strong></span>
-    <span class="muted suggerimento-tastiera"><kbd>Invio</kbd> conferma il punteggio e passa al successivo</span>
   </div>
   <div class="barra-riga">
     <div class="barra-voto" aria-live="polite">
@@ -363,7 +362,7 @@
       <button type="button" class="pulsante-icona pulsante-neutro" id="btn-nota-voto"
               data-info="Nota sul voto finale (solo per il docente)" aria-label="Nota sul voto finale">{{ icona("nota", 17) }}</button>
       <div class="barra-voto-stato">
-        <span class="muted">calcolato <strong id="voto-calcolato">{{ v.voto_base }}</strong></span>
+        <span class="muted" id="box-calcolato" {% if not voto_a_mano %}hidden{% endif %}>calcolato <strong id="voto-calcolato">{{ v.voto_base }}</strong></span>
         <button type="button" class="pulsante-icona pulsante-neutro" id="btn-voto-calcolato" hidden
                 data-info="Torna al voto calcolato, annullando le modifiche a mano" aria-label="Usa il voto calcolato">{{ icona("ricarica", 14) }}</button>
         <span id="stato-voto"></span>
@@ -372,9 +371,9 @@
     <div class="barra-orale">
       <label class="etichetta-check">
         <input type="checkbox" id="checkbox-richiedi-orale" {% if richiedi_orale_checked and orale_possibile %}checked{% endif %} {% if not orale_possibile %}disabled{% endif %}>
-        {% if convocazione %}{{ "Conferma la convocazione all'orale" if convocazione.precedente else "Convoca all'orale" }}{% else %}Orale{% endif %}
+        Orale
       </label>
-      {% if convocazione %}{{ info("Ultima prova: la convocazione confermata qui comparirà nei risultati complessivi; senza spunta lo studente non è convocato." if convocazione.ultima else "La convocazione comparirà nei risultati complessivi solo se confermata nell'ultima prova: nella prossima ti verrà riproposta.") }}{% endif %}
+      {% if convocazione %}{{ info("Convocazione all'orale. Ultima prova: la convocazione confermata qui comparirà nei risultati complessivi; senza spunta lo studente non è convocato." if convocazione.ultima else "La convocazione comparirà nei risultati complessivi solo se confermata nell'ultima prova: nella prossima ti verrà riproposta.") }}{% endif %}
       <span class="muted" id="avviso-orale"></span>
     </div>
     <div class="barra-pulsanti-correzione">
@@ -569,10 +568,12 @@
     var motivoAMano = totaleAMano ? "cambiato a mano" : "esercizi rivalutati a mano";
     // il voto rosso basta a dire che è insufficiente; giallo (mai rosso) finché resta da confermare
     statoVoto.textContent = c.daConfermare
-      ? "provvisorio: " + c.daConfermare + " puntegg" + (c.daConfermare === 1 ? "io" : "i") + " da confermare"
+      ? c.daConfermare + " da confermare"
       : (aMano ? motivoAMano : "");
     statoVoto.className = "stato-voto" + (c.daConfermare ? " provvisorio" : (aMano ? " a-mano" : ""));
     btnUsaCalcolato.hidden = !aMano;
+    // il voto calcolato si mostra solo quando quello finale è stato cambiato
+    document.getElementById("box-calcolato").hidden = !aMano;
     avvisoNota.hidden = !totaleAMano || notaCorrezione.value.trim() !== "";
     if (totaleAMano) mostraNotaVoto(false);
     btnNotaVoto.classList.toggle("attivo", notaCorrezione.value.trim() !== "");

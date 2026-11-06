@@ -312,7 +312,7 @@
           {% elif r.esito != 'voto' %}{{ r.esito }}
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="{{ classe_voto }}">({{ scritto }})</span>
           {% else %}<span class="{{ classe_voto }}">{{ r.voto }}</span>{% if r.richiede_orale and r.orale_svolto %} <span class="badge badge-ok">orale svolto</span>{% endif %}{% endif %}
-          {% if r.convocazione_orale and r.esito == 'voto' %} <span class="badge badge-warn" data-info="Conta solo se confermata nell'ultima prova del raggruppamento">convocato all'orale</span>{% endif %}
+          {% if r.convocazione_orale and r.esito == 'voto' %} <span class="badge badge-warn" data-info="Convocato all'orale: conta solo se confermato nell'ultima prova del raggruppamento">orale</span>{% endif %}
           {% if r.nota_correzione %}<span class="nota-risultato" tabindex="0" data-info="{{ r.nota_correzione }}" aria-label="Nota: {{ r.nota_correzione }}">{{ icona("nota", 12) }} nota</span>{% endif %}
           {% if r.verbalizzato %}
           {% if r.esito == 'voto' and r.voto is not none %}

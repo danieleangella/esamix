@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_icone.html" import icona %}
+{% block title %}Ripristina · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#impostazioni">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Ripristina</span>
+{% endblock %}
+{% block content %}
+<h1>Ripristina {{ appello.nome }} dal backup</h1>
+<div class="card">
+  <p style="margin-top:0"><strong>{{ nome_file }}</strong> <span class="muted">· salvato il {{ (r.creato_il or '')|replace('T', ' alle ') }}</span></p>
+  <table data-senza-filtri style="max-width:30rem">
+    <tr><th></th><th>Ora</th><th>Nel backup</th></tr>
+    <tr><td>Risultati</td><td>{{ r.attuali.risultati }}</td><td><strong>{{ r.nel_backup.risultati }}</strong></td></tr>
+    <tr><td>Compiti stampati</td><td>{{ r.attuali.compiti }}</td><td><strong>{{ r.nel_backup.compiti }}</strong></td></tr>
+    <tr><td>Bozze</td><td>{{ r.attuali.bozze }}</td><td><strong>{{ r.nel_backup.bozze }}</strong></td></tr>
+  </table>
+  {% if r.esercizi_mancanti %}
+  <p class="flash flash-error">Mancano nella banca del corso alcuni esercizi del backup ({{ r.esercizi_mancanti|join(', ') }}): il ripristino non è possibile.</p>
+  {% else %}
+  <p class="flash flash-warning">Tutti i dati attuali dell'appello (esercizi assegnati, compiti, iscritti, presenze, risultati, bozze…)
+    saranno <strong>sostituiti</strong> da quelli del backup. Conviene scaricare prima un backup dello stato attuale.</p>
+  <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/ripristina/conferma" id="form-ripristina-appello">
+    <input type="hidden" name="dati" value="{{ dati }}">
+    <label>Per confermare scrivi <strong>RIPRISTINA</strong></label>
+    <input name="conferma" class="campo-conferma-testo" data-frase-attesa="RIPRISTINA" autocomplete="off" style="max-width:20rem">
+    <div class="barra-pulsanti">
+      <button type="submit" class="danger btn-conferma-testo" disabled>{{ icona("carica", 14) }} Ripristina</button>
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/backup.json" class="icona-azione">{{ icona("scarica", 14) }} backup dello stato attuale</a>
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#impostazioni" class="icona-azione">{{ icona("chiudi", 14) }} annulla</a>
+    </div>
+  </form>
+  <script>attivaConfermaTestuale(document.getElementById("form-ripristina-appello"));</script>
+  {% endif %}
+</div>
+{% endblock %}

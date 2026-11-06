@@ -1,4 +1,5 @@
 import base64
+import base64
 import json
 import math
 import os
@@ -18,6 +19,7 @@ from fastapi.templating import Jinja2Templates
 
 from quizesame import config
 from quizesame.services import corsi as corsi_service
+from quizesame.services import backup_appello as backup_appello_service
 from quizesame.services import studenti as studenti_service
 from quizesame.services import esercizi as esercizi_service
 from quizesame.services import compiti as compiti_service
@@ -3037,6 +3039,46 @@ def dettaglio_risultato(request: Request, tag: str, appello_id: int, matricola: 
         "dettaglio_esercizi_disponibile": dettaglio["dettaglio_esercizi_disponibile"],
         "altri_corsi": studenti_service.storico_altri_corsi(tag, matricola),
     })
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/backup.json")
+def scarica_backup_appello(tag: str, appello_id: int):
+    """Tutti i dati di un appello in un file JSON (vedi backup_appello)."""
+    try:
+        nome, contenuto = backup_appello_service.crea_backup(tag, appello_id)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}", str(e), "error")
+    return Response(contenuto, media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="{nome}"'})
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/ripristina", response_class=HTMLResponse)
+async def ripristina_appello(request: Request, tag: str, appello_id: int, file: UploadFile = File(...)):
+    """Carica un backup dell'appello e mostra cosa cambierebbe, da confermare."""
+    appello = corsi_service.get_appello(tag, appello_id)
+    contenuto = await file.read()
+    try:
+        riepilogo = backup_appello_service.leggi_backup(tag, appello_id, contenuto)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor="impostazioni")
+    return templates.TemplateResponse(request, "ripristina_appello.html", {
+        "corso": corsi_service.get_corso(tag), "appello": appello, "r": riepilogo, "nome_file": file.filename,
+        "dati": base64.b64encode(contenuto).decode("ascii"),
+    })
+
+
+@app.post("/corsi/{tag}/appelli/{appello_id}/ripristina/conferma")
+async def ripristina_appello_conferma(request: Request, tag: str, appello_id: int):
+    form = await request.form()
+    if (form.get("conferma") or "").strip().upper() != "RIPRISTINA":
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Ripristino annullato: manca la conferma", "error",
+                              anchor="impostazioni")
+    try:
+        backup_appello_service.ripristina(tag, appello_id, base64.b64decode(form.get("dati") or ""))
+    except Exception as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", f"Ripristino non riuscito, niente è cambiato: {e}",
+                              "error", anchor="impostazioni")
+    return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", "Dati dell'appello ripristinati dal backup")
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}/copia.pdf")
