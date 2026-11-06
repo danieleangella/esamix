@@ -73,6 +73,29 @@
   {% else %}<p class="muted" style="margin:0">Nessuno studente all'orale.</p>{% endif %}
 </div>
 
+{% if note.simili %}
+<div class="card">
+  <div class="titolo-sezione-correzione"><h2>{{ icona("avviso", 17) }} Compiti simili ({{ note.simili|length }})</h2></div>
+  <table class="tabella-elenco">
+    <thead><tr><th>Studente</th><th>Compito</th><th>Simile a</th><th>Compito</th><th>Risposte uguali</th><th>Errori uguali</th><th>Stampa</th></tr></thead>
+    <tbody>
+    {% for a in note.simili %}
+    <tr>
+      <td>{{ nome_studente(corso.tag, a.di_matricola, a.di_cognome ~ ' ' ~ a.di_nome) }}</td>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ a.di_matricola }}" target="_blank" rel="noopener" class="codice-compito">{{ a.di_codice or '–' }}</a></td>
+      <td>{{ nome_studente(corso.tag, a.matricola, a.cognome ~ ' ' ~ a.nome) }}</td>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ a.matricola }}" target="_blank" rel="noopener" class="codice-compito">{{ a.codice or '–' }}</a></td>
+      <td><strong>{{ a.percentuale }}%</strong>{% if a.identica %} <span class="badge badge-err">identiche</span>{% endif %}
+        {% if a.stesse_scelte %}<div class="muted" style="font-size:0.8rem">stessa risposta a {{ a.stesse_scelte.uguali }} esercizi su {{ a.stesse_scelte.esercizi }}</div>{% endif %}</td>
+      <td>{{ a.errori_comuni }}</td>
+      <td>{% if a.vicini %}<span class="badge badge-warn">vicini</span> {% endif %}<span class="muted" style="font-size:0.8rem">{{ a.vicinanza }}</span></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
 <div class="card">
   <div class="titolo-sezione-correzione"><h2>Note sugli esercizi</h2></div>
   {% if not note.esercizi %}<p class="muted" style="margin:0">Nessuna nota sugli esercizi.</p>{% endif %}

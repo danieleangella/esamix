@@ -464,6 +464,36 @@ def _risposte_simili(conn, appello_id: int, matricola: str, risposte: str,
     return simili
 
 
+def _avviso_simile(s: dict) -> dict:
+    """La parte da conservare di un avviso di compiti simili (vedi _risposte_simili)."""
+    return {
+        "matricola": s["matricola"], "nome": s["nome"], "cognome": s["cognome"], "codice": s["codice"],
+        "percentuale": s["percentuale"], "identica": s["identica"], "errori_comuni": s["errori_comuni"],
+        "uguali": s["uguali"], "confrontabili": s["posizioni_confrontabili"],
+        "stesse_scelte": s.get("stesse_scelte"),
+        "vicini": bool(s["vicinanza"] and s["vicinanza"].get("vicini")),
+        "vicinanza": s["vicinanza"]["testo"] if s["vicinanza"] else "",
+    }
+
+
+def _salva_avvisi_simili(conn, appello_id: int, studente, codice: str, simili: list[dict]) -> None:
+    """Salva sul risultato appena registrato gli avvisi di compiti simili, e su ciascuno
+    degli altri compiti quello reciproco (l'altro era stato corretto prima, senza saperlo)."""
+    avvisi = [_avviso_simile(s) for s in simili]
+    conn.execute("UPDATE risultati SET avvisi_simili=? WHERE appello_id=? AND matricola=?",
+                 (json.dumps(avvisi) if avvisi else None, appello_id, studente["matricola"]))
+    for a in avvisi:
+        r = conn.execute("SELECT avvisi_simili FROM risultati WHERE appello_id=? AND matricola=?",
+                         (appello_id, a["matricola"])).fetchone()
+        if r is None:
+            continue
+        suoi = [x for x in json.loads(r["avvisi_simili"] or "[]") if x["matricola"] != studente["matricola"]]
+        suoi.append({**a, "matricola": studente["matricola"], "nome": studente["nome"],
+                     "cognome": studente["cognome"], "codice": codice})
+        conn.execute("UPDATE risultati SET avvisi_simili=? WHERE appello_id=? AND matricola=?",
+                     (json.dumps(suoi), appello_id, a["matricola"]))
+
+
 def completa_aperte(tag: str, appello_id: int, codice: str, risposte: str) -> str:
     """Se sono arrivate solo le lettere delle domande chiuse (senza il "-" delle aperte,
     es. JavaScript disattivato o codice non ancora riconosciuto mentre si scriveva), le
@@ -803,6 +833,8 @@ def conferma_risultato(
                 json.dumps(rivalutazioni) if rivalutazioni else None,
             ),
         )
+        _salva_avvisi_simili(conn, appello_id, studente, codice, _risposte_simili(
+            conn, appello_id, studente["matricola"], risposte, compito["id"], soluzioni.upper()))
         # In una prova di un raggruppamento l'orale è una convocazione segnalata sulla
         # prova: decide l'ultima prova, che la porta (o la toglie) nei risultati complessivi
         _sincronizza_convocazione(conn, raggruppamento_membro, appello_id, matricola)
@@ -1078,6 +1110,24 @@ def note_appello(tag: str, appello_id: int) -> dict:
             (appello_id,))]
     finally:
         conn.close()
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        simili = []
+        visti = set()
+        for r in conn.execute(
+            "SELECT r.matricola, r.avvisi_simili, s.nome, s.cognome FROM risultati r JOIN studenti s ON s.matricola = r.matricola "
+            "WHERE r.appello_id=? AND r.avvisi_simili IS NOT NULL ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
+            (appello_id,),
+        ):
+            for a in json.loads(r["avvisi_simili"]):
+                coppia = frozenset((r["matricola"], a["matricola"]))
+                if coppia in visti:
+                    continue
+                visti.add(coppia)
+                simili.append({**a, "di_matricola": r["matricola"], "di_nome": r["nome"], "di_cognome": r["cognome"],
+                               "di_codice": codici.get(r["matricola"])})
+    finally:
+        conn.close()
     for c in annotati:
         c["codice"] = codici.get(c["matricola"])
     for o in orali:
@@ -1087,7 +1137,7 @@ def note_appello(tag: str, appello_id: int) -> dict:
         voci.sort(key=lambda v: (v["nota"].strip().lower(), v["studente"].lower()))
         esercizi.append({"esercizio_id": esercizio_id, "nome": voci[0]["esercizio_nome"], "voci": voci})
     esercizi.sort(key=lambda e: e["nome"].lower())
-    return {"compiti": annotati, "orali": orali, "esercizi": esercizi}
+    return {"compiti": annotati, "orali": orali, "esercizi": esercizi, "simili": simili}
 
 
 ESITI_ORALE = ("assente", "insufficiente", "voto")
@@ -1385,6 +1435,12 @@ def elimina_risultato(tag: str, appello_id: int, matricola: str) -> None:
                 "INSERT OR IGNORE INTO appello_presenze (matricola, appello_id) VALUES (?,?)", (matricola, appello_id)
             )
         conn.execute("DELETE FROM risultati WHERE matricola=? AND appello_id=?", (matricola, appello_id))
+        # gli avvisi di compiti simili che gli altri avevano con questo
+        for r in conn.execute("SELECT matricola, avvisi_simili FROM risultati WHERE appello_id=? AND avvisi_simili IS NOT NULL",
+                              (appello_id,)).fetchall():
+            restanti = [a for a in json.loads(r["avvisi_simili"]) if a["matricola"] != matricola]
+            conn.execute("UPDATE risultati SET avvisi_simili=? WHERE appello_id=? AND matricola=?",
+                         (json.dumps(restanti) if restanti else None, appello_id, r["matricola"]))
         conn.commit()
     finally:
         conn.close()

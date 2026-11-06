@@ -515,7 +515,8 @@ COMPITO DA CONVERTIRE
     correggere" elenca chi risulta presente e non ancora corretto, con un pulsante che
     precompila la matricola e sposta il focus sul codice, per scorrere gli studenti più
     rapidamente. Una matricola o un codice scritti per intero vengono presi da soli (senza
-    sceglierli dall'elenco dei suggerimenti) e il cursore passa al campo successivo; il codice
+    sceglierli dall'elenco dei suggerimenti) e il cursore passa al campo successivo; con un solo
+    suggerimento, <kbd>Tab</kbd> lo prende e passa al campo dopo; il codice
     si giudica inesistente solo da 4 caratteri in su (o uscendo dal campo).
     Si arriva sempre a un riepilogo prima di salvare: in alto studente e codice, poi le
     risposte come caselle colorate (in alto la lettera letta, sotto quella giusta: verde
@@ -533,9 +534,10 @@ COMPITO DA CONVERTIRE
     <strong>nota sul voto finale</strong>, visibile solo al docente, per scriverne il motivo;
     l'icona della nota accanto al voto la apre comunque), la spunta dell'<strong>orale</strong>
     (solo con un voto sufficiente: spuntandola la pagina scende alla nota per l'orale, con la
-    motivazione) e le icone per annullare, salvare come bozza e confermare. Finché resta un
-    punteggio da confermare il voto è provvisorio e Conferma propone di salvare la correzione
-    come <strong>bozza</strong>. La bozza tiene da parte matricola, codice e risposte, con quanto
+    motivazione) e le icone per annullare, salvare come bozza e confermare. Finché resta uno
+    svolgimento da confermare il voto è giallo, Conferma è spento (un clic dice quanti ne mancano
+    e porta al primo) e il pulsante principale è <strong>Salva come bozza</strong>; un compito
+    insufficiente ha il voto in rosso e <kbd>Invio</kbd> lo registra. La bozza tiene da parte matricola, codice e risposte, con quanto
     già fatto (punteggi confermati, note, rivalutazioni, nota, voto scelto a mano e orale), senza
     registrare nessun esito: riprendendola si ritrova tutto com'era. La
     correzione compare nell'elenco "Correzioni da completare" della scheda, pronta da riprendere o da scartare in
@@ -547,6 +549,9 @@ COMPITO DA CONVERTIRE
     esercizio (con punteggio e risposta), con il link alla scheda completa di quel compito.
   </p>
   <p>
+    Gli avvisi di compiti simili si salvano con la correzione (anche sul compito dell'altro
+    studente): nei risultati un'icona di attenzione accanto al nome, nella scheda del compito
+    con chi e quanto, e nella pagina Note l'elenco di tutte le coppie.
     Se le risposte sono molto simili a quelle di un altro compito già corretto, un avviso lo
     segnala; aprendo "Dettagli e confronto" si vedono le due griglie lettera per lettera (le
     lettere uguali evidenziate, gli stessi errori in rosso), quante risposte uguali sono
@@ -573,8 +578,8 @@ COMPITO DA CONVERTIRE
     di più. Un punteggio confermato diverso da quello previsto apre da solo la nota
     sull'esercizio, per annotarne la ragione. Se il compito è insufficiente già dalla griglia
     (anche con tutti gli svolgimenti al massimo resterebbe sotto il minimo, o manca un
-    obbligatorio) la correzione degli esercizi è inattiva e si conferma l'insufficienza; la
-    matita accanto all'avviso la attiva comunque. Le domande aperte richiedono sempre un punteggio
+    obbligatorio) la correzione degli esercizi resta visibile ma inattiva e si conferma
+    l'insufficienza; la matita accanto al voto, nella barra in basso, la attiva comunque. Le domande aperte richiedono sempre un punteggio
     assegnato a mano, fino a un massimo impostabile nelle Impostazioni del corso ("Punteggio
     massimo domanda aperta", può superare i punti di una risposta corretta). Gli altri esercizi
     sono già confermati col punteggio calcolato: la <strong>matita</strong> lo cambia. Ogni
@@ -584,7 +589,8 @@ COMPITO DA CONVERTIRE
   </p>
   <p>
     Su <strong>ogni esercizio</strong> si può scrivere una nota (la apre l'icona della nota;
-    è già aperta se c'è una nota o se il punteggio è stato cambiato): si sceglie tra quelle già scritte sullo stesso esercizio negli altri
+    è già aperta se c'è una nota o se il punteggio è stato cambiato; il cestino accanto la
+    cancella): si sceglie tra quelle già scritte sullo stesso esercizio negli altri
     compiti, o la si scrive a mano. Mentre la si scrive, sotto compaiono in piccolo le note
     simili, con i punteggi; passando sopra col mouse si vede l'elenco con studente, punteggio e
     nota (un punteggio diverso da quelli dati con note simili è evidenziato). L'icona
@@ -614,6 +620,14 @@ COMPITO DA CONVERTIRE
     punteggi e note già scritti. Per uno studente che deve fare l'orale in ogni appello la
     casella "Richiedi l'orale" parte spuntata, e toglierla chiede conferma; con uno scritto
     insufficiente l'orale non si può richiedere e il voto si salva normalmente.
+  </p>
+  <p>
+    Dalla scheda del compito di uno studente si scarica una <strong>copia del compito</strong>
+    (PDF, non salvato): lo stesso foglio stampato, con cognome, nome, matricola e risposte
+    nell'intestazione e, negli esercizi, la risposta giusta e quella data segnate.
+    A corso concluso (tutti gli appelli chiusi), accanto all'anno in home e nell'intestazione
+    del corso c'è il PDF (e il .tex) con i testi di tutti gli esercizi dell'anno, appello per
+    appello, con tutte le varianti, le risposte giuste e le soluzioni.
   </p>
   <p>
     Un esito già inserito si può modificare in qualsiasi momento (voto e/o risposte, con

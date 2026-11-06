@@ -95,6 +95,18 @@
   function creaAutocomplete(input, suggerimentiEl, urlBuilder, renderEtichetta, campoValore, onRisultati, renderStato) {
     var timer = null;
     var ultimaRichiesta = 0;
+    var ultimi = { dati: [], valore: null };  // gli ultimi suggerimenti e per cosa
+    function scegli(item) {
+      input.value = campoValore(item);
+      suggerimentiEl.style.display = "none";
+      if (onRisultati) onRisultati([item], campoValore(item));
+    }
+    // Tab con un solo suggerimento per quanto scritto: lo prende e si passa al campo dopo
+    input.addEventListener("keydown", function (ev) {
+      if (ev.key !== "Tab" || ev.shiftKey) return;
+      if (ultimi.dati.length === 1 && ultimi.valore === input.value.trim()
+          && campoValore(ultimi.dati[0]) !== input.value.trim()) scegli(ultimi.dati[0]);
+    });
     input.addEventListener("input", function () {
       clearTimeout(timer);
       var valore = input.value.trim();
@@ -109,6 +121,7 @@
           // scarta la risposta se nel frattempo è partita una richiesta più recente
           // (altrimenti una risposta lenta e superata può sovrascrivere risultati più freschi)
           if (richiestaId !== ultimaRichiesta) return;
+          ultimi = { dati: dati, valore: valore };
           suggerimentiEl.innerHTML = "";
           if (onRisultati) onRisultati(dati, valore);
           if (!dati.length) { suggerimentiEl.style.display = "none"; return; }
@@ -128,11 +141,7 @@
               span.textContent = stato;
               div.appendChild(span);
             }
-            div.addEventListener("click", function () {
-              input.value = campoValore(item);
-              suggerimentiEl.style.display = "none";
-              if (onRisultati) onRisultati([item], campoValore(item));
-            });
+            div.addEventListener("click", function () { scegli(item); });
             suggerimentiEl.appendChild(div);
           });
           suggerimentiEl.style.display = "";

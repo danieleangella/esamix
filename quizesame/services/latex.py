@@ -7,6 +7,7 @@ LatexContext costruito a partire dai dati dell'appello/corso nel database.
 import copy
 import random
 from dataclasses import dataclass
+from typing import Optional
 from random import randint
 
 
@@ -160,7 +161,7 @@ def intestazione_breve(ctx: LatexContext) -> str:
 _CASELLE_PER_RIGA = 12
 
 
-def _griglia_risposte(posizioni: list[dict]) -> str:
+def _griglia_risposte(posizioni: list[dict], lettere: Optional[str] = None) -> str:
     """Tabella con il numero dell'esercizio sopra e la casella vuota sotto, in cui lo
     studente scrive la lettera; per una domanda aperta la casella contiene un trattino
     (non c'è una lettera da scrivere). Con molti esercizi va a capo ogni _CASELLE_PER_RIGA,
@@ -176,7 +177,10 @@ def _griglia_risposte(posizioni: list[dict]) -> str:
             separatore = "|" if ultima or (inizio + k + 1) % 5 else "!{\\vrule width 0.8pt}"
             colonne += ">{\\centering\\arraybackslash}p{0.62cm}" + separatore
         numeri = " & ".join(f"{{\\footnotesize {inizio + k + 1}}}" for k in range(len(gruppo)))
-        caselle = " & ".join("{\\Large --}" if p["aperta"] else "" for p in gruppo)
+        # copia di un compito corretto (`lettere`): nelle caselle le risposte date
+        caselle = " & ".join(
+            "{\\Large --}" if p["aperta"] else (f"{{\\Large\\bfseries {lettere[inizio + k]}}}" if lettere else "")
+            for k, p in enumerate(gruppo))
         # un unico fondo bianco dietro la tabella (sul grigio dell'intestazione): un fondo per
         # cella coprirebbe le righe verticali tra le caselle
         righe.append(
@@ -186,12 +190,24 @@ def _griglia_risposte(posizioni: list[dict]) -> str:
     return "\\\\[0.6cm]\n".join(righe)
 
 
-def intestazione(ctx: LatexContext, codice, posizioni: list[dict]) -> str:
+def intestazione(ctx: LatexContext, codice, posizioni: list[dict], compilato: Optional[dict] = None) -> str:
     """Intestazione del compito dello studente: corso, prova e data con il codice del
     compito ben visibile; poi i dati dello studente su righe ampie da scrivere a mano, la
     griglia delle risposte (vedi _griglia_risposte) e il riquadro del voto. Etichette in
     tondo o grassetto, mai in corsivo, per la leggibilità (anche per studenti con DSA)."""
     linea = "\\rule[-2pt]{{{}}}{{0.4pt}}"
+    if compilato:
+        # copia di un compito corretto: i dati dello studente scritti sulle righe
+        def campo(chiave, larghezza):
+            return (f"\\underline{{\\makebox[{larghezza}][l]{{\\enspace "
+                    f"{_escape_testo_semplice(compilato[chiave])}}}}}")
+        riga_nomi = (f"\\noindent{{\\bfseries Cognome}}\\enspace{campo('cognome', '0.36\\textwidth')}"
+                     f"\\hfill{{\\bfseries Nome}}\\enspace{campo('nome', '0.36\\textwidth')}\\par\n")
+        riga_matricola = f"\\noindent{{\\bfseries Matricola}}\\enspace{campo('matricola', '0.30\\textwidth')}\\par\n"
+    else:
+        riga_nomi = ("\\noindent{\\bfseries Cognome}\\enspace" + linea.format("0.36\\textwidth")
+                     + "\\hfill{\\bfseries Nome}\\enspace" + linea.format("0.36\\textwidth") + "\\par\n")
+        riga_matricola = "\\noindent{\\bfseries Matricola}\\enspace" + linea.format("0.30\\textwidth") + "\\par\n"
     return (
         # tutta l'intestazione su un fondo grigio chiarissimo (le caselle da scrivere restano bianche)
         "\\noindent\\colorbox{black!5}{\\begin{minipage}{\\dimexpr\\textwidth-2\\fboxsep}\\vspace{2pt}\n"
@@ -206,17 +222,16 @@ def intestazione(ctx: LatexContext, codice, posizioni: list[dict]) -> str:
         "\\end{minipage}}\\par\n"
         "\\vspace{0.35cm}\n\n"
         # dati dello studente
-        "\\noindent{\\bfseries Cognome}\\enspace" + linea.format("0.36\\textwidth")
-        + "\\hfill{\\bfseries Nome}\\enspace" + linea.format("0.36\\textwidth") + "\\par\n"
+        + riga_nomi +
         "\\vspace{0.4cm}\n"
-        "\\noindent{\\bfseries Matricola}\\enspace" + linea.format("0.30\\textwidth") + "\\par\n"
+        + riga_matricola +
         "\\vspace{0.3cm}\n\n"
         # griglia delle risposte e voto
         "\\noindent\\begin{minipage}[t]{0.76\\textwidth}\\raggedright\n"
         # sopra e sotto la griglia un po' di spazio, per annotare a mano i punteggi in
         # correzione (non troppo: non deve servire agli studenti né rubare spazio al testo)
         "{\\bfseries Risposte}\\par\\vspace{0.55cm}\n"
-        f"{_griglia_risposte(posizioni)}\\par\\vspace{{0.6cm}}\n"
+        f"{_griglia_risposte(posizioni, compilato['risposte'] if compilato else None)}\\par\\vspace{{0.6cm}}\n"
         "\\end{minipage}\\hfill\n"
         "\\begin{minipage}[t]{0.20\\textwidth}\\raggedleft\n"
         "\\vspace{0.4cm}\n"
@@ -262,15 +277,26 @@ def _prefisso_obbligatorio(ctx: LatexContext, obbligatorio: bool) -> str:
     return f"\\textbf{{{frase}}} " if frase else ""
 
 
-def tex_esercizio(ctx: LatexContext, exx, obbligatorio: bool = False, evidenzia_corretta: bool = False) -> str:
+def tex_esercizio(ctx: LatexContext, exx, obbligatorio: bool = False, evidenzia_corretta: bool = False,
+                  segna: Optional[tuple[str, str]] = None) -> str:
     """`evidenzia_corretta` (fogli di riferimento, dove la corretta è sempre la prima):
     segna la risposta A con un segno di spunta e in grassetto. La lettera va dalla
-    posizione e non dal testo, che potrebbe ripetersi tra due risposte."""
+    posizione e non dal testo, che potrebbe ripetersi tra due risposte. `segna` (copia di
+    un compito corretto): (lettera giusta, lettera data), segnate entrambe."""
     testo, risposte = exx[0], exx[1]
     out = "\n\\begin{ex}\n" + _prefisso_obbligatorio(ctx, obbligatorio) + testo + "\n\\begin{description}\n"
     for k, sol in enumerate(risposte):
         lettera = LETTERE.get(k, str(k + 1))
-        if evidenzia_corretta and k == 0:
+        if segna:
+            giusta, data = segna
+            if lettera == giusta:
+                out += f"\\item[{lettera} $\\checkmark$] \\textbf{{{sol}}}"
+                out += " \\fbox{\\scriptsize risposta data}\n" if lettera == data else "\n"
+            elif lettera == data:
+                out += f"\\item[{lettera} $\\times$] {sol} \\fbox{{\\scriptsize risposta data}}\n"
+            else:
+                out += f"\\item[{lettera}] {sol}\n"
+        elif evidenzia_corretta and k == 0:
             out += f"\\item[{lettera} $\\checkmark$] \\textbf{{{sol}}}\n"
         else:
             out += f"\\item[{lettera}] {sol}\n"
@@ -480,6 +506,45 @@ def crea_file_anteprima(ctx: LatexContext, esercizi_struct: list[dict]) -> str:
     return tex
 
 
+def crea_tex_esercizi_anno(ctx: LatexContext, appelli: list[tuple[str, str, list[dict]]]) -> str:
+    """Tutti i testi degli esercizi dell'anno, a corso concluso: per ogni appello (nome,
+    data, esercizi come per crea_file_anteprima), in ordine di data, ogni esercizio con
+    tutte le sue varianti, la risposta giusta segnata e l'eventuale soluzione."""
+    tex = BEGIN_DOCUMENT.replace("\\begin{document}\n", "\\setlength{\\parindent}{0pt}\n\\raggedbottom\n\\begin{document}\n")
+    tex += intestazione_breve(ctx)
+    n_esercizi = sum(len(es) for _, _, es in appelli)
+    tex += _titolo_documento("Esercizi dell'anno", f"{_quanti(len(appelli), 'appello', 'appelli')}, "
+                             f"{_quanti(n_esercizi, 'esercizio', 'esercizi')}")
+    for n, (nome, data, esercizi) in enumerate(appelli):
+        if n:
+            tex += "\\clearpage\n"
+        tex += ("\\noindent\\colorbox{black!10}{\\parbox{\\dimexpr\\linewidth-2\\fboxsep}{\\strut"
+                f"{{\\large\\bfseries {_escape_testo_semplice(nome)}}}\\hfill {_escape_testo_semplice(data)}}}}}\\par\\medskip\n")
+        for i, es in enumerate(esercizi, start=1):
+            etichetta = f"{i}. {_escape_testo_semplice(es.get('nome') or 'Esercizio')}"
+            if es.get("obbligatorio"):
+                etichetta += " {\\small (obbligatorio)}"
+            if es.get("aperta"):
+                etichetta += " {\\small (domanda aperta)}"
+            tex += f"\\pagebreak[2]\\medskip\\noindent{{\\bfseries {etichetta}}}\\par\\smallskip\n"
+            varianti = es["varianti"]
+            for j, v in enumerate(varianti, start=1):
+                if len(varianti) > 1:
+                    tex += f"{{\\small\\color{{black!60}}Variante {j}}}\\par\n"
+                tex += v["testo"] + "\\par\n"
+                if not es.get("aperta") and v["risposte"]:
+                    tex += "\\begin{description}\\setlength{\\itemsep}{0pt}\n"
+                    for k, r in enumerate(v["risposte"]):
+                        segno = " $\\checkmark$" if k == 0 else ""
+                        tex += f"\\item[{LETTERE.get(k, k + 1)}{segno}] {r}\n"
+                    tex += "\\end{description}\n"
+                tex += "\\smallskip\n"
+            if es.get("soluzione"):
+                tex += _box_soluzione(es["soluzione"])
+    tex += "\n\\end{document}"
+    return tex
+
+
 def _intestazione_esercizio_anteprima(numero: int, totale: int, es: dict) -> str:
     """Barra grigia a tutta larghezza con numero e nome dell'esercizio, così l'inizio di
     ogni esercizio si riconosce a colpo d'occhio anche sfogliando il foglio stampato."""
@@ -535,19 +600,23 @@ def _riquadro_revisione(numero: int, es: dict) -> str:
     )
 
 
-def pagina_compito(ctx: LatexContext, codice, posizioni: list[dict]) -> str:
+def pagina_compito(ctx: LatexContext, codice, posizioni: list[dict], compilato: Optional[dict] = None) -> str:
     """Il foglio di un singolo studente: intestazione con codice e griglia, esercizi su due
     colonne nell'ordine di `posizioni` (ciascuna con testo, risposte nell'ordine stampato,
     obbligatorio, aperta) e regole in fondo. Usata sia per generare un blocco nuovo sia per
-    ricostruire, con la grafica attuale, i compiti già generati (stessi codici e ordine)."""
-    tex = intestazione(ctx, codice, posizioni)
+    ricostruire, con la grafica attuale, i compiti già generati (stessi codici e ordine).
+    `compilato` (copia di un compito corretto): {cognome, nome, matricola, risposte (le
+    lettere date), soluzioni (quelle giuste)}, scritti nell'intestazione e segnati negli
+    esercizi."""
+    tex = intestazione(ctx, codice, posizioni, compilato)
     # testo allineato a sinistra: giustificato, nelle colonne strette, lascia spazi enormi
     tex += "\\begin{small}\n\n\\begin{multicols}{2}\n\\raggedright\n\\setcounter{ex}{0}\n"
-    for p in posizioni:
+    for i, p in enumerate(posizioni):
         if p["aperta"]:
             tex += tex_esercizio_aperto(ctx, p["testo"], p["obbligatorio"])
         else:
-            tex += tex_esercizio(ctx, [p["testo"], p["risposte"]], p["obbligatorio"])
+            segna = (compilato["soluzioni"][i], compilato["risposte"][i]) if compilato else None
+            tex += tex_esercizio(ctx, [p["testo"], p["risposte"]], p["obbligatorio"], segna=segna)
         tex += _separatore_esercizio()
     tex += "\\end{multicols}\n\\end{small}\n\n\\vfill\n"
     tex += regole(ctx)

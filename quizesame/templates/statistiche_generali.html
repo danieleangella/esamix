@@ -30,7 +30,7 @@
       </label>
       {% endfor %}
     </div>
-    <button type="submit">Aggiorna statistiche</button>
+    <button type="submit" class="solo-icona" data-info="Aggiorna statistiche" aria-label="Aggiorna statistiche">{{ icona("ricarica", 16) }}</button>
   </form>
   <script>
   (function () {
@@ -176,8 +176,7 @@
   <summary><strong>Distribuzione dei voti</strong></summary>
   {% if statistiche.distribuzione.bins %}
   <p class="muted" style="margin-top:0.75rem">
-    Media {{ statistiche.distribuzione.media }}, deviazione standard {{ statistiche.distribuzione.dev_std }}.
-    La linea rossa è la curva gaussiana teorica con la stessa media e deviazione standard.
+    Media {{ statistiche.distribuzione.media }}, deviazione standard {{ statistiche.distribuzione.dev_std }}. <span class="muted" data-info="La linea rossa è la curva gaussiana con la stessa media e deviazione standard">· in rosso la gaussiana</span>
   </p>
   <div style="overflow-x:auto">
     <svg viewBox="0 0 {{ statistiche.distribuzione.larghezza }} {{ statistiche.distribuzione.altezza + 40 }}" width="100%" style="color:var(--text)">

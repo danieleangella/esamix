@@ -4,7 +4,7 @@
 <div class="tab-pane" data-pane="presenze{{ pane_suffix }}" style="display:none">
   {% if md.appello.chiuso %}
   <div class="card">
-    <p class="muted">Appello chiuso: per registrare presenze, ritirati o nuovi studenti, riaprilo prima dalla scheda Chiusura.</p>
+    <p class="muted" style="margin:0">{{ icona("lucchetto", 14) }} Appello chiuso: si riapre dalla scheda Chiusura.</p>
   </div>
   {% else %}
   {% set riepilogo = md.riepilogo_presenze %}
@@ -25,7 +25,7 @@
       <div style="display:flex; gap:0.5rem">
         {% if md.appello.presenze_chiuse %}
         <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze/riapri">
-          <button type="submit" class="secondary">{{ icona("lucchetto-aperto", 14) }} Riapri registro</button>
+          <button type="submit" class="secondary solo-icona" data-info="Riapri registro" aria-label="Riapri registro">{{ icona("lucchetto-aperto", 16) }}</button>
         </form>
         {% else %}
         <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/presenze/chiudi"
@@ -328,7 +328,7 @@
         <div><label class="campo-obbligatorio">Cognome</label><input name="cognome" required></div>
         <div><label class="campo-obbligatorio">Nome</label><input name="nome" required></div>
       </div>
-      <button type="submit" style="margin-top:0.5rem">Registra</button>
+      <button type="submit" style="margin-top:0.5rem" class="solo-icona" data-info="Registra" aria-label="Registra">{{ icona("utente-piu", 16) }}</button>
     </form>
   </details>
 

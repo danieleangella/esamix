@@ -72,7 +72,7 @@
       <div><label class="campo-obbligatorio">Nome</label><input name="nome" required placeholder="es. Primo appello"></div>
       <div><label>Data</label><input type="date" name="data" min="2001-01-01" max="2099-12-31"></div>
     </div>
-    <button type="submit">Crea appello</button>
+    <button type="submit" class="solo-icona" data-info="Crea appello" aria-label="Crea appello">{{ icona("piu", 16) }}</button>
   {{ info("Voto minimo ed esercizi obbligatori si ereditano dalle impostazioni del corso (una soglia dedicata si applica alle prove di un raggruppamento). Gli esercizi si assegnano dalla scheda Testo dell'appello, dopo averlo creato.") }}
   </form>
 </details>
@@ -88,7 +88,7 @@
     {% for a in appelli %}
     <div><label style="display:inline"><input type="checkbox" name="membri" value="{{ a.id }}" style="width:auto"> {{ a.nome }}</label></div>
     {% endfor %}
-    <button type="submit">Crea raggruppamento</button>
+    <button type="submit" class="solo-icona" data-info="Crea raggruppamento" aria-label="Crea raggruppamento">{{ icona("piu", 16) }}</button>
   </form>
 </details>
 {% else %}

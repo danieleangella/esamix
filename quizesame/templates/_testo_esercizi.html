@@ -130,7 +130,7 @@
   {% if not md.appello.chiuso %}
   <form class="barra-strumenti" method="post" action="{{ url }}/testo/riapri" style="margin-top:0.5rem"
         onsubmit="return confirm({{ ('Riaprire il testo per modificarlo?' ~ (' Alla prima modifica i ' ~ md.blocchi|length ~ ' blocchi di compiti già generati verranno rigenerati con nuovi codici: quelli già stampati non saranno più validi.' if md.blocchi else ''))|js }});">
-    <button type="submit" class="secondary pulsante-piccolo" style="margin:0">{{ icona("matita", 14) }} Riapri il testo</button>
+    <button type="submit" class="secondary pulsante-piccolo solo-icona" style="margin:0" data-info="Riapri il testo" aria-label="Riapri il testo">{{ icona("matita", 16) }}</button>
     {% if md.appello.testo_chiuso_il %}<span class="muted">chiuso il {{ md.appello.testo_chiuso_il }}</span>{% endif %}
   </form>
   {% endif %}
@@ -144,13 +144,13 @@
 
   {% if not chiuso %}
   <div class="barra-strumenti barra-testo">
-    <button type="button" class="icona-azione" data-apri="nuovo">{{ icona("piu", 14) }} Nuovo esercizio</button>
+    <button type="button" class="icona-azione solo-icona" data-apri="nuovo" data-info="Nuovo esercizio" aria-label="Nuovo esercizio">{{ icona("piu", 16) }}</button>
     {% if md.esercizi_disponibili %}
     <button type="button" class="icona-azione" data-apri="banca" data-info="Esercizi della banca di questo corso non ancora assegnati">{{ icona("banca", 14) }} Dalla banca ({{ md.esercizi_disponibili|length }})</button>
     {% endif %}
-    <button type="button" class="icona-azione" data-apri="altri" data-info="Esercizi di altri corsi o degli anni precedenti">{{ icona("copia", 14) }} Da altri corsi</button>
-    <button type="button" class="icona-azione" data-apri="ia" data-info="Nuovi esercizi sul modello delle prove analoghe degli anni precedenti">{{ icona("scintille", 14) }} Genera con l'IA</button>
-    <button type="button" class="icona-azione" data-apri="file" data-info="Un compito intero da un unico file (es. la risposta di claude.ai o un .json esportato)">{{ icona("carica", 14) }} Importa da file</button>
+    <button type="button" class="icona-azione solo-icona" data-apri="altri" data-info="Esercizi di altri corsi o degli anni precedenti" aria-label="Da altri corsi">{{ icona("copia", 16) }}</button>
+    <button type="button" class="icona-azione solo-icona" data-apri="ia" data-info="Nuovi esercizi sul modello delle prove analoghe degli anni precedenti" aria-label="Genera con l'IA">{{ icona("scintille", 16) }}</button>
+    <button type="button" class="icona-azione solo-icona" data-apri="file" data-info="Un compito intero da un unico file (es. la risposta di claude.ai o un .json esportato)" aria-label="Importa da file">{{ icona("carica", 16) }}</button>
     {% if md.esercizi_assegnati %}
     <a class="icona-azione barra-strumenti-fine" href="{{ url }}/esercizi/esporta" data-info="Scarica gli esercizi di questo appello (testo e varianti) in un file .json, da importare altrove">{{ icona("scarica", 14) }} Esporta</a>
     {% endif %}
@@ -218,7 +218,7 @@
   {% if md.esercizi_assegnati and not chiuso %}
   <form class="barra-conclusione form-chiudi-testo" method="post" action="{{ url }}/testo/chiudi" style="margin-top:0.75rem"
         data-obbligatori="{{ n_obbligatori }}" data-attesi="{{ md.consegna_effettivo if md.consegna_effettivo is defined else '' }}">
-    <button type="submit" style="margin:0">{{ icona("lucchetto", 14) }} Chiudi il testo</button>
+    <button type="submit" style="margin:0" class="solo-icona" data-info="Chiudi il testo" aria-label="Chiudi il testo">{{ icona("lucchetto", 16) }}</button>
     {{ info("Quando il testo è definitivo: gli esercizi non si potranno più modificare (neanche dalla banca) finché non lo riapri, si generano i fogli da pubblicare (senza e con soluzioni) e si possono creare i compiti.") }}
   </form>
   {% endif %}

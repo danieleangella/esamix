@@ -16,6 +16,10 @@
     <a href="/corsi/{{ tag }}/appelli/{{ risultato.appello_id }}/risultati/{{ risultato.matricola }}" target="_blank" rel="noopener" class="link-con-icona">{{ icona("file", 14) }} Scheda completa del compito {{ icona("esterno", 12) }}</a>
     {% endif %}
     <a href="/corsi/{{ tag }}/studenti/{{ risultato.matricola }}" target="_blank" rel="noopener" class="link-con-icona">{{ icona("utente-spunta", 14) }} Carriera completa {{ icona("esterno", 12) }}</a>
+    {% if risultato.codice and risultato.esito in ('voto', 'rifiutato') %}
+    <a href="/corsi/{{ tag }}/appelli/{{ risultato.appello_id }}/risultati/{{ risultato.matricola }}/copia.pdf" class="link-con-icona"
+       data-info="Copia del compito (PDF da scaricare, non salvato): lo stesso foglio con nome, matricola e risposte, e negli esercizi la risposta giusta e quella data">{{ icona("stampa", 14) }} Copia del compito</a>
+    {% endif %}
   </p>
   {% if risultato.esito == 'annullato' %}
   <p><span class="badge badge-err">Compito annullato</span>{% if risultato.annullamento_nota %} — {{ risultato.annullamento_nota }}{% endif %}</p>
@@ -46,6 +50,10 @@
     {% endif %}
     {% if risultato.insufficiente_per_obbligatorio %} · <span class="badge badge-warn">insufficiente per obbligatorio non svolto</span>{% endif %}
     </dd>
+    {% set simili = risultato.avvisi_simili | from_json if risultato.avvisi_simili else [] %}
+    {% if simili %}<dt class="testo-avviso">{{ icona("avviso", 13) }} Simile a</dt>
+    <dd>{% for a in simili %}<strong>{{ a.cognome }} {{ a.nome }}</strong> <span class="muted">{{ a.matricola }}{% if a.codice %} · compito {{ a.codice }}{% endif %}</span>:
+      {{ a.percentuale }}% di risposte uguali{% if a.identica %} (identiche){% endif %}{% if a.errori_comuni %}, {{ a.errori_comuni }} errori uguali{% endif %}{% if a.vicinanza %}; {{ a.vicinanza }}{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}</dd>{% endif %}
     {% if risultato.nota_correzione %}<dt>Nota sul voto</dt><dd style="white-space:pre-line">{{ risultato.nota_correzione }}</dd>{% endif %}
     {% if risultato.richiede_orale or risultato.convocazione_orale %}
     <dt>Orale</dt>
@@ -160,6 +168,5 @@
   <p class="muted">Registrato nel corso, ma senza risultati.</p>
   {% endif %}
   {% endfor %}
-  <p style="margin:1rem 0 0"><a href="/corsi/{{ tag }}/studenti/{{ risultato.matricola }}" class="button secondary" target="_blank" rel="noopener">{{ icona("utente-spunta", 14) }} Pagina dello studente {{ icona("esterno", 12) }}</a></p>
   </div>
 </div>

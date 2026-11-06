@@ -122,6 +122,16 @@ templates.env.filters["markdown_ia"] = analisi_ia_service.markdown_html
 # sempre la versione attuale di un PDF rigenerato invece di mostrarne una copia conservata
 templates.env.globals["versione_link"] = lambda: str(int(__import__("time").time()))
 templates.env.filters["js"] = lambda value: json.dumps(str(value))
+templates.env.filters["from_json"] = lambda value: json.loads(value) if value else None
+
+
+def _corso_chiuso(tag: str) -> bool:
+    """Corso concluso: ha appelli e sono tutti chiusi."""
+    appelli = corsi_service.list_appelli(tag)
+    return bool(appelli) and all(a.chiuso for a in appelli)
+
+
+templates.env.globals["corso_chiuso"] = _corso_chiuso
 templates.env.globals["static_version"] = _static_version
 templates.env.globals["get_app_settings"] = app_config_service.get_settings
 templates.env.globals["riassunto_aule"] = aule_service.riassunto_assegnazione
@@ -892,6 +902,33 @@ def elimina_corso(tag: str):
     except ValueError as e:
         return flash_redirect(f"/corsi/{tag}/impostazioni", str(e), "error")
     return flash_redirect("/", f"Corso '{tag}' eliminato definitivamente")
+
+
+def _esercizi_anno(tag: str, formato: str):
+    """Testi di tutti gli esercizi dell'anno, disponibili a corso concluso."""
+    if not _corso_chiuso(tag):
+        return flash_redirect(f"/corsi/{tag}", "I testi degli esercizi dell'anno si raccolgono quando il corso è chiuso", "error")
+    try:
+        tex_path = compiti_service.genera_esercizi_anno(tag)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}", str(e), "error")
+    if formato == "tex":
+        return PlainTextResponse(tex_path.read_text(encoding="utf-8"), media_type="application/x-tex")
+    compilazione = compiti_service.compila_pdf(tex_path)
+    if not compilazione.ok:
+        return flash_redirect(f"/corsi/{tag}", compilazione.messaggio, "error", dettaglio=compilazione.errore_dettagliato or "")
+    return FileResponse(compilazione.pdf_path, media_type="application/pdf", filename=compilazione.pdf_path.name,
+                        content_disposition_type="inline")
+
+
+@app.get("/corsi/{tag}/esercizi-anno.pdf")
+def esercizi_anno_pdf(tag: str):
+    return _esercizi_anno(tag, "pdf")
+
+
+@app.get("/corsi/{tag}/esercizi-anno.tex")
+def esercizi_anno_tex(tag: str):
+    return _esercizi_anno(tag, "tex")
 
 
 @app.post("/corsi/{tag}/chiudi")
@@ -3000,6 +3037,28 @@ def dettaglio_risultato(request: Request, tag: str, appello_id: int, matricola: 
         "dettaglio_esercizi_disponibile": dettaglio["dettaglio_esercizi_disponibile"],
         "altri_corsi": studenti_service.storico_altri_corsi(tag, matricola),
     })
+
+
+@app.get("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}/copia.pdf")
+def copia_compito_pdf(tag: str, appello_id: int, matricola: str):
+    """Copia del compito corretto di uno studente (vedi compiti.tex_copia_compito): si
+    compila in una cartella temporanea, si scarica e non resta salvata."""
+    import tempfile
+    appello = corsi_service.get_appello(tag, appello_id)
+    try:
+        nome, tex = compiti_service.tex_copia_compito(tag, appello_id, matricola)
+    except ValueError as e:
+        return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", str(e), "error", anchor=_anchor_membro(appello, "valutazione"))
+    with tempfile.TemporaryDirectory() as cartella:
+        tex_path = Path(cartella) / f"{nome}.tex"
+        tex_path.write_text(tex, encoding="utf-8")
+        compilazione = compiti_service.compila_pdf(tex_path)
+        if not compilazione.ok:
+            return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}", compilazione.messaggio,
+                                  "error", dettaglio=compilazione.errore_dettagliato or "")
+        contenuto = compilazione.pdf_path.read_bytes()
+    return Response(contenuto, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{nome}.pdf"'})
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/risultati/{matricola}/dettaglio-inline", response_class=HTMLResponse)

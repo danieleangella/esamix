@@ -81,8 +81,8 @@
     {% if profili_ia|length > 1 %}{% set appello = {'id': 'analisi'} %}{% include "_scelta_profilo_ia.html" %}{% endif %}
     <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-top:0.75rem">
       {% if fornitore_ia %}<button type="submit" class="btn-analizza" style="margin:0">{{ icona("scintille", 14) }} Analizza con l'IA</button>{% endif %}
-      <button type="button" class="{{ 'secondary' if fornitore_ia else '' }} btn-copia-prompt" style="margin:0">{{ icona("copia", 14) }} Copia il prompt</button>
-      <button type="button" class="secondary btn-scarica-prompt" style="margin:0">{{ icona("scarica", 14) }} Scarica il prompt</button>
+      <button type="button" class="{{ 'secondary' if fornitore_ia else '' }} btn-copia-prompt solo-icona" style="margin:0" data-info="Copia il prompt" aria-label="Copia il prompt">{{ icona("copia", 16) }}</button>
+      <button type="button" class="secondary btn-scarica-prompt solo-icona" style="margin:0" data-info="Scarica il prompt" aria-label="Scarica il prompt">{{ icona("scarica", 16) }}</button>
       <span class="muted stato-analisi" role="status"></span>
     </div>
     <p class="muted" style="margin-bottom:0">

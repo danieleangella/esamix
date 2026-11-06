@@ -123,8 +123,8 @@
     <details style="margin-top:0.5rem" data-chiave="riassunto">
       <summary>Riassunto da comunicare agli studenti {{ info("Come sono distribuiti nelle aule: per ogni aula l'intervallo di cognomi e l'aula che accoglie i DSA/L104, senza nomi né numeri. Copialo in un avviso o in un'email.") }}</summary>
       <pre class="riassunto-aule">{{ riassunto.testo }}</pre>
-      <button type="button" class="secondary pulsante-piccolo btn-copia-riassunto" style="margin-top:0.4rem"
-              onclick="var b=this; copiaTesto(b.previousElementSibling.textContent, b.parentElement).then(function (ok) { if (ok) { b.textContent='Copiato!'; setTimeout(function () { b.textContent='Copia'; }, 1500); } });">{{ icona("copia", 13) }} Copia</button>
+      <button type="button" class="secondary pulsante-piccolo btn-copia-riassunto solo-icona" style="margin-top:0.4rem"
+              onclick="var b=this; copiaTesto(b.previousElementSibling.textContent, b.parentElement).then(function (ok) { if (ok) { b.textContent='Copiato!'; setTimeout(function () { b.textContent='Copia'; }, 1500); } });" data-info="Copia" aria-label="Copia">{{ icona("copia", 16) }}</button>
     </details>
     {% endif %}
   {% else %}
@@ -184,7 +184,7 @@
       {% if not md.appello.chiuso %}
       <div class="barra-strumenti" style="margin-top:0.6rem">
         {% if modo != "automatica" %}
-        <button type="submit" name="azione" value="anteprima" class="secondary pulsante-piccolo">{{ icona("ricarica", 14) }} Aggiorna anteprima</button>
+        <button type="submit" name="azione" value="anteprima" class="secondary pulsante-piccolo solo-icona" data-info="Aggiorna anteprima" aria-label="Aggiorna anteprima">{{ icona("ricarica", 16) }}</button>
         {% else %}
         <button type="submit" name="azione" value="anteprima" hidden></button>
         {% endif %}

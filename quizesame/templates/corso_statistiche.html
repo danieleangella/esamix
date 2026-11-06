@@ -92,8 +92,7 @@
   <summary><strong>Distribuzione dei voti</strong></summary>
   {% if statistiche.distribuzione.bins %}
   <p class="muted">
-    Media {{ statistiche.distribuzione.media }}, deviazione standard {{ statistiche.distribuzione.dev_std }}.
-    La linea rossa è la curva gaussiana teorica con la stessa media e deviazione standard.
+    Media {{ statistiche.distribuzione.media }}, deviazione standard {{ statistiche.distribuzione.dev_std }}. <span class="muted" data-info="La linea rossa è la curva gaussiana con la stessa media e deviazione standard">· in rosso la gaussiana</span>
   </p>
   <div style="overflow-x:auto">
     <svg viewBox="0 0 {{ statistiche.distribuzione.larghezza }} {{ statistiche.distribuzione.altezza + 40 }}" width="100%" style="color:var(--text)">

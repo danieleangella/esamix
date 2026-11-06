@@ -107,13 +107,13 @@
       <div>
         {% if appello.chiuso %}
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riapri">
-          <button type="submit" class="icona-azione">{{ icona("lucchetto", 14) }} Riapri l'appello</button>
+          <button type="submit" class="icona-azione solo-icona" data-info="Riapri l'appello" aria-label="Riapri l'appello">{{ icona("lucchetto", 16) }}</button>
         </form>
         {{ info("Appello chiuso: correzioni, verbalizzazioni ed esercizi assegnati non sono modificabili finché non lo riapri.") }}
         {% else %}
         <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/chiudi"
               onsubmit="return confirm({{ ('Chiudere l\'appello ' ~ appello.nome ~ '? Non sarà più possibile correggere, verbalizzare o modificare gli esercizi assegnati finché non lo riapri.')|js }});">
-          <button type="submit" class="icona-azione">{{ icona("lucchetto", 14) }} Chiudi l'appello</button>
+          <button type="submit" class="icona-azione solo-icona" data-info="Chiudi l'appello" aria-label="Chiudi l'appello">{{ icona("lucchetto", 16) }}</button>
         </form>
         {{ info("Quando tutti gli idonei sono stati verbalizzati o hanno rifiutato il voto, e non ci sono più orali da svolgere, chiudi l'appello per evitare modifiche accidentali: correzioni, verbalizzazioni ed esercizi assegnati non sono più modificabili finché non lo riapri." ~ (" Chiudere il raggruppamento chiude anche tutte le sue prove." if raggruppamento else "")) }}
         {% endif %}
@@ -362,7 +362,7 @@
     <span><span class="badge badge-ok">✓ correzione conclusa</span> <span class="muted">— i file da pubblicare sono in cima alla scheda</span></span>
     {% if not appello.chiuso %}
     <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riapri-correzione-scritto" style="margin-left:auto">
-      <button type="submit" class="secondary pulsante-piccolo">{{ icona("lucchetto-aperto", 14) }} Riapri la correzione</button>
+      <button type="submit" class="secondary pulsante-piccolo solo-icona" data-info="Riapri la correzione" aria-label="Riapri la correzione">{{ icona("lucchetto-aperto", 16) }}</button>
     </form>
     {% endif %}
     {% elif not appello.chiuso %}
@@ -370,7 +370,7 @@
       {% else %}Tutte le prove hanno chiuso la correzione.{% endif %}</span>
     <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/concludi-correzione-scritto" style="margin-left:auto">
       <button type="submit" {% if prove_aperte %}disabled{% endif %}
-              data-info="{{ 'Si attiva quando ogni prova ha chiuso la sua correzione' if prove_aperte else 'Genera l\'elenco dei risultati combinato e blocca nuove correzioni (si può riaprire)' }}">Chiudi la correzione</button>
+              data-info="{{ 'Si attiva quando ogni prova ha chiuso la sua correzione' if prove_aperte else 'Genera l\'elenco dei risultati combinato e blocca nuove correzioni (si può riaprire)' }}" class="solo-icona" aria-label="Chiudi la correzione">{{ icona("lucchetto", 16) }}</button>
     </form>
     {% endif %}
   </div>

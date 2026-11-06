@@ -338,6 +338,9 @@ ADDITIVE_COLUMNS = {
         # JSON {posizione: punteggio} degli esercizi a risposta chiusa rivalutati (o
         # confermati) a mano dal docente, riproposti quando si modifica la correzione
         ("rivalutazioni", "TEXT"),
+        # JSON [{matricola, nome, cognome, codice, percentuale, ...}]: i compiti dello stesso
+        # appello con risposte molto simili, segnalati correggendo (salvati come le note)
+        ("avvisi_simili", "TEXT"),
     ],
     "bozze_correzione": [
         ("stato", "TEXT"),

@@ -4,6 +4,7 @@
 <header class="intestazione-pagina">
   <div class="intestazione-livello">Corso</div>
   <h1>{{ corso.nome }} <span class="muted">({{ corso.anno }})</span>
+    {% if corso_chiuso(corso.tag) %}{% from "_formati.html" import formati %}<span class="esercizi-anno" data-info="Testi di tutti gli esercizi dell'anno, con le risposte giuste e le soluzioni">{{ formati("/corsi/" ~ corso.tag ~ "/esercizi-anno", pdf=True, tex=True) }}</span>{% endif %}
     {% if corso.importato_da_legacy %}<span class="badge badge-warn" title="Importato da una migrazione dati legacy: i dati potrebbero essere meno completi di quelli inseriti direttamente in questa app">importato</span>{% endif %}
   </h1>
 </header>

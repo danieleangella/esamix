@@ -11,6 +11,7 @@ from quizesame.services import esercizi as esercizi_service
 from quizesame.services import corsi as corsi_service
 from quizesame.services.latex import (
     LatexContext, crea_file_riferimento, crea_file_blocco, crea_file_griglia, crea_file_anteprima, BEGIN_DOCUMENT,
+    crea_tex_esercizi_anno,
 )
 
 
@@ -247,6 +248,66 @@ def genera_anteprima(tag: str, appello_id: int) -> tuple[Path, bool]:
     if cambiato:
         _salva_testo(path, tex)
     return path, cambiato
+
+
+def tex_copia_compito(tag: str, appello_id: int, matricola: str) -> tuple[str, str]:
+    """(nome del file, .tex) della copia del compito corretto di uno studente: lo stesso
+    foglio stampato (stesso codice, esercizi e risposte nello stesso ordine) con cognome,
+    nome, matricola e risposte date scritti nell'intestazione, e negli esercizi la risposta
+    giusta e quella data segnate. Non si salva: lo si compila e lo si scarica."""
+    from quizesame.services.latex import pagina_compito
+    appello = corsi_service.get_appello(tag, appello_id)
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        r = conn.execute(
+            "SELECT r.risposte, r.compito_id, c.codice, c.soluzioni, s.nome, s.cognome FROM risultati r "
+            "JOIN compiti c ON c.id = r.compito_id JOIN studenti s ON s.matricola = r.matricola "
+            "WHERE r.appello_id=? AND r.matricola=?",
+            (appello_id, matricola),
+        ).fetchone()
+    finally:
+        conn.close()
+    if r is None:
+        raise ValueError("Nessun compito registrato per questo studente in questo appello")
+    posizioni = list_posizioni_compito(tag, r["compito_id"])
+    if not posizioni:
+        raise ValueError("Per questo compito non si sa quale esercizio occupi ciascuna posizione")
+    stampate = [{
+        "testo": p.get("testo") or "", "obbligatorio": bool(p["obbligatorio"]), "aperta": bool(p["aperta"]),
+        "risposte": json.loads(p["risposte_mischiate"]) if p.get("risposte_mischiate") else [],
+    } for p in posizioni]
+    risposte = (r["risposte"] or "").upper().ljust(len(stampate), "X")
+    compilato = {"cognome": r["cognome"], "nome": r["nome"], "matricola": matricola,
+                 "risposte": risposte, "soluzioni": (r["soluzioni"] or "").upper()}
+    ctx = _crea_contesto(corsi_service.get_corso(tag), appello)
+    tex = BEGIN_DOCUMENT + pagina_compito(ctx, r["codice"], stampate, compilato) + "\n\\end{document}"
+    return f"compito-{r['codice']}-{matricola}", tex
+
+
+def path_esercizi_anno(tag: str, ext: str) -> Path:
+    return _out_dir(tag) / f"esercizi-{tag}.{ext}"
+
+
+def genera_esercizi_anno(tag: str) -> Path:
+    """Scrive il .tex con i testi di tutti gli esercizi dell'anno (vedi
+    latex.crea_tex_esercizi_anno): ogni appello o prova con esercizi assegnati, in ordine
+    di data. Ritorna il percorso del .tex."""
+    corso = corsi_service.get_corso(tag)
+    appelli = []
+    for a in corsi_service.list_appelli(tag, includi_raggruppamenti=False):
+        try:
+            esercizi = _esercizi_per_generazione(tag, a.id)
+        except ValueError:
+            continue
+        appelli.append((a.nome, a.data or "", esercizi))
+    if not appelli:
+        raise ValueError("Nessun appello con esercizi assegnati in questo corso")
+    primo = corsi_service.list_appelli(tag, includi_raggruppamenti=False)[0]
+    ctx = _crea_contesto(corso, primo)
+    ctx.appello_nome, ctx.appello_data = f"A.A. {corso.anno}" if corso.anno else "", ""
+    path = path_esercizi_anno(tag, "tex")
+    _salva_testo(path, crea_tex_esercizi_anno(ctx, appelli))
+    return path
 
 
 def path_risultati(tag: str, appello_id: int, ext: str, appello=None) -> Path:

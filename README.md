@@ -186,6 +186,10 @@ dice cosa fare adesso. In tutti gli elenchi di studenti, cliccando il nome si ap
 - **Elenchi** di iscritti e ammessi per l'appello in aula: in ordine di cognome e nome, con le
   caselle per presenza, voto finale e orale (in orizzontale quando le colonne sono tante).
   Nel compito, spazio sopra e sotto la griglia delle risposte per annotare i punteggi.
+- **Copia del compito** di uno studente (PDF da scaricare, non salvato) con dati, risposte e
+  risposta giusta e data segnate; a corso concluso, il PDF con **tutti gli esercizi dell'anno**.
+- Avvisi di **compiti simili** salvati con la correzione, nei risultati e nella pagina Note.
+- **Tema scuro** più contrastato; in correzione Tab prende l'unico suggerimento.
 - **Statistiche** dell'appello calcolate sui compiti corretti, con quanti sono sui consegnati.
 - **Verbalizzazione** (con l'esportazione dei voti nel file della segreteria) e
   **Chiusura**, ognuna nella sua scheda.

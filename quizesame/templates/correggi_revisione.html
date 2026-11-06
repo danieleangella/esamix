@@ -79,6 +79,8 @@
             aria-label="Nota su {{ r.esercizio_nome }}">{{ icona("nota", 15) }}</button>
     <input class="campo-nota" name="nota_{{ r.posizione }}" value="{{ nota }}" {% if note_altri %}list="note-es-{{ r.esercizio_id }}"{% endif %}
            placeholder="Nota (facoltativa)" aria-label="Nota su {{ r.esercizio_nome }}">
+    <button type="button" class="pulsante-icona pulsante-neutro btn-cancella-nota" data-info="Cancella la nota"
+            aria-label="Cancella la nota su {{ r.esercizio_nome }}">{{ icona("cestino", 15) }}</button>
     {% if r.esercizio_id is not none %}
     <a class="pulsante-icona pulsante-neutro link-note-esercizio" target="_blank" rel="noopener"
        href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/note-esercizio/{{ r.esercizio_id }}?escludi={{ v.matricola }}"
@@ -118,23 +120,6 @@
 <div class="flash flash-error">
   Le risposte inserite sono {{ v.risposte|length }}, ma questo compito ne ha {{ v.lunghezza_attesa }}:
   correggile qui sotto e ricalcola prima di poter salvare.
-</div>
-{% endif %}
-{# compito insufficiente qualunque punteggio abbiano gli esercizi: la correzione resta
-   inattiva (si conferma l'insufficienza), la matita la attiva comunque #}
-{% if v.non_svolte_obbligatorie %}
-<div class="flash flash-error avviso-insufficiente">
-  <span>Obbligatori<strong> non svolti</strong>: {{ v.non_svolte_obbligatorie | map(attribute='esercizio_nome') | join(', ') }}.
-  Il compito sarà <strong>insufficiente</strong>, qualunque sia il voto{% if svolgimenti_superflui %}: la correzione degli esercizi è disattivata{% endif %}.</span>
-  {% if svolgimenti_superflui %}<button type="button" class="pulsante-icona pulsante-neutro btn-valuta-comunque"
-    data-info="Attiva comunque la correzione, per cambiare i punteggi degli esercizi" aria-label="Attiva la correzione">{{ icona("matita", 15) }}</button>{% endif %}
-</div>
-{% elif svolgimenti_superflui and lunghezza_valida %}
-<div class="flash flash-warning avviso-insufficiente">
-  <span>Il compito è <strong>insufficiente</strong> già dalla griglia: anche con tutti gli svolgimenti al massimo
-  il voto sarebbe {{ voto_massimo }}, sotto il minimo di {{ votomin_effettivo }}. La correzione degli esercizi è disattivata.</span>
-  <button type="button" class="pulsante-icona pulsante-neutro btn-valuta-comunque"
-    data-info="Attiva comunque la correzione, per cambiare i punteggi degli esercizi" aria-label="Attiva la correzione">{{ icona("matita", 15) }}</button>
 </div>
 {% endif %}
 {% if v.codice_duplicato %}
@@ -363,6 +348,11 @@
       <label for="voto-finale">Voto</label>
       <input type="number" name="voto_finale" id="voto-finale" class="seleziona-al-focus" value="{{ voto_proposto if voto_proposto is not none else v.voto_base }}"
              data-info="Voto finale: si aggiorna con i punteggi degli esercizi; scrivilo per cambiarlo a mano">
+      {% if svolgimenti_superflui %}
+      <button type="button" class="pulsante-icona pulsante-neutro" id="btn-attiva-correzione"
+              data-info="{{ 'Obbligatorio non svolto: ' ~ (v.non_svolte_obbligatorie | map(attribute='esercizio_nome') | join(', ')) ~ '. ' if v.non_svolte_obbligatorie else 'Anche con tutti gli svolgimenti al massimo il voto sarebbe ' ~ voto_massimo ~ ', sotto ' ~ votomin_effettivo ~ '. ' }}Il compito è insufficiente: la correzione degli esercizi è disattivata. Attivala per cambiare i punteggi"
+              aria-label="Attiva la correzione degli esercizi">{{ icona("matita", 17) }}</button>
+      {% endif %}
       <button type="button" class="pulsante-icona pulsante-neutro" id="btn-nota-voto"
               data-info="Nota sul voto finale (solo per il docente)" aria-label="Nota sul voto finale">{{ icona("nota", 17) }}</button>
       <div class="barra-voto-stato">
@@ -378,7 +368,7 @@
         {% if convocazione %}{{ "Conferma la convocazione all'orale" if convocazione.precedente else "Convoca all'orale" }}{% else %}Orale{% endif %}
       </label>
       {% if convocazione %}{{ info("Ultima prova: la convocazione confermata qui comparirà nei risultati complessivi; senza spunta lo studente non è convocato." if convocazione.ultima else "La convocazione comparirà nei risultati complessivi solo se confermata nell'ultima prova: nella prossima ti verrà riproposta.") }}{% endif %}
-      <span class="muted" id="avviso-orale">{% if not orale_possibile %}compito insufficiente{% endif %}</span>
+      <span class="muted" id="avviso-orale"></span>
     </div>
     <div class="barra-pulsanti-correzione">
       <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#valutazione" class="pulsante-icona pulsante-neutro pulsante-grande"
@@ -550,7 +540,8 @@
     if (!totaleAMano) votoFinale.value = perEsercizi ? c.rivalutato : c.voto;
     var voto = parseInt(votoFinale.value, 10);
     var insuff = !isNaN(voto) && voto < votomin;
-    votoFinale.classList.toggle("insufficiente", insuff);
+    // rosso se insufficiente (si conferma subito); giallo se restano svolgimenti da confermare
+    votoFinale.classList.toggle("insufficiente", insuff && !c.daConfermare);
     votoFinale.classList.toggle("provvisorio", c.daConfermare > 0);
     var motivoAMano = totaleAMano ? "cambiato a mano" : "esercizi rivalutati a mano";
     statoVoto.textContent = c.daConfermare
@@ -563,15 +554,32 @@
     if (totaleAMano) mostraNotaVoto(false);
     btnNotaVoto.classList.toggle("attivo", notaCorrezione.value.trim() !== "");
     aggiornaOrale(voto);
-    var confermaInsufficienza = inattiva && insuff;
-    conferma.classList.toggle("danger", confermaInsufficienza && !c.daConfermare);
-    conferma.classList.toggle("da-bozza", c.daConfermare > 0);
+    var confermaInsufficienza = insuff && !c.daConfermare;
+    conferma.classList.toggle("danger", confermaInsufficienza);
+    // con svolgimenti da confermare Conferma è spento e il pulsante principale è la bozza
+    conferma.classList.toggle("disattivato", c.daConfermare > 0);
+    conferma.setAttribute("aria-disabled", c.daConfermare > 0 ? "true" : "false");
+    btnBozza.classList.toggle("principale", c.daConfermare > 0);
     var etichetta = c.daConfermare
-      ? c.daConfermare + " puntegg" + (c.daConfermare === 1 ? "io" : "i") + " da confermare: si salverà come bozza"
+      ? avvisoDaConfermare(c.daConfermare)
       : (confermaInsufficienza ? "Conferma l'insufficienza" : (modificaCorrente ? "Salva le modifiche" : "Conferma"));
     conferma.dataset.info = etichetta;
     conferma.setAttribute("aria-label", etichetta);
   }
+
+  function avvisoDaConfermare(n) {
+    return (n === 1 ? "Manca 1 svolgimento" : "Mancano " + n + " svolgimenti") + " da correggere: confermali, o salva la correzione come bozza";
+  }
+  // Conferma spento: dice quanti svolgimenti mancano e porta al primo
+  conferma.addEventListener("click", function (ev) {
+    var n = daConfermare().length;
+    if (!n) return;
+    ev.preventDefault();
+    window.alert(avvisoDaConfermare(n));
+    var primo = daConfermare()[0];
+    primo.scrollIntoView({ block: "center", behavior: "smooth" });
+    vaiAlSuccessivo(null);
+  });
 
   // --- scheda Esito in fondo: nota sul voto e motivazione dell'orale, solo quando servono
   function aggiornaCardEsito() {
@@ -695,6 +703,11 @@
     var nota = riga.querySelector(".campo-nota");
     nota.addEventListener("input", function () { suggerimento(riga); });
     riga.querySelector(".btn-apri-nota").addEventListener("click", function () { apriNota(riga, true); });
+    riga.querySelector(".btn-cancella-nota").addEventListener("click", function () {
+      nota.value = "";
+      riga.querySelector(".es-nota").classList.add("chiusa");
+      suggerimento(riga);
+    });
     if (nota.value) suggerimento(riga);
   });
 
@@ -737,7 +750,7 @@
     zona.querySelectorAll("input.campo-punteggio, .btn-conferma-punteggio, .btn-modifica-punteggio").forEach(function (el) { el.disabled = !attivo; });
   }
   if (inattiva) imposta(false);
-  document.querySelectorAll(".btn-valuta-comunque").forEach(function (btn) {
+  document.querySelectorAll("#btn-attiva-correzione").forEach(function (btn) {
     btn.addEventListener("click", function () {
       inattiva = false;
       zona.classList.remove("zona-inattiva");
@@ -747,7 +760,7 @@
         var input = campo(riga);
         if (input.value.trim() === "") { input.value = riga.dataset.max; input.classList.add("automatico"); }
       });
-      btn.disabled = true;
+      btn.hidden = true;
       aggiorna();
       vaiAlSuccessivo(null);
     });
@@ -790,16 +803,10 @@
       avvisaFuoriIntervallo(fuori);
       return;
     }
-    // punteggi non confermati: la correzione si salva come bozza
-    var n = daConfermare().length;
-    if (n) {
+    // svolgimenti ancora da confermare (Invio da tastiera su Conferma): non si registra
+    if (daConfermare().length) {
       ev.preventDefault();
-      if (window.confirm(n + (n === 1 ? " punteggio non è ancora confermato" : " punteggi non sono ancora confermati") +
-          ": la correzione si salva come bozza, da riprendere in \"Correzioni da completare\". Salvare come bozza?")) {
-        form.requestSubmit(btnBozza);
-      } else {
-        vaiAlSuccessivo(null);
-      }
+      conferma.click();
       return;
     }
     if (inviato) { ev.preventDefault(); return; }

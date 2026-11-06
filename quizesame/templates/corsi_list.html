@@ -125,7 +125,9 @@
 {% macro riga_corso(c, nome) -%}
   {% set n = conteggio_appelli.get(c.tag, {}) %}
   <tr class="{{ 'corso-corrente' if c.tag in corsi_correnti else '' }}">
-    <td>{% if nome %}<a href="/corsi/{{ c.tag }}" class="nome-corso">{{ c.nome }}</a>{% else %}<span class="rientro-anno"><a href="/corsi/{{ c.tag }}">{{ c.anno or c.tag }}</a></span>{% endif %}</td>
+    <td>{% if nome %}<a href="/corsi/{{ c.tag }}" class="nome-corso">{{ c.nome }}</a>{% else %}<span class="rientro-anno"><a href="/corsi/{{ c.tag }}">{{ c.anno or c.tag }}</a></span>{% endif %}
+      {% if c.tag in corsi_chiusi %}<a class="icona-azione icona-esercizi-anno" href="/corsi/{{ c.tag }}/esercizi-anno.pdf" target="_blank" rel="noopener"
+         data-info="Testi di tutti gli esercizi dell'anno (PDF)" aria-label="Esercizi dell'anno {{ c.anno }}">{{ icona("testo", 14) }}</a>{% endif %}</td>
     <td class="muted">{{ c.anno if nome else '' }}<span class="tag-corso">{{ c.tag }}</span></td>
     <td class="numero">{% if n.totale %}{% if n.aperti %}<strong>{{ n.aperti }}</strong> apert{{ 'o' if n.aperti == 1 else 'i' }} · {% endif %}{{ n.totale }}{% else %}<span class="muted">-</span>{% endif %}</td>
     <td>
@@ -207,7 +209,7 @@
       partono dai valori predefiniti. Dopo la creazione si apre la pagina delle impostazioni,
       per controllarle.
     </p>
-    <button type="submit">Crea corso</button>
+    <button type="submit" class="solo-icona" data-info="Crea corso" aria-label="Crea corso">{{ icona("piu", 16) }}</button>
   </form>
 </details>
 <script>

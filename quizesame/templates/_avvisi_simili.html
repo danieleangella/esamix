@@ -1,0 +1,10 @@
+{# Icona di attenzione per un compito con risposte molto simili ad altri (avvisi salvati
+   correggendo, JSON in risultati.avvisi_simili): al passaggio del mouse, con chi e quanto. #}
+{% from "_icone.html" import icona %}
+{% macro icona_simili(avvisi_json) -%}
+{% if avvisi_json %}{% set avvisi = avvisi_json | from_json %}{% if avvisi %}
+<span class="icona-simili" tabindex="0"
+      data-info="Risposte molto simili a: {% for a in avvisi %}{{ a.cognome }} {{ a.nome }} ({{ a.percentuale }}%{% if a.identica %}, identiche{% endif %}{% if a.errori_comuni %}, {{ a.errori_comuni }} errori uguali{% endif %}{% if a.vicini %}, vicini nella stampa{% endif %}){% if not loop.last %}; {% endif %}{% endfor %}"
+      aria-label="Compito simile ad altri">{{ icona("avviso", 14) }}</span>
+{% endif %}{% endif %}
+{%- endmacro %}
