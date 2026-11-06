@@ -20,9 +20,8 @@
   <p>
     Ci sono correzioni già fatte di ogni tipo (svolgimenti valutati con le note, un voto
     cambiato a mano con la sua nota, un orale richiesto, un compito insufficiente per un
-    obbligatorio non svolto, valutazioni in sospeso, una bozza, un assente, un ritirato), la
-    prima prova parziale già conclusa e la seconda con gli svolgimenti rimandati da valutare
-    nella pagina Svolgimenti e note. Altri compiti sono lasciati da correggere: matricola,
+    obbligatorio non svolto, alcune bozze, un assente, un ritirato), la prima prova parziale
+    già conclusa e la seconda in corso, con correzioni lasciate in bozza. Altri compiti sono lasciati da correggere: matricola,
     codice e risposte da inserire sono elencati in Impostazioni → Corso di prova.
   </p>
   <p>
@@ -505,11 +504,11 @@ COMPITO DA CONVERTIRE
     <kbd>Invio</kbd> passa al campo successivo; sotto ogni campo un controllo immediato
     segnala uno studente già valutato, un codice inesistente o già usato da un altro
     studente, e quante risposte mancano o sono di troppo rispetto al compito. Nel riepilogo
-    il cursore è sul primo punteggio da assegnare a mano (o su Conferma): <kbd>Invio</kbd>
-    passa al punteggio successivo e poi a Conferma, dove un altro <kbd>Invio</kbd> registra il
+    il cursore è sul primo punteggio da confermare (o su Conferma): <kbd>Invio</kbd>
+    lo conferma e passa al successivo e poi a Conferma, dove un altro <kbd>Invio</kbd> registra il
     voto e riporta al modulo per il compito successivo; da un campo <kbd>Invio</kbd> non
     registra mai per sbaglio. In cima alla scheda una barra mostra la
-    percentuale di compiti corretti (in verde quelli completi, in arancione quelli da
+    percentuale di compiti corretti, con quanti sono sul totale (in verde quelli completi, in arancione quelli da
     completare, in grigio i presenti ancora da correggere) e, tra chi ha lo scritto
     sufficiente, la percentuale di ammessi all'orale (la stessa percentuale compare nel
     riepilogo delle statistiche). Un elenco a scomparsa "Presenti da
@@ -526,18 +525,26 @@ COMPITO DA CONVERTIRE
     ciascuna in ordine di numero: <strong>domande aperte</strong>, <strong>obbligatori</strong>
     e <strong>altri esercizi</strong>, su fondo verde (giusto), rosso (sbagliato) o grigio (non
     dato). Ogni esercizio parte dal punteggio calcolato dalla griglia; cliccando sul nome se ne
-    vede il testo, con la risposta data e quella giusta. In fondo allo schermo, sempre in vista
-    anche scorrendo, il <strong>voto</strong> aggiornato in tempo reale (si può cambiare a mano:
-    lo si segnala e si invita a scriverne il motivo nella <strong>nota sul voto finale</strong>,
-    visibile solo al docente) con le icone per annullare, salvare come bozza e confermare. Nel
-    riquadro "Esito" si può <strong>richiedere l'orale</strong> invece di salvare un voto scritto
-    definitivo (solo se il compito è sufficiente), con una nota per l'orale. La
-    <strong>bozza</strong> tiene da parte matricola, codice e risposte, con quanto già fatto
-    (punteggi confermati, note, svolgimenti rimandati, rivalutazioni, nota, voto scelto a mano e
-    orale), senza registrare nessun esito: riprendendola si ritrova tutto com'era. La
-    correzione compare nell'elenco "Correzioni da completare" della scheda (insieme ai
-    compiti con svolgimenti ancora da valutare), pronta da riprendere o da scartare in
+    vede il testo, con la risposta data e quella giusta. Gli altri esercizi restano chiusi
+    (si aprono con un clic sul titolo, da soli se c'è già una nota o un punteggio cambiato, o
+    cliccando su una loro casella della griglia). In fondo allo schermo, sempre in vista
+    anche scorrendo, una barra con nome, matricola e codice del compito, il
+    <strong>voto</strong> aggiornato in tempo reale (si può cambiare a mano: si apre la
+    <strong>nota sul voto finale</strong>, visibile solo al docente, per scriverne il motivo;
+    l'icona della nota accanto al voto la apre comunque), la spunta dell'<strong>orale</strong>
+    (solo con un voto sufficiente: spuntandola la pagina scende alla nota per l'orale, con la
+    motivazione) e le icone per annullare, salvare come bozza e confermare. Finché resta un
+    punteggio da confermare il voto è provvisorio e Conferma propone di salvare la correzione
+    come <strong>bozza</strong>. La bozza tiene da parte matricola, codice e risposte, con quanto
+    già fatto (punteggi confermati, note, rivalutazioni, nota, voto scelto a mano e orale), senza
+    registrare nessun esito: riprendendola si ritrova tutto com'era. La
+    correzione compare nell'elenco "Correzioni da completare" della scheda, pronta da riprendere o da scartare in
     qualsiasi momento.
+  </p>
+  <p>
+    In una prova parziale dopo la prima, in cima al riepilogo ci sono le <strong>note delle
+    prove precedenti</strong> sullo stesso studente: sul voto, per l'orale ed esercizio per
+    esercizio (con punteggio e risposta), con il link alla scheda completa di quel compito.
   </p>
   <p>
     Se le risposte sono molto simili a quelle di un altro compito già corretto, un avviso lo
@@ -558,11 +565,16 @@ COMPITO DA CONVERTIRE
     insufficiente. Se è stato svolto e la risposta a scelta multipla è corretta, lo
     svolgimento riceve in automatico il punteggio massimo (in grigio, con il bordo
     tratteggiato finché non è confermato), da abbassare fino al valore di una risposta
-    sbagliata se lo svolgimento scritto non va; se è giusto, la <strong>spunta</strong> accanto
-    lo conferma (diventa verde) senza doverlo riscrivere e passa allo svolgimento successivo;
-    una volta confermato lo si può comunque cambiare. Gli obbligatori svolti con la risposta
-    <em>sbagliata</em> (in rosso) partono dal punteggio calcolato: la spunta lo conferma, oppure
-    lo si alza se lo svolgimento merita di più. Le domande aperte richiedono sempre un punteggio
+    sbagliata se lo svolgimento scritto non va; il <strong>timbro</strong> accanto (o
+    <kbd>Invio</kbd>) conferma il punteggio e passa allo svolgimento successivo. Confermato, il
+    punteggio resta fisso e conta nel voto; la <strong>matita</strong> lo sblocca per cambiarlo.
+    Gli obbligatori svolti con la risposta <em>sbagliata</em> (in rosso) partono dal punteggio
+    calcolato, anche negativo: il timbro lo conferma, oppure lo si alza se lo svolgimento merita
+    di più. Un punteggio confermato diverso da quello previsto apre da solo la nota
+    sull'esercizio, per annotarne la ragione. Se il compito è insufficiente già dalla griglia
+    (anche con tutti gli svolgimenti al massimo resterebbe sotto il minimo, o manca un
+    obbligatorio) la correzione degli esercizi è inattiva e si conferma l'insufficienza; la
+    matita accanto all'avviso la attiva comunque. Le domande aperte richiedono sempre un punteggio
     assegnato a mano, fino a un massimo impostabile nelle Impostazioni del corso ("Punteggio
     massimo domanda aperta", può superare i punti di una risposta corretta). Gli altri esercizi
     sono già confermati col punteggio calcolato: la <strong>matita</strong> lo cambia. Ogni
@@ -571,8 +583,8 @@ COMPITO DA CONVERTIRE
     correzione e si ritrovano modificandola.
   </p>
   <p>
-    Su <strong>ogni esercizio</strong> si può scrivere una nota (per gli altri esercizi la apre
-    l'icona della nota): si sceglie tra quelle già scritte sullo stesso esercizio negli altri
+    Su <strong>ogni esercizio</strong> si può scrivere una nota (la apre l'icona della nota;
+    è già aperta se c'è una nota o se il punteggio è stato cambiato): si sceglie tra quelle già scritte sullo stesso esercizio negli altri
     compiti, o la si scrive a mano. Mentre la si scrive, sotto compaiono in piccolo le note
     simili, con i punteggi; passando sopra col mouse si vede l'elenco con studente, punteggio e
     nota (un punteggio diverso da quelli dati con note simili è evidenziato). L'icona
@@ -580,15 +592,16 @@ COMPITO DA CONVERTIRE
     compiti, con studente, compito, risposta, punteggio calcolato e assegnato e voto.
   </p>
   <p>
-    Uno svolgimento si può rimandare con l'<strong>orologio</strong>: il compito si
-    registra con un voto provvisorio, in cui una domanda aperta senza punteggio conta 0 (e
-    un obbligatorio il massimo), compare tra le "Correzioni da completare" e intanto non è
-    verbalizzabile. Con la casella "Rimanda la valutazione degli svolgimenti a dopo", sotto
-    il modulo di correzione, le domande aperte di tutti i compiti partono già rimandate.
+    La pagina <strong>Note</strong> (dall'icona in cima alla scheda Correzione) raccoglie tutte
+    le note della correzione: quelle sul voto dei compiti (con il voto calcolato, se cambiato a
+    mano), quelle per l'orale e quelle esercizio per esercizio, con punteggio assegnato e
+    calcolato. Cliccando sull'esercizio se ne vede il testo stampato su quel compito con la
+    risposta data e quella giusta, sullo studente la sua carriera, sul compito la scheda
+    completa in un'altra pagina. Lo stesso vale per la pagina con le note di un solo esercizio.
   </p>
   <p>
-    La pagina <strong>Svolgimenti e note</strong> (dalla scheda Correzione) mostra un
-    esercizio alla volta, con tutti gli studenti: si valutano di fila quelli rimandati
+    La pagina <strong>Svolgimenti</strong> (dalla scheda Correzione) mostra un
+    esercizio alla volta, con tutti gli studenti: si cambiano i punteggi già dati
     (<kbd>Invio</kbd> salva e passa allo studente successivo, il voto del compito si
     ricalcola da solo) e si confrontano punteggi e note di compiti diversi, raggruppati per
     punteggio. Per ogni esercizio l'elenco delle note usate segnala una stessa nota con
@@ -600,9 +613,7 @@ COMPITO DA CONVERTIRE
     Nel riepilogo, il ricalcolo (dopo aver corretto la stringa delle risposte lette) conserva
     punteggi e note già scritti. Per uno studente che deve fare l'orale in ogni appello la
     casella "Richiedi l'orale" parte spuntata, e toglierla chiede conferma; con uno scritto
-    insufficiente l'orale non si può richiedere e il voto si salva normalmente. Un compito
-    con svolgimenti rimandati si registra senza decidere l'orale: lo si decide al
-    completamento della valutazione.
+    insufficiente l'orale non si può richiedere e il voto si salva normalmente.
   </p>
   <p>
     Un esito già inserito si può modificare in qualsiasi momento (voto e/o risposte, con
@@ -637,9 +648,9 @@ COMPITO DA CONVERTIRE
   <p>
     In fondo alla scheda Correzione, il pulsante <strong>"Chiudi la correzione"</strong> si
     attiva quando tutti gli attesi hanno un esito registrato e non restano correzioni da
-    completare (bozze o svolgimenti da valutare), perché i voti ancora provvisori non finiscano nell'elenco da
+    completare (bozze), perché le correzioni a metà non finiscano nell'elenco da
     pubblicare (accanto è indicato cosa manca). Da quel momento anche la pagina Svolgimenti
-    e note è in sola lettura, finché non si riapre la correzione. Chiudere la correzione — indipendente dalla chiusura dell'intero
+    è in sola lettura, finché non si riapre la correzione. Chiudere la correzione — indipendente dalla chiusura dell'intero
     appello, che di solito arriva più tardi (dopo orali e verbalizzazioni) — blocca nuove correzioni
     per questa prova (si può sempre riaprire) e genera l'elenco risultati in
     <code>.html</code>, <code>.tex</code> e <code>.pdf</code> (matricola oscurata): non a
@@ -676,10 +687,14 @@ COMPITO DA CONVERTIRE
     Chiusa la correzione (di tutte le prove, per un raggruppamento), in cima alla scheda c'è il
     <strong>foglio per gli orali</strong> (PDF, HTML, .tex, .md, .csv): l'elenco di chi deve
     sostenerlo, con la casella per la presenza e quella per il voto dell'orale (o l'esito, se già
-    registrato); poi, da una nuova pagina dispari, una scheda per ciascuno con il voto dello scritto
-    (per un raggruppamento i voti delle prove e la media), gli errori fatti in ogni prova (risposte
-    sbagliate o mancanti, punteggi degli svolgimenti con le note), le note sul compito, il motivo
-    dell'orale, l'eventuale DSA/L104 e qualche riga per gli appunti.
+    registrato) e un riepilogo (quanti sono, quanti già fatti, voto medio dello scritto, quanti con
+    note); poi, da una nuova pagina dispari, una scheda per ciascuno (da una pagina nuova) con il
+    voto dello scritto (per un raggruppamento i voti delle prove e la media), tutti gli esercizi
+    di ogni prova con la risposta data e quella giusta, il punteggio e la nota (gli errori
+    evidenziati), il testo di ogni esercizio con le risposte, le note sul compito, il motivo
+    dell'orale, l'eventuale DSA/L104 e qualche riga per gli appunti. Nella scheda Orali, un clic sul
+    nome apre il compito di ogni prova con le stesse informazioni e i link alla scheda completa
+    e alla carriera.
   </p>
 </details>
 
@@ -821,8 +836,11 @@ COMPITO DA CONVERTIRE
     Nella scheda Compiti d'esame di ciascuna prova, dietro un dettaglio a scomparsa
     (solo il PDF resta visibile di default, per velocità), si trova l'elenco degli
     studenti ammessi — con eventuali note DSA/in deroga — esportabile in .csv e .pdf
-    (quest'ultimo pensato per fare l'appello in aula, con una riga di separazione tra uno
-    studente e l'altro e la casella di presenza come prima colonna), insieme alla
+    (quest'ultimo pensato per fare l'appello in aula: in ordine di cognome e nome, con una riga
+    di separazione tra uno studente e l'altro, la casella di presenza come prima colonna,
+    cognome e nome in una colonna sola e in fondo due caselle per scrivere a mano il voto finale
+    e l'orale; con molte colonne, come voti delle prove precedenti e aula, il foglio è in
+    orizzontale; lo stesso vale per l'elenco degli iscritti), insieme alla
     assegnazione alle <strong>aule</strong>. Le aule di ciascuna prova (nome e posti) si
     definiscono nella scheda <strong>Impostazioni</strong> del raggruppamento; una sola per prova
     si può riservare agli studenti <strong>DSA/L104</strong> con il pulsante con l'icona
@@ -908,7 +926,8 @@ COMPITO DA CONVERTIRE
     griglia delle risposte e voto) e una riga verticale tra le due colonne di esercizi. Nella
     griglia delle risposte, dopo ogni quinta casella il filetto è appena più spesso: gli stessi
     gruppi da cinque della casella delle risposte in correzione, per ritrovare il punto mentre
-    si trascrivono.
+    si trascrivono. Sopra e sotto ogni riga di caselle c'è un po' di spazio per annotare a mano i
+    punteggi in correzione.
     <strong>Ogni compito occupa sempre due pagine</strong>, cioè un foglio fronte-retro: se il testo
     sta in una pagina la seconda resta bianca; se non sta in due, la generazione lo segnala.
   </p>

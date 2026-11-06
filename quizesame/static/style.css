@@ -799,8 +799,7 @@ a.cella-risposta:hover { box-shadow: 0 0 0 2px var(--accent-border); }
 .riga-esercizio.evidenziata { animation: riga-evidenziata 1.6s ease-out; }
 @keyframes riga-evidenziata { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 3px transparent; } }
 /* da confermare: bordo tratteggiato finché il punteggio non è confermato */
-.riga-manuale:not(.confermata), .riga-sbagliata:not(.confermata) { border-color: var(--border-strong); border-style: dashed; }
-.riga-esercizio.rimandato .es-nome, .riga-esercizio.rimandato .es-punteggio input { opacity: 0.5; }
+.riga-punteggio:not(.confermata) { border-color: var(--border-strong); border-style: dashed; }
 .es-nome { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.2rem 0.5rem; min-width: 0; }
 .es-nome .btn-testo-esercizio { color: var(--text); font-weight: 600; display: inline; }
 .es-nome .btn-testo-esercizio:hover { color: var(--accent); }
@@ -817,12 +816,9 @@ input.campo-punteggio { width: 4.2rem; font-size: 1.1rem; font-weight: 700; text
 input.campo-punteggio.automatico { color: var(--testo-automatico); font-weight: 500; }
 /* punteggio fuori dall'intervallo consentito */
 input.campo-punteggio.fuori-intervallo { border-color: var(--err-text); color: var(--err-text); background: var(--err-bg); }
-/* spunta che conferma il punteggio proposto: verde piena quando confermato */
-.btn-conferma-punteggio { border-color: var(--border-strong) !important; background: var(--panel) !important; }
-.btn-conferma-punteggio.premuto { background: var(--ok-text) !important; color: var(--su-accento) !important; border-color: var(--ok-text) !important; }
-.es-dopo { display: inline-flex; align-items: center; gap: 0.2rem; margin: 0 0 0 0.15rem; color: var(--muted); cursor: pointer; }
-.es-dopo input { width: auto; margin: 0; }
-.es-dopo:has(input:checked) { color: var(--warn-strong-text); }
+/* timbro che conferma il punteggio: dopo, il punteggio resta fisso (la matita lo sblocca) */
+.btn-conferma-punteggio { border-color: var(--border-strong) !important; background: var(--panel) !important; color: var(--accent) !important; }
+.btn-conferma-punteggio:hover:not(:disabled) { background: var(--accent) !important; color: var(--su-accento) !important; border-color: var(--accent) !important; }
 .es-nota { display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; min-width: 0; }
 .es-nota .campo-nota { flex: 1; min-width: 8rem; padding: 0.3rem 0.5rem; font-size: 0.9rem; background: var(--panel); }
 .es-nota.chiusa .campo-nota, .es-nota.chiusa .link-note-esercizio, .es-nota.chiusa .note-simili { display: none; }
@@ -847,25 +843,39 @@ input.campo-punteggio.fuori-intervallo { border-color: var(--err-text); color: v
   .riga-esercizio .es-nota.chiusa { grid-column: auto; }
   .riga-esercizio .es-punteggio { grid-column: 2; }
 }
-/* compito insufficiente comunque: svolgimenti facoltativi, in grigio finché non se ne valuta uno */
-.sezione-esercizi.svolgimenti-superflui .elenco-esercizi { opacity: 0.45; }
-.sezione-esercizi.svolgimenti-superflui .elenco-esercizi:focus-within { opacity: 1; }
+/* compito insufficiente già dalla griglia: correzione inattiva finché non la si attiva */
+.zona-inattiva .es-punteggio { opacity: 0.45; }
+.zona-inattiva .riga-punteggio { border-style: solid !important; border-color: transparent !important; }
+.avviso-insufficiente { display: flex; align-items: center; gap: 0.75rem; }
+.avviso-insufficiente > span { flex: 1; }
+/* altri esercizi: chiusi, si aprono quando serve */
+.sezione-altri > summary { cursor: pointer; }
+.sezione-altri:not([open]) > summary { margin-bottom: 0; }
+.riassunto-altri { font-size: 0.85rem; }
 
 textarea.testo-normale { font-family: inherit; }
 #card-esito label { margin-top: 0.2rem; }
-.riga-orale { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 1rem; margin-top: 0.9rem; }
-#box-motivazione-orale { margin-top: 0.5rem; }
+#box-nota-voto + #avviso-convocazione, #box-nota-voto + #box-motivazione-orale, #avviso-convocazione + #box-motivazione-orale { margin-top: 0.75rem; }
 .etichetta-check { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; color: var(--text); font-size: 0.95rem; }
 .etichetta-check input { width: auto; margin: 0; }
 .barra-azioni-correzione {
-  position: sticky; bottom: 0; z-index: 30; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 1rem;
-  padding: 0.55rem 1rem; margin: 0 -0.25rem; background: var(--panel); border: 1px solid var(--border-strong);
+  position: sticky; bottom: 0; z-index: 30; display: flex; flex-direction: column; gap: 0.45rem;
+  padding: 0.6rem 1.1rem 0.75rem; margin: 0 -0.25rem; background: var(--panel); border: 1px solid var(--border-strong);
   border-radius: var(--radius); box-shadow: 0 -4px 14px var(--ombra);
 }
 .barra-azioni-correzione button { margin: 0; }
+/* chi si sta correggendo: sempre in vista anche scorrendo la pagina */
+.barra-studente { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.2rem 1.1rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+.barra-nome { font-size: 1.15rem; }
+.barra-studente .suggerimento-tastiera { margin-left: auto; }
+.barra-riga { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem 1.1rem; }
+.barra-orale { display: flex; align-items: center; gap: 0.5rem; }
+.barra-orale .etichetta-check { font-size: 1.05rem; font-weight: 600; }
+.barra-orale .etichetta-check input { width: 1.2rem; height: 1.2rem; }
+#btn-nota-voto.attivo { color: var(--accent); border-color: var(--accent); }
 .barra-voto { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .barra-voto > label { margin: 0; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
-#voto-finale { width: 5rem; font-size: 1.7rem; font-weight: 800; text-align: center; padding: 0.15rem 0.3rem; color: var(--ok-text); margin: 0; }
+#voto-finale { width: 6rem; font-size: 2.1rem; font-weight: 800; text-align: center; padding: 0.15rem 0.3rem; color: var(--ok-text); margin: 0; }
 #voto-finale.insufficiente { color: var(--err-text); }
 #voto-finale.provvisorio { color: var(--warn-text); }
 .barra-voto-stato { display: flex; align-items: center; gap: 0.15rem 0.5rem; flex-wrap: wrap; font-size: 0.85rem; }
@@ -873,8 +883,9 @@ textarea.testo-normale { font-family: inherit; }
 .stato-voto.provvisorio { color: var(--warn-text); font-weight: 600; }
 .stato-voto.a-mano { color: var(--warn-text); }
 .barra-pulsanti-correzione { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; }
-.pulsante-grande { padding: 0.45rem 0.55rem !important; }
-#btn-conferma-correzione { padding: 0.55rem 1.4rem; }
+.pulsante-grande { padding: 0.55rem 0.65rem !important; }
+#btn-conferma-correzione { padding: 0.65rem 1.8rem; }
+#btn-conferma-correzione.da-bozza { background: var(--warn-text); border-color: var(--warn-text); }
 #btn-conferma-correzione.danger { background: var(--err-text); color: var(--su-accento); border-color: var(--err-text); }
 .suggerimento-tastiera { font-size: 0.8rem; }
 @media (max-width: 700px) { .suggerimento-tastiera { display: none; } }
@@ -1098,3 +1109,17 @@ button.pulsante-tema:hover { color: var(--text); background: var(--bg); filter: 
   --grafico-totale: #93c5fd; --grafico-promossi: #22c55e; --grafico-curva: #dc2626;
   }
 }
+
+/* scheda del compito di uno studente (_risultato_dettaglio.html) */
+.link-schede-risultato { display: flex; flex-wrap: wrap; gap: 0.3rem 1.2rem; margin: 0 0 0.6rem; }
+.riepilogo-compito { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1rem; margin: 0 0 0.8rem; }
+.riepilogo-compito dt { color: var(--muted); font-size: 0.85rem; }
+.riepilogo-compito dd { margin: 0; }
+.tabella-esercizi-compito tr.esito-ok td:first-child { box-shadow: inset 3px 0 var(--ok-text); }
+.tabella-esercizi-compito tr.esito-err td:first-child { box-shadow: inset 3px 0 var(--err-text); }
+.tabella-esercizi-compito tr.esito-aperta td:first-child { box-shadow: inset 3px 0 var(--accent); }
+#avviso-orale { font-size: 0.85rem; }
+.casella-a-penna { display: inline-block; height: 1.6rem; border: 1px solid var(--border-strong); background: var(--panel); vertical-align: middle; }
+.note-prove-precedenti > summary { cursor: pointer; }
+.nota-prova-precedente { margin-top: 0.6rem; }
+.nota-prova-precedente ul { margin: 0.25rem 0 0; padding-left: 1.3rem; }

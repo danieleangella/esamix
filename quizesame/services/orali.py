@@ -69,7 +69,7 @@ def foglio_orali(tag: str, appello_id: int) -> dict:
                 d = correzione_service.dettaglio_risultato(tag, p.id, matricola)
             except ValueError:
                 scritti.append({"prova": p.nome, "esito": "nessun risultato", "voto": None, "codice": None,
-                                "errori": [], "n_esercizi": 0, "nota": "", "motivazione_orale": ""})
+                                "errori": [], "righe": [], "n_esercizi": 0, "nota": "", "motivazione_orale": ""})
                 continue
             ris = d["risultato"]
             voto = ris["voto_scritto"] if ris["voto_scritto"] is not None else ris["voto"]
@@ -77,9 +77,14 @@ def foglio_orali(tag: str, appello_id: int) -> dict:
                 {**e, "descrizione": descrizione_errore(e, corso.risposta_corretta)}
                 for e in d["righe"] if _errore(e, corso.risposta_corretta)
             ]
+            # tutti gli esercizi, con la risposta data e quella giusta, il punteggio e la nota
+            righe_compito = [
+                {**e, "errore": _errore(e, corso.risposta_corretta)} for e in d["righe"]
+            ]
             scritti.append({
                 "prova": p.nome, "esito": ris["esito"], "voto": voto, "codice": ris["codice"],
-                "errori": errori, "n_esercizi": len(d["righe"]),
+                "errori": errori, "righe": righe_compito, "n_esercizi": len(d["righe"]),
+                "voto_modificato": bool(ris["voto_modificato"]),
                 "nota": ris["nota_correzione"] or "",
                 "motivazione_orale": ris["orale_motivazione"] or "" if raggruppamento else "",
                 "insufficiente_per_obbligatorio": bool(ris["insufficiente_per_obbligatorio"]),
@@ -107,21 +112,31 @@ def foglio_orali(tag: str, appello_id: int) -> dict:
             "orale_obbligatorio": obbligatorio["motivazione"] or "sì" if obbligatorio else "",
             "scritti": scritti,
         })
+    scritti_noti = [s["scritto"] for s in studenti if s["scritto"] is not None]
     return {
         "corso": corso, "appello": appello, "prove": [p.nome for p in prove] if raggruppamento else [],
         "studenti": studenti,
+        # riepilogo complessivo, in cima al foglio
+        "riepilogo": {
+            "studenti": len(studenti),
+            "svolti": sum(1 for s in studenti if s["esito_orale"]),
+            "media_scritto": round(sum(scritti_noti) / len(scritti_noti), 1) if scritti_noti else None,
+            "con_note": sum(1 for s in studenti if note_studente(s, bool(raggruppamento))
+                            or any(e["nota"] for sc in s["scritti"] for e in sc["righe"])),
+            "dsa": sum(1 for s in studenti if s["dsa"]),
+        },
     }
 
 
 def foglio_orali_csv(dati: dict) -> bytes:
-    """Una riga per studente: anagrafica, voti dello scritto, numero di errori e note, e le
-    colonne Presente e Voto orale da compilare."""
+    """Una riga per studente: anagrafica, voti dello scritto, errori, tutti gli esercizi
+    (risposta data e giusta, punti, nota), note, e le colonne Presente e Voto orale da compilare."""
     prove = dati["prove"]
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\r\n")
     writer.writerow([
         "Matricola", "Cognome", "Nome", "DSA/L104", *prove, "Media" if prove else "Voto scritto",
-        "Errori", "Note", "Presente", "Voto orale",
+        "Errori", "Esercizi", "Note", "Presente", "Voto orale",
     ])
     for s in dati["studenti"]:
         errori = "; ".join(
@@ -129,9 +144,18 @@ def foglio_orali_csv(dati: dict) -> bytes:
             + ", ".join(f"{e['esercizio_nome']} ({e['descrizione']})" for e in sc["errori"])
             for sc in s["scritti"] if sc["errori"]
         )
+        # tutti gli esercizi, uno per riga della cella: numero, nome, risposta data/giusta, punti e nota
+        esercizi = "\n".join(
+            (f"{sc['prova']}: " if prove else "")
+            + f"{e['posizione'] + 1}. {e['esercizio_nome']}: "
+            + ("aperta" if e.get("aperta") else f"{e['lettera_data']}/{e['lettera_corretta']}")
+            + f", {e['punteggio_assegnato'] if e['punteggio_assegnato'] is not None else '-'} punti"
+            + (f" ({e['nota']})" if e["nota"] else "")
+            for sc in s["scritti"] for e in sc["righe"]
+        )
         writer.writerow([
             s["matricola"], s["cognome"], s["nome"], s["dsa"], *s["voti_prove"],
-            s["scritto"] if s["scritto"] is not None else "", errori, " | ".join(note_studente(s, bool(prove))),
+            s["scritto"] if s["scritto"] is not None else "", errori, esercizi, " | ".join(note_studente(s, bool(prove))),
             "", s["esito_orale"],
         ])
     return buffer.getvalue().encode("utf-8-sig")

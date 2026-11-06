@@ -163,7 +163,8 @@ _CASELLE_PER_RIGA = 12
 def _griglia_risposte(posizioni: list[dict]) -> str:
     """Tabella con il numero dell'esercizio sopra e la casella vuota sotto, in cui lo
     studente scrive la lettera; per una domanda aperta la casella contiene un trattino
-    (non c'è una lettera da scrivere). Con molti esercizi va a capo ogni _CASELLE_PER_RIGA."""
+    (non c'è una lettera da scrivere). Con molti esercizi va a capo ogni _CASELLE_PER_RIGA,
+    lasciando tra una riga e l'altra lo spazio per i punteggi annotati a mano in correzione."""
     righe = []
     for inizio in range(0, len(posizioni), _CASELLE_PER_RIGA):
         gruppo = posizioni[inizio:inizio + _CASELLE_PER_RIGA]
@@ -182,7 +183,7 @@ def _griglia_risposte(posizioni: list[dict]) -> str:
             f"{{\\setlength{{\\fboxsep}}{{0pt}}\\colorbox{{white}}{{\\begin{{tabular}}{{{colonne}}}\\hline\n{numeri} \\\\\\hline\n"
             f"\\rule{{0pt}}{{0.65cm}}{caselle} \\\\\\hline\n\\end{{tabular}}}}}}"
         )
-    return "\\\\[4pt]\n".join(righe)
+    return "\\\\[0.6cm]\n".join(righe)
 
 
 def intestazione(ctx: LatexContext, codice, posizioni: list[dict]) -> str:
@@ -212,8 +213,10 @@ def intestazione(ctx: LatexContext, codice, posizioni: list[dict]) -> str:
         "\\vspace{0.3cm}\n\n"
         # griglia delle risposte e voto
         "\\noindent\\begin{minipage}[t]{0.76\\textwidth}\\raggedright\n"
-        "{\\bfseries Risposte}\\\\[2pt]\n"
-        f"{_griglia_risposte(posizioni)}\n"
+        # sopra e sotto la griglia un po' di spazio, per annotare a mano i punteggi in
+        # correzione (non troppo: non deve servire agli studenti né rubare spazio al testo)
+        "{\\bfseries Risposte}\\par\\vspace{0.55cm}\n"
+        f"{_griglia_risposte(posizioni)}\\par\\vspace{{0.6cm}}\n"
         "\\end{minipage}\\hfill\n"
         "\\begin{minipage}[t]{0.20\\textwidth}\\raggedleft\n"
         "\\vspace{0.4cm}\n"
@@ -701,39 +704,55 @@ def crea_tex_risultati(ctx: LatexContext, righe: list[dict], prove: list[str] = 
     return tex
 
 
-def _tabella_ammessi(righe: list[dict], con_aula: bool = False, etichetta: str = "", prove: list[str] = ()) -> str:
+def _elenco_orizzontale(con_aula: bool, prove) -> bool:
+    """Con molte colonne (almeno due tra prove precedenti e aula) l'elenco degli iscritti
+    non sta in verticale: il foglio si stampa in orizzontale."""
+    return len(prove) + bool(con_aula) >= 2
+
+
+def _tabella_ammessi(righe: list[dict], con_aula: bool = False, etichetta: str = "", prove: list[str] = (),
+                     orizzontale: bool = False) -> str:
     """Righe ben distanziate (spazio a sufficienza per segnare a penna presenza/assenza
-    durante l'appello), con una riga di separazione tra uno studente e l'altro. La
-    casella "Presente" è la prima colonna (senza intestazione, da spuntare a penna); la
-    colonna "Note" segnala DSA e/o ammissione in deroga (aggiunto a mano pur non
-    soddisfacendo i requisiti automatici). Lo spazio verticale è dato da uno strut
-    invisibile dentro ogni riga (non da un salto riga finale tipo '\\\\[0.9cm]'): messo
-    dopo l'ultima riga, quest'ultimo lascerebbe la prima riga incollata all'intestazione,
-    con uno spazio diverso (più stretto) da quello, uniforme, fra tutte le altre righe.
+    durante l'appello), in ordine di cognome e nome, con una riga di separazione tra uno
+    studente e l'altro. La casella "Presente" è la prima colonna, da spuntare a penna;
+    cognome e nome stanno in una colonna sola (il cognome in grassetto); la colonna "Note"
+    segnala DSA e/o ammissione in deroga (aggiunto a mano pur non soddisfacendo i requisiti
+    automatici); in fondo due caselle bordate, per scrivere a mano il voto finale e l'orale.
+    Lo spazio verticale è dato da uno strut invisibile dentro ogni riga (non da un salto
+    riga finale tipo '\\\\[0.9cm]'): messo dopo l'ultima riga, quest'ultimo lascerebbe la
+    prima riga incollata all'intestazione, con uno spazio diverso (più stretto) da quello,
+    uniforme, fra tutte le altre righe.
     `con_aula`: colonna in più con l'aula assegnata (nell'elenco generale, se ci sono aule).
     `etichetta`: a quale aula si riferisce il foglio (o "elenco completo"), ripetuta in un
     riquadro in cima a ogni pagina della tabella: i fogli stampati restano riconoscibili
     anche una volta separati e distribuiti nelle aule.
     `prove`: le prove precedenti dello stesso raggruppamento, con una colonna ciascuna per
     il voto preso ('voti_precedenti' di ogni riga)."""
-    # con i voti delle prove precedenti, cognome e nome si stringono per fare posto
-    stretto = 0.03 * min(len(prove), 3)
-    voti_col = _colonne_voti(len(prove))
-    if con_aula:
-        colonne = f"c >{{\\ttfamily}}l >{{\\bfseries}}p{{{0.24 - stretto:.2f}\\textwidth}} p{{{0.2 - stretto:.2f}\\textwidth}}{voti_col} l l"
-        intestazione = ("Presente", "Matricola", "Cognome", "Nome", *map(_testo_piccolo, prove), "Aula", "Note")
+    righe = sorted(righe, key=lambda r: ((r["cognome"] or "").lower(), (r["nome"] or "").lower(), r["matricola"]))
+    # con i voti delle prove precedenti e l'aula, il nome si stringe per fare posto
+    if orizzontale:
+        largo = max(0.2, 0.36 - 0.06 * min(len(prove), 2) - (0.05 if con_aula else 0))
     else:
-        colonne = f"c >{{\\ttfamily}}l >{{\\bfseries}}p{{{0.3 - stretto:.2f}\\textwidth}} p{{{0.25 - stretto:.2f}\\textwidth}}{voti_col} l"
-        intestazione = ("Presente", "Matricola", "Cognome", "Nome", *map(_testo_piccolo, prove), "Note")
+        largo = max(0.15, 0.32 - 0.1 * min(len(prove), 2) - (0.07 if con_aula else 0))
+    voti_col = _colonne_voti(len(prove), "1.25cm")
+    aula_col = " l" if con_aula else ""
+    colonne = f"c >{{\\ttfamily}}l >{{\\raggedright\\arraybackslash}}p{{{largo:.2f}\\textwidth}}{voti_col}{aula_col} l c c"
+    intestazione = ("Presente", "Matricola", "Cognome e nome", *map(_testo_piccolo, prove),
+                    *(("Aula",) if con_aula else ()), "Note", "Voto", "Orale")
     riga_etichetta = (
         f"\\rowcolor{{white}}\\multicolumn{{{len(intestazione)}}}{{r}}"
         f"{{\\setlength{{\\fboxsep}}{{5pt}}\\fbox{{\\Large\\bfseries {etichetta}}}}} \\\\[4pt]\n"
     ) if etichetta else ""
-    tex = _RIGHE_ALTERNATE + (
+    # caselle bianche bordate (anche sulle righe a fondo grigio) per il voto e l'orale
+    casella = lambda larghezza: (  # noqa: E731
+        f"{{\\setlength{{\\fboxsep}}{{0pt}}\\fcolorbox{{black}}{{white}}{{\\rule{{0pt}}{{0.6cm}}\\hspace{{{larghezza}}}}}}}")
+    # con molte colonne (prove precedenti, aula) meno spazio fra l'una e l'altra
+    stretta = "{\\setlength{\\tabcolsep}{3.5pt}\n" if (prove or con_aula) and not orizzontale else "{\n"
+    tex = stretta + _RIGHE_ALTERNATE + (
         f"\\begin{{longtable}}{{{colonne}}}\n{riga_etichetta}\\toprule\n"
         + _riga_intestazione(*intestazione, altezza="0.75cm") + "\\midrule\n\\endhead\n"
     )
-    for i, r in enumerate(righe):
+    for r in righe:
         note_parti = []
         if r.get("dsa"):
             note_parti.append(r.get("dsa_tipo") if r.get("dsa_tipo") in ("DSA", "L104") else "DSA")
@@ -743,9 +762,10 @@ def _tabella_ammessi(righe: list[dict], con_aula: bool = False, etichetta: str =
         aula = f" & {_escape_testo_semplice(r.get('aula_nome') or '--')}" if con_aula else ""
         voti = list(r.get("voti_precedenti") or [])
         voti = "".join(f" & {_escape_testo_semplice(str(v))}" for v in (voti + ["--"] * len(prove))[:len(prove)])
-        tex += (f"\\rule{{0pt}}{{0.75cm}}{{\\Large $\\square$}} & {r['matricola']} & {_escape_testo_semplice(r['cognome'])}"
-                f" & {_escape_testo_semplice(r['nome'])}{voti}{aula} & {note} \\\\\n")
-    tex += "\\bottomrule\n\\end{longtable}\n\n"
+        tex += (f"\\rule{{0pt}}{{0.85cm}}{{\\Large $\\square$}} & {r['matricola']} & "
+                f"{{\\bfseries {_escape_testo_semplice(r['cognome'])}}} {_escape_testo_semplice(r['nome'])}"
+                f"{voti}{aula} & {note} & {casella('1.4cm')} & {casella('0.6cm')} \\\\\n")
+    tex += "\\bottomrule\n\\end{longtable}}\n\n"
     return tex
 
 
@@ -765,9 +785,9 @@ def _testo_piccolo(testo: str) -> str:
     return f"\\small {_escape_testo_semplice(testo)}"
 
 
-def _colonne_voti(n: int) -> str:
+def _colonne_voti(n: int, larghezza: str = "1.7cm") -> str:
     """Colonne dei voti delle prove: larghezza fissa, il nome della prova va a capo."""
-    return " >{\\centering\\arraybackslash}p{1.7cm}" * n
+    return f" >{{\\centering\\arraybackslash}}p{{{larghezza}}}" * n
 
 
 # nuova pagina che sia sempre dispari (un fronte nella stampa fronte-retro), lasciando
@@ -789,27 +809,101 @@ def crea_tex_ammessi(ctx: LatexContext, titolo: str, lista: list[dict], aule: li
     `prove`: vedi _tabella_ammessi."""
     etichetta = f"Aula {_escape_testo_semplice(aula_singola)}" if aula_singola else (
         "Elenco completo (tutte le aule)" if aule else "Elenco completo")
+    orizzontale = _elenco_orizzontale(bool(aule), prove)
     tex = BEGIN_DOCUMENT
+    if orizzontale:
+        tex = tex.replace("\\usepackage{fullpage}\n", "\\usepackage[a4paper,landscape,margin=1.8cm]{geometry}\n")
     tex += _piede_elenco(etichetta)
     tex += intestazione_breve(ctx)
     tex += _titolo_documento(titolo, _quanti(len(lista), "studente", "studenti"))
-    tex += _tabella_ammessi(lista, con_aula=bool(aule), etichetta=etichetta, prove=prove)
+    tex += _tabella_ammessi(lista, con_aula=bool(aule), etichetta=etichetta, prove=prove, orizzontale=orizzontale)
     for aula in aule:
         righe_aula = [r for r in lista if r.get("aula_id") == aula.id]
         etichetta_aula = f"Aula {_escape_testo_semplice(aula.nome)}"
         tex += NUOVA_PAGINA_DISPARI + _piede_elenco(etichetta_aula)
         tex += _titolo_documento(etichetta_aula, _quanti(len(righe_aula), "studente", "studenti") + f" (capienza {aula.capienza})")
-        tex += _tabella_ammessi(righe_aula, etichetta=etichetta_aula, prove=prove)
+        tex += _tabella_ammessi(righe_aula, etichetta=etichetta_aula, prove=prove, orizzontale=orizzontale)
     tex += "\\end{document}"
     return tex
+
+
+def _testi_esercizi_orale(righe: list[dict], e) -> str:
+    """Il testo di ogni esercizio come era stampato sul compito, su due colonne in corpo
+    piccolo, con le risposte nell'ordine stampato: la risposta data segnata (giusta o
+    sbagliata) e quella giusta col segno di spunta."""
+    testi = [r for r in righe if r.get("testo")]
+    if not testi:
+        return ""
+    tex = "\\begin{multicols}{2}\\footnotesize\n"
+    for r in testi:
+        tex += f"\\noindent{{\\bfseries {r['posizione'] + 1}. {e(r['esercizio_nome'])}}}\\par\n{r['testo']}\\par\n"
+        if r.get("risposte"):
+            tex += "\\begin{enumerate}\\setlength{\\itemsep}{0pt}\\setlength{\\parskip}{0pt}\n"
+            for i, risposta in enumerate(r["risposte"]):
+                lettera = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i]
+                segni = []
+                if lettera == r["lettera_corretta"]:
+                    segni.append("$\\checkmark$")
+                if lettera == r["lettera_data"]:
+                    segni.append("\\textbf{risposta data}" if r["corretta"] else "\\textbf{risposta data (sbagliata)}")
+                tex += f"\\item[{lettera}.] {risposta}" + (" \\quad " + " ".join(segni) if segni else "") + "\n"
+            tex += "\\end{enumerate}\n"
+            if r["lettera_data"] == "X":
+                tex += "\\noindent\\textit{Nessuna risposta data.}\\par\n"
+        tex += "\\medskip\n"
+    return tex + "\\end{multicols}\n"
+
+
+def _riepilogo_orali(dati: dict) -> str:
+    """Riepilogo complessivo in cima al foglio per gli orali (testo semplice in LaTeX)."""
+    r = dati.get("riepilogo") or {}
+    parti = [_quanti(r.get("studenti", len(dati["studenti"])), "studente", "studenti") + " all'orale"]
+    if r.get("svolti"):
+        parti.append(f"{r['svolti']} già svolt{'o' if r['svolti'] == 1 else 'i'}")
+    if r.get("media_scritto") is not None:
+        parti.append(("media delle prove" if dati["prove"] else "voto medio dello scritto")
+                     + f" {str(r['media_scritto']).replace('.', ',')}")
+    if r.get("con_note"):
+        parti.append(f"{r['con_note']} con note")
+    if r.get("dsa"):
+        parti.append(f"{r['dsa']} DSA/L104")
+    return "\\noindent " + " \\quad$\\cdot$\\quad ".join(parti) + "\\par\\medskip\n\n"
+
+
+def _tabella_esercizi_orale(righe: list[dict], e) -> str:
+    """Gli esercizi di un compito per la scheda di uno studente: numero, esercizio, risposta
+    data e giusta, punteggio e nota; gli errori in grassetto, su fondo grigio."""
+    tex = ("{\\small\\renewcommand{\\arraystretch}{1.25}\n"
+           "\\begin{tabular}{r p{0.36\\textwidth} c c p{0.36\\textwidth}}\n\\toprule\n"
+           "\\textbf{N.} & \\textbf{Esercizio} & \\textbf{Risposta} & \\textbf{Punti} & \\textbf{Nota} \\\\\n\\midrule\n")
+    for r in righe:
+        nome = e(r["esercizio_nome"]) + (" {\\scriptsize (obbl.)}" if r["obbligatorio"] and not r.get("revisione") else "")
+        if r.get("revisione") == "annullato":
+            nome += " {\\scriptsize (annullato)}"
+        if r.get("aperta"):
+            risposta = "aperta"
+        else:
+            risposta = f"{{\\ttfamily {e(r['lettera_data'])}/{e(r['lettera_corretta'])}}}"
+        punti = str(r["punteggio_assegnato"]) if r["punteggio_assegnato"] is not None else "--"
+        if (r.get("calcolato") is not None and r["punteggio_assegnato"] is not None
+                and r["punteggio_assegnato"] != r["calcolato"] and r.get("revisione") != "annullato"):
+            punti += f" {{\\scriptsize (calc.~{r['calcolato']})}}"
+        nota = f"\\textit{{{e(r['nota'])}}}" if r.get("nota") else ""
+        celle = [str(r["posizione"] + 1), nome, risposta, punti]
+        if r.get("errore"):
+            celle = [f"\\textbf{{{c}}}" for c in celle]
+        tex += ("\\rowcolor{black!8}" if r.get("errore") else "") + " & ".join(celle + [nota]) + " \\\\\n"
+    return tex + "\\bottomrule\n\\end{tabular}}\\par\n"
 
 
 def crea_tex_orali(ctx: LatexContext, dati: dict, note_studente) -> str:
     """Foglio per gli orali (vedi orali.foglio_orali): prima l'elenco di chi deve sostenerlo,
     con la casella della presenza, il voto dello scritto (per un raggruppamento i voti
     delle prove e la media) e lo spazio per il voto dell'orale (o l'esito, se già
-    registrato); poi, da una nuova pagina dispari, una scheda per studente con gli errori
-    fatti in ogni prova, le note e uno spazio per gli appunti. `note_studente(s,
+    registrato), con un riepilogo complessivo; poi, da una nuova pagina dispari, una scheda
+    per studente (da una pagina nuova ciascuno) con tutti gli esercizi di ogni prova (risposta
+    data e giusta, punteggio, nota; gli errori evidenziati) e il loro testo con le risposte, le
+    note e lo spazio per gli appunti. `note_studente(s,
     raggruppamento)`: le note da elencare per uno studente (testo semplice)."""
     prove = dati["prove"]
     studenti = dati["studenti"]
@@ -818,6 +912,7 @@ def crea_tex_orali(ctx: LatexContext, dati: dict, note_studente) -> str:
     tex += intestazione_breve(ctx)
     tex += _titolo_documento("Orali", _quanti(len(studenti), "studente", "studenti"))
     tex += _intestazione_orale(ctx)
+    tex += _riepilogo_orali(dati)
     voti_col = _colonne_voti(len(prove))
     stretto = 0.03 * min(len(prove), 3)
     intestazione = ("Presente", "Matricola", "Cognome", "Nome", *map(_testo_piccolo, prove),
@@ -839,8 +934,9 @@ def crea_tex_orali(ctx: LatexContext, dati: dict, note_studente) -> str:
     if studenti:
         tex += NUOVA_PAGINA_DISPARI
         tex += _titolo_documento("Gli scritti, studente per studente")
-    for s in studenti:
-        tex += "\\noindent\\begin{minipage}{\\textwidth}\n"
+    for n, s in enumerate(studenti):
+        if n:
+            tex += "\\clearpage\n"
         voto = f"scritto {s['scritto']}" if s["scritto"] is not None else "scritto --"
         if prove and s["media_esatta"] is not None:
             voto = f"media {str(s['media_esatta']).replace('.', ',')} (voto {s['scritto']})"
@@ -856,22 +952,21 @@ def crea_tex_orali(ctx: LatexContext, dati: dict, note_studente) -> str:
             if sc["n_esercizi"]:
                 dettagli.append(f"{len(sc['errori'])} errori su {sc['n_esercizi']} esercizi"
                                 if len(sc["errori"]) != 1 else f"1 errore su {sc['n_esercizi']} esercizi")
+            if sc.get("voto_modificato"):
+                dettagli.append("voto cambiato a mano")
             titolo = f"{{\\bfseries {e(sc['prova'])}}}: " if prove else ""
-            tex += f"\\noindent {titolo}{', '.join(dettagli)}\\par\n"
-            if sc["errori"]:
-                tex += "\\begin{itemize}\\setlength{\\itemsep}{0pt}\n"
-                for err in sc["errori"]:
-                    etichetta = e(err["esercizio_nome"]) + (" (obbligatorio)" if err["obbligatorio"] else "")
-                    nota = f" --- \\textit{{{e(err['nota'])}}}" if err["nota"] else ""
-                    tex += f"\\item {etichetta}: {e(err['descrizione'])}{nota}\n"
-                tex += "\\end{itemize}\n"
+            tex += f"\\noindent {titolo}{', '.join(dettagli)}\\par\\smallskip\n"
+            if sc.get("righe"):
+                tex += _tabella_esercizi_orale(sc["righe"], e) + "\\medskip\n"
+                tex += _testi_esercizi_orale(sc["righe"], e)
+
         note = note_studente(s, bool(prove))
         if note:
             tex += "\\noindent{\\small\\bfseries Note:}\\begin{itemize}\\setlength{\\itemsep}{0pt}\n"
             tex += "".join(f"\\item {{\\small {e(n)}}}\n" for n in note)
             tex += "\\end{itemize}\n"
         tex += ("\\smallskip\\noindent{\\small Appunti dell'orale:}\\par\\vspace{0.7cm}"
-                "\\noindent\\rule{\\textwidth}{0.3pt}\\par\\vspace{0.7cm}\\noindent\\rule{\\textwidth}{0.3pt}\\par\n")
-        tex += "\\end{minipage}\\par\\bigskip\\bigskip\n\n"
+                "\\noindent\\rule{\\textwidth}{0.3pt}\\par\\vspace{0.7cm}\\noindent\\rule{\\textwidth}{0.3pt}\\par"
+                "\\vspace{0.7cm}\\noindent\\rule{\\textwidth}{0.3pt}\\par\n\n")
     tex += "\\end{document}"
     return tex

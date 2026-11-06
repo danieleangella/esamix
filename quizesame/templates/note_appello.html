@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from "_studente.html" import nome_studente %}
+{% from "_icone.html" import icona %}
+{% from "_info.html" import info %}
+{% from "_note.html" import tabella_note %}
+{% block title %}Note · {{ appello.nome }}{% endblock %}
+{% block breadcrumb %}
+<a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }}</a> <span class="sep">›</span> <span class="current">Note</span>
+{% endblock %}
+{% block katex %}
+<link rel="stylesheet" href="/static/katex/katex.min.css">
+<script defer src="/static/katex/katex.min.js"></script>
+<script defer src="/static/katex/contrib/auto-render.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="intestazione-pagina">
+  <div class="intestazione-livello">Correzione · <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}">{{ appello.nome }}</a></div>
+  <h1>Note della correzione {{ info("Le note scritte correggendo i compiti: sul voto finale (con il voto calcolato, se cambiato a mano), per l'orale ed esercizio per esercizio. Cliccando sul nome di uno studente si apre la sua carriera, sul compito la scheda completa in un'altra pagina, sull'esercizio il testo con la risposta data e quella giusta.") }}</h1>
+</div>
+<div class="card barra-conclusione">
+  <span>{{ note.compiti|length }} not{{ 'a' if note.compiti|length == 1 else 'e' }} sul voto ·
+    {{ note.orali|length }} all'orale ·
+    {% set n_es = note.esercizi | map(attribute='voci') | map('length') | sum %}{{ n_es }} not{{ 'a' if n_es == 1 else 'e' }} sugli esercizi</span>
+  <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/svolgimenti" class="link-con-icona" style="margin-left:auto">{{ icona("elenco", 14) }} svolgimenti a confronto</a>
+  <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}#{{ anchor }}" class="link-con-icona">{{ icona("indietro", 14) }} torna alla correzione</a>
+</div>
+
+<div class="card">
+  <div class="titolo-sezione-correzione"><h2>Note sul voto dei compiti ({{ note.compiti|length }})</h2></div>
+  {% if note.compiti %}
+  <table class="tabella-elenco">
+    <thead><tr><th>Studente</th><th>Compito</th><th>Voto</th><th>Nota</th><th></th></tr></thead>
+    <tbody>
+    {% for c in note.compiti %}
+    <tr>
+      <td>{{ nome_studente(corso.tag, c.matricola, c.cognome ~ ' ' ~ c.nome) }} <span class="muted">{{ c.matricola }}</span></td>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ c.matricola }}" target="_blank" rel="noopener" class="codice-compito">{{ c.codice or '–' }}</a></td>
+      <td style="white-space:nowrap">
+        {% if c.voto_calcolato is not none %}<span class="muted">{{ c.voto_calcolato }} →</span> <strong>{{ c.voto }}</strong> <span class="badge badge-warn">a mano</span>
+        {% else %}{{ c.voto if c.voto is not none else '–' }}{% endif %}
+      </td>
+      <td style="white-space:pre-line">{{ c.nota or '' }}{% if c.voto_calcolato is not none and not c.nota %}<span class="muted">nessuna spiegazione</span>{% endif %}</td>
+      <td style="text-align:right">
+        {% if modificabile and not c.verbalizzato %}
+        <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ c.matricola }}/modifica" class="pulsante-icona" style="display:inline-flex" data-info="Modifica la correzione" aria-label="Modifica la correzione di {{ c.cognome }} {{ c.nome }}">{{ icona("matita") }}</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted" style="margin:0">Nessuna nota sul voto dei compiti.</p>{% endif %}
+</div>
+
+<div class="card">
+  <div class="titolo-sezione-correzione"><h2>Note per l'orale ({{ note.orali|length }})</h2></div>
+  {% if note.orali %}
+  <table class="tabella-elenco">
+    <thead><tr><th>Studente</th><th>Compito</th><th>Scritto</th><th>Motivazione</th><th>Orale</th></tr></thead>
+    <tbody>
+    {% for o in note.orali %}
+    <tr>
+      <td>{{ nome_studente(corso.tag, o.matricola, o.cognome ~ ' ' ~ o.nome) }} <span class="muted">{{ o.matricola }}</span></td>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ o.matricola }}" target="_blank" rel="noopener" class="codice-compito">{{ o.codice or '–' }}</a></td>
+      <td>{{ o.voto_scritto if o.voto_scritto is not none else (o.voto if o.voto is not none else '–') }}</td>
+      <td>{{ o.orale_motivazione or '' }}{% if not o.orale_motivazione %}<span class="muted">nessuna motivazione</span>{% endif %}</td>
+      <td>{% if o.orale_svolto %}{{ o.esito_orale or 'svolto' }}{% if o.esito_orale == 'voto' %} {{ o.voto }}{% endif %}
+        {% elif o.convocazione_orale %}<span class="badge badge-warn">convocato</span>{% else %}<span class="badge badge-warn">da svolgere</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted" style="margin:0">Nessuno studente all'orale.</p>{% endif %}
+</div>
+
+<div class="card">
+  <div class="titolo-sezione-correzione"><h2>Note sugli esercizi</h2></div>
+  {% if not note.esercizi %}<p class="muted" style="margin:0">Nessuna nota sugli esercizi.</p>{% endif %}
+  {% for es in note.esercizi %}
+  <details class="dettaglio-fisarmonica gruppo-note-esercizio" open>
+    <summary><strong>{{ es.nome }}</strong> <span class="muted">({{ es.voci|length }})</span></summary>
+    {{ tabella_note(corso, appello, es.voci, 'es' ~ es.esercizio_id) }}
+  </details>
+  {% endfor %}
+</div>
+{% endblock %}

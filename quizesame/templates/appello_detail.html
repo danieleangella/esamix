@@ -253,7 +253,7 @@
 {% endfor %}
 {% else %}
 {% set md = {
-  "appello": appello, "compiti": compiti, "risultati": risultati, "valutazioni_sospese": valutazioni_sospese,
+  "appello": appello, "compiti": compiti, "risultati": risultati,
   "esercizi_assegnati": esercizi_assegnati, "esercizi_disponibili": esercizi_disponibili, "argomenti": argomenti,
   "blocchi": blocchi, "riferimento_pdf_esiste": riferimento_pdf_esiste, "riferimento_tex_esiste": riferimento_tex_esiste,
   "votomin_effettivo": votomin_effettivo, "consegna_effettivo": consegna_effettivo,
@@ -319,7 +319,6 @@
           {% if r.esito == 'rifiutato' %}<span class="badge badge-warn">rifiutato</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if r.annullamento_nota %} <span class="muted">— {{ r.annullamento_nota }}</span>{% endif %}
           {% elif r.esito != 'voto' %}{{ r.esito }}
-          {% elif r.valutazione_sospesa %}<span class="badge badge-warn">valutazione in sospeso</span> <span class="muted">({{ r.voto }})</span>
           {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
           {% else %}{{ r.voto }}{% if r.richiede_orale and r.orale_svolto %} <span class="badge badge-ok">orale svolto</span>{% endif %}{% endif %}
           {% if r.convocazione_orale and r.esito == 'voto' %} <span class="badge badge-warn" data-info="Conta solo se confermata nell'ultima prova del raggruppamento">convocato all'orale</span>{% endif %}
@@ -335,9 +334,7 @@
           {% if appello.chiuso %}
           <span class="muted" data-info="Appello chiuso: riaprilo dalla scheda Chiusura per modificare">{{ icona("lucchetto", 14) }}</span>
           {% elif not r.verbalizzato %}
-          {% if r.valutazione_sospesa %}
-          <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica" class="pulsante-icona pulsante-neutro" style="color:var(--warn-strong-text)" data-info="Completa la valutazione (svolgimenti in sospeso)" aria-label="Completa la valutazione">{{ icona("matita", 16) }}</a>
-          {% elif r.esito in ('voto', 'rifiutato') %}
+          {% if r.esito in ('voto', 'rifiutato') %}
           <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ r.matricola }}/modifica" class="pulsante-icona" style="display:inline-flex"
              data-info="Modifica la correzione" aria-label="Modifica il risultato di {{ r.cognome }} {{ r.nome }}">{{ icona("matita") }}</a>
           {% endif %}

@@ -595,8 +595,6 @@ class CorrezioneResult:
     cognome: str
     insufficiente_per_obbligatorio: bool = False
     richiede_orale: bool = False
-    valutazione_sospesa: bool = False
-    svolgimenti_rimandati: int = 0
 
 
 def _sincronizza_convocazione(conn, raggruppamento, appello_id: int, matricola: str) -> None:
@@ -690,11 +688,9 @@ def conferma_risultato(
     """Salva il risultato. `punteggi_obbligatori` sono i punteggi (tra risposta_sbagliata
     e risposta_corretta, o punteggio_max_aperta per le domande aperte) assegnati dal
     docente agli esercizi che richiedono un giudizio manuale (obbligatori risposti
-    correttamente, o domande aperte), dopo aver giudicato lo svolgimento scritto. Le
-    posizioni manuali senza punteggio sono valutazioni rimandate: il risultato resta "in
-    sospeso" con un voto provvisorio (ottimistico, vedi calcola_voto), si completa più
-    tardi da "Modifica" o dalla pagina degli svolgimenti, e intanto voto_finale (voto
-    cambiato a mano) e la richiesta dell'orale vengono ignorati. `note_svolgimenti` sono
+    correttamente, o domande aperte), dopo aver giudicato lo svolgimento scritto: devono
+    esserci tutti (una correzione incompleta si salva come bozza, vedi salva_bozza),
+    altrimenti solleva ValueError. `note_svolgimenti` sono
     le note del docente sugli errori di ciascuno svolgimento, `nota_correzione` una nota
     libera sul compito (es. perché il voto finale è stato cambiato), `rivalutazioni` i
     punteggi dati a mano agli esercizi a risposta chiusa (già compresi in voto_finale:
@@ -703,13 +699,11 @@ def conferma_risultato(
     orale" finché non si chiama completa_orale(). Se lo studente ha già una riga in
     orale_obbligatorio (imposta in un appello precedente, anche di un altro corso da cui è
     stato importato) e non è arrivata `conferma_orale_obbligatorio`, non salva nulla e
-    solleva OraleObbligatorioNonConfermato perché il chiamante mostri l'avviso (non per
-    una valutazione rimandata: lo si chiederà al completamento). Se lo studente ha già un
+    solleva OraleObbligatorioNonConfermato perché il chiamante mostri l'avviso. Se lo studente ha già un
     esito registrato per questo appello (voto, assente o ritirato) e `modifica` non è
     True, non salva nulla e solleva RisultatoGiaValutato: una correzione "nuova" (dal
     form principale) non deve poter sovrascrivere per sbaglio un esito già inserito —
-    solo un "Modifica" esplicito (necessario anche per completare una valutazione
-    sospesa) può."""
+    solo un "Modifica" esplicito può."""
     corsi_service.verifica_appello_aperto(tag, appello_id)
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
@@ -751,11 +745,10 @@ def conferma_risultato(
                 raise ValueError(f"Punteggio {v} dell'esercizio {i + 1} fuori dall'intervallo consentito "
                                  f"({minimo_chiusa}…{corso.risposta_corretta})")
         calcolo = calcola_voto(corso, votomin, soluzioni, risposte, posizioni, punteggi)
-        sospesa = bool(calcolo.mancanti)
+        if calcolo.mancanti:
+            numeri = ", ".join(str(i + 1) for i in sorted(calcolo.mancanti))
+            raise ValueError(f"Manca il punteggio degli esercizi {numeri}: confermalo, o salva la correzione come bozza")
         insufficiente = calcolo.insufficiente
-        if sospesa:
-            richiedi_orale = False
-            voto_finale = None
         richiedi_orale_su_prova = richiedi_orale and raggruppamento_membro is None
         ultima_prova = raggruppamento_membro is not None and raggruppamento_membro.membri[-1].id == appello_id
 
@@ -768,7 +761,7 @@ def conferma_risultato(
 
         # con uno scritto insufficiente l'orale non si può richiedere: niente da confermare
         orale_obb = _orale_obbligatorio(conn, studente["matricola"])
-        if (orale_obb and not sospesa and not richiedi_orale and not conferma_orale_obbligatorio
+        if (orale_obb and not richiedi_orale and not conferma_orale_obbligatorio
                 and voto >= votomin):
             raise OraleObbligatorioNonConfermato(orale_obb["motivazione"] or "", orale_obb["origine"] or "")
 
@@ -805,9 +798,9 @@ def conferma_risultato(
                 json.dumps(punteggi) if punteggi else None,
                 richiedi_orale_su_prova, False,
                 orale_motivazione or None if richiedi_orale else None,
-                sospesa, json.dumps(note) if note else None, (nota_correzione or "").strip() or None,
+                False, json.dumps(note) if note else None, (nota_correzione or "").strip() or None,
                 voto_modificato, richiedi_orale and raggruppamento_membro is not None,
-                json.dumps(rivalutazioni) if rivalutazioni and not sospesa else None,
+                json.dumps(rivalutazioni) if rivalutazioni else None,
             ),
         )
         # In una prova di un raggruppamento l'orale è una convocazione segnalata sulla
@@ -819,16 +812,14 @@ def conferma_risultato(
                 "ON CONFLICT(matricola) DO NOTHING",
                 (matricola, orale_motivazione or "", appello.nome),
             )
-        if not sospesa:
-            _applica_soglia_orale_automatica(conn, corso, matricola)
-        # una correzione confermata rende superflua un'eventuale bozza in sospeso per lo
+        _applica_soglia_orale_automatica(conn, corso, matricola)
+        # una correzione confermata rende superflua un'eventuale bozza ancora aperta per lo
         # stesso studente su questo appello.
         conn.execute("DELETE FROM bozze_correzione WHERE appello_id=? AND matricola=?", (appello_id, matricola))
         conn.commit()
         return CorrezioneResult(
             voto=voto, matricola=studente["matricola"], nome=studente["nome"], cognome=studente["cognome"],
             insufficiente_per_obbligatorio=insufficiente, richiede_orale=richiedi_orale,
-            valutazione_sospesa=sospesa, svolgimenti_rimandati=len(calcolo.mancanti),
         )
     finally:
         conn.close()
@@ -846,13 +837,12 @@ def _carica_risultato_con_compito(conn, appello_id: int, matricola: str):
 def valuta_svolgimento(
     tag: str, appello_id: int, matricola: str, posizione: int, punteggio: Optional[int], nota: str = "",
 ) -> dict:
-    """Assegna (o toglie, con None: valutazione rimandata) il punteggio di un singolo
-    svolgimento di un compito già registrato, con la sua nota, dalla pagina che confronta
-    gli svolgimenti esercizio per esercizio. Il voto si ricalcola, tranne quando era stato
-    cambiato a mano (resta quello, e si avvisa) o l'orale è già stato svolto (cambia solo
-    il voto scritto di riferimento). Quando non resta più niente da giudicare la
-    valutazione esce dalla sospensione, a meno che lo studente non abbia l'orale
-    obbligatorio: allora va confermata dalla pagina del compito, che lo chiede."""
+    """Cambia il punteggio di un singolo svolgimento di un compito già registrato, con la
+    sua nota, dalla pagina che confronta gli svolgimenti esercizio per esercizio. Il voto si
+    ricalcola, tranne quando era stato cambiato a mano (resta quello, e si avvisa) o l'orale
+    è già stato svolto (cambia solo il voto scritto di riferimento)."""
+    if punteggio is None:
+        raise ValueError("Scrivi il punteggio dello svolgimento")
     corsi_service.verifica_appello_aperto(tag, appello_id)
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
@@ -874,20 +864,15 @@ def valuta_svolgimento(
         prima = calcola_voto(corso, votomin, soluzioni, risposte, posizioni, punteggi)
         if posizione not in prima.manuali:
             raise ValueError("Questa posizione non richiede una valutazione a mano")
-        if not r["valutazione_sospesa"]:
-            # risultati registrati prima che i punteggi venissero salvati tutti: le
-            # posizioni senza punteggio valevano quello calcolato dalla lettera, non sono
-            # rimandate (altrimenti cambiarne una rimetterebbe il compito in sospeso)
-            for i in prima.mancanti:
-                lettera = risposte[i].upper() if i < len(risposte) else "X"
-                punteggi[i] = corso.risposta_corretta if lettera == soluzioni[i].upper() else (
-                    corso.risposta_vuota if lettera == "X" else corso.risposta_sbagliata)
-            prima = calcola_voto(corso, votomin, soluzioni, risposte, posizioni, punteggi)
-        if punteggio is None:
-            punteggi.pop(posizione, None)
-        else:
-            _controlla_punteggio(corso, prima.manuali[posizione], punteggio)
-            punteggi[posizione] = punteggio
+        # risultati registrati prima che i punteggi venissero salvati tutti: le posizioni
+        # senza punteggio valevano quello calcolato dalla lettera
+        for i in prima.mancanti:
+            lettera = risposte[i].upper() if i < len(risposte) else "X"
+            punteggi[i] = corso.risposta_corretta if lettera == soluzioni[i].upper() else (
+                corso.risposta_vuota if lettera == "X" else corso.risposta_sbagliata)
+        prima = calcola_voto(corso, votomin, soluzioni, risposte, posizioni, punteggi)
+        _controlla_punteggio(corso, prima.manuali[posizione], punteggio)
+        punteggi[posizione] = punteggio
         note = _json_posizioni(r["note_svolgimenti"])
         if nota and nota.strip():
             note[posizione] = nota.strip()
@@ -895,47 +880,30 @@ def valuta_svolgimento(
             note.pop(posizione, None)
 
         dopo = calcola_voto(corso, votomin, soluzioni, risposte, posizioni, punteggi)
-        voto_a_mano = bool(r["voto_modificato"]) and not r["valutazione_sospesa"] and r["voto_scritto"] is not None
+        voto_a_mano = bool(r["voto_modificato"]) and r["voto_scritto"] is not None
         voto_scritto = r["voto_scritto"] if voto_a_mano else dopo.voto
         voto = r["voto"] if r["orale_svolto"] else voto_scritto
-        sospesa = bool(dopo.mancanti)
         avviso = None
         if voto_a_mano and dopo.voto != prima.voto:
             avviso = (f"Il voto finale di {r['cognome']} {r['nome']} era stato cambiato a mano ({voto_scritto}) e "
                       f"non è stato ricalcolato: con i punteggi attuali sarebbe {dopo.voto}.")
-        elif (r["valutazione_sospesa"] and not sospesa and not r["richiede_orale"]
-              and voto_scritto >= votomin and _orale_obbligatorio(conn, matricola)):
-            sospesa = True
-            avviso = (f"{r['cognome']} {r['nome']} deve fare l'orale in ogni appello: completa la "
-                      "valutazione dalla pagina del compito per scegliere se richiederlo.")
-        elif (r["valutazione_sospesa"] and not sospesa and voto_scritto >= votomin
-              and (convocato := convocazione_precedente(tag, appello_id, matricola))):
-            sospesa = True
-            avviso = (f"{r['cognome']} {r['nome']} era convocato all'orale in {convocato['prova']}: completa la "
-                      "valutazione dalla pagina del compito per confermare o togliere la convocazione.")
         conn.execute(
             "UPDATE risultati SET punteggi_obbligatori=?, note_svolgimenti=?, voto=?, voto_scritto=?, "
-            "valutazione_sospesa=?, insufficiente_per_obbligatorio=?, voto_modificato=? WHERE appello_id=? AND matricola=?",
+            "valutazione_sospesa=0, insufficiente_per_obbligatorio=?, voto_modificato=? WHERE appello_id=? AND matricola=?",
             (json.dumps(punteggi) if punteggi else None, json.dumps(note) if note else None,
-             voto, voto_scritto, sospesa, dopo.insufficiente, voto_a_mano and voto_scritto != dopo.voto,
+             voto, voto_scritto, dopo.insufficiente, voto_a_mano and voto_scritto != dopo.voto,
              appello_id, matricola),
         )
-        if r["valutazione_sospesa"] and not sospesa:
-            _applica_soglia_orale_automatica(conn, corso, matricola)
         conn.commit()
-        return {
-            "voto": voto, "voto_calcolato": dopo.voto, "sospesa": sospesa,
-            "da_valutare": len(dopo.mancanti), "avviso": avviso,
-        }
+        return {"voto": voto, "voto_calcolato": dopo.voto, "avviso": avviso}
     finally:
         conn.close()
 
 
 def svolgimenti_appello(tag: str, appello_id: int, escludi_matricola: Optional[str] = None) -> dict:
     """Tutti gli svolgimenti giudicati a mano in un appello (obbligatori con la risposta
-    corretta e domande aperte), raggruppati per esercizio: per valutare quelli rimandati
-    uno dopo l'altro e confrontare punteggi e note di studenti diversi sullo stesso
-    esercizio. Per ogni esercizio anche le note usate, con i punteggi dati a ciascuna (una
+    corretta e domande aperte), raggruppati per esercizio: per confrontare punteggi e note
+    di studenti diversi sullo stesso esercizio. Per ogni esercizio anche le note usate, con i punteggi dati a ciascuna (una
     stessa nota con punteggi diversi è segnalata), e l'elenco dei compiti con una nota o
     un voto cambiato a mano."""
     corso = corsi_service.get_corso(tag)
@@ -985,18 +953,16 @@ def svolgimenti_appello(tag: str, appello_id: int, escludi_matricola: Optional[s
             es = esercizi.setdefault(chiave, {
                 "chiave": str(chiave), "esercizio_id": p["esercizio_id"], "nome": p["esercizio_nome"],
                 "aperta": bool(p["aperta"]), "massimo": punteggio_massimo(corso, bool(p["aperta"])),
-                "voci": [], "da_valutare": 0, "prima_posizione": i,
+                "voci": [], "prima_posizione": i,
             })
             es["prima_posizione"] = min(es["prima_posizione"], i)
-            da_valutare = i not in punteggi and bool(r["valutazione_sospesa"])
-            es["da_valutare"] += da_valutare
             es["voci"].append({
                 "matricola": r["matricola"], "nome": r["nome"], "cognome": r["cognome"], "posizione": i,
-                "punteggio": punteggi.get(i), "nota": note.get(i, ""), "da_valutare": da_valutare,
-                "voto": r["voto"], "sospesa": bool(r["valutazione_sospesa"]), "modificabile": modificabile,
+                "punteggio": punteggi.get(i), "nota": note.get(i, ""),
+                "voto": r["voto"], "modificabile": modificabile,
                 "verbalizzato": bool(r["verbalizzato"]),
             })
-        voto_a_mano = bool(r["voto_modificato"]) and not r["valutazione_sospesa"] and r["voto_scritto"] is not None
+        voto_a_mano = bool(r["voto_modificato"]) and r["voto_scritto"] is not None
         if voto_a_mano or r["nota_correzione"]:
             compiti_annotati.append({
                 "matricola": r["matricola"], "nome": r["nome"], "cognome": r["cognome"],
@@ -1006,10 +972,9 @@ def svolgimenti_appello(tag: str, appello_id: int, escludi_matricola: Optional[s
 
     elenco = sorted(esercizi.values(), key=lambda e: e["prima_posizione"])
     for es in elenco:
-        # da valutare in cima, poi dal punteggio più alto: studenti con lo stesso
-        # punteggio vicini, per confrontarne le note a colpo d'occhio
-        es["voci"].sort(key=lambda v: (not v["da_valutare"], -(v["punteggio"] if v["punteggio"] is not None else 1e9),
-                                       v["cognome"].lower()))
+        # dal punteggio più alto: studenti con lo stesso punteggio vicini, per confrontarne
+        # le note a colpo d'occhio
+        es["voci"].sort(key=lambda v: (-(v["punteggio"] if v["punteggio"] is not None else 1e9), v["cognome"].lower()))
         gruppi: dict = {}
         for v in es["voci"]:
             if v["nota"] and v["punteggio"] is not None:
@@ -1023,10 +988,7 @@ def svolgimenti_appello(tag: str, appello_id: int, escludi_matricola: Optional[s
         valutati = [v["punteggio"] for v in es["voci"] if v["punteggio"] is not None]
         es["media"] = round(sum(valutati) / len(valutati), 2) if valutati else None
         es["n_valutati"] = len(valutati)
-    return {
-        "esercizi": elenco, "da_valutare": sum(e["da_valutare"] for e in elenco),
-        "compiti_annotati": compiti_annotati,
-    }
+    return {"esercizi": elenco, "compiti_annotati": compiti_annotati}
 
 
 def note_esercizi(tag: str, appello_id: int, escludi_matricola: Optional[str] = None,
@@ -1041,7 +1003,7 @@ def note_esercizi(tag: str, appello_id: int, escludi_matricola: Optional[str] = 
     try:
         risultati = conn.execute(
             "SELECT r.matricola, r.risposte, r.voto, r.voto_scritto, r.punteggi_obbligatori, r.rivalutazioni, "
-            "r.note_svolgimenti, r.valutazione_sospesa, r.compito_id, c.codice, c.soluzioni, s.nome, s.cognome "
+            "r.note_svolgimenti, r.compito_id, c.codice, c.soluzioni, s.nome, s.cognome "
             "FROM risultati r JOIN compiti c ON c.id = r.compito_id JOIN studenti s ON s.matricola = r.matricola "
             "WHERE r.appello_id=? AND r.note_svolgimenti IS NOT NULL "
             "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
@@ -1049,8 +1011,9 @@ def note_esercizi(tag: str, appello_id: int, escludi_matricola: Optional[str] = 
         ).fetchall()
         posizioni: dict[int, dict[int, dict]] = {}
         for p in conn.execute(
-            "SELECT ce.compito_id, ce.posizione, ce.esercizio_id, ce.aperta, ce.obbligatorio, rv.revisione "
-            "FROM compito_esercizi ce JOIN compiti c ON c.id = ce.compito_id "
+            "SELECT ce.compito_id, ce.posizione, ce.esercizio_id, ce.aperta, ce.obbligatorio, ce.risposte_mischiate, "
+            "rv.revisione, e.nome AS esercizio_nome, ev.testo FROM compito_esercizi ce JOIN compiti c ON c.id = ce.compito_id "
+            "LEFT JOIN esercizi e ON e.id = ce.esercizio_id LEFT JOIN esercizio_varianti ev ON ev.id = ce.variante_id "
             "LEFT JOIN appello_revisione_esercizi rv ON rv.appello_id = c.appello_id AND rv.esercizio_id = ce.esercizio_id "
             "WHERE c.appello_id=?",
             (appello_id,),
@@ -1088,9 +1051,43 @@ def note_esercizi(tag: str, appello_id: int, escludi_matricola: Optional[str] = 
                 "obbligatorio": bool(p["obbligatorio"]), "lettera_data": "" if p["aperta"] else lettera,
                 "lettera_corretta": "" if p["aperta"] else giusta,
                 "voto": r["voto_scritto"] if r["voto_scritto"] is not None else r["voto"],
-                "sospesa": bool(r["valutazione_sospesa"]),
+                # per mostrare l'esercizio com'era stampato su quel compito
+                "esercizio_nome": p["esercizio_nome"] or f"Esercizio #{p['esercizio_id']}",
+                "testo": p["testo"] or "", "corretta": not p["aperta"] and lettera == giusta,
+                "risposte": json.loads(p["risposte_mischiate"]) if p["risposte_mischiate"] else [],
             })
     return esito
+
+
+def note_appello(tag: str, appello_id: int) -> dict:
+    """Tutte le note della correzione di un appello, per la pagina che le riassume: le
+    note sul voto dei compiti (con il voto calcolato, se cambiato a mano), le motivazioni
+    dell'orale e le note esercizio per esercizio (vedi note_esercizi), per esercizio
+    nell'ordine del nome."""
+    annotati = svolgimenti_appello(tag, appello_id)["compiti_annotati"]
+    conn = db.get_connection(config.corso_db_path(tag))
+    try:
+        codici = {r["matricola"]: r["codice"] for r in conn.execute(
+            "SELECT r.matricola, c.codice FROM risultati r JOIN compiti c ON c.id = r.compito_id WHERE r.appello_id=?",
+            (appello_id,))}
+        orali = [dict(r) for r in conn.execute(
+            "SELECT r.matricola, r.orale_motivazione, r.orale_svolto, r.esito_orale, r.convocazione_orale, r.voto, "
+            "r.voto_scritto, s.nome, s.cognome FROM risultati r JOIN studenti s ON s.matricola = r.matricola "
+            "WHERE r.appello_id=? AND (r.richiede_orale=1 OR r.convocazione_orale=1) "
+            "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
+            (appello_id,))]
+    finally:
+        conn.close()
+    for c in annotati:
+        c["codice"] = codici.get(c["matricola"])
+    for o in orali:
+        o["codice"] = codici.get(o["matricola"])
+    esercizi = []
+    for esercizio_id, voci in note_esercizi(tag, appello_id).items():
+        voci.sort(key=lambda v: (v["nota"].strip().lower(), v["studente"].lower()))
+        esercizi.append({"esercizio_id": esercizio_id, "nome": voci[0]["esercizio_nome"], "voci": voci})
+    esercizi.sort(key=lambda e: e["nome"].lower())
+    return {"compiti": annotati, "orali": orali, "esercizi": esercizi}
 
 
 ESITI_ORALE = ("assente", "insufficiente", "voto")
@@ -1226,6 +1223,7 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
         risposte = r["risposte"] or ""
         punteggi = json.loads(r["punteggi_obbligatori"]) if r["punteggi_obbligatori"] else {}
         note = json.loads(r["note_svolgimenti"]) if r["note_svolgimenti"] else {}
+        rivalutazioni = json.loads(r["rivalutazioni"]) if r["rivalutazioni"] else {}
 
         posizioni = compiti_service.list_posizioni_compito(tag, r["compito_id"])
         dettaglio_esercizi_disponibile = bool(posizioni)
@@ -1243,23 +1241,25 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
             lettera_data = risposte[i].upper() if i < len(risposte) else "X"
             lettera_corretta = soluzioni[i].upper() if i < len(soluzioni) else "?"
             corretta = lettera_data == lettera_corretta
+            calcolato = None if pos["aperta"] else (
+                corso.risposta_corretta if corretta
+                else (corso.risposta_vuota if lettera_data == "X" else corso.risposta_sbagliata)
+            )
             if pos.get("revisione") == "annullato":
                 punteggio_assegnato = punteggio_massimo(corso, bool(pos["aperta"]))
             elif str(i) in punteggi:
                 punteggio_assegnato = punteggi[str(i)]
-            elif pos["aperta"]:
-                punteggio_assegnato = None
+            elif str(i) in rivalutazioni:
+                punteggio_assegnato = rivalutazioni[str(i)]
             else:
-                punteggio_assegnato = (
-                    corso.risposta_corretta if corretta
-                    else (corso.risposta_vuota if lettera_data == "X" else corso.risposta_sbagliata)
-                )
+                punteggio_assegnato = calcolato
             righe.append({
                 "posizione": i, "esercizio_nome": pos["esercizio_nome"] or f"Posizione {i + 1}",
-                "obbligatorio": bool(pos["obbligatorio"]), "lettera_data": lettera_data,
-                "lettera_corretta": lettera_corretta, "corretta": corretta,
-                "punteggio_assegnato": punteggio_assegnato, "nota": note.get(str(i), ""),
-                "revisione": pos.get("revisione"),
+                "obbligatorio": bool(pos["obbligatorio"]), "aperta": bool(pos["aperta"]),
+                "lettera_data": lettera_data, "lettera_corretta": lettera_corretta, "corretta": corretta,
+                "punteggio_assegnato": punteggio_assegnato, "calcolato": calcolato, "nota": note.get(str(i), ""),
+                "revisione": pos.get("revisione"), "testo": pos.get("testo") or "",
+                "risposte": json.loads(pos["risposte_mischiate"]) if pos.get("risposte_mischiate") else [],
             })
 
         storico = studenti_service.risultati_studente(tag, matricola)
@@ -1274,6 +1274,37 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
         }
     finally:
         conn.close()
+
+
+def note_prove_precedenti(tag: str, appello_id: int, matricola: str) -> list[dict]:
+    """Per una prova di un raggruppamento dopo la prima: le note scritte correggendo lo
+    stesso studente nelle prove precedenti (sul voto, per l'orale ed esercizio per
+    esercizio), prova per prova, con voto e codice del compito. Solo le prove con qualche
+    nota; vuoto per un appello qualsiasi o per la prima prova."""
+    raggruppamento = corsi_service.get_raggruppamento_by_membro(tag, appello_id)
+    if raggruppamento is None:
+        return []
+    ids = [m.id for m in raggruppamento.membri]
+    if appello_id not in ids:
+        return []
+    esito = []
+    for membro in raggruppamento.membri[:ids.index(appello_id)]:
+        try:
+            d = dettaglio_risultato(tag, membro.id, matricola)
+        except ValueError:
+            continue
+        r = d["risultato"]
+        esercizi = [e for e in d["righe"] if e["nota"]]
+        orale = r["orale_motivazione"] if (r["richiede_orale"] or r["convocazione_orale"]) else ""
+        if not (r["nota_correzione"] or orale or esercizi or r["annullamento_nota"]):
+            continue
+        esito.append({
+            "prova": membro.nome, "appello_id": membro.id, "codice": r["codice"], "esito": r["esito"],
+            "voto": r["voto_scritto"] if r["voto_scritto"] is not None else r["voto"],
+            "nota": r["nota_correzione"] or r["annullamento_nota"] or "", "orale": orale or "",
+            "convocato": bool(r["convocazione_orale"]), "esercizi": esercizi,
+        })
+    return esito
 
 
 def list_risultati(tag: str, appello_id: int) -> list[dict]:
@@ -1319,21 +1350,6 @@ def list_orali_svolti(tag: str, appello_id: int) -> list[dict]:
             "SELECT r.*, s.nome, s.cognome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
             "WHERE r.appello_id=? AND r.richiede_orale=1 AND r.orale_svolto=1 "
-            "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
-            (appello_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
-    finally:
-        conn.close()
-
-
-def list_valutazioni_sospese(tag: str, appello_id: int) -> list[dict]:
-    conn = db.get_connection(config.corso_db_path(tag))
-    try:
-        rows = conn.execute(
-            "SELECT r.*, s.nome, s.cognome FROM risultati r "
-            "JOIN studenti s ON s.matricola = r.matricola "
-            "WHERE r.appello_id=? AND r.valutazione_sospesa=1 "
             "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id,),
         ).fetchall()

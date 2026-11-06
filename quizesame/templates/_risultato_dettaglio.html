@@ -1,4 +1,5 @@
 {% from "_icone.html" import icona %}
+{% from "_testo_esercizio.html" import testo_con_risposte %}
 {% set tag = corso.tag if corso is defined else corso_tag %}
 {# Due schede: il compito di questo appello e la carriera dello studente (in questo corso e
    negli altri); il passaggio è gestito in app.js (.schede-risultato), anche quando il
@@ -9,13 +10,21 @@
     <a href="#" data-scheda-risultato="carriera" role="tab">Carriera</a>
   </div>
   <div data-pannello-risultato="compito">
+  {% set prefisso = "r" ~ risultato.appello_id ~ "-" ~ risultato.matricola %}
+  <p class="link-schede-risultato">
+    {% if pagina_completa is not defined %}
+    <a href="/corsi/{{ tag }}/appelli/{{ risultato.appello_id }}/risultati/{{ risultato.matricola }}" target="_blank" rel="noopener" class="link-con-icona">{{ icona("file", 14) }} Scheda completa del compito {{ icona("esterno", 12) }}</a>
+    {% endif %}
+    <a href="/corsi/{{ tag }}/studenti/{{ risultato.matricola }}" target="_blank" rel="noopener" class="link-con-icona">{{ icona("utente-spunta", 14) }} Carriera completa {{ icona("esterno", 12) }}</a>
+  </p>
   {% if risultato.esito == 'annullato' %}
   <p><span class="badge badge-err">Compito annullato</span>{% if risultato.annullamento_nota %} — {{ risultato.annullamento_nota }}{% endif %}</p>
   {% if risultato.codice %}<p class="muted">Codice compito: <strong>{{ risultato.codice }}</strong></p>{% endif %}
   {% elif risultato.codice %}
-  <p class="muted">Codice compito: <strong>{{ risultato.codice }}</strong></p>
-  <p>
-    Voto:
+  <dl class="riepilogo-compito">
+    <dt>Compito</dt><dd><strong class="codice-compito">{{ risultato.codice }}</strong>{% if risultato.risposte %} <span class="muted" style="font-family:monospace">· {{ risultato.risposte }}</span>{% endif %}</dd>
+    <dt>Voto</dt>
+    <dd>
     {% if risultato.esito == 'rifiutato' %}
     <strong>{{ risultato.voto }}</strong>
     {% elif risultato.richiede_orale and not risultato.orale_svolto %}
@@ -23,8 +32,9 @@
     {% elif risultato.esito_orale in ('assente', 'insufficiente') %}
     <strong>{{ risultato.esito_orale }} (orale)</strong> <span class="muted">(voto scritto di riferimento: {{ risultato.voto_scritto if risultato.voto_scritto is not none else '-' }})</span>
     {% else %}
-    <strong>{{ risultato.voto }}</strong>
+    <strong>{{ risultato.voto }}</strong>{% if risultato.orale_svolto and risultato.voto_scritto is not none %} <span class="muted">(scritto {{ risultato.voto_scritto }}, dopo l'orale)</span>{% endif %}
     {% endif %}
+    {% if risultato.voto_modificato %} <span class="badge badge-warn">cambiato a mano</span>{% endif %}
     {% if risultato.esito == 'rifiutato' %} · <span class="badge badge-warn">rifiutato dallo studente</span>{% endif %}
     {% if risultato.verbalizzato %}
     ·
@@ -35,15 +45,16 @@
     {% endif %}
     {% endif %}
     {% if risultato.insufficiente_per_obbligatorio %} · <span class="badge badge-warn">insufficiente per obbligatorio non svolto</span>{% endif %}
-  </p>
+    </dd>
+    {% if risultato.nota_correzione %}<dt>Nota sul voto</dt><dd style="white-space:pre-line">{{ risultato.nota_correzione }}</dd>{% endif %}
+    {% if risultato.richiede_orale or risultato.convocazione_orale %}
+    <dt>Orale</dt>
+    <dd>{% if risultato.orale_svolto %}svolto: {{ risultato.esito_orale or '' }}{% if risultato.esito_orale == 'voto' %} {{ risultato.voto }}{% endif %}
+      {% elif risultato.richiede_orale %}richiesto{% else %}convocato{% endif %}{% if risultato.orale_motivazione %} — {{ risultato.orale_motivazione }}{% endif %}</dd>
+    {% endif %}
+  </dl>
   {% else %}
   <p><strong>{{ risultato.esito }}</strong></p>
-  {% endif %}
-  {% if risultato.nota_correzione %}
-  <p><strong>Nota:</strong> {{ risultato.nota_correzione }}</p>
-  {% endif %}
-  {% if risultato.richiede_orale %}
-  <p><strong>Orale richiesto</strong>{% if risultato.orale_motivazione %} ({{ risultato.orale_motivazione }}){% endif %}</p>
   {% endif %}
 
   {% if righe %}
@@ -54,21 +65,30 @@
     la risposta data a confronto con quella corretta.
   </p>
   {% endif %}
-  <table>
-    <tr><th>Esercizio</th><th>Obbligatorio</th><th>Risposta data</th><th>Risposta corretta</th><th>Esito</th><th>Punteggio assegnato</th><th>Nota</th></tr>
+  <table class="tabella-esercizi-compito" data-senza-filtri>
+    <tr><th>N.</th><th>Esercizio</th><th>Risposta</th><th>Punteggio</th><th>Nota</th></tr>
     {% for r in righe %}
-    <tr>
-      <td>{{ r.esercizio_nome }}{% if r.revisione == 'annullato' %} <span class="badge" title="Annullato nella revisione del testo dopo la prova: punteggio pieno per tutti">annullato</span>{% endif %}</td>
-      <td>{{ 'sì' if r.obbligatorio and not r.revisione else ('non più' if r.obbligatorio else '-') }}</td>
-      <td>{{ r.lettera_data }}</td>
-      <td>{{ r.lettera_corretta }}</td>
+    {% set esito = 'aperta' if r.aperta else ('ok' if r.corretta else ('vuota' if r.lettera_data == 'X' else 'err')) %}
+    {% set id_testo = prefisso ~ "-" ~ r.posizione %}
+    <tr class="esito-{{ esito }}">
+      <td class="muted">{{ r.posizione + 1 }}</td>
       <td>
-        {% if r.corretta %}<span class="badge badge-ok">corretta</span>
-        {% else %}<span class="badge badge-warn">sbagliata</span>{% endif %}
+        {% if r.testo %}<button type="button" class="link-simile apri-testo-esercizio" aria-expanded="false" aria-controls="{{ id_testo }}"
+                data-info="Mostra il testo con la risposta data e quella giusta">{{ r.esercizio_nome }}</button>{% else %}{{ r.esercizio_nome }}{% endif %}
+        {% if r.obbligatorio and not r.revisione %}<span class="badge">obbligatorio</span>{% elif r.revisione == 'facoltativo' %}<span class="badge">non più obbligatorio</span>{% endif %}
+        {% if r.revisione == 'annullato' %} <span class="badge" title="Annullato nella revisione del testo dopo la prova: punteggio pieno per tutti">annullato</span>{% endif %}
       </td>
-      <td>{{ r.punteggio_assegnato if r.punteggio_assegnato is not none else '-' }}</td>
+      <td>{% if r.aperta %}<span class="badge badge-info">aperta</span>
+        {% else %}<span class="es-lettere">{{ r.lettera_data }}<span class="muted">/{{ r.lettera_corretta }}</span></span>
+        {% if r.corretta %}<span class="badge badge-ok">giusta</span>{% elif r.lettera_data == 'X' %}<span class="badge">non data</span>{% else %}<span class="badge badge-err">sbagliata</span>{% endif %}{% endif %}</td>
+      <td style="white-space:nowrap"><strong>{{ r.punteggio_assegnato if r.punteggio_assegnato is not none else '–' }}</strong>
+        {% if r.calcolato is not none and r.punteggio_assegnato is not none and r.punteggio_assegnato != r.calcolato and r.revisione != 'annullato' %}
+        <span class="muted">(calcolato {{ r.calcolato }})</span>{% endif %}</td>
       <td>{{ r.nota }}</td>
     </tr>
+    {% if r.testo %}
+    <tr id="{{ id_testo }}" hidden><td colspan="5"><div class="testo-esercizio">{{ testo_con_risposte(r.testo, r.risposte, r.lettera_data, r.lettera_corretta, r.corretta) }}</div></td></tr>
+    {% endif %}
     {% endfor %}
   </table>
   {% endif %}

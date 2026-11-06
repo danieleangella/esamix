@@ -1,7 +1,12 @@
 {% from "_info.html" import info %}
 <details class="card" open>
   <summary><strong>Riepilogo{% if stat_titolo %} — {{ stat_titolo }}{% endif %}</strong></summary>
-  <p class="muted" style="margin-top:0.75rem">Esiti su {{ stat.totale }} compiti corretti (voto minimo {{ stat.votomin }}).</p>
+  <p class="muted" style="margin-top:0.75rem">
+    {% if stat.corretti is defined and stat.consegnati %}
+    Statistiche sui <strong>{{ stat.corretti }}</strong> compiti corretti: {{ stat.corretti_pct }}% dei {{ stat.consegnati }} consegnati{% if stat.da_correggere %}, <strong>{{ stat.da_correggere }}</strong> ancora da correggere (cambieranno){% endif %}.
+    Esiti su {{ stat.totale }} studenti{% if stat.totale != stat.corretti %} (compresi assenti e ritirati){% endif %}, voto minimo {{ stat.votomin }}.
+    {% else %}Esiti su {{ stat.totale }} compiti corretti (voto minimo {{ stat.votomin }}).{% endif %}
+  </p>
   <div class="stats-grid">
     <div class="stat-tile stat-ok">
       <div class="stat-value">{{ stat.promossi }} {% if stat.promossi_pct is not none %}<span class="stat-pct">({{ stat.promossi_pct }}%)</span>{% endif %}</div>

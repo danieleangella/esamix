@@ -156,27 +156,38 @@ dice cosa fare adesso. In tutti gli elenchi di studenti, cliccando il nome si ap
   "Segna assenti tutti i non corretti".
 - **Correzione**: inserimento delle risposte di ogni compito (solo le lettere delle domande
   chiuse: il "-" delle domande aperte lo aggiunge il campo da solo; matricola e codice esatti
-  si prendono da soli), con una barra con la percentuale di compiti corretti (e di ammessi
+  si prendono da soli), con una barra con la percentuale di compiti corretti, quanti sul totale (e di ammessi
   all'orale tra i sufficienti). Il riepilogo mostra le griglie e poi gli esercizi in tre
   sezioni (domande aperte, obbligatori, altri), ognuno col punteggio calcolato e, cliccando
-  sul nome, il testo con la risposta data e quella giusta; voto e azioni restano sempre in
-  vista. Gli obbligatori svolti con la risposta giusta partono dal punteggio massimo, da
-  confermare con la spunta o da abbassare se lo svolgimento non va; quelli con la risposta
-  sbagliata compaiono in rosso col punteggio calcolato, da confermare o alzare; le domande
-  aperte ricevono un punteggio a mano (finché manca contano 0); gli altri esercizi sono già
-  confermati e si rivalutano con la matita. Su ogni esercizio una nota, con le note già date
-  allo stesso esercizio come suggerimento e una pagina che le raccoglie tutte; una nota sul
-  voto finale e una per l'orale. Le risposte molto simili a quelle di un altro compito sono
-  segnalate, con il confronto delle due griglie e la vicinanza dei compiti nella stampa. Gli svolgimenti si possono
-  rimandare e valutare poi esercizio per esercizio nella pagina **Svolgimenti e note**, che
-  confronta punteggi e note per vedere se le correzioni sono coerenti. Bozze e compiti con
-  svolgimenti da valutare stanno nell'elenco **Correzioni da completare** (una bozza conserva
+  sul nome, il testo con la risposta data e quella giusta (gli altri esercizi a scomparsa);
+  in fondo, sempre in vista, nome, matricola e codice, il voto, la spunta dell'orale e le
+  azioni. Domande aperte e obbligatori partono dal punteggio previsto (il massimo per uno
+  svolgimento, il calcolato per una risposta sbagliata), da confermare col timbro: confermato
+  resta fisso e conta nel voto, la matita lo sblocca; con punteggi non confermati la
+  correzione si salva come bozza. Gli altri esercizi sono già confermati e si rivalutano con
+  la matita. Un compito insufficiente già dalla griglia ha la correzione inattiva (la matita
+  la attiva). Su ogni esercizio una nota, che si apre da sola quando se ne cambia il
+  punteggio, con le note già date allo stesso esercizio come suggerimento; una nota sul voto
+  finale (aperta da sola se il voto si cambia a mano) e una per l'orale; la pagina **Note**
+  le raccoglie tutte, con il testo dell'esercizio e la risposta data. Le risposte molto simili a quelle di un altro compito sono
+  segnalate, con il confronto delle due griglie e la vicinanza dei compiti nella stampa. La pagina **Svolgimenti**
+  confronta punteggi e note esercizio per esercizio, per vedere se le correzioni sono
+  coerenti. Le bozze stanno nell'elenco **Correzioni da completare** (una bozza conserva
   punteggi, note e rivalutazioni già fatti); cancellare una
   correzione riporta lo studente lì. In fondo "Chiudi la correzione", attivo quando tutti
   hanno un esito e non restano correzioni da completare; a correzione chiusa ci sono i
   risultati da pubblicare e i **voti per Moodle** (CSV con la struttura del file di
   prenotazioni Moodle caricato).
-- **Orali**, **Verbalizzazione** (con l'esportazione dei voti nel file della segreteria) e
+- **Orali**: la scheda di ogni studente si apre sotto la riga, con tutti gli esercizi, le
+  risposte, i punteggi e le note e i link alla scheda completa del compito e alla carriera;
+  il foglio per gli orali (PDF) ha un riepilogo e una pagina per studente con gli stessi dati e
+  il testo degli esercizi. Nelle prove parziali dopo la prima, la correzione mostra le note
+  sullo studente nelle prove precedenti.
+- **Elenchi** di iscritti e ammessi per l'appello in aula: in ordine di cognome e nome, con le
+  caselle per presenza, voto finale e orale (in orizzontale quando le colonne sono tante).
+  Nel compito, spazio sopra e sotto la griglia delle risposte per annotare i punteggi.
+- **Statistiche** dell'appello calcolate sui compiti corretti, con quanti sono sui consegnati.
+- **Verbalizzazione** (con l'esportazione dei voti nel file della segreteria) e
   **Chiusura**, ognuna nella sua scheda.
 - **Impostazioni** dell'appello: nome, data, orale e, per le prove parziali, le aule (una può
   essere riservata agli studenti DSA/L104; un avviso segnala quando gli studenti superano la

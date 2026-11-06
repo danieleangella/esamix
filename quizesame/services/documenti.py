@@ -71,7 +71,7 @@ def risultati_md(tag: str, appello_id: int) -> str:
 
 def orali_md(tag: str, appello, dati: dict) -> str:
     """Il foglio per gli orali (vedi orali.foglio_orali): l'elenco con le colonne da
-    compilare (presente, voto orale), poi gli scritti di ciascuno con errori e note."""
+    compilare (presente, voto orale), poi gli scritti di ciascuno con tutti gli esercizi (risposta data e giusta, punti, note)."""
     from quizesame.services import orali as orali_service
     corso = dati["corso"]
     prove = dati["prove"]
@@ -101,10 +101,20 @@ def orali_md(tag: str, appello, dati: dict) -> str:
             if sc["n_esercizi"]:
                 dettagli.append(f"{len(sc['errori'])} errori su {sc['n_esercizi']} esercizi")
             righe += [(f"**{sc['prova']}**: " if prove else "") + ", ".join(dettagli), ""]
-            for e in sc["errori"]:
-                nota = f" — *{e['nota']}*" if e["nota"] else ""
-                righe.append(f"- {e['esercizio_nome']}{' (obbligatorio)' if e['obbligatorio'] else ''}: {e['descrizione']}{nota}")
-            if sc["errori"]:
+            # tutti gli esercizi: risposta data e giusta, punteggio e nota (errori in grassetto)
+            if sc.get("righe"):
+                righe += ["| N. | Esercizio | Risposta | Punti | Nota |", "|---:|---|:---:|:---:|---|"]
+                for e in sc["righe"]:
+                    nome = e["esercizio_nome"] + (" (obbligatorio)" if e["obbligatorio"] and not e.get("revisione") else "")
+                    risposta = "aperta" if e.get("aperta") else f"{e['lettera_data']}/{e['lettera_corretta']}"
+                    punti = "—" if e["punteggio_assegnato"] is None else str(e["punteggio_assegnato"])
+                    if (e.get("calcolato") is not None and e["punteggio_assegnato"] is not None
+                            and e["punteggio_assegnato"] != e["calcolato"] and e.get("revisione") != "annullato"):
+                        punti += f" (calcolato {e['calcolato']})"
+                    if e.get("errore"):
+                        nome, risposta, punti = f"**{nome}**", f"**{risposta}**", f"**{punti}**"
+                    nota = f"*{e['nota']}*" if e["nota"] else ""
+                    righe.append(f"| {e['posizione'] + 1} | {nome} | {risposta} | {punti} | {nota} |".replace("\n", " "))
                 righe.append("")
         note = orali_service.note_studente(s, bool(prove))
         if note:

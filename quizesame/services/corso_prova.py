@@ -117,15 +117,19 @@ def _risposte_studente(compito: dict, bravura: float, rng: random.Random, obblig
 
 
 def _correggi(appello_id: int, matricola: str, compito: dict, rng: random.Random, bravura: float,
-              rimanda: bool = False, voto_a_mano: int | None = None, nota: str = "",
+              in_bozza: bool = False, voto_a_mano: int | None = None, nota: str = "",
               richiedi_orale: bool = False, obbligatorio_vuoto: bool = False) -> None:
     posizioni = compiti_service.list_posizioni_compito(TAG, compito["id"])
     risposte = _risposte_studente(compito, bravura, rng, obbligatorio_vuoto)
+    if in_bozza:
+        # correzione lasciata a metà: i punteggi degli svolgimenti sono ancora da confermare
+        correzione_service.salva_bozza(TAG, appello_id, matricola, compito["codice"], risposte)
+        return
     punteggi, note = {}, {}
     for p in posizioni:
         i = p["posizione"]
         da_giudicare = p["aperta"] or (p["obbligatorio"] and risposte[i] == compito["soluzioni"][i])
-        if not da_giudicare or rimanda:
+        if not da_giudicare:
             continue
         nota_errore, punteggio = NOTE_ERRORI[rng.randrange(len(NOTE_ERRORI))]
         punteggi[i], note[i] = punteggio, nota_errore
@@ -219,7 +223,7 @@ def _popola(oggi: date) -> list[str]:
               nota="Voto alzato: svolgimenti molto ordinati, errori solo di distrazione")
     _correggi(appello.id, iscritti[5], next(c), rng, 0.9, richiedi_orale=True)
     _correggi(appello.id, iscritti[6], next(c), rng, 0.9, obbligatorio_vuoto=True)
-    _correggi(appello.id, iscritti[7], next(c), rng, 0.8, rimanda=True)
+    _correggi(appello.id, iscritti[7], next(c), rng, 0.8, in_bozza=True)
     bozza = next(c)
     correzione_service.salva_bozza(TAG, appello.id, iscritti[8], bozza["codice"],
                                    _risposte_studente(bozza, 0.75, rng))
@@ -229,7 +233,7 @@ def _popola(oggi: date) -> list[str]:
     # iscritti[13]: iscritto, non presente, nessun esito (da segnare assente a fine correzione)
 
     # --- due prove parziali raggruppate: la prima corretta e conclusa, la seconda in corso
-    # con gli svolgimenti rimandati da valutare tutti insieme
+    # con alcune correzioni lasciate in bozza
     prima = corsi_service.create_appello(TAG, "Prima prova parziale di prova", data=(oggi - timedelta(days=40)).strftime("%d/%m/%Y"))
     seconda = corsi_service.create_appello(TAG, "Seconda prova parziale di prova", data=(oggi - timedelta(days=1)).strftime("%d/%m/%Y"))
     corsi_service.create_raggruppamento(TAG, "Prove parziali di prova", [prima.id, seconda.id])
@@ -256,8 +260,7 @@ def _popola(oggi: date) -> list[str]:
     for m in ammessi[:2]:
         _correggi(seconda.id, m, next(c), rng, 0.85)
     for m in ammessi[2:4]:
-        _correggi(seconda.id, m, next(c), rng, 0.8, rimanda=True)
-    corsi_service.update_appello(TAG, seconda.id, rimanda_svolgimenti=True)
+        _correggi(seconda.id, m, next(c), rng, 0.8, in_bozza=True)
     for m in ammessi[4:]:
         da_fare.append(_da_fare(seconda, m, next(c), rng))
 

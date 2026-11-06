@@ -1,0 +1,37 @@
+{# Elenco di note sugli esercizi (vedi correzione.note_esercizi): per ognuna punteggio
+   assegnato e calcolato, l'esercizio (cliccando, il testo stampato su quel compito con la
+   risposta data e quella giusta), lo studente (cliccando, la sua carriera), il compito
+   (scheda completa in un'altra pagina) e il voto. Serve il blocco katex nella pagina. #}
+{% from "_studente.html" import nome_studente %}
+{% from "_testo_esercizio.html" import testo_con_risposte %}
+{% macro tabella_note(corso, appello, voci, prefisso) -%}
+<table class="tabella-elenco tabella-note">
+  <thead>
+    <tr><th>Nota</th><th>Assegnato</th><th>Calcolato</th><th>Esercizio</th><th>Studente</th><th>Compito</th><th>Voto del compito</th></tr>
+  </thead>
+  <tbody>
+    {% for v in voci %}
+    {% set id_testo = prefisso ~ "-" ~ v.matricola ~ "-" ~ v.posizione %}
+    <tr>
+      <td>{{ v.nota }}</td>
+      <td><strong>{{ v.punteggio if v.punteggio is not none else '–' }}</strong>{% if v.calcolato is not none and v.punteggio != v.calcolato %} <span class="badge badge-warn">rivalutato</span>{% endif %}</td>
+      <td class="muted">{{ v.calcolato if v.calcolato is not none else '–' }}</td>
+      <td>
+        <button type="button" class="link-simile apri-testo-esercizio" aria-expanded="false" aria-controls="{{ id_testo }}"
+                data-info="Mostra il testo con la risposta data e quella giusta">{{ v.esercizio_nome }}</button>
+        {% if v.aperta %}<span class="badge badge-info">aperta</span>
+        {% else %}<span class="es-lettere" data-info="Risposta data / risposta giusta">{{ v.lettera_data }}<span class="muted">/{{ v.lettera_corretta }}</span></span>{% endif %}
+        <div class="muted" style="font-size:0.78rem">es. {{ v.posizione + 1 }}{% if v.obbligatorio %} · obbligatorio{% endif %}</div>
+      </td>
+      <td>{{ nome_studente(corso.tag, v.matricola, v.studente) }} <span class="muted">{{ v.matricola }}</span></td>
+      <td><a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/risultati/{{ v.matricola }}" target="_blank" rel="noopener"
+             class="codice-compito" data-info="Scheda completa del compito (in un'altra pagina)">{{ v.codice }}</a></td>
+      <td>{{ v.voto if v.voto is not none else '–' }}</td>
+    </tr>
+    <tr class="riga-testo-nota" id="{{ id_testo }}" hidden>
+      <td colspan="7"><div class="testo-esercizio">{{ testo_con_risposte(v.testo, v.risposte, v.lettera_data, v.lettera_corretta, v.corretta) }}</div></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{%- endmacro %}

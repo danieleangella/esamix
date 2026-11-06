@@ -21,6 +21,8 @@
   </span>
 </div>
 {% if frase_orale %}<p><strong>{{ frase_orale }}</strong></p>{% endif %}
+{% set rp = riepilogo %}
+<p class="muted">{{ rp.studenti }} student{{ 'e' if rp.studenti == 1 else 'i' }} all'orale{% if rp.svolti %} · {{ rp.svolti }} già svolt{{ 'o' if rp.svolti == 1 else 'i' }}{% endif %}{% if rp.media_scritto is not none %} · {{ 'media delle prove' if prove else 'voto medio dello scritto' }} {{ rp.media_scritto|string|replace('.', ',') }}{% endif %}{% if rp.con_note %} · {{ rp.con_note }} con note{% endif %}{% if rp.dsa %} · {{ rp.dsa }} DSA/L104{% endif %}</p>
 <div class="card" style="padding:0.5rem 1rem">
   <table class="tabella-elenco">
     <thead><tr><th>Presente</th><th>Matricola</th><th>Cognome</th><th>Nome</th>{% for p in prove %}<th>{{ p }}</th>{% endfor %}
@@ -48,12 +50,19 @@
     <span style="float:right">{% if prove and s.media_esatta is not none %}media {{ s.media_esatta|string|replace('.', ',') }} (voto {{ s.scritto }}){% else %}scritto {{ s.scritto if s.scritto is not none else '—' }}{% endif %}</span></h3>
   {% for sc in s.scritti %}
   <p style="margin:0.4rem 0">{% if prove %}<strong>{{ sc.prova }}</strong>: {% endif %}{{ ('voto ' ~ sc.voto) if sc.voto is not none else sc.esito }}{% if sc.codice %}, compito {{ sc.codice }}{% endif %}{% if sc.n_esercizi %}, {{ sc.errori|length }} error{{ 'e' if sc.errori|length == 1 else 'i' }} su {{ sc.n_esercizi }} esercizi{% endif %}</p>
-  {% if sc.errori %}
-  <ul style="margin:0 0 0.4rem">
-    {% for e in sc.errori %}
-    <li>{{ e.esercizio_nome }}{% if e.obbligatorio %} <span class="badge">obbligatorio</span>{% endif %}: {{ e.descrizione }}{% if e.nota %} — <em>{{ e.nota }}</em>{% endif %}</li>
+  {% if sc.righe %}
+  <table class="tabella-esercizi-compito" data-senza-filtri style="margin:0.3rem 0 0.6rem">
+    <tr><th>N.</th><th>Esercizio</th><th>Risposta</th><th>Punti</th><th>Nota</th></tr>
+    {% for e in sc.righe %}
+    <tr class="{{ 'esito-err' if e.errore else 'esito-ok' }}" {% if e.errore %}style="font-weight:600"{% endif %}>
+      <td class="muted">{{ e.posizione + 1 }}</td>
+      <td>{{ e.esercizio_nome }}{% if e.obbligatorio and not e.revisione %} <span class="badge">obbligatorio</span>{% endif %}{% if e.revisione == 'annullato' %} <span class="badge">annullato</span>{% endif %}</td>
+      <td>{% if e.aperta %}<span class="badge badge-info">aperta</span>{% else %}<span class="es-lettere">{{ e.lettera_data }}<span class="muted">/{{ e.lettera_corretta }}</span></span>{% endif %}</td>
+      <td>{{ e.punteggio_assegnato if e.punteggio_assegnato is not none else '–' }}{% if e.calcolato is not none and e.punteggio_assegnato is not none and e.punteggio_assegnato != e.calcolato and e.revisione != 'annullato' %} <span class="muted">(calcolato {{ e.calcolato }})</span>{% endif %}</td>
+      <td><em>{{ e.nota }}</em></td>
+    </tr>
     {% endfor %}
-  </ul>
+  </table>
   {% endif %}
   {% endfor %}
   {% set note = note_studente(s, prove|length > 0) %}

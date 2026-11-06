@@ -1,0 +1,25 @@
+{# Testo di un esercizio così come era stampato su un compito, con le risposte nell'ordine
+   stampato: la risposta data evidenziata (verde se giusta, rosso se sbagliata) e quella
+   giusta in verde. Uso: {% from "_testo_esercizio.html" import testo_con_risposte %}
+   Per aprirlo e chiuderlo con un pulsante: classe "apri-testo-esercizio" e aria-controls
+   con l'id del riquadro (vedi app.js). #}
+{% macro testo_con_risposte(testo, risposte, lettera_data, lettera_corretta, corretta) -%}
+{% if testo %}
+<div class="testo-esercizio-quesito">{{ testo | testo_web }}</div>
+{% if risposte %}
+<ol class="risposte-esercizio" type="A">
+  {% for risposta in risposte %}
+  {% set lettera = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[loop.index0] %}
+  <li class="{% if lettera == lettera_corretta %}giusta{% endif %}{% if lettera == lettera_data %} data{% endif %}">
+    {{ risposta | testo_web }}
+    {% if lettera == lettera_data %}<span class="badge {{ 'badge-ok' if corretta else 'badge-err' }}">risposta data</span>{% endif %}
+    {% if lettera == lettera_corretta and not corretta %}<span class="badge badge-ok">giusta</span>{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+{% if lettera_data == 'X' %}<p class="muted" style="margin:0.3rem 0 0">Nessuna risposta data.</p>{% endif %}
+{% endif %}
+{% else %}
+<p class="muted" style="margin:0">Testo non disponibile per questo compito.</p>
+{% endif %}
+{%- endmacro %}

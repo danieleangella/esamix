@@ -206,7 +206,23 @@ def calcola(tag: str, appello_id: int, includi_esercizi: bool = True, corso=None
         media = lambda lista: round(sum(lista) / len(lista), 2) if lista else None  # noqa: E731
         pct = lambda n: round(100 * n / totale) if totale else None  # noqa: E731
 
+        # le statistiche valgono per i compiti già corretti: quanti sono rispetto a tutti
+        # quelli consegnati (ancora da correggere: bozze, presenti senza esito e compiti
+        # con svolgimenti in sospeso)
+        con_esito = {r["matricola"] for r in risultati}
+        corretti = sum(1 for r in risultati
+                       if r["esito"] in ("voto", "rifiutato", "annullato") and not r["valutazione_sospesa"])
+        sospesi = sum(1 for r in risultati if r["valutazione_sospesa"])
+        bozze = {r["matricola"] for r in conn.execute(
+            "SELECT matricola FROM bozze_correzione WHERE appello_id=?", (appello_id,))}
+        presenti = {r["matricola"] for r in conn.execute(
+            "SELECT matricola FROM appello_presenze WHERE appello_id=?", (appello_id,))}
+        da_correggere = sospesi + len((bozze | presenti) - con_esito)
+        consegnati = corretti + da_correggere
+
         return {
+            "corretti": corretti, "da_correggere": da_correggere, "consegnati": consegnati,
+            "corretti_pct": round(100 * corretti / consegnati) if consegnati else None,
             "totale": totale, "promossi": len(promossi), "insufficienti": len(insufficienti),
             "in_attesa_orale": len(in_attesa_orale), "orali_svolti": len(voti_orali),
             "promossi_pct": pct(len(promossi)), "insufficienti_pct": pct(len(insufficienti)),

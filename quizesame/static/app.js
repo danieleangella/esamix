@@ -1135,3 +1135,15 @@ new MutationObserver(function () {
     if (!_pulsanteEsercizio(m, [".btn-modifica-assegnato", ".btn-modifica-esercizio"], m.dataset.esercizio)) m.hidden = true;
   });
 }).observe(document.documentElement, { childList: true, subtree: true });
+
+// Testo di un esercizio a scomparsa (_testo_esercizio.html): il pulsante col nome lo apre
+// e lo chiude (aria-controls), con le formule rese alla prima apertura
+document.addEventListener("click", function (ev) {
+  var btn = ev.target.closest(".apri-testo-esercizio");
+  if (!btn) return;
+  var box = document.getElementById(btn.getAttribute("aria-controls"));
+  if (!box) return;
+  box.hidden = !box.hidden;
+  btn.setAttribute("aria-expanded", box.hidden ? "false" : "true");
+  if (!box.hidden && !box.dataset.reso && typeof renderizzaLatex === "function") { box.dataset.reso = "1"; renderizzaLatex(box); }
+});
