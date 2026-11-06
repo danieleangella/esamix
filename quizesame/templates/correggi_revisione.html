@@ -68,6 +68,9 @@
     <button type="button" class="pulsante-icona pulsante-neutro btn-modifica-punteggio" {% if not confermato %}hidden{% endif %}
             data-info="Cambia il punteggio ({{ 'previsto: ' ~ previsto }}): il voto si ricalcola"
             aria-label="Cambia il punteggio di {{ r.esercizio_nome }}">{{ icona("matita", 15) }}</button>
+    <button type="button" class="pulsante-icona pulsante-neutro btn-ricalcola-punteggio"
+            data-info="Annulla il punteggio dato a mano: torna a quello previsto ({{ previsto }})"
+            aria-label="Riporta il punteggio di {{ r.esercizio_nome }} a quello previsto">{{ icona("ricarica", 15) }}</button>
     {% else %}
     <span class="es-valore">{{ corso.punteggio_max_aperta if r.aperta else corso.risposta_corretta }}</span>
     <span class="muted es-max" data-info="Annullato nella revisione del testo: punteggio pieno per tutti">pieno</span>
@@ -480,7 +483,10 @@
   // svolgimento senza punteggio: una domanda aperta conta 0, un obbligatorio il massimo
   function provvisorio(riga) { return riga.dataset.aperta ? 0 : parseInt(riga.dataset.max, 10); }
   function daConfermare() {
-    return righe.filter(function (r) { return attiva(r) && r.classList.contains("riga-da-confermare") && !confermata(r); });
+    // da confermare: gli svolgimenti non ancora confermati e le righe sbloccate con la matita
+    return righe.filter(function (r) {
+      return attiva(r) && !confermata(r) && (r.classList.contains("riga-da-confermare") || r.dataset.sbloccata);
+    });
   }
 
   // --- punteggi: interi tra il minimo e il massimo della casella
@@ -561,11 +567,11 @@
     votoFinale.classList.toggle("insufficiente", insuff && !c.daConfermare);
     votoFinale.classList.toggle("provvisorio", c.daConfermare > 0);
     var motivoAMano = totaleAMano ? "cambiato a mano" : "esercizi rivalutati a mano";
+    // il voto rosso basta a dire che è insufficiente; giallo (mai rosso) finché resta da confermare
     statoVoto.textContent = c.daConfermare
       ? "provvisorio: " + c.daConfermare + " puntegg" + (c.daConfermare === 1 ? "io" : "i") + " da confermare"
-      : (insufficientePerObbligatorio ? "insufficiente: obbligatorio non svolto"
-        : (inattiva && insuff && !aMano ? "insufficiente già dalla griglia" : (insuff ? "insufficiente" : (aMano ? motivoAMano : ""))));
-    statoVoto.className = "stato-voto" + (c.daConfermare ? " provvisorio" : (insuff ? " insufficiente" : (aMano ? " a-mano" : "")));
+      : (aMano ? motivoAMano : "");
+    statoVoto.className = "stato-voto" + (c.daConfermare ? " provvisorio" : (aMano ? " a-mano" : ""));
     btnUsaCalcolato.hidden = !aMano;
     avvisoNota.hidden = !totaleAMano || notaCorrezione.value.trim() !== "";
     if (totaleAMano) mostraNotaVoto(false);
@@ -585,7 +591,7 @@
   }
 
   function avvisoDaConfermare(n) {
-    return (n === 1 ? "Manca 1 svolgimento" : "Mancano " + n + " svolgimenti") + " da correggere: confermali, o salva la correzione come bozza";
+    return (n === 1 ? "Manca 1 punteggio" : "Mancano " + n + " punteggi") + " da confermare col timbro: confermali, o salva la correzione come bozza";
   }
   // Conferma spento: dice quanti svolgimenti mancano e porta al primo
   conferma.addEventListener("click", function (ev) {
@@ -700,13 +706,15 @@
       suggerimento(riga);
       aggiorna();
     });
-    // un punteggio scritto e lasciato è confermato
-    input.addEventListener("change", function () { if (!confermata(riga) && input.value.trim() !== "") fissa(riga, false); });
-    // sbloccato con la matita e lasciato senza cambiarlo: torna fisso com'era
-    input.addEventListener("blur", function () {
-      setTimeout(function () {
-        if (riga.dataset.sbloccata && !confermata(riga) && !riga.contains(document.activeElement)) fissa(riga, false);
-      }, 150);
+    // un punteggio ancora da confermare, scritto e lasciato, è confermato; uno sbloccato con
+    // la matita resta aperto finché non lo si conferma col timbro (o con Invio)
+    input.addEventListener("change", function () {
+      if (!confermata(riga) && !riga.dataset.sbloccata && input.value.trim() !== "") fissa(riga, false);
+    });
+    // ricalcola: torna al punteggio previsto, annullando quello dato a mano
+    riga.querySelector(".btn-ricalcola-punteggio").addEventListener("click", function () {
+      input.value = riga.dataset.previsto;
+      fissa(riga, false);
     });
   });
 
@@ -804,8 +812,6 @@
 
   var inviato = false;
   form.addEventListener("submit", function (ev) {
-    // punteggi sbloccati e lasciati: valgono come scritti
-    righe.forEach(function (riga) { if (riga.dataset.sbloccata && !confermata(riga)) fissa(riga, false); });
     // posizioni non confermate (e altri esercizi al punteggio calcolato): riproponendo la
     // pagina (o riprendendo la bozza) restano da confermare, quelli confermati restano tali
     document.getElementById("automatici-hidden").value = righe.filter(function (r) {

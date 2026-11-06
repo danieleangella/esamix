@@ -18,7 +18,8 @@
 <table style="margin:0 0 0.5rem" data-senza-filtri>
   {% for r in c.risultati %}
   <tr>
-    <td>{{ r.appello_nome }}{% if r.appello_data %} <span class="muted">{{ r.appello_data }}</span>{% endif %}</td>
+    <td>{% if r.prove %}{{ r.appello_nome }}{% else %}<a href="/corsi/{{ c.corso_tag }}/appelli/{{ r.appello_id }}/risultati/{{ matricola }}" target="_blank" rel="noopener"
+           data-info="Scheda del compito (in un'altra pagina)">{{ r.appello_nome }}</a>{% endif %}{% if r.appello_data %} <span class="muted">{{ r.appello_data }}</span>{% endif %}</td>
     <td>
       {% if r.esito == 'rifiutato' %}rifiutato <span class="muted">({{ r.voto }})</span>
       {% elif r.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if r.annullamento_nota %} <span class="muted">— {{ r.annullamento_nota }}</span>{% endif %}
@@ -31,7 +32,7 @@
     <td>{% if r.verbalizzato %}<span class="muted">verbalizzato {{ r.data_verbalizzazione or "" }}</span>{% endif %}</td>
   </tr>
   {% if r.prove %}
-  <tr class="riga-prove"><td colspan="3">{% for p in r.prove %}{{ p.nome }}: {{ p.voto if p.voto is not none else (p.esito or 'non svolta') }} · {% endfor %}media {{ r.media or '–' }}</td></tr>
+  <tr class="riga-prove"><td colspan="3">{% for p in r.prove %}<a href="/corsi/{{ c.corso_tag }}/appelli/{{ p.appello_id }}/risultati/{{ matricola }}" target="_blank" rel="noopener">{{ p.nome }}</a>: {{ p.voto if p.voto is not none else (p.esito or 'non svolta') }} · {% endfor %}media {{ r.media or '–' }}</td></tr>
   {% for p in r.prove if p.nota_correzione or p.convocazione_orale %}
   <tr class="riga-nota-carriera"><td colspan="3">{{ icona("nota", 12) }} <span class="muted">{{ p.nome }}:</span>
     {% if p.nota_correzione %}<span style="white-space:pre-line">{{ p.nota_correzione }}</span>{% endif %}

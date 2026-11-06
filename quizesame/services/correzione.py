@@ -1260,8 +1260,8 @@ def dettaglio_risultato(tag: str, appello_id: int, matricola: str) -> dict:
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         r = conn.execute(
-            "SELECT r.*, s.nome, s.cognome FROM risultati r JOIN studenti s ON s.matricola = r.matricola "
-            "WHERE r.appello_id=? AND r.matricola=?",
+            "SELECT r.*, s.nome, s.cognome, s.dsa, s.dsa_tipo, s.dsa_note FROM risultati r "
+            "JOIN studenti s ON s.matricola = r.matricola WHERE r.appello_id=? AND r.matricola=?",
             (appello_id, matricola),
         ).fetchone()
         if r is None:

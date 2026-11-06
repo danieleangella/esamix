@@ -5,12 +5,13 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}/studenti">Studenti</a> <span class="sep">›</span> <span class="current">{{ studente.cognome }} {{ studente.nome }}</span>
 {% endblock %}
 {% block content %}
-<h1>{{ studente.cognome }} {{ studente.nome }} <span class="muted">({{ studente.matricola }})</span></h1>
+<h1>{{ studente.cognome }} {{ studente.nome }} <span class="muted">({{ studente.matricola }})</span>{% if studente.dsa %} <span class="badge badge-info"{% if studente.dsa_note %} data-info="{{ studente.dsa_note }}"{% endif %}>{{ studente.dsa_tipo if studente.dsa_tipo in ('DSA', 'L104') else 'DSA' }}</span>{% endif %}</h1>
 
 <div class="card">
   <p class="muted">
     Corso di laurea: <strong>{{ studente.laurea_nome or '-' }}</strong>
   </p>
+  {% if studente.dsa and studente.dsa_note %}<p><span class="muted">{{ studente.dsa_tipo or 'DSA' }}:</span> {{ studente.dsa_note }}</p>{% endif %}
   {% if orale_obbligatorio %}
   <p><span class="badge badge-warn">Orale sempre obbligatorio</span>
     {% if orale_obbligatorio.motivazione %} — {{ orale_obbligatorio.motivazione }}{% endif %}
@@ -21,10 +22,11 @@
 
 {% macro tabella_risultati(tag, risultati) %}
   <table>
-    <tr><th>Appello</th><th>Data</th><th>Esito</th><th>Orale</th><th>Verbalizzato</th><th></th></tr>
+    <tr><th>Appello</th><th>Data</th><th>Esito</th><th>Orale</th><th>Verbalizzato</th></tr>
     {% for r in risultati %}
     <tr>
-      <td>{{ r.appello_nome }}</td>
+      <td>{% if r.prove %}{{ r.appello_nome }}{% else %}<a href="/corsi/{{ tag }}/appelli/{{ r.appello_id }}/risultati/{{ studente.matricola }}" target="_blank" rel="noopener"
+             data-info="Scheda del compito (in un'altra pagina)">{{ r.appello_nome }}</a>{% endif %}</td>
       <td class="muted" style="white-space:nowrap">{{ r.appello_data or '-' }}</td>
       <td>
         {% if r.esito == 'rifiutato' %}rifiutato <span class="muted">({{ r.voto }})</span>
@@ -50,11 +52,10 @@
         {% endif %}
         {% else %}-{% endif %}
       </td>
-      <td><a href="/corsi/{{ tag }}/appelli/{{ r.appello_id }}/risultati/{{ studente.matricola }}">Dettaglio</a></td>
     </tr>
     {% if r.prove %}
-    <tr class="riga-prove"><td colspan="6">
-      {% for p in r.prove %}<a href="/corsi/{{ tag }}/appelli/{{ p.appello_id }}/risultati/{{ studente.matricola }}">{{ p.nome }}</a>: <strong>{{ p.voto if p.voto is not none else (p.esito or 'non svolta') }}</strong>{% if p.voto is not none and not p.superata %} <span class="badge badge-err">non superata</span>{% endif %} · {% endfor %}media <strong>{{ r.media or '–' }}</strong>
+    <tr class="riga-prove"><td colspan="5">
+      {% for p in r.prove %}<a href="/corsi/{{ tag }}/appelli/{{ p.appello_id }}/risultati/{{ studente.matricola }}" target="_blank" rel="noopener">{{ p.nome }}</a>: <strong>{{ p.voto if p.voto is not none else (p.esito or 'non svolta') }}</strong>{% if p.voto is not none and not p.superata %} <span class="badge badge-err">non superata</span>{% endif %} · {% endfor %}media <strong>{{ r.media or '–' }}</strong>
     </td></tr>
     {% endif %}
     {% endfor %}

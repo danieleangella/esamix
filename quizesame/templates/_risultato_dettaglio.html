@@ -26,6 +26,7 @@
   {% if risultato.codice %}<p class="muted">Codice compito: <strong>{{ risultato.codice }}</strong></p>{% endif %}
   {% elif risultato.codice %}
   <dl class="riepilogo-compito">
+    {% if risultato.dsa and pagina_completa is not defined %}<dt>Studente</dt><dd><span class="badge badge-info">{{ risultato.dsa_tipo if risultato.dsa_tipo in ('DSA', 'L104') else 'DSA' }}</span>{% if risultato.dsa_note %} <span class="muted">{{ risultato.dsa_note }}</span>{% endif %}</dd>{% endif %}
     <dt>Compito</dt><dd><strong class="codice-compito">{{ risultato.codice }}</strong>{% if risultato.risposte %} <span class="muted" style="font-family:monospace">· {{ risultato.risposte }}</span>{% endif %}</dd>
     <dt>Voto</dt>
     <dd>

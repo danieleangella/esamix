@@ -4,17 +4,21 @@
 <a href="/">Corsi</a> <span class="sep">›</span> <span class="current">{{ riepilogo[0].cognome }} {{ riepilogo[0].nome }}</span>
 {% endblock %}
 {% block content %}
-<h1>{{ riepilogo[0].cognome }} {{ riepilogo[0].nome }} <span class="muted">({{ matricola }})</span></h1>
+<h1>{{ riepilogo[0].cognome }} {{ riepilogo[0].nome }} <span class="muted">({{ matricola }})</span>
+  {% set dsa = riepilogo | map(attribute='dsa') | select | first %}{% if dsa %}<span class="badge badge-info">{{ dsa }}</span>{% endif %}</h1>
 
 {% for c in riepilogo %}
 <div class="card">
-  <h2><a href="/corsi/{{ c.corso_tag }}/studenti/{{ matricola }}">{{ c.corso_nome }}</a> <span class="muted">({{ c.corso_anno }})</span></h2>
+  <h2><a href="/corsi/{{ c.corso_tag }}/studenti/{{ matricola }}">{{ c.corso_nome }}</a> <span class="muted">({{ c.corso_anno }})</span>
+    {% if c.dsa %}<span class="badge badge-info"{% if c.dsa_note %} data-info="{{ c.dsa_note }}"{% endif %}>{{ c.dsa }}</span>{% endif %}
+    {% if c.orale_obbligatorio %}<span class="badge badge-warn" data-info="{{ c.orale_obbligatorio.motivazione or '' }}">orale obbligatorio</span>{% endif %}</h2>
   {% if c.risultati %}
   <table>
-    <tr><th>Appello</th><th>Esito</th><th>Orale</th><th>Verbalizzato</th><th></th></tr>
+    <tr><th>Appello</th><th>Esito</th><th>Orale</th><th>Verbalizzato</th></tr>
     {% for r in c.risultati %}
     <tr>
-      <td>{{ r.appello_nome }}</td>
+      <td>{% if r.prove %}{{ r.appello_nome }}{% else %}<a href="/corsi/{{ c.corso_tag }}/appelli/{{ r.appello_id }}/risultati/{{ matricola }}" target="_blank" rel="noopener"
+             data-info="Scheda del compito (in un'altra pagina)">{{ r.appello_nome }}</a>{% endif %}</td>
       <td>
         {% if r.esito == 'rifiutato' %}rifiutato <span class="muted">({{ r.voto }})</span>
         {% elif r.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if r.annullamento_nota %} <span class="muted">— {{ r.annullamento_nota }}</span>{% endif %}
@@ -39,11 +43,10 @@
         {% endif %}
         {% else %}-{% endif %}
       </td>
-      <td><a href="/corsi/{{ c.corso_tag }}/appelli/{{ r.appello_id }}/risultati/{{ matricola }}">Dettaglio</a></td>
     </tr>
     {% if r.prove %}
-    <tr class="riga-prove"><td colspan="5">
-      {% for p in r.prove %}<a href="/corsi/{{ c.corso_tag }}/appelli/{{ p.appello_id }}/risultati/{{ matricola }}">{{ p.nome }}</a>: <strong>{{ p.voto if p.voto is not none else (p.esito or 'non svolta') }}</strong>{% if p.voto is not none and not p.superata %} <span class="badge badge-err">non superata</span>{% endif %} · {% endfor %}media <strong>{{ r.media or '–' }}</strong>
+    <tr class="riga-prove"><td colspan="4">
+      {% for p in r.prove %}<a href="/corsi/{{ c.corso_tag }}/appelli/{{ p.appello_id }}/risultati/{{ matricola }}" target="_blank" rel="noopener">{{ p.nome }}</a>: <strong>{{ p.voto if p.voto is not none else (p.esito or 'non svolta') }}</strong>{% if p.voto is not none and not p.superata %} <span class="badge badge-err">non superata</span>{% endif %} · {% endfor %}media <strong>{{ r.media or '–' }}</strong>
     </td></tr>
     {% endif %}
     {% endfor %}

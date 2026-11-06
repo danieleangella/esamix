@@ -1143,3 +1143,6 @@ button.pulsante-tema:hover { color: var(--text); background: var(--bg); filter: 
 .carriera-corso-attuale > p:first-child strong { color: var(--accent); }
 .riga-nota-carriera td { font-size: 0.85rem; padding-top: 0; color: var(--text); }
 #btn-attiva-correzione.attivo { color: var(--su-accento); background: var(--err-text); }
+/* ricalcola: solo su un punteggio confermato e diverso da quello previsto */
+.riga-esercizio:not(.rivalutata) .btn-ricalcola-punteggio, .riga-esercizio:not(.confermata) .btn-ricalcola-punteggio,
+.zona-inattiva .btn-ricalcola-punteggio { display: none; }

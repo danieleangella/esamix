@@ -9,7 +9,7 @@
 <script defer src="/static/katex/contrib/auto-render.min.js"></script>
 {% endblock %}
 {% block content %}
-<h1>{{ risultato.cognome }} {{ risultato.nome }} <span class="muted">({{ risultato.matricola }})</span></h1>
+<h1>{{ risultato.cognome }} {{ risultato.nome }} <span class="muted">({{ risultato.matricola }})</span>{% if risultato.dsa %} <span class="badge badge-info"{% if risultato.dsa_note %} data-info="{{ risultato.dsa_note }}"{% endif %}>{{ risultato.dsa_tipo if risultato.dsa_tipo in ('DSA', 'L104') else 'DSA' }}</span>{% endif %}</h1>
 <p class="muted" style="margin-top:-0.75rem">
   {{ corso.nome }} <span class="sep">›</span> A.A. {{ corso.anno }} <span class="sep">›</span> {{ appello.nome }}
 </p>
