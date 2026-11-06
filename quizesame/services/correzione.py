@@ -255,14 +255,14 @@ class ValutazionePreliminare:
 
 
 def insufficiente_comunque(corso, votomin: int, valutazione: ValutazionePreliminare) -> bool:
-    """Il compito è insufficiente qualunque punteggio abbiano gli svolgimenti da giudicare
-    a mano: c'è un obbligatorio non svolto, oppure anche con tutti gli svolgimenti al
-    massimo il voto resterebbe sotto la soglia. Valutarli non cambia l'esito."""
+    """Il compito è insufficiente qualunque punteggio abbiano gli esercizi: c'è un
+    obbligatorio non svolto, oppure anche con tutti gli svolgimenti al massimo il voto
+    resterebbe sotto la soglia. La correzione degli esercizi parte allora disattivata."""
+    if valutazione.non_svolte_obbligatorie:
+        return True
     manuali = valutazione.da_valutare + valutazione.domande_aperte
     if not manuali:
         return False
-    if valutazione.non_svolte_obbligatorie:
-        return True
     return valutazione.voto_fisso + sum(punteggio_massimo(corso, r.aperta) for r in manuali) < votomin
 
 

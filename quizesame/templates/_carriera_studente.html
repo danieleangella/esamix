@@ -1,12 +1,21 @@
-{# Carriera di uno studente in tutti i corsi, in forma compatta: si apre sotto la riga di un
-   escluso dal filtro sulla matricola (_iscritti.html) per decidere se ammetterlo. #}
+{# Carriera di uno studente in tutti i corsi, in forma compatta (dal più recente): esiti,
+   note della correzione, richieste e motivazioni dell'orale, DSA/L104 e orale obbligatorio.
+   Si apre sotto il nome di uno studente in un elenco (apriCarriera in app.js) e, nella
+   correzione, sotto il nome dello studente; in fondo il link alla sua pagina completa. #}
+{% from "_icone.html" import icona %}
 {% if not riepilogo %}
 <p class="muted" style="margin:0.25rem 0">Nessun corso in EsaMiX con questa matricola: nessun risultato precedente.</p>
 {% else %}
 {% for c in riepilogo %}
-<p style="margin:0.25rem 0"><strong>{{ c.corso_nome }}</strong> <span class="muted">({{ c.corso_anno }})</span></p>
+<div class="carriera-corso{% if c.corso_tag == tag %} carriera-corso-attuale{% endif %}">
+<p style="margin:0.25rem 0"><strong>{{ c.corso_nome }}</strong> <span class="muted">({{ c.corso_anno }})</span>
+  {% if c.corso_tag == tag %}<span class="badge badge-info">questo corso</span>{% endif %}
+  {% if c.dsa %}<span class="badge badge-info" {% if c.dsa_note %}data-info="{{ c.dsa_note }}"{% endif %}>{{ c.dsa }}</span>{% endif %}
+  {% if c.orale_obbligatorio %}<span class="badge badge-warn" data-info="Da {{ c.orale_obbligatorio.origine or '?' }}: {{ c.orale_obbligatorio.motivazione or 'nessuna motivazione' }}">orale obbligatorio</span>{% endif %}
+</p>
+{% if c.dsa and c.dsa_note %}<p class="muted" style="margin:0 0 0.25rem; font-size:0.85rem">{{ c.dsa }}: {{ c.dsa_note }}</p>{% endif %}
 {% if c.risultati %}
-<table style="margin:0 0 0.5rem">
+<table style="margin:0 0 0.5rem" data-senza-filtri>
   {% for r in c.risultati %}
   <tr>
     <td>{{ r.appello_nome }}{% if r.appello_data %} <span class="muted">{{ r.appello_data }}</span>{% endif %}</td>
@@ -14,21 +23,32 @@
       {% if r.esito == 'rifiutato' %}rifiutato <span class="muted">({{ r.voto }})</span>
       {% elif r.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if r.annullamento_nota %} <span class="muted">— {{ r.annullamento_nota }}</span>{% endif %}
       {% elif r.esito != 'voto' %}{{ r.esito }}
-      {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto }})</span>
+      {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="muted">({{ r.voto_scritto if r.voto_scritto is not none else r.voto }})</span>
       {% elif r.esito_orale in ('assente', 'insufficiente') %}{{ r.esito_orale }} (orale)
-      {% elif r.superato %}<span class="badge badge-ok">{{ r.voto }}</span>
+      {% elif r.superato %}<span class="badge badge-ok">{{ r.voto }}</span>{% if r.orale_svolto %} <span class="muted">dopo l'orale</span>{% endif %}
       {% else %}<span class="badge badge-err">insufficiente</span> <span class="muted">({{ r.voto }})</span>{% endif %}
     </td>
     <td>{% if r.verbalizzato %}<span class="muted">verbalizzato {{ r.data_verbalizzazione or "" }}</span>{% endif %}</td>
   </tr>
   {% if r.prove %}
   <tr class="riga-prove"><td colspan="3">{% for p in r.prove %}{{ p.nome }}: {{ p.voto if p.voto is not none else (p.esito or 'non svolta') }} · {% endfor %}media {{ r.media or '–' }}</td></tr>
+  {% for p in r.prove if p.nota_correzione or p.convocazione_orale %}
+  <tr class="riga-nota-carriera"><td colspan="3">{{ icona("nota", 12) }} <span class="muted">{{ p.nome }}:</span>
+    {% if p.nota_correzione %}<span style="white-space:pre-line">{{ p.nota_correzione }}</span>{% endif %}
+    {% if p.convocazione_orale %}<span class="badge badge-warn">convocato all'orale</span>{% if p.orale_motivazione %} {{ p.orale_motivazione }}{% endif %}{% endif %}</td></tr>
+  {% endfor %}
+  {% endif %}
+  {% if r.nota_correzione or (r.richiede_orale and r.orale_motivazione) %}
+  <tr class="riga-nota-carriera"><td colspan="3">{{ icona("nota", 12) }}
+    {% if r.nota_correzione %}<span style="white-space:pre-line">{{ r.nota_correzione }}</span>{% endif %}
+    {% if r.richiede_orale and r.orale_motivazione %}<span class="muted">orale:</span> {{ r.orale_motivazione }}{% endif %}</td></tr>
   {% endif %}
   {% endfor %}
 </table>
 {% else %}
 <p class="muted" style="margin:0 0 0.5rem">Registrato, nessun risultato.</p>
 {% endif %}
+</div>
 {% endfor %}
-<p style="margin:0.25rem 0"><a href="/corsi/{{ tag }}/studenti/{{ matricola }}" target="_blank" rel="noopener">Pagina dello studente ↗</a></p>
 {% endif %}
+<p style="margin:0.25rem 0"><a href="/corsi/{{ tag }}/studenti/{{ matricola }}" target="_blank" rel="noopener" class="link-con-icona">{{ icona("utente-spunta", 14) }} Scheda completa dello studente {{ icona("esterno", 12) }}</a></p>

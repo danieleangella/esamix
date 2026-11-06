@@ -1135,3 +1135,11 @@ button.pulsante-tema:hover { color: var(--text); background: var(--bg); filter: 
 .testo-avviso { color: var(--warn-strong-text) !important; display: flex; align-items: center; gap: 0.25rem; }
 .esercizi-anno { font-size: 0.85rem; font-weight: 400; margin-left: 0.5rem; vertical-align: middle; }
 .icona-esercizi-anno { margin-left: 0.35rem; vertical-align: middle; }
+/* carriera dello studente nella correzione, a scomparsa */
+.testata-correzione h1 { display: flex; align-items: center; gap: 0.4rem; }
+#btn-carriera svg { transition: transform 0.15s; }
+#btn-carriera.aperto svg { transform: rotate(180deg); }
+.testata-correzione .box-carriera { flex-basis: 100%; margin-top: 0.75rem; padding-top: 0.6rem; border-top: 1px solid var(--border); }
+.carriera-corso-attuale > p:first-child strong { color: var(--accent); }
+.riga-nota-carriera td { font-size: 0.85rem; padding-top: 0; color: var(--text); }
+#btn-attiva-correzione.attivo { color: var(--su-accento); background: var(--err-text); }

@@ -121,6 +121,7 @@ def risultati_studente(tag: str, matricola: str) -> list[dict]:
             "SELECT a.id AS appello_id, a.nome AS appello_nome, a.data AS appello_data, a.tipo AS appello_tipo, "
             "r.voto, r.voto_scritto, r.esito, r.richiede_orale, "
             "r.orale_svolto, r.esito_orale, r.verbalizzato, r.data_verbalizzazione, r.annullamento_nota, "
+            "r.nota_correzione, r.orale_motivazione, r.convocazione_orale, "
             "EXISTS(SELECT 1 FROM raggruppamento_membri rm WHERE rm.appello_id = a.id) AS membro_raggruppamento "
             "FROM risultati r JOIN appelli a ON a.id = r.appello_id "
             f"WHERE r.matricola=? ORDER BY {corsi_service.ordine_data('a.data')}, a.id",
@@ -171,6 +172,10 @@ def carriera_studente(tag: str, matricola: str) -> list[dict]:
             prove.append({
                 "appello_id": m.id, "nome": m.nome, "data": m.data, "voto": voto,
                 "esito": p["esito"] if p else None, "superata": voto is not None and voto >= soglia,
+                # note della correzione di quella prova
+                "nota_correzione": p["nota_correzione"] if p else None,
+                "orale_motivazione": p["orale_motivazione"] if p and p["convocazione_orale"] else None,
+                "convocazione_orale": bool(p and p["convocazione_orale"]),
             })
         riga = per_appello.get(g.appello_id)
         if riga is None:
@@ -183,6 +188,7 @@ def carriera_studente(tag: str, matricola: str) -> list[dict]:
                 "esito": "prove in corso" if in_corso else "prove non superate", "richiede_orale": False,
                 "orale_svolto": False, "esito_orale": None, "verbalizzato": False,
                 "data_verbalizzazione": None, "annullamento_nota": None, "superato": None,
+                "nota_correzione": None, "orale_motivazione": None, "convocazione_orale": False,
             }
         else:
             riga = dict(riga)
@@ -230,10 +236,21 @@ def riepilogo_globale(matricola: str) -> list[dict]:
         s = get_studente(corso.tag, matricola)
         if s is None:
             continue
+        conn = db.get_connection(config.corso_db_path(corso.tag))
+        try:
+            obbligatorio = conn.execute(
+                "SELECT motivazione, origine FROM orale_obbligatorio WHERE matricola=?", (matricola,)
+            ).fetchone()
+        finally:
+            conn.close()
         riepilogo.append({
             "corso_tag": corso.tag, "corso_nome": corso.nome, "corso_anno": corso.anno,
             "nome": s.nome, "cognome": s.cognome, "risultati": carriera_studente(corso.tag, matricola),
+            "dsa": tipo_dsa(s.dsa, s.dsa_tipo), "dsa_note": s.dsa_note or "",
+            "orale_obbligatorio": dict(obbligatorio) if obbligatorio else None,
         })
+    # dal corso più recente
+    riepilogo.sort(key=lambda c: c["corso_anno"] or "", reverse=True)
     return riepilogo
 
 
