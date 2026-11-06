@@ -38,7 +38,7 @@
 
 <section class="card riquadro-impostazioni" id="chiave">
   {% set imp = app_settings %}
-  <h2>{{ icona("lucchetto", 17) }} Chiave di sblocco {{ info("Facoltativa. Se impostata, le operazioni pericolose (ripristini, eliminazioni, migrazione, verbalizzazioni) e, se scegli, anche l'inserimento e la modifica degli esiti chiedono la chiave; le pagine restano tutte visibili. Inserita, vale per la sessione finché non resta inattiva per i minuti indicati. Si conserva solo un'impronta, mai la chiave in chiaro: se la dimentichi, toglila dal file app_settings.json.") }}</h2>
+  <h2>{{ icona("lucchetto", 17) }} Chiave di sblocco {{ info("Facoltativa. Se impostata, le operazioni pericolose (ripristini, eliminazioni, migrazione, verbalizzazioni) e, se scegli, anche l'inserimento e la modifica degli esiti chiedono la chiave; le pagine restano tutte visibili. Inserita, vale per la sessione finché non resta inattiva per i minuti indicati. Si conserva solo un'impronta, mai la chiave in chiaro.") }}</h2>
   <form method="post" action="/impostazioni/chiave" autocomplete="off">
     {% if imp.chiave_impronta %}
     <p style="margin:0 0 0.5rem"><span class="badge badge-ok">attiva</span></p>
@@ -71,6 +71,16 @@
     </div>
     {% endif %}
   </form>
+  {% if imp.chiave_impronta %}
+  {# chiave dimenticata: discreto, quasi invisibile (si apre col puntino in fondo al riquadro) #}
+  <details class="chiave-dimenticata">
+    <summary aria-label="Chiave dimenticata">·</summary>
+    <form method="post" action="/impostazioni/chiave-dimenticata" class="barra-aggiungi" style="margin-top:0.4rem">
+      <input name="conferma" placeholder="scrivi TOGLI LA CHIAVE" autocomplete="off" style="max-width:14rem" aria-label="Conferma">
+      <button type="submit" class="solo-icona danger" style="margin:0" data-info="Togli la chiave senza conoscerla" aria-label="Togli la chiave">{{ icona("lucchetto-aperto", 15) }}</button>
+    </form>
+  </details>
+  {% endif %}
 </section>
 
 <section class="card riquadro-impostazioni">

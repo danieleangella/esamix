@@ -22,7 +22,7 @@ _sessioni: dict[str, float] = {}
 _APPELLO = r"^/corsi/[^/]+/appelli/\d+"
 PERICOLOSE = [re.compile(p) for p in (
     r"^/ripristina-backup", _APPELLO + r"/ripristina", r"^/elimina-tutti-i-dati", r"^/migrazione/esegui",
-    r"^/impostazioni/corso-prova/elimina", r"^/impostazioni/chiave",
+    r"^/impostazioni/corso-prova/elimina", r"^/impostazioni/chiave$",
     r"^/corsi/[^/]+/elimina$", _APPELLO + r"/elimina$", _APPELLO + r"/blocchi/\d+/elimina",
     r"^/corsi/[^/]+/studenti/[^/]+/elimina", r"^/corsi/[^/]+/esercizi/\d+/elimina",
     _APPELLO + r"/verbalizza",

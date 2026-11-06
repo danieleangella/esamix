@@ -34,10 +34,11 @@
   {% set massimo = corso.risposta_corretta %}
   {% set previsto = calcolato %}
   {% set valore = rivalutazioni.get(r.posizione, calcolato) %}
-  {% set confermato = tipo == 'altro' or modifica or r.posizione in rivalutazioni %}
+  {# gli obbligatori con la risposta sbagliata partono già confermati, come gli altri: la matita li cambia #}
+  {% set confermato = true %}
 {% endif %}
 {% set diverso = tipo in ('manuale', 'sbagliato', 'altro') and confermato and valore != '' and valore != previsto %}
-<div class="riga-esercizio esito-{{ esito }}{% if tipo in ('manuale', 'sbagliato') %} riga-da-confermare{% endif %}{% if tipo in ('manuale', 'sbagliato', 'altro') %} riga-punteggio{% endif %}{% if tipo == 'manuale' %} riga-manuale{% elif tipo == 'sbagliato' %} riga-sbagliata{% endif %}{% if confermato %} confermata{% endif %}{% if diverso %} rivalutata{% endif %}"
+<div class="riga-esercizio esito-{{ esito }}{% if tipo == 'manuale' %} riga-da-confermare{% endif %}{% if tipo in ('manuale', 'sbagliato', 'altro') %} riga-punteggio{% endif %}{% if tipo == 'manuale' %} riga-manuale{% elif tipo == 'sbagliato' %} riga-sbagliata{% endif %}{% if confermato %} confermata{% endif %}{% if diverso %} rivalutata{% endif %}"
      id="es-{{ r.posizione }}" data-pos="{{ r.posizione }}" data-esercizio="{{ r.esercizio_id if r.esercizio_id is not none else '' }}"
      {% if tipo in ('manuale', 'sbagliato', 'altro') %}data-tipo="{{ tipo }}" data-previsto="{{ previsto }}" data-max="{{ massimo }}" data-aperta="{{ '1' if r.aperta else '' }}"{% endif %}>
   <div class="es-nome">
@@ -287,7 +288,7 @@
 <div class="card sezione-esercizi">
   <div class="titolo-sezione-correzione">
     <h2>Obbligatori ({{ obbligatori|length }})</h2>
-    {{ info("Con la risposta giusta (in verde) si giudica lo svolgimento: parte dal punteggio massimo (" ~ corso.risposta_corretta ~ "). Con la risposta sbagliata (in rosso) parte dal punteggio calcolato (" ~ corso.risposta_sbagliata ~ "), da confermare o alzare se lo svolgimento merita di più. Il timbro (o Invio) conferma il punteggio, che resta fisso e conta nel voto; la matita lo sblocca. Un punteggio diverso da quello previsto apre la nota. Un obbligatorio non svolto rende il compito insufficiente.") }}
+    {{ info("Con la risposta giusta (in verde) si giudica lo svolgimento: parte dal punteggio massimo (" ~ corso.risposta_corretta ~ "). Con la risposta sbagliata (in rosso) il punteggio calcolato (" ~ corso.risposta_sbagliata ~ ") è già confermato: la matita lo alza se lo svolgimento merita di più. Il timbro (o Invio) conferma il punteggio, che resta fisso e conta nel voto; la matita lo sblocca. Un punteggio diverso da quello previsto apre la nota. Un obbligatorio non svolto rende il compito insufficiente.") }}
     <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/svolgimenti" class="link-laterale pulsante-icona pulsante-neutro" target="_blank" rel="noopener"
        data-info="Confronta punteggi e note con gli altri compiti, esercizio per esercizio (pagina Svolgimenti, in un'altra scheda)" aria-label="Confronta con gli altri compiti">{{ icona("esterno", 15) }}</a>
   </div>
@@ -816,7 +817,7 @@
     // posizioni non confermate (e altri esercizi al punteggio calcolato): riproponendo la
     // pagina (o riprendendo la bozza) restano da confermare, quelli confermati restano tali
     document.getElementById("automatici-hidden").value = righe.filter(function (r) {
-      return !confermata(r) || (tipo(r) === "altro" && parseInt(campo(r).value, 10) === previsto(r));
+      return !confermata(r) || (tipo(r) !== "manuale" && parseInt(campo(r).value, 10) === previsto(r));
     }).map(function (r) { return r.dataset.pos; }).join(",");
     var bottone = ev.submitter;
     if (bottone && bottone !== conferma) return;  // bozza o ricalcola: nessun controllo

@@ -319,6 +319,16 @@ async def imposta_chiave(request: Request):
     return risposta
 
 
+@app.post("/impostazioni/chiave-dimenticata")
+def togli_chiave_dimenticata(conferma: str = Form("")):
+    """Chiave dimenticata: la toglie senza chiedere quella attuale (opzione nascosta nelle
+    Impostazioni, con una conferma scritta; volutamente fuori dalle operazioni protette)."""
+    if conferma.strip().upper() != "TOGLI LA CHIAVE":
+        return flash_redirect("/impostazioni", "Chiave non tolta: manca la conferma", "error", anchor="chiave")
+    chiave_service.imposta("", True, chiave_service.MINUTI_PREDEFINITI)
+    return flash_redirect("/impostazioni", "Chiave di sblocco tolta", anchor="chiave")
+
+
 _ETICHETTE_AZIONI = [
     ("ia/verifica", "Verifica con l'IA"), ("ia/genera", "Generazione esercizi con l'IA"),
     ("ia/correggi/conferma", "Conferma correzione con l'IA"), ("ia/correggi", "Correzione proposta dall'IA"),

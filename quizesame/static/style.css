@@ -1146,3 +1146,6 @@ button.pulsante-tema:hover { color: var(--text); background: var(--bg); filter: 
 /* ricalcola: solo su un punteggio confermato e diverso da quello previsto */
 .riga-esercizio:not(.rivalutata) .btn-ricalcola-punteggio, .riga-esercizio:not(.confermata) .btn-ricalcola-punteggio,
 .zona-inattiva .btn-ricalcola-punteggio { display: none; }
+.chiave-dimenticata summary { list-style: none; cursor: pointer; color: var(--border-strong); width: 1rem; margin-left: auto; text-align: center; }
+.chiave-dimenticata summary::-webkit-details-marker { display: none; }
+.chiave-dimenticata summary::before { content: none !important; }
