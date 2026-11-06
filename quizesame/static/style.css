@@ -1079,9 +1079,17 @@ button.pulsante-tema:hover { color: var(--text); background: var(--bg); filter: 
 .topbar nav { order: 2; margin-left: auto; }
 .topbar .topbar-marchio { order: 1; }
 .topbar .menu-toggle { order: 4; }
+/* lucchetto della chiave di sblocco: accanto al tema, verde se sbloccato, arancione se bloccato */
+.topbar .modulo-lucchetto, .topbar a.lucchetto-chiuso { order: 3; margin-left: 0.35rem; }
+.topbar .modulo-lucchetto button.pulsante-tema { margin: 0; color: var(--ok-text); border-color: var(--ok-border); background: var(--ok-bg); }
+.topbar a.lucchetto-chiuso { display: inline-flex; align-items: center; padding: 0.3rem 0.4rem; border-radius: 6px; line-height: 1;
+  color: var(--warn-strong-text); border: 1px solid var(--warn-border); background: var(--warn-bg); }
+.topbar a.lucchetto-chiuso:hover, .topbar .modulo-lucchetto button.pulsante-tema:hover { filter: brightness(var(--schiarisci)); }
 @media (max-width: 700px) {
   .topbar nav { order: 5; margin-left: 0; }
   button.pulsante-tema { margin-left: auto; }
+  .topbar .modulo-lucchetto, .topbar a.lucchetto-chiuso { margin-left: auto; }
+  .topbar .modulo-lucchetto + button.pulsante-tema, .topbar a.lucchetto-chiuso + button.pulsante-tema { margin-left: 0.35rem; }
 }
 .tabella-appelli-corso td:first-child { min-width: 11rem; }
 .card > p:only-child { margin: 0; }
