@@ -157,54 +157,11 @@
     </p>
   </section>
 
-  <section class="card riquadro-impostazioni">
-    <h2>Backup {{ info("Tutti i dati di questo appello (esercizi assegnati, compiti stampati, iscritti, presenze, aule, risultati, note, bozze) in un file da conservare. Reinserirlo sostituisce i dati attuali, dopo una conferma; i PDF si rigenerano.") }}</h2>
-    <div class="barra-pulsanti" style="margin-top:0">
-      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/backup.json" class="button solo-icona" data-info="Scarica il backup dell'appello" aria-label="Scarica il backup dell'appello">{{ icona("scarica", 16) }}</a>
-      <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/ripristina" enctype="multipart/form-data" class="inline form-ripristina-appello">
-        <label class="button secondary solo-icona" data-info="Reinserisci un backup (chiede conferma)" aria-label="Reinserisci un backup" style="margin:0">
-          {{ icona("carica", 16) }}<input type="file" name="file" accept=".json,application/json" hidden onchange="this.form.submit()">
-        </label>
-      </form>
-    </div>
-  </section>
-
   {% if raggruppamento %}
+  {# prove del raggruppamento e chi vi è ammesso, in un riquadro solo #}
   <section class="card riquadro-impostazioni">
-    <h2>Ammissione e media {{ info("La media combina i voti di: " ~ (raggruppamento.membri | map(attribute='nome') | join(', ')) ~ ". Conta solo chi ha superato la soglia di ciascuna prova; la media è sufficiente se supera il voto minimo del corso (" ~ corso.votomin ~ "). Alle prove successive alla prima è ammesso chi ha superato la precedente; singoli studenti si ammettono a mano (in deroga) dalla scheda Compiti d'esame della prova.") }}</h2>
-    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/raggruppamento/modifica">
-      <label>Alla prima prova sono ammessi</label>
-      <label class="riga-opzione"><input type="radio" name="fonte_ammessi" value="iscritti" {% if raggruppamento.fonte_ammessi != 'corso' %}checked{% endif %}>
-        solo gli iscritti {{ info("Quelli dell'elenco iscritti della prima prova (file della segreteria, Moodle o aggiunti a mano, nella sua scheda Compiti d'esame): nessuno finché non ne aggiungi.") }}</label>
-      <label class="riga-opzione"><input type="radio" name="fonte_ammessi" value="corso" {% if raggruppamento.fonte_ammessi == 'corso' %}checked{% endif %}>
-        tutti gli studenti del corso</label>
-      <div class="riga-opzione">
-        <span>e solo con matricola &ge;</span>
-        <input type="number" name="matricola_minima_prima_prova" value="{{ raggruppamento.matricola_minima_prima_prova or '' }}" placeholder="nessun limite" style="width:9rem">
-      </div>
-      <div class="barra-pulsanti">
-        <button type="submit" class="solo-icona secondary" data-info="Salva" aria-label="Salva">{{ icona("salva", 16) }}</button>
-        <button type="button" class="solo-icona secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate" aria-label="Annulla le modifiche">{{ icona("annulla", 16) }}</button>
-      </div>
-    </form>
-  </section>
-
-  {# le aule si definiscono qui, una serie per ogni prova; l'assegnazione degli studenti
-     resta nella scheda Compiti d'esame della prova #}
-  {% for md in membri_dati %}
-  <section class="card riquadro-impostazioni blocco-aule" data-appello="{{ md.appello.id }}">
-    <h2>Aule · {{ md.appello.nome }}</h2>
-    <div class="contenitore-aule">{% include "_aule.html" %}</div>
-  </section>
-  {% endfor %}
-  <script>
-  document.querySelectorAll(".blocco-aule .contenitore-aule").forEach(function (c) { attivaAule(c, "{{ corso.tag }}"); });
-  </script>
-  {% endif %}
-
-  <section class="card riquadro-impostazioni">
-    <h2>{{ 'Prove ed eliminazione' if raggruppamento else 'Eliminazione' }}</h2>
-    {% if raggruppamento %}
+    <h2>Prove e ammissione</h2>
+    <h3 class="titolo-sottosezione">Prove</h3>
     <table>
       <tr><th>Prova</th><th>Data</th><th></th></tr>
       {% for m in raggruppamento.membri %}
@@ -233,8 +190,67 @@
       </tr>
       {% endfor %}
     </table>
+    <h3 class="titolo-sottosezione">Ammissione e media {{ info("La media combina i voti di: " ~ (raggruppamento.membri | map(attribute='nome') | join(', ')) ~ ". Conta solo chi ha superato la soglia di ciascuna prova; la media è sufficiente se supera il voto minimo del corso (" ~ corso.votomin ~ "). Alle prove successive alla prima è ammesso chi ha superato la precedente; singoli studenti si ammettono a mano (in deroga) dalla scheda Compiti d'esame della prova.") }}</h3>
+    <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/raggruppamento/modifica">
+      <label>Alla prima prova sono ammessi</label>
+      <label class="riga-opzione"><input type="radio" name="fonte_ammessi" value="iscritti" {% if raggruppamento.fonte_ammessi != 'corso' %}checked{% endif %}>
+        solo gli iscritti {{ info("Quelli dell'elenco iscritti della prima prova (file della segreteria, Moodle o aggiunti a mano, nella sua scheda Compiti d'esame): nessuno finché non ne aggiungi.") }}</label>
+      <label class="riga-opzione"><input type="radio" name="fonte_ammessi" value="corso" {% if raggruppamento.fonte_ammessi == 'corso' %}checked{% endif %}>
+        tutti gli studenti del corso</label>
+      <div class="riga-opzione">
+        <span>e solo con matricola &ge;</span>
+        <input type="number" name="matricola_minima_prima_prova" value="{{ raggruppamento.matricola_minima_prima_prova or '' }}" placeholder="nessun limite" style="width:9rem">
+      </div>
+      <div class="barra-pulsanti">
+        <button type="submit" class="solo-icona secondary" data-info="Salva" aria-label="Salva">{{ icona("salva", 16) }}</button>
+        <button type="button" class="solo-icona secondary btn-annulla" disabled data-info="Scarta le modifiche non salvate" aria-label="Annulla le modifiche">{{ icona("annulla", 16) }}</button>
+      </div>
+    </form>
+  </section>
+
+  {# le aule di tutte le prove in un riquadro solo, una scheda per prova; l'assegnazione
+     degli studenti resta nella scheda Compiti d'esame della prova #}
+  <section class="card riquadro-impostazioni campo-largo riquadro-aule-prove">
+    <h2>Aule</h2>
+    {% if membri_dati|length > 1 %}
+    <div class="schede-aule" role="tablist">
+      {% for md in membri_dati %}
+      <button type="button" role="tab" class="scheda-variante{{ ' attiva' if loop.first else '' }}" data-scheda-aule="{{ md.appello.id }}"
+              aria-selected="{{ 'true' if loop.first else 'false' }}">{{ md.appello.nome }}
+        <span class="muted">· {{ md.aule|length }}</span></button>
+      {% endfor %}
+    </div>
     {% endif %}
-    <details class="dettaglio-fisarmonica"{% if raggruppamento %} style="margin-top:0.75rem"{% endif %}>
+    {% for md in membri_dati %}
+    <div class="blocco-aule" data-appello="{{ md.appello.id }}" data-pannello-aule="{{ md.appello.id }}" {% if not loop.first %}hidden{% endif %}>
+      <div class="contenitore-aule">{% include "_aule.html" %}</div>
+    </div>
+    {% endfor %}
+  </section>
+  <script>
+  document.querySelectorAll(".blocco-aule .contenitore-aule").forEach(function (c) { attivaAule(c, "{{ corso.tag }}"); });
+  document.querySelectorAll("[data-scheda-aule]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("[data-scheda-aule]").forEach(function (x) {
+        x.classList.toggle("attiva", x === b); x.setAttribute("aria-selected", x === b ? "true" : "false");
+      });
+      document.querySelectorAll("[data-pannello-aule]").forEach(function (p) { p.hidden = p.dataset.pannelloAule !== b.dataset.schedaAule; });
+    });
+  });
+  </script>
+  {% endif %}
+
+  <section class="card riquadro-impostazioni">
+    <h2>Backup ed eliminazione {{ info("Il backup contiene tutti i dati di questo appello (esercizi assegnati, compiti stampati, iscritti, presenze, aule, risultati, note, bozze) in un file da conservare. Reinserirlo sostituisce i dati attuali, dopo una conferma; i PDF si rigenerano.") }}</h2>
+    <div class="barra-pulsanti" style="margin-top:0">
+      <a href="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/backup.json" class="button solo-icona" data-info="Scarica il backup dell'appello" aria-label="Scarica il backup dell'appello">{{ icona("scarica", 16) }}</a>
+      <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/ripristina" enctype="multipart/form-data" class="inline form-ripristina-appello">
+        <label class="button secondary solo-icona" data-info="Reinserisci un backup (chiede conferma)" aria-label="Reinserisci un backup" style="margin:0">
+          {{ icona("carica", 16) }}<input type="file" name="file" accept=".json,application/json" hidden onchange="this.form.submit()">
+        </label>
+      </form>
+    </div>
+    <details class="dettaglio-fisarmonica" style="margin-top:0.75rem">
       <summary class="testo-pericolo">Elimina {{ 'il raggruppamento' if raggruppamento else "l'appello" }}</summary>
       {% if risultati %}
       <p class="muted" style="margin-top:0.5rem">Ha già <strong>{{ risultati|length }}</strong> risultati registrati, che verranno eliminati insieme.
