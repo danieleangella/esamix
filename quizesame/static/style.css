@@ -1157,3 +1157,21 @@ button.pulsante-tema:hover { color: var(--text); background: var(--bg); filter: 
 .chiave-dimenticata summary { list-style: none; cursor: pointer; color: var(--border-strong); width: 1rem; margin-left: auto; text-align: center; }
 .chiave-dimenticata summary::-webkit-details-marker { display: none; }
 .chiave-dimenticata summary::before { content: none !important; }
+.pseudonimo .nome-reale { color: var(--accent); font-weight: 600; }
+.senza-nomi .nome-reale { display: none; }
+.icona-risultato { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 0.35rem; color: var(--muted); cursor: default; }
+.icona-risultato.orale-attesa { color: var(--warn-strong-text); }
+.icona-risultato.orale-svolto { color: var(--ok-text); }
+.icona-risultato.nota-risultato { color: var(--accent); }
+/* Svolgimenti: note usate, ciascuna a scomparsa con i compiti che la riportano */
+.nota-usata { border-bottom: 1px solid var(--border); padding: 0.35rem 0; }
+.nota-usata > summary { display: flex; justify-content: space-between; gap: 1rem; cursor: pointer; }
+.nota-usata.incoerente > summary > span:first-child { color: var(--warn-strong-text); font-weight: 600; }
+.nota-usata ul { margin: 0.35rem 0 0.2rem; padding-left: 1.2rem; font-size: 0.9rem; }
+.es-lettere.ok { color: var(--ok-text); }
+.es-lettere.err { color: var(--err-text); }
+.segno-obbligatorio { color: var(--warn-strong-text); font-weight: 700; }
+.elenco-note-usate .nota-usata li { display: list-item; padding: 0.1rem 0; border: 0; background: none; }
+.nota-usata > summary { font-weight: 400; color: var(--text); }
+.card .nota-usata > summary { color: var(--text); font-size: 0.92rem; }
+.card .nota-usata > summary > span:first-of-type { flex: 1; text-align: left; }

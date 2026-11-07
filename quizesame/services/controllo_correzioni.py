@@ -176,7 +176,7 @@ def segnala_sospette(tag: str, appello_id: int) -> list[dict]:
     """Registra le domande sospette di un appello: ognuna una volta sola (una segnalazione
     già chiarita da una verifica non torna). Per le nuove, l'esercizio diventa "da
     controllare" nelle verifiche, con il motivo, così compare nella banca esercizi e
-    nell'appello finché una verifica con l'IA o a mano non lo conferma. Ritorna le
+    nell'appello finché una verifica con un LLM o a mano non lo conferma. Ritorna le
     segnalazioni ancora aperte dell'appello."""
     from quizesame.services import esercizi as esercizi_service
 

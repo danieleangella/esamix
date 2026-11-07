@@ -231,7 +231,7 @@ function copiaTesto(testo, doveMostrare) {
   return mostra();
 }
 
-// Pannello "Genera con l'IA" (_genera_ia.html), inserito via fetch nella scheda Testo.
+// Pannello "Genera con un LLM" (_genera_ia.html), inserito via fetch nella scheda Testo.
 function attivaPannelloIA(radice) {
   var form = radice.querySelector(".form-genera-ia");
   if (!form) return;
@@ -624,7 +624,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }).observe(document.body, { childList: true, subtree: true });
 });
 
-// Matita accanto al cestino (aule, prove di un raggruppamento, configurazioni IA): apre e
+// Matita accanto al cestino (aule, prove di un raggruppamento, configurazioni LLM): apre e
 // chiude il modulo di modifica sotto la riga, data-modifica="<id del modulo>"; il suo
 // pulsante Annulla (data-chiudi-modifica) lo richiude scartando quanto scritto.
 document.addEventListener("click", function (ev) {
@@ -653,7 +653,7 @@ document.addEventListener("click", function (ev) {
 // Le azioni sugli esercizi assegnati (assegna dalla banca, togli, obbligatorio, crea,
 // modifica, importa da altri corsi) vengono inviate in background: il server risponde con
 // il riquadro ridisegnato (X-Frammento), senza ricaricare tutta la pagina dell'appello.
-// Importa da file e Genera con l'IA portano invece a una pagina di conferma, come prima.
+// Importa da file e Genera con un LLM portano invece a una pagina di conferma, come prima.
 var _AZIONI_TESTO_IN_BACKGROUND = ["/obbligatorio", "/rimuovi", "/esercizi/assegna", "/esercizi/nuovo", "/modifica", "/importa-da-altri-corsi"];
 var _AZIONI_TESTO_RIGENERANO = _AZIONI_TESTO_IN_BACKGROUND.concat(["/importa-json", "/ia/genera"]);
 

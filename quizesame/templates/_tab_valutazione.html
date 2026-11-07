@@ -273,11 +273,13 @@
   <details class="card" open>
     <summary><strong>Risultati inseriti ({{ md.risultati|length }})</strong>{% if n_assenti or n_ritirati %} <span class="muted">— {{ n_corretti }} corrett{{ 'o' if n_corretti == 1 else 'i' }}{% if n_assenti %}, {{ n_assenti }} assent{{ 'e' if n_assenti == 1 else 'i' }}{% endif %}{% if n_ritirati %}, {{ n_ritirati }} ritirat{{ 'o' if n_ritirati == 1 else 'i' }}{% endif %}</span>{% endif %}
       </summary>
+    {% set con_aule = md.risultati | selectattr('aula_nome') | list | length > 0 %}
     <table class="tabella-risultati" style="margin-top:0.5rem">
       <tr>
         <th class="th-ordina-risultati ordinata" data-campo="inserimento" data-direzione="desc" data-info="Ordine di inserimento: un clic passa dal più recente al primo inserito e viceversa">N. {{ icona("ordina-giu", 13, "icona-ordine") }}</th>
         <th class="th-ordina-risultati" data-campo="cognome" data-info="Ordina per cognome">Studente {{ icona("ordina", 13, "icona-ordine") }}</th>
         <th>Matricola</th>
+        {% if con_aule %}<th>Aula</th>{% endif %}
         <th class="th-ordina-risultati" data-campo="voto" data-info="Ordina per voto">Esito {{ icona("ordina", 13, "icona-ordine") }}</th>
         <th style="text-align:right"></th>
       </tr>
@@ -291,9 +293,10 @@
       <tr class="riga-risultato" data-inserimento="{{ ordine_inserimento[r.id] }}" data-cognome="{{ r.cognome|lower }}" data-voto="{{ r.voto if r.voto is not none else -9999 }}">
         <td class="numero-inserimento">{{ ordine_inserimento[r.id] }}</td>
         <td>
-          <button type="button" class="link-simile btn-dettaglio-risultato" data-matricola="{{ r.matricola }}">{{ r.cognome }} {{ r.nome }}</button>{{ icona_simili(r.avvisi_simili) }}
+          <button type="button" class="link-simile btn-dettaglio-risultato" data-matricola="{{ r.matricola }}">{{ r.cognome }} {{ r.nome }}</button>
         </td>
         <td>{{ r.matricola }}</td>
+        {% if con_aule %}<td>{{ r.aula_nome or '' }}</td>{% endif %}
         <td>
           {% if r.esito == 'rifiutato' %}<span class="badge badge-warn">rifiutato</span> <span class="{{ classe_voto }}">({{ r.voto }})</span>
           {% elif r.esito == 'annullato' %}<span class="badge badge-err">annullato</span>{% if r.annullamento_nota %} <span class="muted">— {{ r.annullamento_nota }}</span>{% endif %}
@@ -310,10 +313,20 @@
           </div>
           {% endif %}
           {% elif r.esito != 'voto' %}{{ r.esito }}
-          {% elif r.richiede_orale and not r.orale_svolto %}<span class="badge badge-warn">in attesa di orale</span> <span class="{{ classe_voto }}">({{ scritto }})</span>
-          {% else %}<span class="{{ classe_voto }}">{{ r.voto }}</span>{% if r.richiede_orale and r.orale_svolto %} <span class="badge badge-ok">orale svolto</span>{% endif %}{% endif %}
-          {% if r.convocazione_orale and r.esito == 'voto' %} <span class="badge badge-warn" data-info="Convocato all'orale: conta solo se confermato nell'ultima prova del raggruppamento">orale</span>{% endif %}
-          {% if r.nota_correzione %}<span class="nota-risultato" tabindex="0" data-info="{{ r.nota_correzione }}" aria-label="Nota: {{ r.nota_correzione }}">{{ icona("nota", 12) }} nota</span>{% endif %}
+          {% elif r.richiede_orale and not r.orale_svolto %}<span class="{{ classe_voto }}">{{ scritto | lode }}</span>
+          {% else %}<span class="{{ classe_voto }}">{{ r.voto | lode }}</span>{% endif %}
+          {# dopo il voto: orale, note (sul compito e sugli esercizi) e compiti simili, come icone con la descrizione #}
+          {% if r.esito == 'voto' and (r.richiede_orale or r.convocazione_orale) %}
+          {% set testo_orale = ('Orale svolto' ~ (': ' ~ r.esito_orale if r.esito_orale else '')) if r.orale_svolto else ('Convocato all\'orale (conta solo se confermato nell\'ultima prova del raggruppamento)' if r.convocazione_orale and not r.richiede_orale else 'In attesa di orale') %}
+          <span class="icona-risultato {{ 'orale-svolto' if r.orale_svolto else 'orale-attesa' }}" tabindex="0"
+                data-info="{{ testo_orale }}{% if r.orale_motivazione %} — {{ r.orale_motivazione }}{% endif %}" aria-label="{{ testo_orale }}">{{ icona("orale", 14) }}</span>
+          {% endif %}
+          {% if r.nota_correzione or r.note_esercizi %}
+          {% set testo_note %}{% if r.nota_correzione %}Nota sul compito: {{ r.nota_correzione }}{% endif %}{% for n, nome, nota in r.note_esercizi %}{% if r.nota_correzione or not loop.first %}
+{% endif %}es. {{ n }} {{ nome }}: {{ nota }}{% endfor %}{% endset %}
+          <span class="icona-risultato nota-risultato" tabindex="0" data-info="{{ testo_note }}" aria-label="Note: {{ testo_note }}">{{ icona("nota", 14) }}{% if r.note_esercizi|length + (1 if r.nota_correzione else 0) > 1 %}<span class="conteggio-note">{{ r.note_esercizi|length + (1 if r.nota_correzione else 0) }}</span>{% endif %}</span>
+          {% endif %}
+          {{ icona_simili(r.avvisi_simili) }}
           {% if r.verbalizzato %}
           {% if r.esito == 'voto' and r.voto is not none %}
           <span class="badge {{ 'badge-ok' if r.voto >= md.votomin_effettivo else 'badge-err' }}">{{ 'superato' if r.voto >= md.votomin_effettivo else 'insufficiente' }} verbalizzato {{ r.data_verbalizzazione or "" }}</span>
@@ -343,7 +356,7 @@
         </td>
       </tr>
       <tr class="riga-dettaglio-risultato" data-matricola="{{ r.matricola }}" style="display:none">
-        <td colspan="5"></td>
+        <td colspan="{{ 6 if con_aule else 5 }}"></td>
       </tr>
       {% endfor %}
     </table>

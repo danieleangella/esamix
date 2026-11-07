@@ -1,5 +1,5 @@
 {% from "_icone.html" import icona %}
-{# Pannello "Genera con l'IA" della scheda Testo, caricato via fetch all'apertura. #}
+{# Pannello "Genera con un LLM" della scheda Testo, caricato via fetch all'apertura. #}
 <div class="pannello-ia" style="margin-top:0.75rem">
   {% if riferimenti.prove %}
   <p class="muted spiegazione sr-only" style="margin-top:0">
@@ -35,7 +35,7 @@
     {% endif %}
     <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-top:0.5rem">
       {% if fornitore_ia %}
-      <button type="submit" class="btn-genera-ia" style="margin:0">Genera con l'IA</button>
+      <button type="submit" class="btn-genera-ia" style="margin:0">Genera con un LLM</button>
       {% endif %}
       <button type="button" class="secondary btn-prompt-ia" style="margin:0">{{ icona("copia", 14) }} {{ 'Copia il prompt' if fornitore_ia else 'Copia il prompt per claude.ai' }}</button>
       <span class="muted stato-ia" role="status"></span>

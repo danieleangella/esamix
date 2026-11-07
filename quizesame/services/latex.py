@@ -720,7 +720,7 @@ def celamatr(matricola: str) -> str:
 
 def celavoto(voto: int, votomin: int) -> str:
     if voto > 30:
-        return "30lode"
+        return "30 e lode"
     if voto < votomin:
         return "non superato"
     return str(voto)
@@ -742,7 +742,7 @@ def _intestazione_orale(ctx: LatexContext) -> str:
 def crea_tex_risultati(ctx: LatexContext, righe: list[dict], prove: list[str] = (), avviso: str = "") -> str:
     """righe: dict con matricola/nome/cognome/etichetta (e voti_prove, uno per ciascuna
     delle `prove` di un raggruppamento) — etichetta è già il testo da stampare al posto del
-    voto (un numero, "30lode", "non superato", "orale", "assente", "ritirato", ...): la
+    voto (un numero, "30 e lode", "non superato", "orale", "assente", "ritirato", ...): la
     logica su quale etichetta usare vive in risultati.py. `avviso`: frase (testo semplice)
     in un riquadro sopra l'elenco, es. dove trovare le convocazioni all'orale."""
     tex = BEGIN_DOCUMENT

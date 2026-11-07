@@ -933,18 +933,19 @@ def valuta_svolgimento(
 
 
 def svolgimenti_appello(tag: str, appello_id: int, escludi_matricola: Optional[str] = None) -> dict:
-    """Tutti gli svolgimenti giudicati a mano in un appello (obbligatori con la risposta
-    corretta e domande aperte), raggruppati per esercizio: per confrontare punteggi e note
-    di studenti diversi sullo stesso esercizio. Per ogni esercizio anche le note usate, con i punteggi dati a ciascuna (una
-    stessa nota con punteggi diversi è segnalata), e l'elenco dei compiti con una nota o
-    un voto cambiato a mano."""
+    """Tutti gli esercizi dei compiti registrati in un appello, raggruppati per esercizio
+    (obbligatorio o no, domanda aperta o chiusa): per ognuno gli studenti con la risposta
+    data e giusta, il punteggio assegnato (e quello calcolato, se diverso), la nota e il
+    voto del compito, dal punteggio più alto; e le note usate, ciascuna con i compiti che
+    la riportano (una stessa nota con punteggi diversi è segnalata). Anche l'elenco dei
+    compiti con una nota o un voto cambiato a mano."""
     corso = corsi_service.get_corso(tag)
     appello = corsi_service.get_appello(tag, appello_id)
     votomin = corsi_service.effective_votomin(corso, appello)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         risultati = conn.execute(
-            "SELECT r.*, c.soluzioni, s.nome, s.cognome FROM risultati r "
+            "SELECT r.*, c.soluzioni, c.codice, s.nome, s.cognome FROM risultati r "
             "JOIN compiti c ON c.id = r.compito_id JOIN studenti s ON s.matricola = r.matricola "
             "WHERE r.appello_id=? AND r.esito IN ('voto', 'rifiutato') "
             "ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
@@ -968,31 +969,44 @@ def svolgimenti_appello(tag: str, appello_id: int, escludi_matricola: Optional[s
     for r in risultati:
         if escludi_matricola is not None and r["matricola"] == escludi_matricola:
             continue
-        soluzioni, risposte = r["soluzioni"], r["risposte"] or ""
+        soluzioni, risposte = (r["soluzioni"] or "").upper(), (r["risposte"] or "").upper()
         posizioni = posizioni_per_compito.get(r["compito_id"]) or [
             {"posizione": i, "esercizio_id": None, "esercizio_nome": f"Posizione {i + 1}", "obbligatorio": False,
-             "aperta": c == "-"} for i, c in enumerate(soluzioni)
+             "aperta": c == "-", "revisione": None} for i, c in enumerate(soluzioni)
         ]
         punteggi = _json_posizioni(r["punteggi_obbligatori"])
+        rivalutazioni = _json_posizioni(r["rivalutazioni"])
         note = _json_posizioni(r["note_svolgimenti"])
         calcolo = calcola_voto(corso, votomin, soluzioni, risposte, posizioni, punteggi)
         modificabile = not appello.chiuso and not appello.correzione_scritti_conclusa and not r["verbalizzato"]
         for p in posizioni:
             i = p["posizione"]
-            if i not in calcolo.manuali:
-                continue
+            aperta = bool(p["aperta"])
+            lettera = risposte[i] if i < len(risposte) else "X"
+            giusta = soluzioni[i] if i < len(soluzioni) else "?"
+            calcolato = None if aperta else (
+                corso.risposta_vuota if lettera == "X" else (corso.risposta_corretta if lettera == giusta else corso.risposta_sbagliata))
+            if p.get("revisione") == "annullato":
+                assegnato = punteggio_massimo(corso, aperta)
+            elif i in punteggi:
+                assegnato = punteggi[i]
+            else:
+                assegnato = rivalutazioni.get(i, calcolato)
             chiave = p["esercizio_id"] if p["esercizio_id"] is not None else f"pos{i}"
             es = esercizi.setdefault(chiave, {
                 "chiave": str(chiave), "esercizio_id": p["esercizio_id"], "nome": p["esercizio_nome"],
-                "aperta": bool(p["aperta"]), "massimo": punteggio_massimo(corso, bool(p["aperta"])),
-                "voci": [], "prima_posizione": i,
+                "aperta": aperta, "obbligatorio": bool(p["obbligatorio"]), "revisione": p.get("revisione"),
+                "massimo": punteggio_massimo(corso, aperta), "voci": [], "prima_posizione": i,
             })
             es["prima_posizione"] = min(es["prima_posizione"], i)
+            es["obbligatorio"] = es["obbligatorio"] or bool(p["obbligatorio"])
             es["voci"].append({
-                "matricola": r["matricola"], "nome": r["nome"], "cognome": r["cognome"], "posizione": i,
-                "punteggio": punteggi.get(i), "nota": note.get(i, ""),
-                "voto": r["voto"], "modificabile": modificabile,
-                "verbalizzato": bool(r["verbalizzato"]),
+                "matricola": r["matricola"], "nome": r["nome"], "cognome": r["cognome"], "codice": r["codice"],
+                "posizione": i, "lettera_data": "" if aperta else lettera, "lettera_corretta": "" if aperta else giusta,
+                "corretta": not aperta and lettera == giusta, "non_data": not aperta and lettera == "X",
+                "punteggio": assegnato, "calcolato": calcolato, "nota": note.get(i, ""),
+                "voto": r["voto_scritto"] if r["voto_scritto"] is not None else r["voto"],
+                "modificabile": modificabile, "verbalizzato": bool(r["verbalizzato"]),
             })
         voto_a_mano = bool(r["voto_modificato"]) and r["voto_scritto"] is not None
         if voto_a_mano or r["nota_correzione"]:
@@ -1006,20 +1020,23 @@ def svolgimenti_appello(tag: str, appello_id: int, escludi_matricola: Optional[s
     for es in elenco:
         # dal punteggio più alto: studenti con lo stesso punteggio vicini, per confrontarne
         # le note a colpo d'occhio
-        es["voci"].sort(key=lambda v: (-(v["punteggio"] if v["punteggio"] is not None else 1e9), v["cognome"].lower()))
+        es["voci"].sort(key=lambda v: (-(v["punteggio"] if v["punteggio"] is not None else -1e9), v["cognome"].lower()))
         gruppi: dict = {}
         for v in es["voci"]:
-            if v["nota"] and v["punteggio"] is not None:
-                g = gruppi.setdefault(v["nota"].strip().lower(), {"nota": v["nota"].strip(), "punteggi": {}})
-                g["punteggi"][v["punteggio"]] = g["punteggi"].get(v["punteggio"], 0) + 1
+            if v["nota"]:
+                g = gruppi.setdefault(v["nota"].strip().lower(), {"nota": v["nota"].strip(), "punteggi": {}, "voci": []})
+                g["voci"].append(v)
+                if v["punteggio"] is not None:
+                    g["punteggi"][v["punteggio"]] = g["punteggi"].get(v["punteggio"], 0) + 1
         es["note"] = sorted(
-            ({**g, "n": sum(g["punteggi"].values()), "incoerente": len(g["punteggi"]) > 1,
+            ({**g, "n": len(g["voci"]), "incoerente": len(g["punteggi"]) > 1,
               "punteggi": sorted(g["punteggi"].items(), reverse=True)} for g in gruppi.values()),
             key=lambda g: (-g["n"], g["nota"].lower()),
         )
         valutati = [v["punteggio"] for v in es["voci"] if v["punteggio"] is not None]
         es["media"] = round(sum(valutati) / len(valutati), 2) if valutati else None
         es["n_valutati"] = len(valutati)
+        es["giuste"] = sum(1 for v in es["voci"] if v["corretta"])
     return {"esercizi": elenco, "compiti_annotati": compiti_annotati}
 
 
@@ -1358,17 +1375,31 @@ def note_prove_precedenti(tag: str, appello_id: int, matricola: str) -> list[dic
 
 
 def list_risultati(tag: str, appello_id: int) -> list[dict]:
+    """I risultati dell'appello, con l'aula assegnata ("aula_nome") e le note sui singoli
+    esercizi ("note_esercizi": [(numero, nome dell'esercizio, nota)])."""
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         rows = conn.execute(
-            "SELECT r.*, s.nome, s.cognome FROM risultati r "
+            "SELECT r.*, s.nome, s.cognome, au.nome AS aula_nome FROM risultati r "
             "JOIN studenti s ON s.matricola = r.matricola "
+            "LEFT JOIN aula_assegnazioni aa ON aa.matricola = r.matricola AND aa.appello_id = r.appello_id "
+            "LEFT JOIN appello_aule au ON au.id = aa.aula_id "
             "WHERE r.appello_id=? ORDER BY s.cognome COLLATE NOCASE, s.nome COLLATE NOCASE",
             (appello_id,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        nomi = {(p["compito_id"], p["posizione"]): p["nome"] for p in conn.execute(
+            "SELECT ce.compito_id, ce.posizione, e.nome FROM compito_esercizi ce JOIN compiti c ON c.id = ce.compito_id "
+            "JOIN esercizi e ON e.id = ce.esercizio_id WHERE c.appello_id=?", (appello_id,))}
     finally:
         conn.close()
+    risultati = []
+    for r in rows:
+        d = dict(r)
+        note = _json_posizioni(d.get("note_svolgimenti"))
+        d["note_esercizi"] = [(i + 1, nomi.get((d["compito_id"], i)) or f"posizione {i + 1}", n)
+                              for i, n in sorted(note.items()) if n]
+        risultati.append(d)
+    return risultati
 
 
 def list_orali_da_svolgere(tag: str, appello_id: int) -> list[dict]:

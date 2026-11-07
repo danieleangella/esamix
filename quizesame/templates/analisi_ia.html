@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Analisi con l'IA · {{ titolo }}{% endblock %}
+{% block title %}Analisi con un LLM · {{ titolo }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span>
 {% if corso %}<a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>{% endif %}
 <a href="{{ torna }}">{{ torna_etichetta }}</a>
-<span class="sep">›</span> <span class="current">Analisi con l'IA</span>
+<span class="sep">›</span> <span class="current">Analisi con un LLM</span>
 {% endblock %}
 {% block katex %}
 <link rel="stylesheet" href="/static/katex/katex.min.css">
@@ -14,7 +14,7 @@
 {% block content %}
 {% from "_icone.html" import icona %}
 <header class="intestazione-pagina">
-  <div class="intestazione-livello">Analisi delle statistiche con l'IA · <a href="{{ torna }}">{{ torna_etichetta }}</a></div>
+  <div class="intestazione-livello">Analisi delle statistiche con un LLM · <a href="{{ torna }}">{{ torna_etichetta }}</a></div>
   <h1>{{ titolo }}</h1>
 </header>
 
@@ -25,8 +25,8 @@
   <p class="muted" style="margin-top:0">
     {% if analisi.quando %}Analisi del <strong>{{ analisi.quando[:16]|replace('T', ' ') }}</strong>, {% endif %}con
     {{ analisi.conf.nome }}{% if analisi.conf.modello != 'chatbot' %} ({{ analisi.conf.modello }}){% endif %}.
-    Sono stime statistiche del modello, non prove: in particolare, i compiti indicati come svolti con l'IA vanno ricontrollati.
-    Gli studenti sono indicati con pseudonimi casuali, diversi a ogni analisi.
+    Sono stime statistiche del modello, non prove: in particolare, i compiti indicati come svolti con un LLM vanno ricontrollati.
+    Gli studenti sono indicati con pseudonimi casuali, diversi a ogni analisi{% if nomi %}: accanto, il nome ritrovato sul tuo computer (al modello non è mai stato inviato){% endif %}.
   </p>
   <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center">
     <button type="button" class="solo-icona secondary" id="btn-copia-analisi" style="margin:0" data-info="Copia il testo" aria-label="Copia il testo">{{ icona("copia", 16) }}</button>
@@ -37,12 +37,13 @@
       <button type="submit" class="pulsante-icona" style="margin:0" data-info="Elimina questa analisi" aria-label="Elimina questa analisi">{{ icona("cestino", 16) }}</button>
     </form>
     {% endif %}
+    {% if nomi %}<label class="etichetta-check" style="margin-left:auto"><input type="checkbox" id="mostra-nomi" checked> mostra i nomi</label>{% endif %}
     <span class="muted" id="stato-copia-analisi" role="status"></span>
   </div>
   <textarea id="testo-analisi" hidden>{{ analisi.testo }}</textarea>
 </div>
 <div class="card rapporto-ia" id="rapporto-ia">
-  {{ analisi.testo | markdown_ia }}
+  {{ con_nomi(analisi.testo | markdown_ia, nomi or {}) }}
 </div>
 {% endif %}
 
@@ -52,26 +53,29 @@
     Il modello riceve i risultati delle prove {% if tipo == 'generale' %}dei corsi selezionati{% elif tipo == 'corso' %}di tutto il corso{% else %}di questo appello{% endif %}
     e scrive un rapporto sulle criticità: gli argomenti capiti meno{% if tipo != 'generale' %} (quest'anno e rispetto agli altri anni accademici){% else %} e come cambiano negli anni accademici{% endif %},
     gli esercizi problematici (troppo difficili, poco selettivi, con una risposta sbagliata più scelta di quella giusta),
-    {% if tipo != 'generale' %}una stima di quanti compiti sono stati probabilmente svolti con l'aiuto dell'IA o copiati tra studenti,{% endif %}
+    {% if tipo != 'generale' %}una stima di quanti compiti sono stati probabilmente svolti con l'aiuto dell'LLM o copiati tra studenti,{% endif %}
     la calibrazione della prova e suggerimenti per il corso.
   </p>
   <p class="muted spiegazione sr-only">
     <strong>Dati anonimi:</strong> gli studenti compaiono solo come pseudonimi casuali (S001, S002, …); non vengono inviati matricole,
     nomi, corso di laurea, DSA, né le tue note e decisioni sui singoli studenti (motivazioni dell'orale, compiti annullati, note di
-    correzione), così che la stima dei compiti svolti con l'IA si basi solo sui risultati. Vengono inviati i testi degli esercizi
+    correzione), così che la stima dei compiti svolti con un LLM si basi solo sui risultati. Vengono inviati i testi degli esercizi
     e gli esiti. Puoi controllare tutto il testo in "Mostra il prompt".
   </p>
   <form method="post" action="{{ qui }}" class="form-analisi-ia">
     {% if tipo != 'generale' %}
     <label style="display:flex; align-items:center; gap:0.4rem; color:var(--text); font-weight:normal">
       <input type="checkbox" name="compiti" value="1" style="width:auto; margin:0" {% if opzioni.compiti %}checked{% endif %}>
-      Includi le risposte dei singoli compiti (anonime): servono per stimare i compiti svolti con l'IA o copiati</label>
+      Includi le risposte dei singoli compiti (anonime): servono per stimare i compiti svolti con un LLM o copiati</label>
     <label style="display:flex; align-items:center; gap:0.4rem; color:var(--text); font-weight:normal">
       <input type="checkbox" name="storico" value="1" style="width:auto; margin:0" {% if opzioni.storico %}checked{% endif %}>
       Includi gli altri anni accademici dello stesso corso, per il confronto</label>
     {% else %}
     <input type="hidden" name="storico" value="1">
     {% endif %}
+    <label style="display:flex; align-items:center; gap:0.4rem; color:var(--text); font-weight:normal">
+      {{ 'Altri anni accademici: solo gli ultimi' if tipo != 'generale' else 'Solo gli ultimi' }}
+      <input type="number" name="anni" min="0" value="{{ opzioni.anni or '' }}" placeholder="tutti" style="width:5.5rem; margin:0"> anni</label>
     <label style="display:flex; align-items:center; gap:0.4rem; color:var(--text); font-weight:normal">
       <input type="checkbox" name="note" value="1" style="width:auto; margin:0" {% if opzioni.note %}checked{% endif %}>
       Includi le note sugli errori negli svolgimenti, raggruppate per esercizio (escluse quelle che parlano di copiature o dispositivi)</label>
@@ -80,7 +84,7 @@
               placeholder="es. concentrati sulla parte di algebra lineare; confronta soprattutto con gli ultimi due anni">{{ opzioni.istruzioni }}</textarea>
     {% if profili_ia|length > 1 %}{% set appello = {'id': 'analisi'} %}{% include "_scelta_profilo_ia.html" %}{% endif %}
     <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-top:0.75rem">
-      {% if fornitore_ia %}<button type="submit" class="btn-analizza" style="margin:0">{{ icona("scintille", 14) }} Analizza con l'IA</button>{% endif %}
+      {% if fornitore_ia %}<button type="submit" class="btn-analizza" style="margin:0">{{ icona("scintille", 14) }} Analizza con un LLM</button>{% endif %}
       <button type="button" class="{{ 'secondary' if fornitore_ia else '' }} btn-copia-prompt solo-icona" style="margin:0" data-info="Copia il prompt" aria-label="Copia il prompt">{{ icona("copia", 16) }}</button>
       <button type="button" class="secondary btn-scarica-prompt solo-icona" style="margin:0" data-info="Scarica il prompt" aria-label="Scarica il prompt">{{ icona("scarica", 16) }}</button>
       <span class="muted stato-analisi" role="status"></span>
@@ -90,7 +94,7 @@
       {% if caratteri > 600000 %}<strong>È molto lungo:</strong> potrebbe superare il limite del modello; togli le risposte dei compiti o gli altri anni.{% endif %}{% endif %}
       {% if fornitore_ia %}{% if profili_ia|length <= 1 %}Configurazione: <strong>{{ fornitore_ia.nome }}</strong> ({{ fornitore_ia.modello }}). {% endif %}
       L'analisi richiede di solito alcuni minuti e resta salvata qui sotto.
-      {% else %}Senza configurazione IA: copia il prompt e incollalo in un chatbot (es. <a href="https://claude.ai" target="_blank" rel="noopener">claude.ai</a>;
+      {% else %}Senza configurazione LLM: copia il prompt e incollalo in un chatbot (es. <a href="https://claude.ai" target="_blank" rel="noopener">claude.ai</a>;
       se è troppo lungo per la chat, scaricalo e allegalo come file), oppure aggiungi una chiave in <a href="/impostazioni#ia">Impostazioni</a>.{% endif %}
     </p>
   </form>
@@ -101,11 +105,17 @@
 </details>
 
 <details class="card" {% if not fornitore_ia and not analisi %}open{% endif %}>
-  <summary><strong>Con un chatbot: salva qui la risposta</strong></summary>
-  <p class="muted spiegazione sr-only" style="margin-top:0.5rem">Dopo aver usato il prompt in un chatbot, puoi incollare qui la sua risposta per conservarla insieme alle altre analisi.</p>
-  <form method="post" action="{{ qui }}">
-    <textarea name="risposta" rows="6" required placeholder="Incolla qui il rapporto del chatbot"></textarea>
-    <button type="submit" data-info="Salva la risposta" aria-label="Salva la risposta" class="solo-icona">{{ icona("salva", 16) }}</button>
+  <summary><strong>Con un chatbot: carica qui la risposta</strong></summary>
+  <p class="muted spiegazione sr-only" style="margin-top:0.5rem">Dopo aver usato il prompt in un chatbot, carica il file .md che ti restituisce, oppure incollane qui il testo Markdown: si conserva insieme alle altre analisi. Se la risposta riporta il codice dell'analisi, accanto agli pseudonimi compaiono i nomi.</p>
+  <form method="post" action="{{ qui }}" enctype="multipart/form-data" class="form-risposta-chatbot">
+    <div class="barra-aggiungi" style="margin:0.5rem 0">
+      <label class="button secondary" style="margin:0">{{ icona("carica", 14) }} file .md
+        <input type="file" name="file_md" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden
+               onchange="this.closest('form').querySelector('.nome-file-md').textContent = this.files[0] ? this.files[0].name : ''"></label>
+      <span class="muted nome-file-md"></span>
+    </div>
+    <textarea name="risposta" rows="6" placeholder="…oppure incolla qui il Markdown del rapporto"></textarea>
+    <button type="submit" data-info="Salva e mostra il rapporto" aria-label="Salva e mostra il rapporto" class="solo-icona">{{ icona("salva", 16) }}</button>
   </form>
 </details>
 
@@ -130,7 +140,16 @@
 document.addEventListener("DOMContentLoaded", function () {
   var rapporto = document.getElementById("rapporto-ia");
   if (rapporto) renderizzaLatex(rapporto);
+  var mostra = document.getElementById("mostra-nomi");
+  if (mostra) mostra.addEventListener("change", function () { rapporto.classList.toggle("senza-nomi", !mostra.checked); });
 });
+(function () {
+  // senza file né testo non c'è niente da salvare
+  var f = document.querySelector(".form-risposta-chatbot");
+  if (f) f.addEventListener("submit", function (ev) {
+    if (!f.elements.file_md.files.length && !f.elements.risposta.value.trim()) { ev.preventDefault(); window.alert("Carica il file .md o incolla il testo del rapporto"); }
+  });
+})();
 (function () {
   var btnCopia = document.getElementById("btn-copia-analisi");
   if (btnCopia) btnCopia.addEventListener("click", function () {
@@ -149,6 +168,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var campo = form.elements[nome];
       if (campo && (campo.type === "hidden" || campo.checked)) parametri.set(nome, "1");
     });
+    parametri.set("anni", form.elements.anni.value);
     parametri.set("istruzioni", form.elements.istruzioni.value);
     return base + "?" + parametri;
   }

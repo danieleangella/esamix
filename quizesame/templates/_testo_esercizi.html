@@ -29,7 +29,7 @@
          data-info="Anteprima di controllo: tutti gli esercizi con tutte le varianti, la risposta corretta e la soluzione (non crea compiti né codici)">{{ icona("occhio", 14) }} Anteprima</a>
       <a class="icona-azione" href="{{ url }}/anteprima.tex" data-info="Sorgente LaTeX dell'anteprima">.tex</a>
       <a class="icona-azione" href="{{ url }}/ia/verifica"
-         data-info="Fai ricontrollare all'IA risposte corrette e soluzioni di tutti gli esercizi">{{ icona("spunta", 14) }} Verifica con l'IA</a>
+         data-info="Fai ricontrollare all'LLM risposte corrette e soluzioni di tutti gli esercizi">{{ icona("spunta", 14) }} Verifica con un LLM</a>
     </span>
     {% endif %}</summary>
   <span class="dati-testo" hidden data-n="{{ md.esercizi_assegnati|length }}" data-obbligatori="{{ n_obbligatori }}" data-blocchi="{{ md.blocchi|length }}"></span>
@@ -115,7 +115,7 @@
     {% endfor %}
   </table>
   {% else %}
-  <p class="muted">Nessun esercizio ancora assegnato: aggiungine dalla banca, da altri corsi, creane uno nuovo o generalo con l'IA.</p>
+  <p class="muted">Nessun esercizio ancora assegnato: aggiungine dalla banca, da altri corsi, creane uno nuovo o generalo con un LLM.</p>
   {% endif %}
 
   {% if testo_chiuso %}
@@ -138,7 +138,7 @@
   {# a testo chiuso servono di rado: link discreti in fondo #}
   <p class="muted" style="margin:0.5rem 0 0; font-size:0.85rem">Controlli:
     <a href="{{ url }}/anteprima.pdf" target="_blank" rel="noopener" data-info="Tutti gli esercizi con tutte le varianti, la risposta corretta e la soluzione">anteprima di controllo</a>
-    · <a href="{{ url }}/ia/verifica" data-info="Fai ricontrollare all'IA risposte corrette e soluzioni (per correggere un esercizio va riaperto il testo)">verifica con l'IA</a></p>
+    · <a href="{{ url }}/ia/verifica" data-info="Fai ricontrollare all'LLM risposte corrette e soluzioni (per correggere un esercizio va riaperto il testo)">verifica con un LLM</a></p>
   {% endif %}
   {% endif %}
 
@@ -149,7 +149,7 @@
     <button type="button" class="icona-azione" data-apri="banca" data-info="Esercizi della banca di questo corso non ancora assegnati">{{ icona("banca", 14) }} Dalla banca ({{ md.esercizi_disponibili|length }})</button>
     {% endif %}
     <button type="button" class="icona-azione solo-icona" data-apri="altri" data-info="Esercizi di altri corsi o degli anni precedenti" aria-label="Da altri corsi">{{ icona("copia", 16) }}</button>
-    <button type="button" class="icona-azione solo-icona" data-apri="ia" data-info="Nuovi esercizi sul modello delle prove analoghe degli anni precedenti" aria-label="Genera con l'IA">{{ icona("scintille", 16) }}</button>
+    <button type="button" class="icona-azione solo-icona" data-apri="ia" data-info="Nuovi esercizi sul modello delle prove analoghe degli anni precedenti" aria-label="Genera con un LLM">{{ icona("scintille", 16) }}</button>
     <button type="button" class="icona-azione solo-icona" data-apri="file" data-info="Un compito intero da un unico file (es. la risposta di claude.ai o un .json esportato)" aria-label="Importa da file">{{ icona("carica", 16) }}</button>
     {% if md.esercizi_assegnati %}
     <a class="icona-azione barra-strumenti-fine" href="{{ url }}/esercizi/esporta" data-info="Scarica gli esercizi di questo appello (testo e varianti) in un file .json, da importare altrove">{{ icona("scarica", 14) }} Esporta</a>

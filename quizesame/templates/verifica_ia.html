@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% from "_icone.html" import icona %}
-{% block title %}Verifica con l'IA · {{ titolo }}{% endblock %}
+{% block title %}Verifica con un LLM · {{ titolo }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
 <a href="{{ torna }}">{{ torna_etichetta }}</a>
-<span class="sep">›</span> <span class="current">Verifica con l'IA</span>
+<span class="sep">›</span> <span class="current">Verifica con un LLM</span>
 {% endblock %}
 {% block katex %}
 <link rel="stylesheet" href="/static/katex/katex.min.css">
@@ -15,7 +15,7 @@
 {% from "_stato_verifica.html" import stato_verifica %}
 {% set n_verificati = stati.values() | selectattr("stato", "equalto", "verificato") | list | length %}
 <header class="intestazione-pagina">
-  <div class="intestazione-livello">Verifica con l'IA · <a href="{{ torna }}">{{ corso.nome }} ({{ corso.anno }})</a></div>
+  <div class="intestazione-livello">Verifica con un LLM · <a href="{{ torna }}">{{ corso.nome }} ({{ corso.anno }})</a></div>
   <h1>{{ titolo }}</h1>
 </header>
 
@@ -73,7 +73,7 @@
     <p class="muted" style="margin-bottom:0">
       {% if fornitore_ia %}{% if profili_ia|length <= 1 %}Configurazione: <strong>{{ fornitore_ia.nome }}</strong> ({{ fornitore_ia.modello }}). {% endif %}
       Può richiedere alcuni minuti. Vengono inviati solo i testi degli esercizi, nessun dato degli studenti.
-      {% else %}Nessuna configurazione IA: usa il prompt con claude.ai (qui sotto), oppure aggiungine una in
+      {% else %}Nessuna configurazione LLM: usa il prompt con claude.ai (qui sotto), oppure aggiungine una in
       <a href="/impostazioni#ia">Impostazioni</a>.{% endif %}
     </p>
   </form>
@@ -102,7 +102,7 @@
     <tr>
       <td>{{ e.nome or ('#' ~ e.id) }}</td>
       <td>{{ stato_verifica(corso.tag, e, st, url) }}
-        {% if st.quando %}<span class="muted" style="font-size:0.8rem">{{ st.quando[:16] }}{% if st.origine == 'manuale' %} · a mano{% elif st.origine == 'correzione' %} · corretto con l'IA{% elif st.origine == 'sospetto' %} · sospetto dalle risposte degli studenti{% endif %}</span>{% endif %}</td>
+        {% if st.quando %}<span class="muted" style="font-size:0.8rem">{{ st.quando[:16] }}{% if st.origine == 'manuale' %} · a mano{% elif st.origine == 'correzione' %} · corretto con un LLM{% elif st.origine == 'sospetto' %} · sospetto dalle risposte degli studenti{% endif %}</span>{% endif %}</td>
       <td style="text-align:right"><a href="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/ia/verifica">verifica solo questo</a></td>
     </tr>
     {% endfor %}
@@ -146,14 +146,14 @@
     <span class="badge {{ etichette[r.esito][0] }}">{{ etichette[r.esito][1] }}</span>
     {% if salvata %}<span class="muted" style="font-size:0.85rem">ora:</span>
       {% if attuale %}{{ stato_verifica(corso.tag, r.esercizio, attuale, qui) }}{% else %}<span class="badge">eliminato</span>{% endif %}{% endif %}
-    {% if da_sistemare %}<a class="icona-azione" style="margin-left:auto" href="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi?torna={{ (qui ~ '')|urlencode }}&amp;auto=1">Correggi con l'IA</a>{% endif %}</summary>
+    {% if da_sistemare %}<a class="icona-azione" style="margin-left:auto" href="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi?torna={{ (qui ~ '')|urlencode }}&amp;auto=1">Correggi con un LLM</a>{% endif %}</summary>
   {% if r.commento %}<p style="margin-top:0.25rem">{{ r.commento }}</p>{% endif %}
   {% for v in r.varianti %}
   <div class="variante-verificata">
     <div>{% if r.varianti|length > 1 %}<strong>Variante {{ v.numero }}</strong> {% endif %}<span class="badge {{ etichette[v.esito][0] }}">{{ etichette[v.esito][1] }}</span></div>
     <div class="muted" style="white-space:pre-wrap">{{ v.testo | testo_web }}</div>
     {% if not r.esercizio.aperta %}
-    <div>Indicata come corretta: <strong>{{ v.indicata }}</strong>{% if v.risposta_calcolata %} · secondo l'IA: <strong>{{ v.risposta_calcolata }}</strong>{% endif %}</div>
+    <div>Indicata come corretta: <strong>{{ v.indicata }}</strong>{% if v.risposta_calcolata %} · secondo l'LLM: <strong>{{ v.risposta_calcolata }}</strong>{% endif %}</div>
     {% endif %}
     {% if v.commento %}<div>{{ v.commento }}</div>{% endif %}
   </div>
@@ -168,7 +168,7 @@
     <form class="inline form-proponi" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi">
       <input type="hidden" name="torna" value="{{ qui }}">
       <input type="hidden" name="profilo" value="{{ fornitore_ia.id }}">
-      <button type="submit" style="margin:0">Proponi una correzione con l'IA</button>
+      <button type="submit" style="margin:0">Proponi una correzione con un LLM</button>
     </form>
     {% else %}
     <a class="button" href="/corsi/{{ corso.tag }}/esercizi/{{ r.esercizio.id }}/ia/correggi?torna={{ (qui ~ '')|urlencode }}">Proponi una correzione (con claude.ai)</a>

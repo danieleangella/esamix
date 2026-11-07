@@ -158,8 +158,8 @@
     (se ce n'è già uno identico si riusa quello) e aggiunto al compito. La pagina
     <a href="/esercizi">Tutti gli esercizi</a> (menu in alto) mostra invece gli esercizi di tutti i
     corsi insieme, con gli stessi filtri: ogni esercizio si può modificare (matita),
-    verificare con l'IA (✓) o far correggere all'IA (scintille). Un esercizio modificato
-    dopo una verifica con l'IA risulta da verificare di nuovo (↻).
+    verificare con un LLM (✓) o far correggere all'LLM (scintille). Un esercizio modificato
+    dopo una verifica con un LLM risulta da verificare di nuovo (↻).
   </p>
   <p>
     Se un esercizio è già usato in compiti generati o in un testo chiuso, modificarlo non
@@ -171,7 +171,7 @@
     Nella scheda Testo, sotto l'elenco degli esercizi assegnati, una barra di pulsanti apre un
     pannello alla volta: <strong>Nuovo esercizio</strong>, <strong>Dalla banca</strong> (gli
     esercizi del corso non ancora assegnati, da selezionare e assegnare),
-    <strong>Da altri corsi</strong>, <strong>Genera con l'IA</strong>, <strong>Importa da
+    <strong>Da altri corsi</strong>, <strong>Genera con un LLM</strong>, <strong>Importa da
     file</strong> ed <strong>Esporta</strong>. Su ogni esercizio, la matita apre il modulo di
     modifica e il cestino lo toglie dal compito: viene chiesto anche se eliminarlo dalla banca
     dati del corso, oppure lasciarvelo per riusarlo in futuro. Tutto questo aggiorna solo
@@ -190,7 +190,7 @@
   </p>
   <p>
     Finché il testo è aperto, l'icona <strong>Anteprima</strong> nel titolo di "Esercizi assegnati"
-    (a testo chiuso, un link discreto in fondo alla scheda, insieme alla verifica con l'IA)
+    (a testo chiuso, un link discreto in fondo alla scheda, insieme alla verifica con un LLM)
     apre un PDF di controllo con tutti gli esercizi del
     compito, tutte le loro varianti, la risposta corretta segnata e la
     soluzione/suggerimento: si può aprire in qualunque momento, anche prima dei blocchi, e
@@ -218,9 +218,9 @@
 </details>
 
 <details class="card dettaglio-fisarmonica" id="genera-ia">
-  <summary>Generare esercizi con l'IA</summary>
+  <summary>Generare esercizi con un LLM</summary>
   <p>
-    Nella scheda <strong>Testo</strong> di un appello, il pannello <strong>"Genera con l'IA"</strong>
+    Nella scheda <strong>Testo</strong> di un appello, il pannello <strong>"Genera con un LLM"</strong>
     crea nuovi esercizi con Claude prendendo a modello le prove analoghe degli anni precedenti
     dello stesso corso (stesso nome e corso di studi): per una prova di un raggruppamento, ad
     esempio la seconda prova parziale, le seconde prove parziali degli altri anni; per un appello
@@ -231,11 +231,11 @@
   <p>
     Gli esercizi proposti si vedono per intero (testo, risposte con la corretta segnata,
     soluzione) in una pagina di conferma, dove si sceglie quali importare: <strong>vanno
-    sempre controllati</strong>, perché l'IA può sbagliare i calcoli. Dopo l'import
+    sempre controllati</strong>, perché l'LLM può sbagliare i calcoli. Dopo l'import
     l'Anteprima della scheda Testo permette un controllo completo.
   </p>
   <p>
-    Per usare l'IA direttamente dall'app si salva almeno una configurazione in Impostazioni →
+    Per usare l'LLM direttamente dall'app si salva almeno una configurazione in Impostazioni →
     "Intelligenza artificiale". Se ne possono salvare più d'una (es. una chiave personale e una
     del dipartimento, o un server) e scegliere ogni volta quale usare dal menu del pannello;
     quella predefinita è già selezionata. I fornitori sono <strong>Anthropic</strong> (Claude Opus 5, chiave API a pagamento sul
@@ -252,7 +252,7 @@
     <strong>Verifica delle soluzioni.</strong> Il modello risolve per conto suo ogni esercizio, in
     ogni variante, e segnala se la risposta indicata come corretta è sbagliata o non è l'unica
     corretta, se il testo è ambiguo o ha formule scritte male e se la soluzione contiene errori.
-    Si può verificare il compito di un appello (<strong>✓ Verifica con l'IA</strong> nel titolo di
+    Si può verificare il compito di un appello (<strong>✓ Verifica con un LLM</strong> nel titolo di
     "Esercizi assegnati" della scheda Testo), l'intera banca di un corso (pagina Esercizi del
     corso), un singolo esercizio (dal suo stato, accanto al nome) oppure tutte le banche insieme
     (pagina "Tutti gli esercizi"). È un aiuto, non una garanzia: anche il modello può sbagliare.
@@ -262,11 +262,11 @@
     (✓ verificato, ✗ errore, ? da controllare, "modificato" se è stato cambiato dopo l'ultima
     verifica, "da verificare" se non è mai stato verificato). Con "Controlla solo quelli da
     verificare" gli esercizi già verificati e non modificati vengono saltati. Se un dubbio
-    dell'IA è infondato, <strong>Segna come corretto</strong> lo segna come verificato.
+    dell'LLM è infondato, <strong>Segna come corretto</strong> lo segna come verificato.
   </p>
   <p>
-    <strong>Correzione con l'IA.</strong> Per un esercizio con errori o dubbi,
-    <strong>Proponi una correzione con l'IA</strong> (o "Correggi con l'IA" accanto al titolo) fa
+    <strong>Correzione con un LLM.</strong> Per un esercizio con errori o dubbi,
+    <strong>Proponi una correzione con un LLM</strong> (o "Correggi con un LLM" accanto al titolo) fa
     riscrivere l'esercizio correggendo solo ciò che è stato segnalato, elenca le modifiche fatte
     (testo, risposta corretta, risposte sbagliate, soluzione) e mostra <em>prima</em> e <em>dopo</em> affiancati,
     con le parti tolte barrate in rosso e quelle nuove in verde. La proposta si può
@@ -275,11 +275,11 @@
     modifica fatta a mano (anche negli appelli che lo usano) e segnato come verificato.
   </p>
   <p>
-    Senza una configurazione IA, in ogni pagina si copia il prompt in claude.ai e si incolla poi
+    Senza una configurazione LLM, in ogni pagina si copia il prompt in claude.ai e si incolla poi
     la risposta di Claude ("Con claude.ai: incolla la risposta"): il risultato è lo stesso.
   </p>
   <p>
-    Indipendentemente dall'IA, l'app non accetta esercizi con <strong>due risposte uguali</strong>
+    Indipendentemente dall'LLM, l'app non accetta esercizi con <strong>due risposte uguali</strong>
     nella stessa variante (a meno di spazi e maiuscole): lo segnala nel modulo, nell'import, nella
     banca esercizi e prima di generare i compiti.
   </p>
@@ -299,14 +299,14 @@
     restano nella banca dati del corso o vengono eliminati anche da lì.
   </p>
   <p>
-    Il modo più rapido per preparare il file è darlo da fare a un'IA (Claude, ChatGPT…):
+    Il modo più rapido per preparare il file è darlo da fare a un LLM (Claude, ChatGPT…):
     copia il prompt qui sotto, incollalo nella chat e aggiungi in fondo il compito (testo
     LaTeX, PDF allegato o anche una foto). Copia poi la risposta nella casella di
     importazione. Se qualcosa non va, l'app indica la riga con l'errore: puoi correggerla
-    a mano o incollare il messaggio all'IA chiedendole di sistemare il file.
+    a mano o incollare il messaggio all'LLM chiedendole di sistemare il file.
   </p>
   <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem">
-    <strong>Prompt da dare all'IA</strong>
+    <strong>Prompt da dare all'LLM</strong>
     <button type="button" class="solo-icona secondary" id="btn-copia-prompt-import" style="margin-top:0" data-info="Copia il prompt" aria-label="Copia il prompt">{{ icona("copia", 16) }}</button>
   </div>
   <pre id="prompt-import" style="white-space:pre-wrap; word-break:break-word; overflow-x:auto; font-size:0.85rem; background:var(--code-bg); padding:0.75rem; border-radius:6px">{% raw %}Converti il compito d'esame che trovi in fondo a questo messaggio in un file di testo per l'importazione in EsaMiX. Rispondi SOLO con il contenuto del file, dentro un unico blocco di codice, senza commenti prima o dopo.
@@ -314,14 +314,14 @@
 {% endraw %}{{ formato_esercizi }}{% raw %}
 
 REGOLE PER LA CONVERSIONE
-- Se il compito non riporta le opzioni di risposta di un esercizio a scelta multipla, proponile tu (una corretta, verificata con cura, e tre sbagliate verosimili, tipicamente errori comuni degli studenti) e scrivi nella riga "note": Risposte proposte dall'IA, da verificare.
+- Se il compito non riporta le opzioni di risposta di un esercizio a scelta multipla, proponile tu (una corretta, verificata con cura, e tre sbagliate verosimili, tipicamente errori comuni degli studenti) e scrivi nella riga "note": Risposte proposte dall'LLM, da verificare.
 - Se la soluzione non è indicata nel compito, ometti la sezione "### SOLUZIONE".
 
 COMPITO DA CONVERTIRE
 {% endraw %}</pre>
   <p class="muted">
     Il formato si può anche scrivere a mano: è lo stesso descritto nel prompt. Il testo
-    prima del primo <code>### ESERCIZIO</code> e le righe <code>```</code> che l'IA mette
+    prima del primo <code>### ESERCIZIO</code> e le righe <code>```</code> che l'LLM mette
     intorno al blocco di codice vengono ignorati. Resta possibile importare anche un file
     <code>.json</code> esportato da EsaMiX.
   </p>
@@ -507,7 +507,10 @@ COMPITO DA CONVERTIRE
     il cursore è sul primo punteggio da confermare (o su Conferma): <kbd>Invio</kbd>
     lo conferma e passa al successivo e poi a Conferma, dove un altro <kbd>Invio</kbd> registra il
     voto e riporta al modulo per il compito successivo; da un campo <kbd>Invio</kbd> non
-    registra mai per sbaglio. In cima alla scheda una barra mostra la
+    registra mai per sbaglio. Nei risultati inseriti, dopo il voto (oltre il 30, «30 e lode»), icone con la descrizione
+    al passaggio del mouse: l'orale (con la motivazione), le note (sul compito e sui singoli
+    esercizi) e i compiti simili; se ci sono aule, una colonna con l'aula, filtrabile.
+    In cima alla scheda una barra mostra la
     percentuale di compiti corretti, con quanti sono sul totale (in verde quelli completi, in arancione quelli da
     completare, in grigio i presenti ancora da correggere) e, tra chi ha lo scritto
     sufficiente, la percentuale di ammessi all'orale (la stessa percentuale compare nel
@@ -612,14 +615,13 @@ COMPITO DA CONVERTIRE
     completa in un'altra pagina. Lo stesso vale per la pagina con le note di un solo esercizio.
   </p>
   <p>
-    La pagina <strong>Svolgimenti</strong> (dalla scheda Correzione) mostra un
-    esercizio alla volta, con tutti gli studenti: si cambiano i punteggi già dati
-    (<kbd>Invio</kbd> salva e passa allo studente successivo, il voto del compito si
-    ricalcola da solo) e si confrontano punteggi e note di compiti diversi, raggruppati per
-    punteggio. Per ogni esercizio l'elenco delle note usate segnala una stessa nota con
-    punteggi diversi; in fondo, i compiti con una nota o con un voto cambiato a mano (con il
-    voto calcolato accanto). Se il voto di un compito era stato cambiato a mano, cambiare un
-    punteggio non lo sovrascrive: un avviso mostra quanto sarebbe ora il voto calcolato.
+    La pagina <strong>Svolgimenti</strong> (dalla scheda Correzione) è da consultare: mostra
+    tutti gli esercizi dei compiti corretti (obbligatori e no, segnati con *), uno alla volta con
+    tutti gli studenti, dal punteggio più alto: risposta data e giusta, punteggio (con il
+    calcolato, se diverso), nota e voto del compito, con il link alla scheda del compito e la
+    matita che apre la sua correzione in un'altra pagina. Sotto, le note usate per
+    quell'esercizio: ciascuna si apre sui compiti che la riportano, col punteggio dato, e una
+    stessa nota con punteggi diversi è segnalata.
   </p>
   <p>
     Nel riepilogo, il ricalcolo (dopo aver corretto la stringa delle risposte lette) conserva
@@ -764,14 +766,19 @@ COMPITO DA CONVERTIRE
     grafici con la variazione nel tempo di percentuale promossi e voto medio.
   </p>
   <p>
-    In tutte e tre, <strong>Analizza con l'IA</strong> prepara un rapporto sulle criticità: argomenti
+    In tutte e tre, <strong>Analizza con un LLM</strong> prepara un rapporto sulle criticità: argomenti
     capiti meno (anche rispetto agli altri anni accademici dello stesso corso), esercizi troppo
-    difficili o poco selettivi, una stima dei compiti probabilmente svolti con l'aiuto dell'IA o copiati
+    difficili o poco selettivi, una stima dei compiti probabilmente svolti con l'aiuto dell'LLM o copiati
     (dagli indicatori calcolati sui risultati: coerenza delle risposte, risposte sbagliate identiche,
     scritto rispetto alle prove precedenti e all'orale), calibrazione della prova e suggerimenti. I dati
     sono anonimi (pseudonimi casuali, nessuna matricola né nota del docente sui singoli studenti); senza
-    chiave API si copia o si scarica il prompt per un chatbot, e la risposta si può salvare insieme alle
-    analisi fatte da qui.
+    chiave API si copia o si scarica il prompt per un chatbot, e la risposta (il file .md che il
+    chatbot restituisce, o il suo testo Markdown) si carica qui e resta salvata con le altre analisi.
+    Il rapporto comprende anche le indicazioni per i prossimi compiti: concetti da rispiegare e come
+    verificare che siano stati capiti, e le varianti di uno stesso esercizio con esiti molto diversi,
+    con le cause e come renderle omogenee. Si possono includere solo gli ultimi N anni accademici.
+    Ogni prompt ha un codice: la mappa tra pseudonimi e studenti resta solo sul computer (per tre
+    mesi) e, se la risposta riporta il codice, accanto agli pseudonimi compaiono i nomi.
   </p>
 </details>
 
@@ -984,7 +991,7 @@ COMPITO DA CONVERTIRE
   <p>
     La voce <strong>Registro</strong> del menu elenca, una riga per azione, tutto ciò che è stato
     fatto nell'app (ogni modulo inviato, con l'esito, e ogni documento aperto o scaricato), le
-    verifiche con l'IA e gli aggiornamenti installati, con le novità di ciascuno. Si può filtrare
+    verifiche con un LLM e gli aggiornamenti installati, con le novità di ciascuno. Si può filtrare
     per corso, tipo e testo. Il registro è nel file <code>registro.jsonl</code> accanto ai corsi.
   </p>
 </details>

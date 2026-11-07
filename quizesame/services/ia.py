@@ -375,7 +375,7 @@ def genera(tag: str, appello, n_esercizi: int, n_varianti: int, istruzioni: str 
     formato, chiede una sola volta al modello di correggerla indicando l'errore."""
     conf = fornitore(profilo_id)
     if not conf:
-        raise ValueError("Nessuna configurazione IA (Anthropic, OpenRouter o Ollama): vedi Impostazioni")
+        raise ValueError("Nessuna configurazione LLM (Anthropic, OpenRouter o Ollama): vedi Impostazioni")
     # un modello locale ha di solito un contesto più piccolo: meno prove di riferimento
     max_prove = 3 if conf["fornitore"] == "ollama" else MAX_PROVE_RIFERIMENTO
     prompt = costruisci_prompt(tag, appello, n_esercizi, n_varianti, istruzioni, max_prove=max_prove)
@@ -548,7 +548,7 @@ def verifica(tag: str, esercizi: list, contesto: str = "", profilo_id: str = "")
     soluzione."""
     conf = fornitore(profilo_id)
     if not conf:
-        raise ValueError("Nessuna configurazione IA (Anthropic, OpenRouter o Ollama): vedi Impostazioni")
+        raise ValueError("Nessuna configurazione LLM (Anthropic, OpenRouter o Ollama): vedi Impostazioni")
     prompt = costruisci_prompt_verifica(tag, esercizi, contesto)
     messaggi = [{"role": "user", "content": prompt["richiesta"]}]
     for tentativo in range(2):
@@ -728,7 +728,7 @@ def proponi_correzione(esercizio, risultato: dict, profilo_id: str = "") -> dict
     """Chiede al modello la versione corretta dell'esercizio (non salva nulla)."""
     conf = fornitore(profilo_id)
     if not conf:
-        raise ValueError("Nessuna configurazione IA (Anthropic, OpenRouter o Ollama): vedi Impostazioni")
+        raise ValueError("Nessuna configurazione LLM (Anthropic, OpenRouter o Ollama): vedi Impostazioni")
     prompt = costruisci_prompt_correzione(esercizio, risultato)
     messaggi = [{"role": "user", "content": prompt["richiesta"]}]
     for tentativo in range(2):

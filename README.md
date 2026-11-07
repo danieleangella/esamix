@@ -3,7 +3,7 @@
 App locale per la creazione e la correzione di compiti d'esame a risposta multipla.
 Gira come un piccolo server sul proprio computer e si usa dal browser. I dati restano
 sul computer su cui gira l'app; l'unica eccezione, facoltativa, è la generazione di
-esercizi con l'IA (vedi sotto).
+esercizi con un LLM (vedi sotto).
 
 ## Requisiti
 
@@ -146,7 +146,7 @@ scheda in cui completarla (tratteggiata se non ancora disponibile); il riquadro 
 dice cosa fare adesso. In tutti gli elenchi di studenti, cliccando il nome si apre la sua carriera.
 
 - **Testo**: esercizi del compito, aggiunti dalla banca del corso, da altri corsi, creati da
-  zero, generati con l'IA o importati da un file; obbligatorio sì/no con un clic. Quando è
+  zero, generati con un LLM o importati da un file; obbligatorio sì/no con un clic. Quando è
   pronto si **chiude il testo**: non si modifica più finché non lo si riapre, e si generano i
   fogli da pubblicare (senza e con soluzioni).
 - **Compiti d'esame**: elenco iscritti (file della segreteria, prenotazioni Moodle, aggiunte
@@ -190,6 +190,11 @@ dice cosa fare adesso. In tutti gli elenchi di studenti, cliccando il nome si ap
   risposta giusta e data segnate; a corso concluso, il PDF con **tutti gli esercizi dell'anno**.
 - Avvisi di **compiti simili** salvati con la correzione, nei risultati e nella pagina Note.
 - **Backup di un appello** (file JSON con tutti i suoi dati) da scaricare e, dopo conferma, reinserire.
+- **Analisi con un LLM**: risposta del chatbot caricata come file .md (o incollata), solo gli ultimi
+  N anni, indicazioni per i prossimi compiti (concetti da rispiegare, varianti da rendere omogenee);
+  la mappa pseudonimi-studenti resta sul computer e mostra i nomi accanto agli pseudonimi.
+- **Svolgimenti** in sola lettura, con tutti gli esercizi e le note usate (con i compiti che le riportano).
+- **Risultati**: «30 e lode» oltre il 30; icone per orale, note e compiti simili; colonna dell'aula.
 - **Chiave di sblocco** facoltativa (Impostazioni): protegge le operazioni pericolose e, a scelta,
   l'inserimento degli esiti; vale per la sessione fino a un periodo di inattività.
 - **Tema scuro** più contrastato; in correzione Tab prende l'unico suggerimento.
@@ -241,23 +246,23 @@ grafica nuova mantenendo codici e ordine di esercizi e risposte.
 ## Registro
 
 La voce **Registro** del menu elenca tutte le azioni svolte nell'app (moduli inviati con
-l'esito, documenti aperti o scaricati, verifiche con l'IA) e gli aggiornamenti installati.
+l'esito, documenti aperti o scaricati, verifiche con un LLM) e gli aggiornamenti installati.
 Il registro è nel file `corsi/registro.jsonl`.
 
-## Generazione di esercizi con l'IA (facoltativa)
+## Generazione di esercizi con un LLM (facoltativa)
 
-Nella scheda Testo di un appello, **"Genera con l'IA"** crea nuovi esercizi con Claude
+Nella scheda Testo di un appello, **"Genera con un LLM"** crea nuovi esercizi con Claude
 (Anthropic) sul modello delle prove analoghe degli anni precedenti dello stesso corso:
 per una prova parziale, le prove parziali corrispondenti; per un appello, gli appelli.
 Gli esercizi proposti passano sempre da una pagina di conferma, dove si sceglie quali
 importare.
 
-Dalla stessa scheda, **"✓ Verifica con l'IA"** fa ricontrollare al modello tutti gli
+Dalla stessa scheda, **"✓ Verifica con un LLM"** fa ricontrollare al modello tutti gli
 esercizi del compito (risposte indicate come corrette, unicità della risposta, testi e
 soluzioni) e mostra per ciascuno se è corretto, da controllare o sbagliato. La verifica si
 può fare anche su tutta la banca di un corso, su un singolo esercizio o su tutti i corsi
 ("Tutti gli esercizi"); l'esito resta salvato per ogni esercizio, così quelli corretti non
-vanno ricontrollati finché non vengono modificati. Per gli esercizi con problemi, l'IA può
+vanno ricontrollati finché non vengono modificati. Per gli esercizi con problemi, l'LLM può
 proporre una correzione: si vede prima e dopo, la si può ritoccare e la si salva solo
 confermando.
 

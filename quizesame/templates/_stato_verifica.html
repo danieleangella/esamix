@@ -4,13 +4,13 @@
    {{ stato_verifica(corso.tag, e, stati[e.id], torna) }} #}
 {% macro stato_verifica(tag, e, st, torna="") -%}
 {%- if st.stato == 'verificato' -%}
-<span class="badge badge-ok" title="Verificato il {{ st.quando[:16] }}{% if st.origine == 'manuale' %} (a mano){% elif st.origine == 'correzione' %} (corretto con l'IA){% endif %}">✓ verificato</span>
+<span class="badge badge-ok" title="Verificato il {{ st.quando[:16] }}{% if st.origine == 'manuale' %} (a mano){% elif st.origine == 'correzione' %} (corretto con un LLM){% endif %}">✓ verificato</span>
 {%- elif st.stato in ('errore', 'dubbio') -%}
 <a class="badge {{ 'badge-err' if st.stato == 'errore' else 'badge-warn' }}" href="/corsi/{{ tag }}/esercizi/{{ e.id }}/ia/correggi?torna={{ torna|urlencode }}"
-   title="{% if st.origine == 'sospetto' %}Soluzione sospetta: nelle risposte degli studenti una risposta sbagliata è stata scelta più di quella corretta. Apri per vederlo e correggerlo, oppure verificalo{% else %}La verifica con l'IA ha segnalato {{ 'un errore' if st.stato == 'errore' else 'un dubbio' }}: apri per vederlo e correggerlo{% endif %}">{{ '✗ errore' if st.stato == 'errore' else ('? sospetto' if st.origine == 'sospetto' else '? da controllare') }}</a>
+   title="{% if st.origine == 'sospetto' %}Soluzione sospetta: nelle risposte degli studenti una risposta sbagliata è stata scelta più di quella corretta. Apri per vederlo e correggerlo, oppure verificalo{% else %}La verifica con un LLM ha segnalato {{ 'un errore' if st.stato == 'errore' else 'un dubbio' }}: apri per vederlo e correggerlo{% endif %}">{{ '✗ errore' if st.stato == 'errore' else ('? sospetto' if st.origine == 'sospetto' else '? da controllare') }}</a>
 {%- elif st.stato == 'modificato' -%}
 <a class="badge badge-warn" href="/corsi/{{ tag }}/esercizi/{{ e.id }}/ia/verifica" title="Modificato dopo l'ultima verifica: verificalo di nuovo">modificato</a>
 {%- else -%}
-<a class="badge" href="/corsi/{{ tag }}/esercizi/{{ e.id }}/ia/verifica" title="Mai verificato con l'IA: verificalo">da verificare</a>
+<a class="badge" href="/corsi/{{ tag }}/esercizi/{{ e.id }}/ia/verifica" title="Mai verificato con un LLM: verificalo">da verificare</a>
 {%- endif -%}
 {%- endmacro %}

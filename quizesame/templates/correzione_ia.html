@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% from "_icone.html" import icona %}
-{% block title %}Correzione con l'IA · {{ esercizio.nome or esercizio.id }}{% endblock %}
+{% block title %}Correzione con un LLM · {{ esercizio.nome or esercizio.id }}{% endblock %}
 {% block breadcrumb %}
 <a href="/">Corsi</a> <span class="sep">›</span> <a href="/corsi/{{ corso.tag }}">{{ corso.nome }}</a> <span class="muted">({{ corso.anno }})</span> <span class="sep">›</span>
-<a href="{{ torna }}">indietro</a> <span class="sep">›</span> <span class="current">Correzione con l'IA</span>
+<a href="{{ torna }}">indietro</a> <span class="sep">›</span> <span class="current">Correzione con un LLM</span>
 {% endblock %}
 {% block katex %}
 <link rel="stylesheet" href="/static/katex/katex.min.css">
@@ -12,7 +12,7 @@
 {% endblock %}
 {% block content %}
 <header class="intestazione-pagina">
-  <div class="intestazione-livello">Correzione con l'IA · <a href="/corsi/{{ corso.tag }}/esercizi">{{ corso.nome }} ({{ corso.anno }})</a></div>
+  <div class="intestazione-livello">Correzione con un LLM · <a href="/corsi/{{ corso.tag }}/esercizi">{{ corso.nome }} ({{ corso.anno }})</a></div>
   <h1>{{ esercizio.nome or ('Esercizio #' ~ esercizio.id) }}</h1>
 </header>
 
@@ -38,7 +38,7 @@
   <ul style="margin:0.4rem 0 0">
     {% if problemi.commento %}<li>{{ problemi.commento }}</li>{% endif %}
     {% for v in problemi.varianti or [] %}{% if v.esito != 'ok' %}
-    <li>Variante {{ v.numero }} ({{ v.esito }}): {{ v.commento }}{% if v.risposta_calcolata %} — secondo l'IA: {{ v.risposta_calcolata }}{% endif %}</li>
+    <li>Variante {{ v.numero }} ({{ v.esito }}): {{ v.commento }}{% if v.risposta_calcolata %} — secondo l'LLM: {{ v.risposta_calcolata }}{% endif %}</li>
     {% endif %}{% endfor %}
     {% if problemi.soluzione and problemi.soluzione.esito in ('errore', 'dubbio') %}<li>Soluzione ({{ problemi.soluzione.esito }}): {{ problemi.soluzione.commento }}</li>{% endif %}
   </ul>
@@ -54,7 +54,7 @@
   {% if modifiche %}
   <ul style="margin:0.4rem 0 0">{% for m in modifiche %}<li>{{ m }}</li>{% endfor %}</ul>
   {% else %}
-  <p class="muted" style="margin:0.4rem 0 0">Nessuna differenza rispetto all'esercizio attuale: secondo l'IA non c'è niente da cambiare.
+  <p class="muted" style="margin:0.4rem 0 0">Nessuna differenza rispetto all'esercizio attuale: secondo l'LLM non c'è niente da cambiare.
     Se sei d'accordo, puoi segnarlo come verificato.</p>
   {% endif %}
 </div>
@@ -84,7 +84,7 @@
     {{ colonna('prima') }}
   </div>
   <div class="card proposta">
-    <div class="titoletto" style="margin-top:0">Dopo (proposta dell'IA)</div>
+    <div class="titoletto" style="margin-top:0">Dopo (proposta dell'LLM)</div>
     {{ colonna('dopo') }}
   </div>
 </div>
@@ -115,7 +115,7 @@
 </details>
 {% else %}
 <div class="card">
-  <p style="margin-top:0">L'IA riscrive l'esercizio correggendo <strong>solo</strong> ciò che è stato segnalato. Prima di salvare vedrai
+  <p style="margin-top:0">L'LLM riscrive l'esercizio correggendo <strong>solo</strong> ciò che è stato segnalato. Prima di salvare vedrai
     prima e dopo affiancati e deciderai tu se accettare.</p>
   <form method="post" class="form-correzione-ia">
     <input type="hidden" name="torna" value="{{ torna }}">
@@ -149,7 +149,7 @@ document.addEventListener("DOMContentLoaded", function () { renderizzaLatex(docu
   var form = document.querySelector(".form-correzione-ia");
   if (!form) return;
   var stato = form.querySelector(".stato-correzione");
-  // arrivando da "Correggi con l'IA" nei risultati della verifica, la proposta parte da sola
+  // arrivando da "Correggi con un LLM" nei risultati della verifica, la proposta parte da sola
   if (new URLSearchParams(location.search).get("auto") === "1" && form.querySelector('button[type="submit"]')) {
     setTimeout(function () { form.requestSubmit(); }, 50);
   }

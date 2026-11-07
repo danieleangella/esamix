@@ -56,7 +56,7 @@
   {% set n_da_verificare = stati_v.values() | selectattr("stato", "in", ["mai", "modificato"]) | list | length %}
   {% set n_problemi = stati_v.values() | selectattr("stato", "in", ["errore", "dubbio"]) | list | length %}
   <p style="margin:0.75rem 0 0; display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center">
-    <a class="icona-azione" href="/corsi/{{ corso.tag }}/esercizi/ia/verifica" data-info="Fai ricontrollare all'IA risposte corrette e soluzioni degli esercizi della banca">{{ icona("spunta", 14) }} Verifica con l'IA</a>
+    <a class="icona-azione" href="/corsi/{{ corso.tag }}/esercizi/ia/verifica" data-info="Fai ricontrollare all'LLM risposte corrette e soluzioni degli esercizi della banca">{{ icona("spunta", 14) }} Verifica con un LLM</a>
     <span class="muted">{{ esercizi|length - n_da_verificare - n_problemi }} verificati · {{ n_da_verificare }} da verificare{% if n_problemi %} · <strong>{{ n_problemi }} con errori o dubbi</strong>{% endif %}</span>
   </p>
   <table data-senza-filtri class="tabella-banca-esercizi" style="margin-top:0.75rem">

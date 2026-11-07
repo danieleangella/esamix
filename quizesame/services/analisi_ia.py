@@ -1,18 +1,18 @@
-"""Analisi delle statistiche con l'IA: per un appello (o un raggruppamento di prove), per
+"""Analisi delle statistiche con un LLM: per un appello (o un raggruppamento di prove), per
 un corso o per un insieme di corsi (le Statistiche generali), raccoglie in forma anonima
 i risultati delle prove e ne fa un prompt per un modello linguistico, che individua le
 criticità utili a ripensare il corso: argomenti capiti meno (quest'anno e negli anni
-precedenti), esercizi problematici, compiti probabilmente svolti con l'aiuto dell'IA o
+precedenti), esercizi problematici, compiti probabilmente svolti con l'aiuto dell'LLM o
 copiati, calibrazione della prova.
 
 Anonimato: gli studenti compaiono solo come pseudonimi (S001, S002, ...) assegnati in un
 ordine casuale diverso a ogni prompt; non escono mai matricole, nomi, corso di laurea,
 DSA, né le note e le decisioni del docente sui singoli studenti (motivazioni dell'orale,
-compiti annullati, note di correzione), così che la stima dei compiti svolti con l'IA si
+compiti annullati, note di correzione), così che la stima dei compiti svolti con un LLM si
 basi solo sui risultati. Le note sugli errori negli svolgimenti, se incluse, sono
 raggruppate per esercizio e mai collegate allo studente.
 
-Il prompt si può copiare in un chatbot oppure inviare con una configurazione IA delle
+Il prompt si può copiare in un chatbot oppure inviare con una configurazione LLM delle
 Impostazioni (vedi ia._chiama); le analisi fatte restano salvate in file JSON."""
 import hashlib
 import json
@@ -36,7 +36,7 @@ from quizesame.services import statistiche as statistiche_service
 # assenti restano fuori (l'annullamento è una decisione del docente, non un risultato)
 _ESITI_SVOLTI = ("voto", "rifiutato")
 # note sugli svolgimenti che parlano di copiature o dispositivi: sono indicazioni del
-# docente, che la stima "oggettiva" dei compiti svolti con l'IA non deve vedere
+# docente, che la stima "oggettiva" dei compiti svolti con un LLM non deve vedere
 _NOTA_ESCLUSA = re.compile(r"\b(ia|ai|gpt|chatgpt|chatbot|copia\w*|copiat\w*|cellular\w*|telefon\w*|smartphone)\b", re.I)
 MAX_NOTE_PER_ESERCIZIO = 15
 MAX_COPPIE = 20
@@ -118,7 +118,7 @@ def _edizioni(corso) -> list:
 
 def _analizza_prova(tag: str, corso, appello, pseudonimi: dict, includi_note: bool, storico: bool) -> dict:
     """Esercizi (testo, esiti, risposte sbagliate scelte, discriminazione) e compiti
-    anonimi di una prova, con gli indicatori calcolati per la stima di copiature e IA."""
+    anonimi di una prova, con gli indicatori calcolati per la stima di copiature e LLM."""
     votomin = corsi_service.effective_votomin(corso, appello)
     conn = db.get_connection(config.corso_db_path(tag))
     try:
@@ -172,7 +172,9 @@ def _analizza_prova(tag: str, corso, appello, pseudonimi: dict, includi_note: bo
                     esercizi[p["esercizio_id"]], p["opzioni"], p["soluzioni"][i] if i < len(p["soluzioni"] or "") else ""))
 
     per_es = {eid: {"giuste": 0, "sbagliate": 0, "non_date": 0, "scelte": Counter(), "punti": [], "note": [],
-                    "obbligatorio": False, "x": [], "y": []} for eid in ordine}
+                    "obbligatorio": False, "x": [], "y": [],
+                    # per variante: [giuste, totale] (domande chiuse) o i punteggi (aperte)
+                    "per_variante": defaultdict(lambda: [0, 0]), "punti_variante": defaultdict(list)} for eid in ordine}
     compiti = []
     for r in risultati:
         soluzioni, risposte = r["soluzioni"] or "", r["risposte"] or ""
@@ -197,6 +199,8 @@ def _analizza_prova(tag: str, corso, appello, pseudonimi: dict, includi_note: bo
                     voci.append(f"{et}=?")
                 else:
                     st["punti"].append(punti)
+                    if nvar:
+                        st["punti_variante"][nvar].append(punti)
                     voci.append(f"{et}={punti}/{corso.punteggio_max_aperta}")
                     if scritto is not None:
                         st["x"].append(punti)
@@ -204,6 +208,9 @@ def _analizza_prova(tag: str, corso, appello, pseudonimi: dict, includi_note: bo
                 continue
             data = risposte[i].upper() if i < len(risposte) else "X"
             giusta = data == (soluzioni[i].upper() if i < len(soluzioni) else "?")
+            if nvar:
+                st["per_variante"][nvar][1] += 1
+                st["per_variante"][nvar][0] += 1 if giusta else 0
             if giusta:
                 st["giuste"] += 1
                 codice = "+"
@@ -333,6 +340,13 @@ def _testo_prova(d: dict, includi_compiti: bool, corso) -> str:
                 righe.append("Risposte sbagliate scelte: " + ", ".join(
                     (f"v{nv}" if len(e.varianti) > 1 else "") + f"({c}) {n2} volte"
                     for (nv, c), n2 in es["scelte"].most_common()))
+        if len(e.varianti) > 1 and (es["per_variante"] or es["punti_variante"]):
+            if e.aperta:
+                righe.append("Esiti per variante: " + "; ".join(
+                    f"v{nv} punteggio medio {_media(p)} su {len(p)}" for nv, p in sorted(es["punti_variante"].items())))
+            else:
+                righe.append("Esiti per variante: " + "; ".join(
+                    f"v{nv} giuste {_pct(g, n)} su {n}" for nv, (g, n) in sorted(es["per_variante"].items())))
         if es["discriminazione"] is not None:
             righe.append(f"Discriminazione (correlazione tra esito dell'esercizio e voto dello scritto): {es['discriminazione']}")
         if es["note"]:
@@ -447,15 +461,16 @@ Come leggere i dati:
 - L'orale non è sostenuto da tutti: può essere richiesto per regole del corso o a discrezione del docente, quindi il campione degli orali non è casuale. Un orale molto più basso dello scritto resta comunque un indizio utile.
 - Mancano di proposito tutte le indicazioni del docente sui singoli studenti (sospetti, annullamenti, motivazioni): le tue stime devono basarsi solo sui risultati.
 
-Scrivi in italiano un rapporto in Markdown, con titoli di sezione, numeri a sostegno di ogni affermazione e senza ripetere i dati grezzi. Sezioni:
+Scrivi in italiano un rapporto in Markdown, con titoli di sezione, numeri a sostegno di ogni affermazione e senza ripetere i dati grezzi. Rispondi solo con il documento Markdown (niente testo prima o dopo, niente blocco di codice intorno): se puoi, rendilo scaricabile come file .md. La prima riga del documento deve essere esattamente la riga "Codice dell'analisi: ..." che trovi all'inizio dei dati. Sezioni:
 1. **Sintesi** — le 5-8 osservazioni più importanti.
 2. **Argomenti e concetti capiti meno** — globalmente e nella prova o nell'anno analizzato, confrontati con gli anni precedenti quando i dati lo permettono (peggiorati, migliorati, critici da sempre). Deduci l'argomento dal testo quando non è indicato. Per gli esercizi più sbagliati, interpreta le risposte sbagliate più scelte: quale errore concettuale o di calcolo rivelano.
 3. **Esercizi problematici** — troppo facili o troppo difficili, poco discriminanti, con un'opzione sbagliata scelta più di quella giusta (possibile errore nel testo o nella soluzione: verifica tu risolvendo l'esercizio), molte risposte non date.
-4. **Compiti probabilmente svolti con l'aiuto dell'IA** — stima quanti compiti (un intervallo, con il grado di confidenza) e quali pseudonimi sono più sospetti, spiegando gli indizi di ciascuno. Ragiona così: risolvi tu gli esercizi come farebbe un chatbot interrogato in fretta e individua le risposte sbagliate tipiche di un modello linguistico; cerca compiti che le scelgono, compiti con esercizi difficili giusti e facili sbagliati (G alto), con quasi nessuna risposta lasciata in bianco, con uno scritto molto più alto delle prove precedenti dello stesso studente o dell'orale. Distingui gli indizi forti da quelli deboli e ricorda che sono indizi statistici, non prove.
+4. **Compiti probabilmente svolti con l'aiuto dell'LLM** — stima quanti compiti (un intervallo, con il grado di confidenza) e quali pseudonimi sono più sospetti, spiegando gli indizi di ciascuno. Ragiona così: risolvi tu gli esercizi come farebbe un chatbot interrogato in fretta e individua le risposte sbagliate tipiche di un modello linguistico; cerca compiti che le scelgono, compiti con esercizi difficili giusti e facili sbagliati (G alto), con quasi nessuna risposta lasciata in bianco, con uno scritto molto più alto delle prove precedenti dello stesso studente o dell'orale. Distingui gli indizi forti da quelli deboli e ricorda che sono indizi statistici, non prove.
 5. **Possibili copiature tra studenti** — dalle coppie con molte risposte sbagliate identiche rispetto a quelle attese per caso.
 6. **Calibrazione della prova** — distribuzione dei voti, soglia di sufficienza, rapporto tra scritto e orale, differenze tra prove o appelli e tra anni.
-7. **Suggerimenti per il corso** — concreti e ordinati per priorità: argomenti da rinforzare e come, esercizi da riscrivere o sostituire, modifiche al formato della prova (anche per ridurre l'uso dell'IA).
-8. **Limiti dell'analisi** — dati mancanti o pochi casi che rendono incerte le conclusioni."""
+7. **Suggerimenti per il corso** — concreti e ordinati per priorità: argomenti da rinforzare e come, esercizi da riscrivere o sostituire, modifiche al formato della prova (anche per ridurre l'uso degli LLM).
+8. **Indicazioni per i prossimi compiti** — (a) gli esercizi andati molto male: quale concetto rispiegare e come verificare nei compiti successivi che sia stato compreso (che tipo di esercizio proporre, con quali distrattori mirati agli errori osservati); (b) le varianti dello stesso esercizio con esiti molto diversi (vedi "Esiti per variante"): quanto differiscono, le cause probabili (numeri o calcoli più pesanti, un passaggio in più, distrattori più insidiosi, testo meno chiaro) e come correggerle per rendere le varianti il più possibile omogenee; (c) esercizi troppo facili o poco discriminanti da sostituire.
+9. **Limiti dell'analisi** — dati mancanti o pochi casi che rendono incerte le conclusioni."""
 
 
 def ambito_appello(tag: str, appello_id: int) -> dict:
@@ -515,11 +530,29 @@ def _regole(corso) -> str:
             "Un esercizio obbligatorio non svolto rende insufficiente il compito.")
 
 
+def _recenti(corsi: list, anni: int, riferimento: Optional[int] = None) -> list:
+    """Solo i corsi degli ultimi `anni` anni accademici (0 = tutti), contando all'indietro
+    dall'anno di `riferimento` (o dal più recente tra i corsi)."""
+    if not anni or not corsi:
+        return corsi
+    ultimo = riferimento or max(statistiche_service._anno_key(c.anno) for c in corsi)
+    return [c for c in corsi if not statistiche_service._anno_key(c.anno) or statistiche_service._anno_key(c.anno) > ultimo - anni]
+
+
+def nuovo_codice() -> str:
+    """Codice di un prompt: lega la risposta del modello alla mappa (locale) degli pseudonimi."""
+    return datetime.now().strftime("%Y%m%d-%H%M") + "-" + secrets.token_hex(3)
+
+
 def costruisci_prompt(ambito: dict, includi_compiti: bool = True, includi_note: bool = True, includi_storico: bool = True,
-                      istruzioni: str = "") -> dict:
-    """{"sistema", "richiesta", "n_compiti"}: il testo da inviare al modello per l'ambito."""
-    parti = []
+                      istruzioni: str = "", anni: int = 0) -> dict:
+    """{"sistema", "richiesta", "n_compiti", "codice", "pseudonimi"}: il testo da inviare al
+    modello per l'ambito; "pseudonimi" ({pseudonimo: matricola}) resta sul computer, per
+    ritrovare dopo chi c'è dietro gli pseudonimi citati nella risposta."""
+    codice = nuovo_codice()
+    parti = [f"Codice dell'analisi: {codice}", ""]
     n_compiti = 0
+    pseudonimi = {}
     if ambito["tipo"] in ("appello", "corso"):
         corso = ambito["corso"]
         if ambito["tipo"] == "appello":
@@ -542,7 +575,7 @@ def costruisci_prompt(ambito: dict, includi_compiti: bool = True, includi_note: 
                 continue
             n_compiti += len(d["compiti"])
             parti += ["", _testo_prova(d, includi_compiti, corso)]
-        altre = [c for c in _edizioni(corso) if c.tag != corso.tag] if includi_storico else []
+        altre = [c for c in _recenti(_edizioni(corso), anni, statistiche_service._anno_key(corso.anno)) if c.tag != corso.tag] if includi_storico else []
         if altre:
             parti += ["", "## Edizioni degli anni precedenti (o successivi) dello stesso corso, per confronto"]
             parti += ["\n\n".join(_testo_edizione(c, dettaglio_esercizi=True) for c in altre)]
@@ -550,19 +583,20 @@ def costruisci_prompt(ambito: dict, includi_compiti: bool = True, includi_note: 
             parti += ["", "## Le altre prove della stessa edizione, per confronto",
                       _testo_edizione(corso, dettaglio_esercizi=False)]
     else:
-        corsi = sorted(ambito["corsi"], key=lambda c: statistiche_service._anno_key(c.anno))
+        corsi = sorted(_recenti(ambito["corsi"], anni), key=lambda c: statistiche_service._anno_key(c.anno))
         parti += [
             "# Analisi di più edizioni o corsi",
             f"Corsi inclusi: {', '.join(f'{c.nome} ({c.anno})' for c in corsi)}.",
             "Non ci sono i dati dei singoli compiti: l'analisi riguarda andamento negli anni, argomenti ed esercizi. "
-            "Nella sezione sui compiti svolti con l'IA ragiona sui segnali aggregati (es. cambiamenti della distribuzione "
+            "Nella sezione sui compiti svolti con un LLM ragiona sui segnali aggregati (es. cambiamenti della distribuzione "
             "dei voti o degli esercizi più sbagliati negli anni recenti) e indica cosa servirebbe per una stima per compito.",
             "", "## Edizioni",
         ]
         parti += ["\n\n".join(f"{_testo_edizione(c, dettaglio_esercizi=True)}\n{_regole(c)}" for c in corsi)]
     if istruzioni.strip():
         parti += ["", "## Indicazioni del docente per questa analisi", istruzioni.strip()]
-    return {"sistema": SISTEMA, "richiesta": "\n".join(parti), "n_compiti": n_compiti}
+    return {"sistema": SISTEMA, "richiesta": "\n".join(parti), "n_compiti": n_compiti, "codice": codice,
+            "pseudonimi": {p: m for m, p in pseudonimi.items()}}
 
 
 def prompt_come_testo(prompt: dict) -> str:
@@ -570,16 +604,72 @@ def prompt_come_testo(prompt: dict) -> str:
 
 
 def analizza(ambito: dict, includi_compiti: bool, includi_note: bool, includi_storico: bool, istruzioni: str = "",
-             profilo_id: str = "") -> dict:
+             profilo_id: str = "", anni: int = 0) -> dict:
     conf = ia_service.fornitore(profilo_id)
     if not conf:
-        raise ValueError("Nessuna configurazione IA (Anthropic, OpenRouter o Ollama): vedi Impostazioni")
-    prompt = costruisci_prompt(ambito, includi_compiti, includi_note, includi_storico, istruzioni)
+        raise ValueError("Nessuna configurazione LLM (Anthropic, OpenRouter o Ollama): vedi Impostazioni")
+    prompt = costruisci_prompt(ambito, includi_compiti, includi_note, includi_storico, istruzioni, anni)
+    salva_mappa(ambito, prompt)
     risposta = ia_service._chiama(conf, prompt["sistema"], [{"role": "user", "content": prompt["richiesta"]}])
     testo = ia_service._testo(risposta).strip()
     if not testo:
         raise ValueError("Il modello non ha risposto nulla: riprova")
     return {"testo": testo, "conf": {"nome": conf["nome"], "modello": conf["modello"]}}
+
+
+# --- mappe degli pseudonimi (solo sul computer) ------------------------------------------
+
+_CODICE_RE = re.compile(r"Codice dell.analisi:\s*\**\s*(\d{8}-\d{4}-[0-9a-f]{6})")
+GIORNI_MAPPE = 90
+
+
+def _cartella_mappe(ambito: dict) -> Path:
+    return _cartella(ambito) / "mappe"
+
+
+def salva_mappa(ambito: dict, prompt: dict) -> None:
+    """Conserva sul computer, per qualche mese, quale matricola c'è dietro ogni pseudonimo
+    di un prompt (identificato dal suo codice): la risposta del modello, salvata qui,
+    potrà mostrare i nomi. Le mappe più vecchie si cancellano."""
+    if not prompt.get("pseudonimi"):
+        return
+    cartella = _cartella_mappe(ambito)
+    cartella.mkdir(parents=True, exist_ok=True)
+    (cartella / f"{prompt['codice']}.json").write_text(json.dumps(
+        {"codice": prompt["codice"], "quando": datetime.now().isoformat(timespec="seconds"),
+         "pseudonimi": prompt["pseudonimi"]}, ensure_ascii=False), encoding="utf-8")
+    limite = datetime.now().timestamp() - GIORNI_MAPPE * 86400
+    for vecchia in cartella.glob("*.json"):
+        if vecchia.stat().st_mtime < limite:
+            vecchia.unlink(missing_ok=True)
+
+
+def carica_mappa(ambito: dict, codice: str) -> Optional[dict]:
+    if not re.fullmatch(r"\d{8}-\d{4}-[0-9a-f]{6}", codice or ""):
+        return None
+    try:
+        return json.loads((_cartella_mappe(ambito) / f"{codice}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def nomi_pseudonimi(ambito: dict, pseudonimi: dict) -> dict:
+    """{pseudonimo: "Cognome Nome (matricola)"} per gli pseudonimi di un'analisi salvata."""
+    if not pseudonimi or not ambito.get("tag"):
+        return {}
+    from quizesame.services import studenti as studenti_service
+    nomi = {}
+    for p, m in pseudonimi.items():
+        s = studenti_service.get_studente(ambito["tag"], m)
+        nomi[p] = f"{s.cognome} {s.nome} ({m})" if s else m
+    return nomi
+
+
+def pulisci_markdown(testo: str) -> str:
+    """Toglie il blocco di codice che a volte avvolge il documento (```markdown ... ```)."""
+    t = (testo or "").strip()
+    m = re.fullmatch(r"```[a-zA-Z]*\s*\n(.*)\n```", t, re.S)
+    return (m.group(1) if m else t).strip()
 
 
 # --- analisi salvate ---------------------------------------------------------------------
@@ -602,10 +692,15 @@ def salva(ambito: dict, testo: str, conf: dict, opzioni: dict) -> str:
     while (cartella / f"{analisi_id}.json").exists():
         n += 1
         analisi_id = f"{base}-{n}"
+    testo = pulisci_markdown(testo)
+    trovato = _CODICE_RE.search(testo)
+    mappa = carica_mappa(ambito, trovato.group(1)) if trovato else None
     dati = {
         "id": analisi_id, "quando": adesso.isoformat(timespec="seconds"), "tipo": ambito["tipo"],
         "appello_id": ambito.get("appello_id"), "tags": ambito.get("tags"), "titolo": ambito["titolo"],
         "conf": conf, "opzioni": opzioni, "testo": testo,
+        # solo sul computer: chi c'è dietro gli pseudonimi citati nel rapporto
+        "pseudonimi": (mappa or {}).get("pseudonimi") or {},
     }
     (cartella / f"{analisi_id}.json").write_text(json.dumps(dati, ensure_ascii=False, indent=1), encoding="utf-8")
     return analisi_id
@@ -662,6 +757,19 @@ def _inline(t: str) -> str:
     t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
     t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
     return re.sub(r"(?<![\w*$\\])\*(?!\s)([^*$]+?)(?<!\s)\*(?![\w*])", r"<em>\1</em>", t)
+
+
+def con_nomi(html: Markup, nomi: dict) -> Markup:
+    """Accanto a ogni pseudonimo del rapporto, il nome dello studente (nascondibile)."""
+    if not nomi:
+        return html
+    def sost(m):
+        nome = nomi.get(m.group(0))
+        if not nome:
+            return m.group(0)
+        return (f'<span class="pseudonimo" data-info="{escape(nome)}">{m.group(0)}'
+                f'<span class="nome-reale"> · {escape(nome)}</span></span>')
+    return Markup(re.sub(r"\bS\d{3,}\b", sost, str(html)))
 
 
 def markdown_html(testo: str) -> Markup:

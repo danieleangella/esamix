@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import BackgroundTasks, FastAPI, Form, Query, Request, UploadFile, File
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -119,13 +120,16 @@ templates.env.filters["accenti_tex"] = testo_web.accenti
 templates.env.filters["anteprima_testo"] = lambda t: statistiche_service._anteprima(t or "", 90)
 # testo di un esercizio (LaTeX) in una pagina con KaTeX: accenti, grassetti, eqnarray
 templates.env.filters["testo_web"] = testo_web.testo_html
-# risposta in Markdown di un'analisi con l'IA
+# risposta in Markdown di un'analisi con un LLM
 templates.env.filters["markdown_ia"] = analisi_ia_service.markdown_html
+templates.env.globals["con_nomi"] = analisi_ia_service.con_nomi
 # contrassegno nei link ai documenti, diverso a ogni apertura della pagina: il browser scarica
 # sempre la versione attuale di un PDF rigenerato invece di mostrarne una copia conservata
 templates.env.globals["versione_link"] = lambda: str(int(__import__("time").time()))
 templates.env.filters["js"] = lambda value: json.dumps(str(value))
 templates.env.filters["from_json"] = lambda value: json.loads(value) if value else None
+# un voto sopra il massimo è la lode
+templates.env.filters["lode"] = lambda v: "30 e lode" if isinstance(v, int) and v > 30 else v
 
 
 def _corso_chiuso(tag: str) -> bool:
@@ -330,8 +334,8 @@ def togli_chiave_dimenticata(conferma: str = Form("")):
 
 
 _ETICHETTE_AZIONI = [
-    ("ia/verifica", "Verifica con l'IA"), ("ia/genera", "Generazione esercizi con l'IA"),
-    ("ia/correggi/conferma", "Conferma correzione con l'IA"), ("ia/correggi", "Correzione proposta dall'IA"),
+    ("ia/verifica", "Verifica con un LLM"), ("ia/genera", "Generazione esercizi con un LLM"),
+    ("ia/correggi/conferma", "Conferma correzione con un LLM"), ("ia/correggi", "Correzione proposta dall'LLM"),
     ("esercizi/ordine", "Riordino esercizi"), ("importa-json", "Import esercizi"),
     ("ricompila-pdf", "Rigenerazione PDF"), ("importa-da-altri-corsi", "Import da altri corsi"),
     ("esercizi/nuovo", "Nuovo esercizio"), ("/modifica", "Modifica"), ("/elimina", "Eliminazione"),
@@ -700,7 +704,7 @@ def aggiungi_profilo_ia(
     nome: str = Form(""), fornitore: str = Form("anthropic"), chiave: str = Form(""),
     modello: str = Form(""), url: str = Form(""), token: str = Form(""), predefinito: str = Form(""),
 ):
-    """Salva una nuova configurazione IA (se ne possono avere più d'una e scegliere di
+    """Salva una nuova configurazione LLM (se ne possono avere più d'una e scegliere di
     volta in volta quale usare)."""
     if fornitore not in ia_service.FORNITORI:
         return flash_redirect("/impostazioni", "Fornitore non valido", "error", anchor="ia")
@@ -1367,7 +1371,7 @@ def _dati_appello(tag: str, corso, appello) -> dict:
         "risultati_tex_esiste": compiti_service.path_risultati(tag, appello.id, "tex", appello=appello).exists(),
         "risultati_pdf_esiste": compiti_service.path_risultati(tag, appello.id, "pdf", appello=appello).exists(),
     }
-    # usato dall'avviso della verifica con l'IA, in due schede: calcolato una volta sola
+    # usato dall'avviso della verifica con un LLM, in due schede: calcolato una volta sola
     dati["stati_verifica_esercizi"] = esercizi_service.stati_verifica(tag, esercizi_assegnati) if esercizi_assegnati else {}
     dati["riepilogo_home"] = _calcola_riepilogo_home(corso, appello, dati)
     return dati
@@ -1547,7 +1551,7 @@ def concludi_correzione_scritto(tag: str, appello_id: int, background_tasks: Bac
         return flash_redirect(
             f"/corsi/{tag}/controllo-correzioni", msg + f". Attenzione: {n} domand{'a' if n == 1 else 'e'} con una soluzione "
             "sospetta (una risposta sbagliata scelta più di quella corretta): ricontrolla"
-            f"{'la' if n == 1 else 'le'} qui sotto, anche con la verifica con l'IA",
+            f"{'la' if n == 1 else 'le'} qui sotto, anche con la verifica con un LLM",
             "warning", anchor=f"appello-{appello_id}",
         )
     return flash_redirect(f"/corsi/{tag}/appelli/{appello_id}", msg, anchor=anchor)
@@ -2218,7 +2222,7 @@ async def importa_esercizi_json_conferma(request: Request, tag: str, appello_id:
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/ia", response_class=HTMLResponse)
 def pannello_ia(request: Request, tag: str, appello_id: int):
-    """Frammento del pannello "Genera con l'IA" della scheda Testo, caricato solo alla
+    """Frammento del pannello "Genera con un LLM" della scheda Testo, caricato solo alla
     sua apertura: cercare le prove di riferimento legge le banche di più corsi."""
     appello = corsi_service.get_appello(tag, appello_id)
     rif = ia_service.riferimenti_precedenti(tag, appello)
@@ -2243,7 +2247,7 @@ def prompt_ia(tag: str, appello_id: int, n: int = 10, varianti: int = 2, istruzi
 
 
 def _ambito_verifica(tag: str, appello_id: Optional[int] = None, esercizio_id: Optional[int] = None) -> dict:
-    """Cosa verificare con l'IA: gli esercizi di un appello, uno solo, o tutta la banca
+    """Cosa verificare con un LLM: gli esercizi di un appello, uno solo, o tutta la banca
     del corso; con l'indirizzo della pagina e quello a cui tornare per correggere."""
     corso = corsi_service.get_corso(tag)
     if esercizio_id is not None:
@@ -2307,7 +2311,7 @@ def _esegui_verifica(request: Request, tag: str, ambito: dict, profilo: str, ris
     except OSError:
         salvata = None
     registro_service.registra(
-        "ia", f"Verifica con l'IA: {ambito['titolo']}", tag=tag, appello_id=ambito["appello"].id if ambito["appello"] else None,
+        "ia", f"Verifica con un LLM: {ambito['titolo']}", tag=tag, appello_id=ambito["appello"].id if ambito["appello"] else None,
         esito=f"{len(risultati)} esercizi: {conteggi['ok']} corretti, {conteggi['dubbio']} dubbi, {conteggi['errore']} errori ({conf['nome']})",
     )
     return _pagina_verifica_ia(request, tag, ambito, risultati=risultati, conf_usata=conf, conteggi=conteggi, profilo=profilo,
@@ -2413,7 +2417,7 @@ def prompt_verifica_esercizio(tag: str, esercizio_id: int, solo_da_verificare: s
 
 @app.post("/corsi/{tag}/esercizi/{esercizio_id}/verificato")
 def segna_verificato(tag: str, esercizio_id: int, torna: str = Form("")):
-    """Il docente ha ricontrollato l'esercizio (es. il dubbio dell'IA era infondato): lo
+    """Il docente ha ricontrollato l'esercizio (es. il dubbio dell'LLM era infondato): lo
     segna come verificato, finché non viene modificato."""
     e = esercizi_service.get_esercizio(tag, esercizio_id)
     if e is None:
@@ -2422,7 +2426,7 @@ def segna_verificato(tag: str, esercizio_id: int, torna: str = Form("")):
     return flash_redirect(torna or f"/corsi/{tag}/esercizi", f"Esercizio «{e.nome or e.id}» segnato come verificato")
 
 
-# --- Analisi delle statistiche con l'IA: per un appello, un corso o più corsi -------------
+# --- Analisi delle statistiche con un LLM: per un appello, un corso o più corsi -------------
 
 def _ambito_analisi(tag: str = "", appello_id: Optional[int] = None, corsi: Optional[list[str]] = None) -> dict:
     if appello_id is not None:
@@ -2441,10 +2445,12 @@ def _pagina_analisi(request: Request, ambito: dict, salvata: str = "", **extra):
         extra["analisi"] = analisi_ia_service.carica(ambito, salvata)
         if extra["analisi"] is None:
             extra["errore"] = "Analisi salvata non trovata"
-    opzioni = extra.pop("opzioni", {"compiti": True, "note": True, "storico": True, "istruzioni": ""})
+    opzioni = extra.pop("opzioni", {"compiti": True, "note": True, "storico": True, "istruzioni": "", "anni": 0})
+    if extra.get("analisi"):
+        extra["nomi"] = analisi_ia_service.nomi_pseudonimi(ambito, extra["analisi"].get("pseudonimi") or {})
     try:
         prompt = analisi_ia_service.costruisci_prompt(
-            ambito, opzioni["compiti"], opzioni["note"], opzioni["storico"], opzioni["istruzioni"])
+            ambito, opzioni["compiti"], opzioni["note"], opzioni["storico"], opzioni["istruzioni"], opzioni.get("anni", 0))
         caratteri, n_compiti = len(prompt["sistema"]) + len(prompt["richiesta"]), prompt["n_compiti"]
     except Exception:
         caratteri, n_compiti = None, 0
@@ -2456,17 +2462,17 @@ def _pagina_analisi(request: Request, ambito: dict, salvata: str = "", **extra):
 
 
 def _esegui_analisi(request: Request, ambito: dict, form: dict):
-    """Avvia l'analisi con la configurazione IA scelta (o salva la risposta incollata da un
+    """Avvia l'analisi con la configurazione LLM scelta (o salva la risposta incollata da un
     chatbot) e mostra il rapporto, che resta salvato."""
     opzioni = {"compiti": bool(form.get("compiti")), "note": bool(form.get("note")), "storico": bool(form.get("storico")),
-               "istruzioni": form.get("istruzioni", "")}
+               "istruzioni": form.get("istruzioni", ""), "anni": _intero(form.get("anni"))}
     risposta = (form.get("risposta") or "").strip()
     try:
         if risposta:
             esito = {"testo": risposta, "conf": {"nome": "risposta incollata", "modello": "chatbot"}}
         else:
             esito = analisi_ia_service.analizza(ambito, opzioni["compiti"], opzioni["note"], opzioni["storico"],
-                                                opzioni["istruzioni"], profilo_id=form.get("profilo", ""))
+                                                opzioni["istruzioni"], profilo_id=form.get("profilo", ""), anni=opzioni["anni"])
     except ValueError as e:
         return _pagina_analisi(request, ambito, errore=str(e), opzioni=opzioni, profilo=form.get("profilo", ""))
     try:
@@ -2474,14 +2480,30 @@ def _esegui_analisi(request: Request, ambito: dict, form: dict):
         analisi = analisi_ia_service.carica(ambito, salvata)
     except OSError:
         analisi = {"id": "", "quando": "", "conf": esito["conf"], "testo": esito["testo"]}
-    registro_service.registra("ia", f"Analisi delle statistiche con l'IA: {ambito['titolo']}", tag=ambito["tag"],
+    registro_service.registra("ia", f"Analisi delle statistiche con un LLM: {ambito['titolo']}", tag=ambito["tag"],
                               appello_id=ambito.get("appello_id"), esito=esito["conf"]["nome"])
     return _pagina_analisi(request, ambito, analisi=analisi, opzioni=opzioni)
 
 
-def _prompt_analisi(ambito: dict, compiti: str, note: str, storico: str, istruzioni: str) -> PlainTextResponse:
-    prompt = analisi_ia_service.costruisci_prompt(ambito, bool(compiti), bool(note), bool(storico), istruzioni)
+def _intero(valore) -> int:
+    try:
+        return max(0, int(str(valore or "0").strip() or 0))
+    except ValueError:
+        return 0
+
+
+def _prompt_analisi(ambito: dict, compiti: str, note: str, storico: str, istruzioni: str, anni: str = "") -> PlainTextResponse:
+    prompt = analisi_ia_service.costruisci_prompt(ambito, bool(compiti), bool(note), bool(storico), istruzioni, _intero(anni))
+    # la mappa degli pseudonimi resta sul computer: la risposta salvata qui mostrerà i nomi
+    analisi_ia_service.salva_mappa(ambito, prompt)
     return PlainTextResponse(analisi_ia_service.prompt_come_testo(prompt))
+
+
+async def _risposta_caricata(file_md: Optional[UploadFile], risposta: str) -> str:
+    """Il rapporto Markdown: dal file .md caricato, se c'è, altrimenti dal testo incollato."""
+    if file_md is not None and file_md.filename:
+        return (await file_md.read()).decode("utf-8", errors="replace")
+    return risposta
 
 
 def _elimina_analisi(ambito: dict, salvata: str):
@@ -2496,13 +2518,15 @@ def pagina_analisi_appello(request: Request, tag: str, appello_id: int, salvata:
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/ia/analisi", response_class=HTMLResponse)
-def esegui_analisi_appello(request: Request, tag: str, appello_id: int, compiti: str = Form(""), note: str = Form(""), storico: str = Form(""), istruzioni: str = Form(""), risposta: str = Form(""), profilo: str = Form("")):
-    return _esegui_analisi(request, _ambito_analisi(tag, appello_id), dict(compiti=compiti, note=note, storico=storico, istruzioni=istruzioni, risposta=risposta, profilo=profilo))
+async def esegui_analisi_appello(request: Request, tag: str, appello_id: int, compiti: str = Form(""), note: str = Form(""), storico: str = Form(""), istruzioni: str = Form(""), risposta: str = Form(""), profilo: str = Form(""), anni: str = Form(""), file_md: Optional[UploadFile] = File(None)):
+    risposta = await _risposta_caricata(file_md, risposta)
+    # la chiamata al modello dura minuti: fuori dal ciclo degli eventi
+    return await run_in_threadpool(_esegui_analisi, request, _ambito_analisi(tag, appello_id), dict(compiti=compiti, note=note, storico=storico, istruzioni=istruzioni, risposta=risposta, profilo=profilo, anni=anni))
 
 
 @app.get("/corsi/{tag}/appelli/{appello_id}/ia/analisi/prompt", response_class=PlainTextResponse)
-def prompt_analisi_appello(tag: str, appello_id: int, compiti: str = "", note: str = "", storico: str = "", istruzioni: str = ""):
-    return _prompt_analisi(_ambito_analisi(tag, appello_id), compiti, note, storico, istruzioni)
+def prompt_analisi_appello(tag: str, appello_id: int, compiti: str = "", note: str = "", storico: str = "", istruzioni: str = "", anni: str = ""):
+    return _prompt_analisi(_ambito_analisi(tag, appello_id), compiti, note, storico, istruzioni, anni)
 
 
 @app.post("/corsi/{tag}/appelli/{appello_id}/ia/analisi/elimina")
@@ -2516,13 +2540,15 @@ def pagina_analisi_corso(request: Request, tag: str, salvata: str = ""):
 
 
 @app.post("/corsi/{tag}/ia/analisi", response_class=HTMLResponse)
-def esegui_analisi_corso(request: Request, tag: str, compiti: str = Form(""), note: str = Form(""), storico: str = Form(""), istruzioni: str = Form(""), risposta: str = Form(""), profilo: str = Form("")):
-    return _esegui_analisi(request, _ambito_analisi(tag), dict(compiti=compiti, note=note, storico=storico, istruzioni=istruzioni, risposta=risposta, profilo=profilo))
+async def esegui_analisi_corso(request: Request, tag: str, compiti: str = Form(""), note: str = Form(""), storico: str = Form(""), istruzioni: str = Form(""), risposta: str = Form(""), profilo: str = Form(""), anni: str = Form(""), file_md: Optional[UploadFile] = File(None)):
+    risposta = await _risposta_caricata(file_md, risposta)
+    # la chiamata al modello dura minuti: fuori dal ciclo degli eventi
+    return await run_in_threadpool(_esegui_analisi, request, _ambito_analisi(tag), dict(compiti=compiti, note=note, storico=storico, istruzioni=istruzioni, risposta=risposta, profilo=profilo, anni=anni))
 
 
 @app.get("/corsi/{tag}/ia/analisi/prompt", response_class=PlainTextResponse)
-def prompt_analisi_corso(tag: str, compiti: str = "", note: str = "", storico: str = "", istruzioni: str = ""):
-    return _prompt_analisi(_ambito_analisi(tag), compiti, note, storico, istruzioni)
+def prompt_analisi_corso(tag: str, compiti: str = "", note: str = "", storico: str = "", istruzioni: str = "", anni: str = ""):
+    return _prompt_analisi(_ambito_analisi(tag), compiti, note, storico, istruzioni, anni)
 
 
 @app.post("/corsi/{tag}/ia/analisi/elimina")
@@ -2540,14 +2566,16 @@ def pagina_analisi_generale(request: Request, corsi: list[str] = Query(None), sa
 
 
 @app.post("/ia/analisi", response_class=HTMLResponse)
-def esegui_analisi_generale(request: Request, corsi: list[str] = Query(None), compiti: str = Form(""), note: str = Form(""), storico: str = Form(""), istruzioni: str = Form(""), risposta: str = Form(""), profilo: str = Form("")):
-    return _esegui_analisi(request, _ambito_analisi(corsi=corsi), dict(compiti=compiti, note=note, storico=storico, istruzioni=istruzioni, risposta=risposta, profilo=profilo))
+async def esegui_analisi_generale(request: Request, corsi: list[str] = Query(None), compiti: str = Form(""), note: str = Form(""), storico: str = Form(""), istruzioni: str = Form(""), risposta: str = Form(""), profilo: str = Form(""), anni: str = Form(""), file_md: Optional[UploadFile] = File(None)):
+    risposta = await _risposta_caricata(file_md, risposta)
+    # la chiamata al modello dura minuti: fuori dal ciclo degli eventi
+    return await run_in_threadpool(_esegui_analisi, request, _ambito_analisi(corsi=corsi), dict(compiti=compiti, note=note, storico=storico, istruzioni=istruzioni, risposta=risposta, profilo=profilo, anni=anni))
 
 
 @app.get("/ia/analisi/prompt", response_class=PlainTextResponse)
 def prompt_analisi_generale(corsi: list[str] = Query(None), compiti: str = "", note: str = "", storico: str = "",
-                            istruzioni: str = ""):
-    return _prompt_analisi(_ambito_analisi(corsi=corsi), compiti, note, storico, istruzioni)
+                            istruzioni: str = "", anni: str = ""):
+    return _prompt_analisi(_ambito_analisi(corsi=corsi), compiti, note, storico, istruzioni, anni)
 
 
 @app.post("/ia/analisi/elimina")
@@ -2555,7 +2583,7 @@ def elimina_analisi_generale(corsi: list[str] = Query(None), salvata: str = Form
     return _elimina_analisi(_ambito_analisi(corsi=corsi), salvata)
 
 
-# --- Correzione con l'IA: proposta, confronto, conferma ------------------------------------
+# --- Correzione con un LLM: proposta, confronto, conferma ------------------------------------
 
 def _pagina_correzione(request: Request, tag: str, esercizio_id: int, torna: str, **extra):
     e = esercizi_service.get_esercizio(tag, esercizio_id)
@@ -2583,7 +2611,7 @@ def prompt_correzione_ia(tag: str, esercizio_id: int):
 @app.post("/corsi/{tag}/esercizi/{esercizio_id}/ia/correggi", response_class=HTMLResponse)
 def proponi_correzione_ia(request: Request, tag: str, esercizio_id: int, torna: str = Form(""),
                           profilo: str = Form(""), risposta: str = Form(""), modifica: str = Form("")):
-    """Chiede all'IA (o legge dalla risposta incollata di claude.ai) la versione corretta
+    """Chiede all'LLM (o legge dalla risposta incollata di claude.ai) la versione corretta
     dell'esercizio e mostra il confronto: non salva nulla finché il docente non conferma."""
     e = esercizi_service.get_esercizio(tag, esercizio_id)
     stato = esercizi_service.stati_verifica(tag, [e])[e.id]
@@ -4517,7 +4545,7 @@ def _contesto_elenco_esercizi(escludi_tag: str = "", corso_corrente=None) -> dic
     nome_preselezionato = ""
     if corso_corrente and corso_corrente.nome in nomi_corso:
         nome_preselezionato = corso_corrente.nome
-    # stato della verifica con l'IA di ogni esercizio, per la piccola icona nella lista
+    # stato della verifica con un LLM di ogni esercizio, per la piccola icona nella lista
     stati_ia = {}
     for c in corsi_presenti:
         esercizi_c = [e for cc, e in righe if cc is c]
@@ -4561,7 +4589,7 @@ def _riepilogo_verifiche_corsi() -> list[dict]:
 
 @app.post("/esercizi/ia/verifica")
 def verifica_tutti_i_corsi(profilo: str = Form("")):
-    """Verifica con l'IA, corso per corso, tutti gli esercizi da verificare di tutte le
+    """Verifica con un LLM, corso per corso, tutti gli esercizi da verificare di tutte le
     banche (mai verificati o modificati dopo l'ultima verifica); gli esiti restano salvati."""
     totale = {"ok": 0, "dubbio": 0, "errore": 0}
     corsi_fatti, errori = 0, []
@@ -4668,7 +4696,7 @@ async def modifica_esercizio(tag: str, esercizio_id: int, request: Request, back
             return flash_redirect(destinazione, str(e), "error", anchor=ancora)
         nomi = _nomi_appelli(tag, fissati)
         msg = (f"Esercizio salvato come nuova versione (#{nuovo.id}): i compiti già generati ({nomi}) restano "
-               "com'erano. La nuova versione va verificata di nuovo con l'IA.")
+               "com'erano. La nuova versione va verificata di nuovo con un LLM.")
         # salvato, si riapre in lettura: la nuova versione, al posto di quella diventata invisibile
         if in_frammento:
             return _esito_testo(request, tag, int(appello_frammento), msg, aperto=nuovo.id)

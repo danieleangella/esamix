@@ -1,4 +1,4 @@
-"""Verifiche con l'IA salvate: ogni verifica completata resta in un file JSON nella
+"""Verifiche con un LLM salvate: ogni verifica completata resta in un file JSON nella
 cartella `verifiche_ia` del corso (quindi anche nei backup), per poterla rivedere in
 seguito con tutti i commenti del modello, non solo con l'esito per esercizio salvato
 nel database."""

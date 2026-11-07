@@ -79,8 +79,8 @@ def firma_contenuto(esercizio: "Esercizio") -> str:
 
 def registra_verifica(tag: str, esercizio: "Esercizio", esito: str, dettaglio: Optional[dict] = None, origine: str = "ia") -> None:
     """Salva l'esito della verifica di un esercizio, legato al suo contenuto attuale.
-    `origine`: "ia" (verifica con l'IA), "manuale" (segnato corretto dal docente) o
-    "correzione" (correzione proposta dall'IA e accettata)."""
+    `origine`: "ia" (verifica con un LLM), "manuale" (segnato corretto dal docente) o
+    "correzione" (correzione proposta dall'LLM e accettata)."""
     conn = db.get_connection(config.corso_db_path(tag))
     try:
         conn.execute(
@@ -337,7 +337,7 @@ def sostituisci_con_copia(
     compiti non devono cambiare, quindi si crea una copia con le modifiche, che prende il
     suo posto nella banca e negli appelli ancora aperti (`appelli_aperti`), mentre il vecchio
     diventa invisibile e resta solo per i compiti che lo usano. La copia non eredita la
-    verifica con l'IA: va verificata di nuovo."""
+    verifica con un LLM: va verificata di nuovo."""
     nuovo = create_esercizio(tag, nome, note, varianti, argomento=argomento, difficolta=difficolta,
                              soluzione=soluzione, aperta=aperta)
     conn = db.get_connection(config.corso_db_path(tag))
@@ -565,9 +565,9 @@ def anteprima_importa_json(tag: str, dati: dict) -> list[dict]:
 
 
 # --- Importazione da file di testo semplice: pensato per essere preparato a mano o da
-# un'IA a partire da un compito esistente (vedi la guida, sezione "Importare un compito
+# un LLM a partire da un compito esistente (vedi la guida, sezione "Importare un compito
 # da un unico file"). A differenza del JSON non richiede di raddoppiare le barre
-# rovesciate del LaTeX, che è l'errore più frequente nei file JSON scritti da un'IA. ---
+# rovesciate del LaTeX, che è l'errore più frequente nei file JSON scritti da un LLM. ---
 
 _MARCATORE = re.compile(r"^\s*#{2,}\s*(ESERCIZIO|VARIANTE|SOLUZIONE)\b", re.IGNORECASE)
 _RISPOSTA = re.compile(r"^\s*([+-])\s+(.*\S)\s*$")
@@ -589,14 +589,14 @@ def parse_testo_esercizi(testo: str) -> dict:
     """Converte il formato testuale in {"esercizi": [...]}, la stessa struttura del file
     JSON di esportazione, così da riusare anteprima e conferma dell'import JSON. Gli
     errori riportano il numero di riga, per poterli correggere (o farli correggere
-    all'IA) senza cercare a tentativi."""
+    all'LLM) senza cercare a tentativi."""
     esercizi: list[dict] = []
     corrente: Optional[dict] = None
     sezione = None  # "intestazione" | "variante" | "soluzione"
     variante: Optional[dict] = None
 
     for n, riga in enumerate(testo.replace("\r\n", "\n").replace("\r", "\n").split("\n"), start=1):
-        # recinti di codice markdown (```), che un'IA aggiunge spesso intorno al file
+        # recinti di codice markdown (```), che un LLM aggiunge spesso intorno al file
         if riga.strip().startswith("```"):
             continue
         m = _MARCATORE.match(riga)

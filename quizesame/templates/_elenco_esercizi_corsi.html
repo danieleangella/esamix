@@ -43,10 +43,10 @@
       <td>
         {{ (e.nome or ('#' ~ e.id))|accenti_tex }}
         {% set st_ia = stati_ia.get((c.tag, e.id)) if stati_ia is defined else None %}
-        {% if st_ia == 'verificato' %}<span class="icona-ia icona-ia-ok" title="Verificato con l'IA">✓</span>
-        {% elif st_ia == 'errore' %}<span class="icona-ia icona-ia-errore" title="La verifica con l'IA ha trovato un errore">✗</span>
-        {% elif st_ia == 'dubbio' %}<span class="icona-ia icona-ia-dubbio" title="La verifica con l'IA ha un dubbio da controllare">?</span>
-        {% elif st_ia == 'modificato' %}<span class="icona-ia icona-ia-dubbio" title="Modificato dopo la verifica con l'IA: va verificato di nuovo">↻</span>{% endif %}
+        {% if st_ia == 'verificato' %}<span class="icona-ia icona-ia-ok" title="Verificato con un LLM">✓</span>
+        {% elif st_ia == 'errore' %}<span class="icona-ia icona-ia-errore" title="La verifica con un LLM ha trovato un errore">✗</span>
+        {% elif st_ia == 'dubbio' %}<span class="icona-ia icona-ia-dubbio" title="La verifica con un LLM ha un dubbio da controllare">?</span>
+        {% elif st_ia == 'modificato' %}<span class="icona-ia icona-ia-dubbio" title="Modificato dopo la verifica con un LLM: va verificato di nuovo">↻</span>{% endif %}
         {% if e.difficolta %}<span class="muted" title="Difficoltà">{{ '★' * e.difficolta }}{{ '☆' * (3 - e.difficolta) }}</span>{% endif %}
         {% if e.aperta %}<span class="badge badge-info">aperta</span>{% endif %}
         {% set problemi = problemi_risposte(e) %}{% if problemi %}<span class="badge badge-err" title="{{ problemi|join('; ') }}">⚠ risposte uguali</span>{% endif %}
@@ -59,11 +59,11 @@
       {% if not selezionabile %}
       <td class="cella-azioni">
         <button type="button" class="pulsante-icona pulsante-neutro btn-modifica-elenco" data-url="/corsi/{{ c.tag }}/esercizi/{{ e.id }}/form?redirect_to=/esercizi"
-                data-info="Modifica l'esercizio (se era verificato con l'IA, va verificato di nuovo)" aria-label="Modifica {{ e.nome or ('#' ~ e.id) }}">{{ icona("matita") }}</button>
+                data-info="Modifica l'esercizio (se era verificato con un LLM, va verificato di nuovo)" aria-label="Modifica {{ e.nome or ('#' ~ e.id) }}">{{ icona("matita") }}</button>
         <a class="pulsante-icona pulsante-neutro" style="display:inline-flex" href="/corsi/{{ c.tag }}/esercizi/{{ e.id }}/ia/verifica"
-           data-info="Verifica con l'IA risposte e soluzione" aria-label="Verifica con l'IA {{ e.nome or ('#' ~ e.id) }}">{{ icona("spunta") }}</a>
+           data-info="Verifica con un LLM risposte e soluzione" aria-label="Verifica con un LLM {{ e.nome or ('#' ~ e.id) }}">{{ icona("spunta") }}</a>
         <a class="pulsante-icona pulsante-neutro" style="display:inline-flex" href="/corsi/{{ c.tag }}/esercizi/{{ e.id }}/ia/correggi?torna=/esercizi"
-           data-info="Correggi con l'IA: propone una versione corretta da controllare prima di salvarla" aria-label="Correggi con l'IA {{ e.nome or ('#' ~ e.id) }}">{{ icona("scintille") }}</a>
+           data-info="Correggi con un LLM: propone una versione corretta da controllare prima di salvarla" aria-label="Correggi con un LLM {{ e.nome or ('#' ~ e.id) }}">{{ icona("scintille") }}</a>
       </td>
       {% endif %}
     </tr>

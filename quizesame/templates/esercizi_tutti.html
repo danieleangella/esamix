@@ -15,7 +15,7 @@
 {% if verifiche_corsi %}
 {% set tot_da = verifiche_corsi | sum(attribute="da_verificare") %}
 <details class="card" id="verifica-ia" {% if tot_da %}open{% endif %}>
-  <summary><strong>Verifica con l'IA delle banche esercizi</strong>
+  <summary><strong>Verifica con un LLM delle banche esercizi</strong>
     {% if tot_da %}<span class="badge badge-warn">{{ tot_da }} da verificare</span>{% else %}<span class="badge badge-ok">tutti verificati</span>{% endif %}</summary>
   <table class="tabella-elenco">
     <thead><tr><th>Corso</th><th>Esercizi</th><th>Verificati</th><th>Da verificare</th><th>Errori o dubbi</th><th></th></tr></thead>
@@ -40,7 +40,7 @@
   });
   </script>
   {% else %}
-  <p class="muted" style="margin-bottom:0">Per verificare tutto in un colpo solo serve una configurazione IA in
+  <p class="muted" style="margin-bottom:0">Per verificare tutto in un colpo solo serve una configurazione LLM in
     <a href="/impostazioni#ia">Impostazioni</a>; con claude.ai usa il link "verifica" di ogni corso.</p>
   {% endif %}
 </details>

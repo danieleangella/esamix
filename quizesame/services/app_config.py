@@ -1,6 +1,6 @@
 """Impostazioni dell'app nel suo complesso (non di un singolo corso): nome ed email del docente,
 mostrato nel menu in alto, se mostrare il riquadro di riepilogo generale in homepage e
-le configurazioni per l'IA. Salvate in un file JSON accanto alle cartelle dei corsi, non
+le configurazioni per l'LLM. Salvate in un file JSON accanto alle cartelle dei corsi, non
 in un database per corso, perché valgono per l'intera installazione."""
 import json
 import uuid
@@ -24,7 +24,7 @@ class AppSettings:
     mostra_riepilogo_home: bool = True
     # tema delle pagine: "auto" (chiaro o scuro come il sistema), "light" o "dark"
     tema: str = "auto"
-    # Configurazioni per l'IA (vedi services/ia.py): se ne possono salvare più d'una (es.
+    # Configurazioni per l'LLM (vedi services/ia.py): se ne possono salvare più d'una (es.
     # una chiave personale e una del dipartimento, o un server Ollama) e scegliere di volta
     # in volta quale usare. Ognuna è {"id", "nome", "fornitore" (anthropic | openrouter |
     # ollama), "chiave", "url", "modello", "token"}: chiave per Anthropic/OpenRouter,

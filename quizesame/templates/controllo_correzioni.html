@@ -79,7 +79,7 @@
   {% if e.domande_sospette %}
   <h3>Domande con soluzione sospetta</h3>
   <p class="muted spiegazione sr-only" style="margin-top:0">Una stessa risposta sbagliata è stata scelta da più studenti di quella indicata come corretta.
-    Può essere solo una domanda difficile, ma vale la pena ricontrollare la soluzione, anche con la verifica con l'IA.</p>
+    Può essere solo una domanda difficile, ma vale la pena ricontrollare la soluzione, anche con la verifica con un LLM.</p>
   {% for d in e.domande_sospette %}
   {% set seg = segnalazioni.get((d.esercizio_id, e.appello.id, d.corretta)) %}
   <div class="variante-verificata domanda-sospetta">
@@ -92,7 +92,7 @@
     <div>Scelta più spesso: <strong>{{ d.sbagliata | accenti_tex }}</strong> <span class="badge badge-warn">{{ d.n_sbagliata }} su {{ d.risposte }}</span></div>
     {% if not (seg and seg.risolta_il) %}
     <div class="azioni-rapide" style="margin-top:0.4rem">
-      <a class="button" href="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/ia/verifica">Verifica con l'IA</a>
+      <a class="button" href="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/ia/verifica">Verifica con un LLM</a>
       <a class="button secondary" href="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/ia/correggi?torna={{ ('/corsi/' ~ corso.tag ~ '/controllo-correzioni')|urlencode }}">{{ icona("matita", 14) }} Correggi l'esercizio</a>
       <form class="inline" method="post" action="/corsi/{{ corso.tag }}/esercizi/{{ d.esercizio_id }}/verificato">
         <input type="hidden" name="torna" value="/corsi/{{ corso.tag }}/controllo-correzioni#appello-{{ e.appello.id }}">

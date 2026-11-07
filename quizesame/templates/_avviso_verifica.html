@@ -1,4 +1,4 @@
-{# Avviso, nelle schede Testo e Compiti d'esame, se la verifica con l'IA ha segnalato
+{# Avviso, nelle schede Testo e Compiti d'esame, se la verifica con un LLM ha segnalato
    errori o dubbi ancora aperti negli esercizi di questo appello (cioè non corretti né
    segnati come corretti né modificati da allora), con il link all'ultima verifica salvata. #}
 {% if md.esercizi_assegnati %}
@@ -12,7 +12,7 @@
 {% set _url_appello = "/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id %}
 {% set _ultima = ultima_verifica_ia(corso.tag, md.appello.id) %}
 <div class="flash {{ 'flash-error' if _errori else 'flash-warning' }} avviso-verifica-ia">
-  <strong>Verifica con l'IA:</strong>
+  <strong>Verifica con un LLM:</strong>
   {% if _errori %}{{ _errori|length }} esercizi{{ 'o' if _errori|length == 1 else '' }} con errori{% endif %}{% if _errori and _dubbi %} e {% endif %}{% if _dubbi %}{{ _dubbi|length }} da controllare{% endif %}
   —
   {% for e in _errori + _dubbi %}<a href="/corsi/{{ corso.tag }}/esercizi/{{ e.id }}/ia/correggi?torna={{ _url_appello|urlencode }}">{{ e.nome or ('#' ~ e.id) }}</a>{{ ', ' if not loop.last }}{% endfor %}.
