@@ -294,7 +294,7 @@
       <td><strong>Complessivi (tutte le prove)</strong></td>
       <td>
         {% if risultati_tex_esiste or risultati_pdf_esiste %}
-        {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/risultati", pdf=risultati_pdf_esiste, html=True, tex=risultati_tex_esiste, md=True) }}
+        {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/risultati", pdf=True, html=True, tex=risultati_tex_esiste, md=True) }}
         {% else %}<span class="muted">pronti quando è chiusa la correzione di tutte le prove</span>{% endif %}
       </td>
     </tr>
@@ -303,7 +303,7 @@
       <td><a href="#valutazione-{{ md.appello.id }}" data-tab="valutazione-{{ md.appello.id }}">{{ md.appello.nome }}</a></td>
       <td>
         {% if md.risultati_tex_esiste or md.risultati_pdf_esiste %}
-        {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/risultati", pdf=md.risultati_pdf_esiste, html=True, tex=md.risultati_tex_esiste, md=True) }}
+        {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/risultati", pdf=True, html=True, tex=md.risultati_tex_esiste, md=True) }}
         {% else %}<span class="muted">pronti quando ne chiudi la correzione</span>{% endif %}
         {% if md.appello.correzione_scritti_conclusa %}
         <a class="icona-azione" href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/voti-moodle.csv" data-info="Voti di questa prova da importare in Moodle">{{ icona("scarica", 13) }} Voti per Moodle</a>
@@ -371,7 +371,7 @@
   {% set prove_aperte = membri_dati|rejectattr("appello.correzione_scritti_conclusa")|list %}
   <div class="card barra-conclusione">
     {% if appello.correzione_scritti_conclusa %}
-    <span><span class="badge badge-ok">✓ correzione conclusa</span> <span class="muted">— i file da pubblicare sono in cima alla scheda</span></span>
+    <span class="muted">I risultati da pubblicare sono in cima alla scheda.</span>
     {% if not appello.chiuso %}
     <form class="inline" method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/riapri-correzione-scritto" style="margin-left:auto">
       <button type="submit" class="secondary pulsante-piccolo solo-icona" data-info="Riapri la correzione" aria-label="Riapri la correzione">{{ icona("lucchetto-aperto", 16) }}</button>

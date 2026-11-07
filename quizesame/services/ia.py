@@ -281,6 +281,16 @@ def costruisci_prompt(
     parti.append("Includi per ogni esercizio una breve sezione ### SOLUZIONE con i passaggi principali.")
     if istruzioni.strip():
         parti += ["", "Indicazioni aggiuntive del docente:", istruzioni.strip()]
+    # dalle analisi dei compiti già svolti: cosa verificare e come rendere omogenee le varianti
+    from quizesame.services import analisi_ia as analisi_ia_service
+    indicazioni = analisi_ia_service.indicazioni_recenti(tag)
+    if indicazioni:
+        parti += ["", "INDICAZIONI DALLE ANALISI DEI COMPITI PRECEDENTI (tienine conto: includi esercizi che "
+                  "verifichino la comprensione dei concetti indicati come da rispiegare, con distrattori mirati "
+                  "agli errori osservati, e prepara varianti di difficoltà davvero equivalente, evitando le cause "
+                  "di disomogeneità segnalate)"]
+        for ind in indicazioni:
+            parti += ["", f"--- Dall'analisi «{ind['titolo']}» del {ind['quando']} ---", ind["testo"]]
     if gia_assegnati:
         parti += [
             "",
@@ -302,7 +312,7 @@ def costruisci_prompt(
             "Non ci sono prove precedenti con esercizi da prendere a modello: basati sul nome del corso "
             "e sulle indicazioni del docente, con argomenti e difficoltà tipici di un esame di questo corso.",
         ]
-    return {"sistema": sistema, "richiesta": "\n".join(parti), "riferimenti": rif}
+    return {"sistema": sistema, "richiesta": "\n".join(parti), "riferimenti": rif, "indicazioni": indicazioni}
 
 
 _BLOCCO_CODICE = re.compile(r"```[a-zA-Z]*\n(.*?)```", re.DOTALL)

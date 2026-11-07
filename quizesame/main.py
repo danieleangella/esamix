@@ -2234,6 +2234,7 @@ def pannello_ia(request: Request, tag: str, appello_id: int):
         "corso": corsi_service.get_corso(tag), "appello": appello, "riferimenti": rif,
         "n_suggerito": n_suggerito, "varianti_suggerite": min(max(1, varianti_suggerite), 5),
         "fornitore_ia": ia_service.fornitore(), "profili_ia": ia_service.profili(),
+        "indicazioni": analisi_ia_service.indicazioni_recenti(tag),
     })
 
 
@@ -3343,6 +3344,14 @@ def scarica_risultati(tag: str, appello_id: int):
 @app.get("/corsi/{tag}/appelli/{appello_id}/risultati.pdf")
 def scarica_risultati_pdf(tag: str, appello_id: int):
     path = compiti_service.path_risultati(tag, appello_id, "pdf")
+    if not path.exists():
+        # PDF non ancora compilato (si compila in background alla chiusura della
+        # correzione): lo si compila adesso dal .tex, o si genera tutto se manca anche quello
+        tex_path = path.with_suffix(".tex")
+        if tex_path.exists():
+            compiti_service.compila_pdf(tex_path)
+        elif corsi_service.get_appello(tag, appello_id).correzione_scritti_conclusa:
+            _genera_risultati_cache(tag, appello_id)
     if not path.exists():
         return PlainTextResponse(
             "PDF non ancora generato: si genera automaticamente quando concludi la correzione scritta "

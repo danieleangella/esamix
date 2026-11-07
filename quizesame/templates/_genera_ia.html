@@ -20,6 +20,15 @@
     nome del corso e sulle indicazioni che scrivi qui sotto.</p>
   {% endif %}
 
+  {% if indicazioni %}
+  <details style="margin-bottom:0.5rem">
+    <summary class="muted">Tiene conto delle indicazioni per i prossimi compiti di {{ indicazioni|length }} analisi</summary>
+    {% for ind in indicazioni %}
+    <div class="muted" style="margin:0.4rem 0 0; font-size:0.85rem"><strong>{{ ind.titolo }}</strong> ({{ ind.quando }})</div>
+    <div class="rapporto-ia" style="font-size:0.85rem">{{ ind.testo | markdown_ia }}</div>
+    {% endfor %}
+  </details>
+  {% endif %}
   <form method="post" action="/corsi/{{ corso.tag }}/appelli/{{ appello.id }}/ia/genera" class="form-genera-ia">
     <div class="form-grid">
       <div><label for="ia-n-{{ appello.id }}">Numero di esercizi</label>

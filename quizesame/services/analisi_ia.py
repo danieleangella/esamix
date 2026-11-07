@@ -751,6 +751,59 @@ def elimina(ambito: dict, analisi_id: str) -> bool:
     return True
 
 
+# --- indicazioni per i prossimi compiti ---------------------------------------------------
+
+_TITOLO_INDICAZIONI = re.compile(r"indicazioni per i prossimi compiti", re.I)
+_TITOLO_SEZIONE = re.compile(r"^\s*(#{1,6}\s|\d+[.)]\s+\*\*|\*\*\d+[.)])")
+
+
+def sezione_indicazioni(testo: str) -> str:
+    """Dal rapporto di un'analisi, la sola sezione "Indicazioni per i prossimi compiti"
+    (fino al titolo della sezione successiva); vuota se non c'è."""
+    righe = (testo or "").splitlines()
+    for i, riga in enumerate(righe):
+        if _TITOLO_INDICAZIONI.search(riga) and _TITOLO_SEZIONE.match(riga):
+            corpo = []
+            for r in righe[i + 1:]:
+                if _TITOLO_SEZIONE.match(r):
+                    break
+                corpo.append(r)
+            # il titolo stesso può contenere già l'inizio del testo (es. "8. **Indicazioni...** — ...")
+            resto = re.sub(r"^.*?indicazioni per i prossimi compiti\**\s*[—:-]*\s*", "", riga, flags=re.I).strip()
+            return "\n".join(([resto] if resto else []) + corpo).strip()
+    return ""
+
+
+def indicazioni_recenti(tag: str, max_analisi: int = 3) -> list[dict]:
+    """Le indicazioni per i prossimi compiti delle analisi salvate più recenti di questo
+    corso (e, se non bastano, delle altre edizioni dello stesso insegnamento): una per
+    appello, dalla più recente. [{"titolo", "quando", "testo"}]"""
+    corso = corsi_service.get_corso(tag)
+    corsi = [corso] + sorted(corsi_service.corsi_simili(corso, corsi_service.list_corsi()),
+                             key=lambda c: statistiche_service._anno_key(c.anno), reverse=True)
+    trovate, visti = [], set()
+    for c in corsi:
+        cartella = config.corso_dir(c.tag) / "analisi_ia"
+        if not cartella.exists():
+            continue
+        analisi = []
+        for p in cartella.glob("*.json"):
+            try:
+                analisi.append(json.loads(p.read_text(encoding="utf-8")))
+            except (OSError, ValueError):
+                continue
+        for d in sorted(analisi, key=lambda d: d.get("quando") or "", reverse=True):
+            chiave = (c.tag, d.get("tipo"), d.get("appello_id"))
+            testo = sezione_indicazioni(d.get("testo", ""))
+            if chiave in visti or not testo:
+                continue
+            visti.add(chiave)
+            trovate.append({"titolo": d.get("titolo") or c.nome, "quando": (d.get("quando") or "")[:10], "testo": testo})
+            if len(trovate) >= max_analisi:
+                return trovate
+    return trovate
+
+
 # --- Markdown della risposta -------------------------------------------------------------
 
 def _inline(t: str) -> str:

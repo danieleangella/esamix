@@ -456,9 +456,8 @@
   {% set pronta = md.risultati and not mancano and not md.bozze_correzione %}
   <div class="card barra-conclusione">
     {% if md.appello.correzione_scritti_conclusa %}
-    <span><span class="badge badge-ok">✓ correzione conclusa</span></span>
     {% if md.risultati_tex_esiste or md.risultati_pdf_esiste %}
-    <span>Risultati da pubblicare {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/risultati", pdf=md.risultati_pdf_esiste, html=True, tex=md.risultati_tex_esiste, md=True) }}</span>
+    <span>Risultati da pubblicare {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ md.appello.id ~ "/risultati", pdf=True, html=True, tex=md.risultati_tex_esiste, md=True) }}</span>
     {% endif %}
     <a class="icona-azione" href="/corsi/{{ corso.tag }}/appelli/{{ md.appello.id }}/voti-moodle.csv"
        data-info="{{ 'Voti di questa prova nel formato del file di Moodle caricato (' ~ md.moodle_file.nome_file ~ '), con una colonna in più per il voto: da importare nel registro valutatore di Moodle' if md.moodle_file else 'Voti di questa prova in un CSV per Moodle (Nome, Cognome, Codice identificativo, Indirizzo email, Voto): da importare nel registro valutatore. Se carichi le prenotazioni da Moodle, si usa la struttura di quel file' }}">{{ icona("scarica", 14) }} Voti per Moodle</a>
@@ -492,8 +491,7 @@
   {# corrette tutte le prove del raggruppamento: anche l'elenco complessivo #}
   {% if raggruppamento and appello.correzione_scritti_conclusa and (risultati_tex_esiste or risultati_pdf_esiste) %}
   <div class="card barra-conclusione">
-    <span><span class="badge badge-ok">✓ tutte le prove corrette</span></span>
-    <span>Risultati complessivi da pubblicare (tutte le prove) {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/risultati", pdf=risultati_pdf_esiste, html=True, tex=risultati_tex_esiste, md=True) }}</span>
+    <span>Risultati complessivi da pubblicare (tutte le prove) {{ formati("/corsi/" ~ corso.tag ~ "/appelli/" ~ appello.id ~ "/risultati", pdf=True, html=True, tex=risultati_tex_esiste, md=True) }}</span>
   </div>
   {% endif %}
 </div>
