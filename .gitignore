@@ -7,6 +7,9 @@ __pycache__/
 corsi/*/db.sqlite
 corsi/*/output/
 corsi/*/verifiche_ia/
+# analisi con un LLM e mappe pseudonimi-matricole: dati degli studenti
+corsi/*/analisi_ia/
+corsi/_analisi_ia/
 corsi/app_settings.json
 corsi/registro.jsonl
 *.sqlite
